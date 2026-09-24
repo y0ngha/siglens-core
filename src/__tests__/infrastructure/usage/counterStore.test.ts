@@ -6,7 +6,9 @@ const { mockIncr, mockExpire, mockGet, mockDecr, mockRedisConstructor } =
         const expire = vi.fn();
         const get = vi.fn();
         const decr = vi.fn();
-        const constructor = vi.fn(() => ({ incr, expire, get, decr }));
+        const constructor = vi.fn(function () {
+            return { incr, expire, get, decr };
+        });
         return {
             mockIncr: incr,
             mockExpire: expire,
@@ -27,12 +29,14 @@ const originalEnv = process.env;
 describe('createCounterStore', () => {
     beforeEach(() => {
         vi.resetAllMocks();
-        mockRedisConstructor.mockImplementation(() => ({
-            incr: mockIncr,
-            expire: mockExpire,
-            get: mockGet,
-            decr: mockDecr,
-        }));
+        mockRedisConstructor.mockImplementation(function () {
+            return {
+                incr: mockIncr,
+                expire: mockExpire,
+                get: mockGet,
+                decr: mockDecr,
+            };
+        });
         process.env = {
             ...originalEnv,
             UPSTASH_REDIS_REST_URL: 'https://redis.test',

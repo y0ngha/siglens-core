@@ -4,11 +4,7 @@
  * 45 ≤ NEUTRAL < 55 ≤ GREED < 75 ≤ EXTREME_GREED).
  */
 export type FearGreedLabel =
-    | 'EXTREME_FEAR'
-    | 'FEAR'
-    | 'NEUTRAL'
-    | 'GREED'
-    | 'EXTREME_GREED';
+    'EXTREME_FEAR' | 'FEAR' | 'NEUTRAL' | 'GREED' | 'EXTREME_GREED';
 
 /**
  * Confidence bucket derived from the walk-forward sample size:

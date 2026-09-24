@@ -134,8 +134,7 @@ describe('formatChartPatternCandidatesSection', () => {
                 const num = (label: string): string =>
                     new RegExp(`- ${label}: (-?[\\d.]+)`).exec(block)![1]!;
                 const direction = /- Direction: (up|down)/.exec(block)![1] as
-                    | 'up'
-                    | 'down';
+                    'up' | 'down';
                 const recomputed = computePatternTargets(
                     Number(num('Breakout level')),
                     Number(num('Extreme level')),

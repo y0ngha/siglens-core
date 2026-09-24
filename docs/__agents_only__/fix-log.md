@@ -217,3 +217,9 @@
   Pattern: Type widening (Pick<...> field addition) flows through untyped spread (`...technicalRest`); type narrows in callee but runtime behavior unchanged. All 35 vitest tests pass both before and after the widening; only `yarn typecheck` TS2353 catches the type-level change.
   Rule (generalization): Type-only changes through untyped spreads cannot be guarded by runtime tests. When a change's mechanism is pure type narrowing through a spread, typecheck is mandatory. Failure mode: writing runtime test cases believing they protect type changes; tests pass silently through the narrowing.
   Context: Single occurrence. Architectural insight: type narrowing enforcement for spread-based field additions must separate from runtime test coverage. Tests cannot fail when runtime is unchanged.
+
+## [chore/deps-2026-09 Round 1 | 의존성 업그레이드 | 2026-09-24]
+- Violation (R1 REQUIRED, fixed): `@anthropic-ai/sdk` 0.114+가 `StopReason`에 `'model_context_window_exceeded'`를 추가했는데 `callClaude`는 이를 재시도 가능한 catch-all로 떨어뜨렸다(같은 입력 재시도는 같은 벽에 부딪힌다)
+  - Rule: (new) SDK를 올릴 때는 어댑터가 분기하는 **열거형 응답값**(stop_reason / finishReason 등)의 union을 구·신 `.d.ts`로 diff한다 — 새 값은 목(mock) 테스트로도 실키 스모크로도 드러나지 않고 catch-all로 조용히 흡수된다
+  - Context: `truncated`(max_tokens | model_context_window_exceeded) 하나로 구조화 출력 가드와 MAX_TOKENS_CODE 분기를 함께 태움. 되돌리면 실패하는 테스트 2건 추가
+- Decision (not a violation): tsc-alias 1.9.x는 dist의 모든 상대 import에 `.js`를 붙인다(359파일). TS 5.9 유지 중엔 이득이 없어 `~1.8.17`로 고정 — dist가 게시된 1.14.0 tarball과 바이트 동일함을 확인. 1.9는 TS 6 전환 때 함께 올릴 것

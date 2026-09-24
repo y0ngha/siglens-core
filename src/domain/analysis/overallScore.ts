@@ -36,11 +36,7 @@ import type {
  * An axis that can vote in the overall synthesis.
  */
 export type OverallScoreAxis =
-    | 'technical'
-    | 'fundamental'
-    | 'news'
-    | 'options'
-    | 'financials';
+    'technical' | 'fundamental' | 'news' | 'options' | 'financials';
 
 /** Neutral midpoint of the 0–100 axis scale. */
 const NEUTRAL = 50;

@@ -6,12 +6,14 @@ const { mockIncr, mockExpire, mockGet, mockDecr, mockRedisConstructor } =
         const expire = vi.fn();
         const get = vi.fn();
         const decr = vi.fn();
-        const constructor = vi.fn(() => ({
-            incr,
-            expire,
-            get,
-            decr,
-        }));
+        const constructor = vi.fn(function () {
+            return {
+                incr,
+                expire,
+                get,
+                decr,
+            };
+        });
 
         return {
             mockIncr: incr,

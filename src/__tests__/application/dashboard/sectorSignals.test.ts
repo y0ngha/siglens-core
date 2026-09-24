@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Mock } from 'vitest';
 import type {
     Bar,
     MarketQuote,
@@ -9,11 +10,10 @@ import type {
 import type { CacheProvider } from '@/domain/ports/cache';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
-const mockCache: {
-    get: ReturnType<typeof vi.fn>;
-    set: ReturnType<typeof vi.fn>;
-    delete: ReturnType<typeof vi.fn>;
-} = {
+// `Mock` (= `Mock<Procedure>`), not `ReturnType<typeof vi.fn>`: since vitest 4
+// the bare `vi.fn()` type also admits a constructor, which no longer satisfies
+// `CacheProvider`'s method signatures.
+const mockCache: { get: Mock; set: Mock; delete: Mock } = {
     get: vi.fn(),
     set: vi.fn(),
     delete: vi.fn(),

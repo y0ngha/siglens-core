@@ -7,11 +7,13 @@ const mockCreate = vi.hoisted(() => vi.fn());
 
 vi.mock('openai', () => ({
     __esModule: true,
-    default: vi.fn(() => ({
-        responses: {
-            create: mockCreate,
-        },
-    })),
+    default: vi.fn(function () {
+        return {
+            responses: {
+                create: mockCreate,
+            },
+        };
+    }),
 }));
 
 const mockedOpenAI = vi.mocked(OpenAI);

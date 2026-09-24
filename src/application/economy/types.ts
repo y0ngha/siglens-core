@@ -25,8 +25,7 @@ export interface SubmitMacroBriefingSubmitted {
 
 /** Result of {@link submitMacroBriefing} — either a cache hit or a freshly submitted job. */
 export type SubmitMacroBriefingResult =
-    | SubmitMacroBriefingCached
-    | SubmitMacroBriefingSubmitted;
+    SubmitMacroBriefingCached | SubmitMacroBriefingSubmitted;
 
 // ─────────────────────────────────────────
 // Poll
@@ -84,8 +83,7 @@ export interface SubmitEconomicEventAnalysisSubmitted {
 
 /** Result of {@link submitEconomicEventAnalysis} — either a cache hit or a freshly submitted job. */
 export type SubmitEconomicEventAnalysisResult =
-    | SubmitEconomicEventAnalysisCached
-    | SubmitEconomicEventAnalysisSubmitted;
+    SubmitEconomicEventAnalysisCached | SubmitEconomicEventAnalysisSubmitted;
 
 // ─────────────────────────────────────────
 // Poll Economic Event Analysis
@@ -141,8 +139,7 @@ export interface SubmitIndicatorTranslationSubmitted {
 
 /** Result of {@link submitIndicatorTranslation} — either a cache hit or a freshly submitted job. */
 export type SubmitIndicatorTranslationResult =
-    | SubmitIndicatorTranslationCached
-    | SubmitIndicatorTranslationSubmitted;
+    SubmitIndicatorTranslationCached | SubmitIndicatorTranslationSubmitted;
 
 // ─────────────────────────────────────────
 // Poll Indicator Translation
@@ -251,5 +248,4 @@ export interface RunIndicatorTranslationOptions {
  * LLM-level failures propagate as thrown exceptions.
  */
 export type RunIndicatorTranslationResult =
-    | { status: 'cached'; nameKo: string }
-    | { status: 'done'; nameKo: string };
+    { status: 'cached'; nameKo: string } | { status: 'done'; nameKo: string };

@@ -98,8 +98,7 @@ export interface ChatbotLimitError {
  * Error code returned when a daily usage limit blocks a request.
  */
 export type UsageLimitErrorCode =
-    | AnalysisLimitError['code']
-    | ChatbotLimitError['code'];
+    AnalysisLimitError['code'] | ChatbotLimitError['code'];
 
 /**
  * @internal

@@ -152,14 +152,12 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     // Build multi entries (only for bars in detection window)
     const multiEntries: CandlePatternEntry[] = Array.from(
         multiEntryMap.entries()
-    ).map(
-        ([i, { pattern }]): CandlePatternEntry => ({
-            barIndex: i - detectionStartIndex,
-            patternType: 'multi',
-            singlePattern: null,
-            multiPattern: pattern,
-        })
-    );
+    ).map(([i, { pattern }]): CandlePatternEntry => ({
+        barIndex: i - detectionStartIndex,
+        patternType: 'multi',
+        singlePattern: null,
+        multiPattern: pattern,
+    }));
 
     // Build single entries (excluding bars involved in multi patterns)
     const detectionBars = extendedBars.slice(detectionStartIndex);

@@ -78,11 +78,7 @@ export interface EconomySnapshot {
 
 /** Macro regime label produced by the AI briefing. */
 export type MacroRegime =
-    | 'expansion'
-    | 'slowdown'
-    | 'contraction'
-    | 'recovery'
-    | 'neutral';
+    'expansion' | 'slowdown' | 'contraction' | 'recovery' | 'neutral';
 
 /**
  * Normalized macro AI briefing response.

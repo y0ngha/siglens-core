@@ -4,11 +4,13 @@ vi.mock('@upstash/redis', () => {
     const mockGet = vi.fn();
     const mockSet = vi.fn();
     const mockDel = vi.fn();
-    const MockRedis = vi.fn(() => ({
-        get: mockGet,
-        set: mockSet,
-        del: mockDel,
-    }));
+    const MockRedis = vi.fn(function () {
+        return {
+            get: mockGet,
+            set: mockSet,
+            del: mockDel,
+        };
+    });
     return { Redis: MockRedis };
 });
 
@@ -72,11 +74,13 @@ describe('createCacheProvider', () => {
 
         it('get delegates to reader.get', async () => {
             const mockGet = vi.fn().mockResolvedValue({ foo: 'bar' });
-            MockRedis.mockImplementation(() => ({
-                get: mockGet,
-                set: vi.fn(),
-                del: vi.fn(),
-            }));
+            MockRedis.mockImplementation(function () {
+                return {
+                    get: mockGet,
+                    set: vi.fn(),
+                    del: vi.fn(),
+                };
+            });
 
             const provider = createCacheProvider()!;
             const result = await provider.get<{ foo: string }>('my-key');
@@ -86,11 +90,13 @@ describe('createCacheProvider', () => {
 
         it('set delegates to writer.set with ex option', async () => {
             const mockSet = vi.fn().mockResolvedValue('OK');
-            MockRedis.mockImplementation(() => ({
-                get: vi.fn(),
-                set: mockSet,
-                del: vi.fn(),
-            }));
+            MockRedis.mockImplementation(function () {
+                return {
+                    get: vi.fn(),
+                    set: mockSet,
+                    del: vi.fn(),
+                };
+            });
 
             const provider = createCacheProvider()!;
             await provider.set('my-key', { data: 1 }, 300);
@@ -103,11 +109,13 @@ describe('createCacheProvider', () => {
 
         it('delete delegates to writer.del', async () => {
             const mockDel = vi.fn().mockResolvedValue(1);
-            MockRedis.mockImplementation(() => ({
-                get: vi.fn(),
-                set: vi.fn(),
-                del: mockDel,
-            }));
+            MockRedis.mockImplementation(function () {
+                return {
+                    get: vi.fn(),
+                    set: vi.fn(),
+                    del: mockDel,
+                };
+            });
 
             const provider = createCacheProvider()!;
             await provider.delete('my-key');
@@ -123,7 +131,7 @@ describe('createCacheProvider', () => {
         const writerGet = vi.fn();
         const readerGet = vi.fn().mockResolvedValue('cached');
         let callCount = 0;
-        MockRedis.mockImplementation(() => {
+        MockRedis.mockImplementation(function () {
             callCount++;
             return callCount === 1
                 ? { get: writerGet, set: vi.fn(), del: vi.fn() }
