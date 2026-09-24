@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.15.1](https://github.com/y0ngha/siglens-core/compare/v1.15.0...v1.15.1) (2026-09-24)
+
+### Bug Fixes
+
+* **ai:** 이미 취소된 signal로 들어온 요청은 보내기 전에 거부한다 ([f9e012c](https://github.com/y0ngha/siglens-core/commit/f9e012cae2fdeae3a1bb426ca40838ad275d6b61))
+
 # [1.15.0](https://github.com/y0ngha/siglens-core/compare/v1.14.0...v1.15.0) (2026-09-24)
 
 # [1.14.0](https://github.com/y0ngha/siglens-core/compare/v1.13.1...v1.14.0) (2026-09-21)
