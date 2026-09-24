@@ -61,12 +61,16 @@ function swingSmc(
     lows: [index: number, price: number][]
 ): SMCResult {
     return {
-        swingHighs: highs.map(
-            ([index, price]): SMCSwingPoint => ({ index, price, type: 'high' })
-        ),
-        swingLows: lows.map(
-            ([index, price]): SMCSwingPoint => ({ index, price, type: 'low' })
-        ),
+        swingHighs: highs.map(([index, price]): SMCSwingPoint => ({
+            index,
+            price,
+            type: 'high',
+        })),
+        swingLows: lows.map(([index, price]): SMCSwingPoint => ({
+            index,
+            price,
+            type: 'low',
+        })),
         structureBreaks: [],
     } as unknown as SMCResult;
 }

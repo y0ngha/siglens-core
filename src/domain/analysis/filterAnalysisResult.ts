@@ -12,10 +12,7 @@ import type {
 } from '@/domain/types';
 
 type OptionalActionFieldKey =
-    | 'entryRecommendation'
-    | 'entryPrices'
-    | 'stopLoss'
-    | 'takeProfitPrices';
+    'entryRecommendation' | 'entryPrices' | 'stopLoss' | 'takeProfitPrices';
 
 type OptionalActionField =
     | readonly [

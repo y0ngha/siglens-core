@@ -23,8 +23,7 @@ import type { AssembledPromptRecord } from '@/domain/types';
  */
 export function notifyPromptAssembled(
     callback:
-        | ((record: AssembledPromptRecord) => void | Promise<void>)
-        | undefined,
+        ((record: AssembledPromptRecord) => void | Promise<void>) | undefined,
     record: AssembledPromptRecord,
     logPrefix: string
 ): void {

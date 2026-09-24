@@ -116,10 +116,8 @@ export function calculateStochRSI(
         if (dBufSize >= dPeriod) dValues[i] = dSum / dPeriod;
     }
 
-    return closes.map(
-        (_, i): StochRSIResult => ({
-            k: kValues[i] ?? null,
-            d: dValues[i] ?? null,
-        })
-    );
+    return closes.map((_, i): StochRSIResult => ({
+        k: kValues[i] ?? null,
+        d: dValues[i] ?? null,
+    }));
 }

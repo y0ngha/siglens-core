@@ -45,11 +45,7 @@ export type CurrencyCode = 'USD' | 'KRW';
  * `buildAnalysisCacheKey` (cache-key composition) in `infrastructure/cache/config.ts`.
  */
 export type PositionBucket =
-    | 'deep-profit'
-    | 'profit'
-    | 'near-breakeven'
-    | 'loss'
-    | 'deep-loss';
+    'deep-profit' | 'profit' | 'near-breakeven' | 'loss' | 'deep-loss';
 
 /**
  * Declarative trading-session schedule. `always-open` = 24/7 (crypto);
@@ -753,11 +749,7 @@ export type SkillType =
  * signal → confirmation → regime → measurement → risk.
  */
 export type SkillUsageRole =
-    | 'signal'
-    | 'confirmation'
-    | 'regime'
-    | 'measurement'
-    | 'risk';
+    'signal' | 'confirmation' | 'regime' | 'measurement' | 'risk';
 
 /** A single skill loaded from `skills/*.md` and consumed by the prompt builders. */
 export interface Skill {
@@ -861,11 +853,7 @@ export type SkillStateFeature =
  * - `'channelProximity'` — proximity to (or breach of) a channel high/low.
  */
 export type SkillStatePredicateKind =
-    | 'pctB'
-    | 'bandDistAtr'
-    | 'level'
-    | 'ratio'
-    | 'channelProximity';
+    'pctB' | 'bandDistAtr' | 'level' | 'ratio' | 'channelProximity';
 
 /**
  * A textbook *state* predicate: "this indicator feature is currently notable".
@@ -1058,8 +1046,7 @@ export interface MultiCandlePatternEntry {
 
 /** A detected candle pattern at a specific bar — single or multi. */
 export type CandlePatternEntry =
-    | SingleCandlePatternEntry
-    | MultiCandlePatternEntry;
+    SingleCandlePatternEntry | MultiCandlePatternEntry;
 
 /**
  * @internal
@@ -2230,12 +2217,7 @@ export type ClaudeEffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
  * needs it. Add it here once the SDK catches up.
  */
 export type ChatGptEffortLevel =
-    | 'none'
-    | 'minimal'
-    | 'low'
-    | 'medium'
-    | 'high'
-    | 'xhigh';
+    'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 /**
  * @deprecated Use {@link ClaudeEffortLevel} or {@link ChatGptEffortLevel}.
@@ -2270,8 +2252,7 @@ export interface GeminiReasoningConfig {
  * maps to `thinking: {type:'adaptive'}` plus `output_config.effort`.
  */
 export type ClaudeAdaptiveReasoningConfig =
-    | { mode: 'disabled' }
-    | { mode: 'adaptive'; effort: ClaudeEffortLevel };
+    { mode: 'disabled' } | { mode: 'adaptive'; effort: ClaudeEffortLevel };
 
 /**
  * Claude extended-thinking configuration for one toggle state, used by
@@ -2768,11 +2749,7 @@ export type FundamentalSentiment = 'bullish' | 'neutral' | 'bearish';
 
 /** Named union for the five fundamental analysis categories. */
 export type FundamentalCategory =
-    | 'valuation'
-    | 'profitability'
-    | 'growth'
-    | 'health'
-    | 'futureDirection';
+    'valuation' | 'profitability' | 'growth' | 'health' | 'futureDirection';
 
 /**
  * Per-category assessment summary used by the fundamental analysis response.
@@ -3134,11 +3111,7 @@ export type NewsCategory =
  * from the FMP feed the article came from, not from its content.
  */
 export type NewsFeedCategory =
-    | 'general'
-    | 'stock'
-    | 'crypto'
-    | 'forex'
-    | 'articles';
+    'general' | 'stock' | 'crypto' | 'forex' | 'articles';
 
 /**
  * Language the article body is written in.
@@ -3276,11 +3249,7 @@ export interface EarningsReport {
 
 /** Named union for the action type on an analyst grade change event. */
 export type GradesAction =
-    | 'upgrade'
-    | 'downgrade'
-    | 'maintained'
-    | 'initiated'
-    | 'other';
+    'upgrade' | 'downgrade' | 'maintained' | 'initiated' | 'other';
 
 /** Single analyst grade change event for a symbol. */
 export interface GradesEvent {
@@ -3835,10 +3804,7 @@ export type CongressOwner = 'self' | 'spouse' | 'joint' | 'child' | 'unknown';
 export type CongressSentiment = 'bullish' | 'neutral' | 'bearish';
 /** Net flow direction derived from buy vs sell counts across all disclosed trades. */
 export type CongressTrendDirection =
-    | 'net_buying'
-    | 'net_selling'
-    | 'balanced'
-    | 'no_trades';
+    'net_buying' | 'net_selling' | 'balanced' | 'no_trades';
 
 /** USD range disclosed under the STOCK Act bands. */
 export interface CongressAmountRange {

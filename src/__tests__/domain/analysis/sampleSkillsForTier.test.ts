@@ -151,17 +151,14 @@ describe('sampleSkillsForTier', () => {
         });
 
         it('uses the seed and ignores nested object property order', () => {
-            const variants = Array.from(
-                { length: 8 },
-                (_, index): Skill => ({
-                    ...makeSkill(`seed-variant-${index}`, 'pattern'),
-                    gating: {
-                        tier: 'gated',
-                        signalKind: 'event',
-                        triggers: [`seed-trigger-${index}`],
-                    },
-                })
-            );
+            const variants = Array.from({ length: 8 }, (_, index): Skill => ({
+                ...makeSkill(`seed-variant-${index}`, 'pattern'),
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: [`seed-trigger-${index}`],
+                },
+            }));
             const reordered = variants.map(skill => ({
                 ...skill,
                 gating: {

@@ -228,8 +228,7 @@ export function buildNewsAnalysisPrompt(
     symbol: string,
     companyNameOrNews: string | ReadonlyArray<EnrichedNewsItem>,
     newsOrCalendar:
-        | ReadonlyArray<EnrichedNewsItem>
-        | readonly EarningsCalendarItem[],
+        ReadonlyArray<EnrichedNewsItem> | readonly EarningsCalendarItem[],
     calendarOrSkills: readonly EarningsCalendarItem[] | readonly Skill[],
     maybeSkills?: readonly Skill[],
     assetClass: AssetClass = 'equity',

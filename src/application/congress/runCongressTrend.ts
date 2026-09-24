@@ -40,8 +40,7 @@ import {
 const DEFAULT_LIMIT = 50;
 
 type ProviderFetchResult =
-    | { status: 'ok'; trades: CongressTrade[] }
-    | SubmitCongressTrendFetchError;
+    { status: 'ok'; trades: CongressTrade[] } | SubmitCongressTrendFetchError;
 
 /**
  * Fetch senate + house trades in parallel and merge them.
