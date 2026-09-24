@@ -271,6 +271,9 @@ export async function callDeepSeek(
     prompt: string,
     options: DeepSeekCallOptions
 ): Promise<string> {
+    // 이미 취소된 signal은 'abort' 이벤트를 다시 쏘지 않으므로 아래에서 다는 리스너만으로는
+    // 전파되지 않는다 — 어떤 준비 작업보다 먼저 여기서 끊는다(재시도 대상 아님: status·retryable 없음).
+    options.signal?.throwIfAborted();
     const { model, apiKey } = options;
     const client = getClient(apiKey);
     const spec = MODEL_SPECS[model] as DeepSeekModelSpec | undefined;
@@ -278,9 +281,6 @@ export async function callDeepSeek(
         throw new Error(`[DeepSeek] Unknown model: ${model}`);
     }
 
-    // 이미 취소된 signal은 'abort' 이벤트를 다시 쏘지 않으므로 아래 리스너만으로는 전파되지
-    // 않는다 — 요청을 보내기 전에 여기서 끊는다(재시도 대상 아님: status·retryable 없음).
-    options.signal?.throwIfAborted();
     const controller = new AbortController();
     // .unref()로 timer가 event loop를 점유하지 않게 하여 정상 종료를 막지 않도록 한다.
     const timeoutId = setTimeout(
