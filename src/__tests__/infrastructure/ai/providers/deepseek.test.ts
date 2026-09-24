@@ -14,17 +14,19 @@ const mockResponsesCreate = vi.hoisted(() => vi.fn());
 
 vi.mock('openai', () => ({
     __esModule: true,
-    default: vi.fn((options: unknown) => ({
-        __options: options,
-        chat: {
-            completions: {
-                create: mockCreate,
+    default: vi.fn(function (options: unknown) {
+        return {
+            __options: options,
+            chat: {
+                completions: {
+                    create: mockCreate,
+                },
             },
-        },
-        responses: {
-            create: mockResponsesCreate,
-        },
-    })),
+            responses: {
+                create: mockResponsesCreate,
+            },
+        };
+    }),
 }));
 
 const mockedOpenAI = vi.mocked(OpenAI);

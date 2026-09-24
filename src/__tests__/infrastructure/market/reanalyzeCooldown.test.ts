@@ -18,11 +18,13 @@ const mockDel = vi.fn();
 describe('reanalyzeCooldown', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        MockRedis.mockImplementation(() => ({
-            set: mockSet,
-            pttl: mockPttl,
-            del: mockDel,
-        }));
+        MockRedis.mockImplementation(function () {
+            return {
+                set: mockSet,
+                pttl: mockPttl,
+                del: mockDel,
+            };
+        });
         process.env.UPSTASH_REDIS_REST_URL = 'https://redis.test';
         process.env.UPSTASH_REDIS_REST_TOKEN = 'test-token';
     });

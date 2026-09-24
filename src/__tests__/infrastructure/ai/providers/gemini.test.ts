@@ -9,11 +9,13 @@ import type { GeminiModelId } from '@/domain/analysis/modelSpecs';
 const mockGenerateContent = vi.hoisted(() => vi.fn());
 
 vi.mock('@google/genai', () => ({
-    GoogleGenAI: vi.fn(() => ({
-        models: {
-            generateContent: mockGenerateContent,
-        },
-    })),
+    GoogleGenAI: vi.fn(function () {
+        return {
+            models: {
+                generateContent: mockGenerateContent,
+            },
+        };
+    }),
     // The adapter maps domain thinking levels through this enum, so the mock
     // must carry it — a bare function mock makes the import undefined at runtime.
     ThinkingLevel: {

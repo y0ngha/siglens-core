@@ -66,11 +66,22 @@ const CORPUS: readonly Case[] = [
         { a: null, b: true, c: false },
     ],
     ['number with trailing dot', '{"a": 1.}', { a: 1 }],
-    ['number with leading dot', '{"a": .5}', THROWS],
+    // 3.14.1+: `.5` is completed to `0.5` (3.14.0 left the invalid `.5` in place).
+    ['number with leading dot', '{"a": .5}', { a: 0.5 }],
     ['number with dangling exponent', '{"a": 2e}', { a: 2 }],
     ['number that is only a minus sign', '{"a": -}', { a: -0 }, { a: 0 }],
-    ['unquoted value starting with a keyword', '{"a": trueish}', THROWS],
-    ['unquoted value starting with null', '{"a": nullable value}', THROWS],
+    // 3.14.1+: an unquoted value that merely starts with a keyword is quoted as a
+    // string instead of failing on the keyword prefix.
+    [
+        'unquoted value starting with a keyword',
+        '{"a": trueish}',
+        { a: 'trueish' },
+    ],
+    [
+        'unquoted value starting with null',
+        '{"a": nullable value}',
+        { a: 'nullable value' },
+    ],
     ['unescaped quote before a paren', '{"a":"f("x")"}', THROWS],
     [
         'raw newline inside a string',
@@ -78,9 +89,11 @@ const CORPUS: readonly Case[] = [
         { a: 'line1\nline2' },
     ],
     [
+        // 3.15.0: entity-encoded structural quotes are decoded (3.14 kept them as
+        // literal key/value text). Entities *inside* a valid string stay put — below.
         'HTML-entity-encoded quotes',
         '{&quot;a&quot;:&quot;b&quot;}',
-        { '&quot;a&quot;': '&quot;b&quot;' },
+        { a: 'b' },
     ],
     [
         'entities inside a valid string value survive',
@@ -99,13 +112,14 @@ const CORPUS: readonly Case[] = [
         '{"trend": bullish momentum, "n":1}',
         { trend: 'bullish momentum', n: 1 },
     ],
-    ['backslash right after a closed string', '{"a":"b"\\}', { a: 'b' }],
+    // 3.15.0 (#175): a stray backslash after a closed string now fails the repair
+    // consistently. 3.14 either dropped it, overflowed the stack (array case —
+    // already a SyntaxError for us, but after burning a deep recursion), or glued
+    // it into the previous value (`"b\"\n"` — silently corrupted output). Failing
+    // is the safe outcome: callers treat a SyntaxError as a retryable parse failure.
+    ['backslash right after a closed string', '{"a":"b"\\}', THROWS],
     ['backslash after a string inside an array', '["a"\\,"b"]', THROWS],
-    [
-        'literal backslash-n after a closed string',
-        '{"a":"b"\\n,"c":1}',
-        { a: 'b"\n', c: 1 },
-    ],
+    ['literal backslash-n after a closed string', '{"a":"b"\\n,"c":1}', THROWS],
 ];
 
 describe('jsonrepair salvage — extractJsonWithRepair', () => {

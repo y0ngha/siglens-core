@@ -238,6 +238,13 @@ export async function callClaude(
 
         const elapsed = Date.now() - start;
         const stopReason = message.stop_reason;
+        // `model_context_window_exceeded` (typed since SDK 0.114) is the same failure as
+        // `max_tokens` from the caller's side: generation was cut off by a token ceiling —
+        // the context window rather than `max_tokens` — so the output is truncated and a
+        // retry with the same input hits the same wall. Route both through one branch.
+        const truncated =
+            stopReason === 'max_tokens' ||
+            stopReason === 'model_context_window_exceeded';
 
         console.log(
             `[Claude] Response time: ${elapsed}ms (model: ${model}, stop_reason: ${stopReason})`
@@ -265,11 +272,7 @@ export async function callClaude(
             // stop_reason이 'max_tokens'면 input이 non-null이어도 출력이 중간에 잘렸을 수
             // 있다 — partial/malformed JSON을 성공으로 반환하지 않고 아래 전용
             // max_tokens 분기(재시도 트리거)로 떨어뜨린다.
-            if (
-                toolUseBlock &&
-                toolUseBlock.input != null &&
-                stopReason !== 'max_tokens'
-            ) {
+            if (toolUseBlock && toolUseBlock.input != null && !truncated) {
                 return JSON.stringify(toolUseBlock.input);
             }
             // forceStructuredTool이 아니면(`tool_choice: auto`, thinking 모델) 모델이 tool
@@ -313,7 +316,7 @@ export async function callClaude(
             );
         }
 
-        if (stopReason === 'max_tokens') {
+        if (truncated) {
             console.warn('[Claude] MAX_TOKENS: output truncated', {
                 model,
                 stopReason,

@@ -10,11 +10,13 @@ const mockFinalMessage = vi.hoisted(() => vi.fn());
 const mockStream = vi.hoisted(() => vi.fn());
 
 vi.mock('@anthropic-ai/sdk', () => ({
-    default: vi.fn(() => ({
-        messages: {
-            stream: mockStream,
-        },
-    })),
+    default: vi.fn(function () {
+        return {
+            messages: {
+                stream: mockStream,
+            },
+        };
+    }),
 }));
 
 // MODEL_SPECS를 mock해 이 파일이 프로덕션 등급 배치 변경에 흔들리지 않게 한다.
@@ -248,6 +250,46 @@ describe('callClaude', () => {
             callClaude('prompt', {
                 model: MODEL_WITH_EFFORT,
                 apiKey: 'key',
+            })
+        ).rejects.toMatchObject({ code: MAX_TOKENS_CODE });
+    });
+
+    it('throws MAX_TOKENS_CODE (not a retryable error) when stop_reason is model_context_window_exceeded', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'model_context_window_exceeded',
+                content: [{ type: 'text', text: '{"partial":' }],
+            })
+        );
+
+        const error = await callClaude('prompt', {
+            model: MODEL_WITH_EFFORT,
+            apiKey: 'key',
+        }).catch((e: unknown) => e);
+        expect(error).toMatchObject({ code: MAX_TOKENS_CODE });
+        expect(error).not.toHaveProperty('retryable');
+    });
+
+    it('throws MAX_TOKENS_CODE when a structured response is cut off by the context window', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'model_context_window_exceeded',
+                content: [
+                    {
+                        type: 'tool_use',
+                        id: 'tu_partial',
+                        name: 'structured_analysis',
+                        input: { sentiment: 'bul' },
+                    },
+                ],
+            })
+        );
+
+        await expect(
+            callClaude('prompt', {
+                model: MODEL_WITHOUT_THINKING,
+                apiKey: 'key',
+                responseSchema: { type: 'object' },
             })
         ).rejects.toMatchObject({ code: MAX_TOKENS_CODE });
     });
