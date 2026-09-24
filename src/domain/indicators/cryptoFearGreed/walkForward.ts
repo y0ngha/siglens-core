@@ -14,7 +14,7 @@ import {
     walkForwardHistory,
     walkForwardSnapshot,
 } from '@/domain/indicators/fearGreed/equalWeight';
-import type { MarketFearGreedHistoryPoint } from '@/domain/indicators/marketFearGreed/types';
+import type { FearGreedHistoryPoint } from '@/domain/indicators/fearGreed/types';
 
 /**
  * Factor time series, all `null` when the universe is below the minimum size —
@@ -80,11 +80,11 @@ export function computeCryptoFearGreedIndex(
  * `score: null`, which the UI renders as a gap.
  *
  * @param input - Benchmark (BTC), safe-haven (gold), and universe series.
- * @returns {MarketFearGreedHistoryPoint[]} One point per common session, ascending by date.
+ * @returns {FearGreedHistoryPoint[]} One point per common session, ascending by date.
  */
 export function computeCryptoFearGreedHistory(
     input: CryptoFearGreedInput
-): MarketFearGreedHistoryPoint[] {
+): FearGreedHistoryPoint[] {
     const series = alignCryptoSeries(input);
     return walkForwardHistory(
         CRYPTO_FEAR_GREED_FACTOR_KEYS,

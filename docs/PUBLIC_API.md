@@ -323,7 +323,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | Symbol | Source |
 |---|---|
 | `computeCryptoFearGreedIndex(input)` — crypto-market snapshot from a benchmark coin (BTC), a safe-haven close series (gold, forward-filled onto the 7-day calendar), and a universe of ≥ 5 coins. Six factors (momentum, downside volatility, safe haven, breadth, alt season, volume flow), same scale/labels/confidence as the market index. Returns `CryptoFearGreedSnapshot \| null`. | `domain/indicators/cryptoFearGreed/walkForward.ts` |
-| `computeCryptoFearGreedHistory(input)` — walk-forward score history, one point per common session. Returns `MarketFearGreedHistoryPoint[]`. | `domain/indicators/cryptoFearGreed/walkForward.ts` |
+| `computeCryptoFearGreedHistory(input)` — walk-forward score history, one point per common session. Returns `FearGreedHistoryPoint[]`. | `domain/indicators/cryptoFearGreed/walkForward.ts` |
 | `CRYPTO_FEAR_GREED_FACTOR_KEYS` — the six factor keys, in display order. | `domain/indicators/cryptoFearGreed/types.ts` |
 
 **재무제표 분석 헬퍼 (3)**
@@ -534,7 +534,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 - Fear & Greed Index (crypto market, additive):
     - `CryptoDailyBar`, `CryptoFearGreedInput`
     - `CryptoFearGreedFactorKey`, `CryptoFearGreedFactor`, `CryptoFearGreedSnapshot`
-    - History points reuse `MarketFearGreedHistoryPoint`; `safeHaven` reuses `MarketDailyClose`.
+    - History points reuse `FearGreedHistoryPoint` (the generic per-stock point type — structurally identical to `MarketFearGreedHistoryPoint`); `safeHaven` reuses `MarketDailyClose`.
 - 마켓 레퍼런스 (`computeMarketReference`의 반환/요소 타입, `domain/types.ts`):
     - `MarketReference` (`{ short, medium, long }` — 각 `HorizonReference`), `HorizonReference` (`{ window, levels, structure }`), `HorizonWindow` (`bars`/`fromTime`/`toTime` — 호라이즌 lookback 윈도우), `HorizonKey` (`'short'` | `'medium'` | `'long'`).
     - `ReferenceLevels` (`{ support, resistance }` — 현재가 기준 side 분리, nearest-first), `ReferenceLevel` (price/label/kind/distancePercent), `ReferenceLevelKind` (레벨 출처 union — fib/VP/swing/MA/EMA/round/pivot/ichimoku/donchian/bollinger/keltner/supertrend/vwap/avwap; 컨빅션 랭크가 아닌 서술 라벨). `'avwap'`는 호라이즌 윈도우의 극단 스윙(최고가 스윙 고/최저가 스윙 저)에 앵커링한 Anchored VWAP 레벨. 앵커 계산 헬퍼 `anchoredVwap`는 `@internal`로 **public 미노출**.
