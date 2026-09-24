@@ -66,8 +66,8 @@ describe('computeMarketFactorsAtT', () => {
         expect(factors).not.toBeNull();
         expect(factors?.momentum).toBeCloseTo(0, 12);
         expect(factors?.volatility).toBeCloseTo(0, 12);
-        expect(factors?.safeHaven).toBeCloseTo(0, 12);
-        expect(factors?.junkBond).toBeCloseTo(0, 12);
+        expect(factors?.safe_haven).toBeCloseTo(0, 12);
+        expect(factors?.junk_bond).toBeCloseTo(0, 12);
         expect(factors?.breadth).toBeCloseTo(0, 12);
     });
 
@@ -113,7 +113,7 @@ describe('computeMarketFactorsAtT', () => {
             LAST
         );
 
-        expect(factors?.safeHaven).toBeCloseTo(0.1 - 0.05, 12);
+        expect(factors?.safe_haven).toBeCloseTo(0.1 - 0.05, 12);
     });
 
     it('computes junk-bond demand as the high-yield minus investment-grade 20-session return', () => {
@@ -125,7 +125,7 @@ describe('computeMarketFactorsAtT', () => {
             LAST
         );
 
-        expect(factors?.junkBond).toBeCloseTo(0.02 - 0.01, 12);
+        expect(factors?.junk_bond).toBeCloseTo(0.02 - 0.01, 12);
     });
 
     it('computes breadth as the equal-weight minus cap-weight 20-session return', () => {

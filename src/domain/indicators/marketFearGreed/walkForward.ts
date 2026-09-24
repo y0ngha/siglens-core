@@ -1,12 +1,16 @@
+import {
+    walkForwardHistory,
+    walkForwardSnapshot,
+} from '@/domain/indicators/fearGreed/equalWeight';
 import { alignSeries } from '@/domain/indicators/marketFearGreed/align';
-import { composeMarketSnapshot } from '@/domain/indicators/marketFearGreed/composition';
 import { computeMarketFactorsAtT } from '@/domain/indicators/marketFearGreed/factors';
-import type {
-    AlignedMarketSeries,
-    MarketFactorValues,
-    MarketFearGreedHistoryPoint,
-    MarketFearGreedInput,
-    MarketFearGreedSnapshot,
+import {
+    MARKET_FEAR_GREED_FACTOR_KEYS,
+    type AlignedMarketSeries,
+    type MarketFactorValues,
+    type MarketFearGreedHistoryPoint,
+    type MarketFearGreedInput,
+    type MarketFearGreedSnapshot,
 } from '@/domain/indicators/marketFearGreed/types';
 
 function buildFactorTS(
@@ -43,21 +47,11 @@ export function computeMarketFearGreedIndex(
     input: MarketFearGreedInput
 ): MarketFearGreedSnapshot | null {
     const series = alignSeries(input);
-    if (series.dates.length === 0) return null;
-
-    const factorTS = buildFactorTS(series);
-    const t = series.dates.length - 1;
-    const current = factorTS[t];
-    if (!current) return null;
-
-    const sample = factorTS
-        .slice(0, t)
-        .filter((f): f is MarketFactorValues => f !== null);
-
-    const composition = composeMarketSnapshot(current, sample);
-    if (!composition) return null;
-
-    return { ...composition, asOf: series.dates[t] };
+    return walkForwardSnapshot(
+        MARKET_FEAR_GREED_FACTOR_KEYS,
+        series.dates,
+        buildFactorTS(series)
+    );
 }
 
 /**
@@ -75,27 +69,9 @@ export function computeMarketFearGreedHistory(
     input: MarketFearGreedInput
 ): MarketFearGreedHistoryPoint[] {
     const series = alignSeries(input);
-    const factorTS = buildFactorTS(series);
-    const sample: MarketFactorValues[] = [];
-    const out: MarketFearGreedHistoryPoint[] = new Array(series.dates.length);
-
-    // Sequential, not a `.map` — each session's percentile ranks depend on the
-    // sample accumulated by the sessions before it.
-    for (let t = 0; t < series.dates.length; t++) {
-        const date = series.dates[t];
-        const current = factorTS[t];
-
-        if (!current) {
-            out[t] = { date, score: null, label: null };
-            continue;
-        }
-
-        const composition = composeMarketSnapshot(current, sample);
-        out[t] = composition
-            ? { date, score: composition.score, label: composition.label }
-            : { date, score: null, label: null };
-        sample.push(current);
-    }
-
-    return out;
+    return walkForwardHistory(
+        MARKET_FEAR_GREED_FACTOR_KEYS,
+        series.dates,
+        buildFactorTS(series)
+    );
 }

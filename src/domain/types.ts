@@ -427,6 +427,14 @@ export type {
     MarketFearGreedHistoryPoint,
 } from '@/domain/indicators/marketFearGreed/types';
 
+export type {
+    CryptoDailyBar,
+    CryptoFearGreedInput,
+    CryptoFearGreedFactorKey,
+    CryptoFearGreedFactor,
+    CryptoFearGreedSnapshot,
+} from '@/domain/indicators/cryptoFearGreed/types';
+
 // ─── Smart Money Concepts ────────────────────────────────────────────────────
 // Concept reference: Smart Money Concepts (SMC) / ICT methodology
 // Original TradingView indicator: "Smart Money Concepts [LuxAlgo]" by LuxAlgo

@@ -301,6 +301,10 @@ large feature's types would push `domain/types.ts` past 2,200 lines and dilute i
 discoverability. Implementation files in that feature folder must still NOT define their
 own types — they import from the feature-local `types.ts`.
 
+Also exempted: `domain/indicators/marketFearGreed/types.ts` and
+`domain/indicators/cryptoFearGreed/types.ts` — index-specific input/factor/snapshot types
+kept beside their module; all public ones are re-exported from `domain/types.ts`.
+
 ```typescript
 // ✅ domain/options/types.ts defines OptionsContract, OptionsChain, ...
 // ✅ domain/types.ts re-exports the full set

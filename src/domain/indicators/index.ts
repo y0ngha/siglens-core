@@ -88,6 +88,11 @@ export {
     MARKET_FEAR_GREED_SERIES_KEYS,
     MARKET_FEAR_GREED_FACTOR_KEYS,
 } from './marketFearGreed';
+export {
+    computeCryptoFearGreedIndex,
+    computeCryptoFearGreedHistory,
+    CRYPTO_FEAR_GREED_FACTOR_KEYS,
+} from './cryptoFearGreed';
 export * from './constants';
 export * from './utils';
 
