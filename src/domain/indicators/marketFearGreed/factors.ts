@@ -1,4 +1,7 @@
-import { sma } from '@/domain/indicators/utils';
+import {
+    distanceFromMa,
+    returnOver,
+} from '@/domain/indicators/fearGreed/returns';
 import type {
     AlignedMarketSeries,
     MarketFactorValues,
@@ -26,32 +29,6 @@ export const MARKET_FEAR_GREED_WINDOWS = {
  */
 export const MARKET_FEAR_GREED_WARMUP =
     MARKET_FEAR_GREED_WINDOWS.MOMENTUM_MA - 1;
-
-/** Simple return over `window` sessions ending at `t`, or null when out of range. */
-function returnOver(
-    closes: number[],
-    t: number,
-    window: number
-): number | null {
-    const from = t - window;
-    if (from < 0) return null;
-    const base = closes[from];
-    if (!(base > 0)) return null;
-    return closes[t] / base - 1;
-}
-
-/** Relative distance of `closes[t]` from its `window`-session moving average. */
-function distanceFromMa(
-    closes: number[],
-    t: number,
-    window: number
-): number | null {
-    // Slice only the window itself, not the whole prefix — this runs once per
-    // session per factor, so a prefix copy would make the history O(n²).
-    const ma = sma(closes.slice(Math.max(0, t + 1 - window), t + 1), window);
-    if (ma === null || !(ma > 0)) return null;
-    return (closes[t] - ma) / ma;
-}
 
 /**
  * Raw factor bundle for session `t`, using only sessions ≤ `t` (no look-ahead).
@@ -101,8 +78,8 @@ export function computeMarketFactorsAtT(
     return {
         momentum,
         volatility: -vixDistance,
-        safeHaven: sp500Return - treasuryReturn,
-        junkBond: highYieldReturn - investmentGradeReturn,
+        safe_haven: sp500Return - treasuryReturn,
+        junk_bond: highYieldReturn - investmentGradeReturn,
         breadth: equalWeightReturn - sp500Return,
     };
 }

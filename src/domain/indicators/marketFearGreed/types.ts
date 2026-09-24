@@ -128,14 +128,8 @@ export interface MarketFearGreedHistoryPoint {
     label: FearGreedLabel | null;
 }
 
-/** @internal Raw factor bundle shared by the factor, composition, and walk-forward modules. */
-export interface MarketFactorValues {
-    momentum: number;
-    volatility: number;
-    safeHaven: number;
-    junkBond: number;
-    breadth: number;
-}
+/** @internal Raw factor bundle, keyed by factor key, shared by the factor and walk-forward modules. */
+export type MarketFactorValues = Record<MarketFearGreedFactorKey, number>;
 
 /** @internal Date-aligned close series, produced by the inner join in `align.ts`. */
 export interface AlignedMarketSeries {

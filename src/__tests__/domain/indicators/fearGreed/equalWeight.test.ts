@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { FEAR_GREED_CONFIDENCE_THRESHOLDS } from '@/domain/indicators/fearGreed/composition';
-import { composeMarketSnapshot } from '@/domain/indicators/marketFearGreed/composition';
+import {
+    composeEqualWeightSnapshot,
+    walkForwardHistory,
+    walkForwardSnapshot,
+} from '@/domain/indicators/fearGreed/equalWeight';
 import {
     MARKET_FEAR_GREED_FACTOR_KEYS,
     type MarketFactorValues,
@@ -13,8 +17,8 @@ function values(overrides: Partial<MarketFactorValues> = {}) {
     return {
         momentum: 0,
         volatility: 0,
-        safeHaven: 0,
-        junkBond: 0,
+        safe_haven: 0,
+        junk_bond: 0,
         breadth: 0,
         ...overrides,
     } satisfies MarketFactorValues;
@@ -24,7 +28,19 @@ function sampleOf(count: number, v: MarketFactorValues): MarketFactorValues[] {
     return new Array(count).fill(null).map(() => ({ ...v }));
 }
 
-describe('composeMarketSnapshot', () => {
+/** The market-index key set exercises the composer with five real factors. */
+function composeMarketSnapshot(
+    current: MarketFactorValues,
+    sample: MarketFactorValues[]
+) {
+    return composeEqualWeightSnapshot(
+        MARKET_FEAR_GREED_FACTOR_KEYS,
+        current,
+        sample
+    );
+}
+
+describe('composeEqualWeightSnapshot', () => {
     it('returns null when the walk-forward sample is below the LIMITED threshold', () => {
         const result = composeMarketSnapshot(
             values({ momentum: 1 }),
@@ -59,8 +75,8 @@ describe('composeMarketSnapshot', () => {
             values({
                 momentum: 1,
                 volatility: 1,
-                safeHaven: 1,
-                junkBond: 1,
+                safe_haven: 1,
+                junk_bond: 1,
                 breadth: 1,
             }),
             sampleOf(NORMAL, values())
@@ -78,8 +94,8 @@ describe('composeMarketSnapshot', () => {
                 values({
                     momentum: 1,
                     volatility: 1,
-                    safeHaven: 1,
-                    junkBond: 1,
+                    safe_haven: 1,
+                    junk_bond: 1,
                     breadth: 1,
                 })
             )
@@ -106,8 +122,8 @@ describe('composeMarketSnapshot', () => {
         const current = values({
             momentum: 0.11,
             volatility: 0.22,
-            safeHaven: 0.33,
-            junkBond: 0.44,
+            safe_haven: 0.33,
+            junk_bond: 0.44,
             breadth: 0.55,
         });
 
@@ -134,5 +150,70 @@ describe('composeMarketSnapshot', () => {
         const momentum = result?.factors.find(f => f.key === 'momentum');
 
         expect(momentum?.percentile).toBeCloseTo(25, 12);
+    });
+});
+
+describe('walkForwardSnapshot', () => {
+    const keys = ['a'] as const;
+    const dates = Array.from({ length: LIMITED + 2 }, (_, i) => `d${i}`);
+
+    it('returns null for an empty series', () => {
+        expect(walkForwardSnapshot(keys, [], [])).toBeNull();
+    });
+
+    it('returns null when the latest bundle is null', () => {
+        const ts = dates.map((_, i) =>
+            i === dates.length - 1 ? null : { a: i }
+        );
+        expect(walkForwardSnapshot(keys, dates, ts)).toBeNull();
+    });
+
+    it('ranks the latest bundle against the valid bundles before it', () => {
+        // One null gap inside the prior sample: it must be skipped, not counted.
+        const ts = dates.map((_, i) => (i === 0 ? null : { a: i }));
+        const snapshot = walkForwardSnapshot(keys, dates, ts);
+
+        expect(snapshot?.asOf).toBe(dates[dates.length - 1]);
+        expect(snapshot?.sampleSize).toBe(dates.length - 2);
+        expect(snapshot?.score).toBe(100);
+    });
+
+    it('returns null while the prior sample is below LIMITED', () => {
+        const short = dates.slice(0, LIMITED);
+        expect(
+            walkForwardSnapshot(
+                keys,
+                short,
+                short.map((_, i) => ({ a: i }))
+            )
+        ).toBeNull();
+    });
+});
+
+describe('walkForwardHistory', () => {
+    const keys = ['a'] as const;
+    const dates = Array.from({ length: LIMITED + 3 }, (_, i) => `d${i}`);
+    const ts = dates.map((_, i) => (i === 1 ? null : { a: i }));
+
+    it('emits one point per session with null scores until LIMITED samples exist', () => {
+        const history = walkForwardHistory(keys, dates, ts);
+
+        expect(history.map(p => p.date)).toEqual(dates);
+        // Index 1 is a null bundle; valid samples before index t are t-1 for
+        // t ≥ 2, so the first scored index is LIMITED + 1.
+        expect(history.findIndex(p => p.score !== null)).toBe(LIMITED + 1);
+        expect(history[1]).toEqual({ date: 'd1', score: null, label: null });
+    });
+
+    it('agrees with the snapshot at every prefix', () => {
+        const history = walkForwardHistory(keys, dates, ts);
+        dates.forEach((_, t) => {
+            const snapshot = walkForwardSnapshot(
+                keys,
+                dates.slice(0, t + 1),
+                ts.slice(0, t + 1)
+            );
+            expect(history[t].score).toBe(snapshot?.score ?? null);
+        });
     });
 });

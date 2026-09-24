@@ -9,8 +9,10 @@ import {
 /**
  * Last-write-wins map from ISO date to close, dropping non-finite and
  * non-positive closes (a zero close would make every return diverge).
+ *
+ * @internal Shared with the crypto index's safe-haven alignment.
  */
-function toCloseMap(series: MarketDailyClose[]): Map<string, number> {
+export function toCloseMap(series: MarketDailyClose[]): Map<string, number> {
     const map = new Map<string, number>();
     for (const point of series) {
         if (!Number.isFinite(point.close) || point.close <= 0) continue;

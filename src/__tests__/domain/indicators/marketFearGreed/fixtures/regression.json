@@ -1,0 +1,618 @@
+{
+    "snapshot": {
+        "score": 57.25714285714285,
+        "label": "GREED",
+        "factors": [
+            {
+                "key": "momentum",
+                "rawValue": 0.08254852428514597,
+                "percentile": 100
+            },
+            {
+                "key": "volatility",
+                "rawValue": -0.048690545312769534,
+                "percentile": 25.142857142857146
+            },
+            {
+                "key": "safe_haven",
+                "rawValue": 0.09832994236295722,
+                "percentile": 89.14285714285714
+            },
+            {
+                "key": "junk_bond",
+                "rawValue": -0.06031791398475439,
+                "percentile": 14.857142857142858
+            },
+            {
+                "key": "breadth",
+                "rawValue": 0.00330427500270436,
+                "percentile": 57.14285714285714
+            }
+        ],
+        "confidence": "normal",
+        "sampleSize": 175,
+        "asOf": "2021-10-27"
+    },
+    "history": [
+        { "date": "2021-01-01", "score": null, "label": null },
+        { "date": "2021-01-02", "score": null, "label": null },
+        { "date": "2021-01-03", "score": null, "label": null },
+        { "date": "2021-01-04", "score": null, "label": null },
+        { "date": "2021-01-05", "score": null, "label": null },
+        { "date": "2021-01-06", "score": null, "label": null },
+        { "date": "2021-01-07", "score": null, "label": null },
+        { "date": "2021-01-08", "score": null, "label": null },
+        { "date": "2021-01-09", "score": null, "label": null },
+        { "date": "2021-01-10", "score": null, "label": null },
+        { "date": "2021-01-11", "score": null, "label": null },
+        { "date": "2021-01-12", "score": null, "label": null },
+        { "date": "2021-01-13", "score": null, "label": null },
+        { "date": "2021-01-14", "score": null, "label": null },
+        { "date": "2021-01-15", "score": null, "label": null },
+        { "date": "2021-01-16", "score": null, "label": null },
+        { "date": "2021-01-17", "score": null, "label": null },
+        { "date": "2021-01-18", "score": null, "label": null },
+        { "date": "2021-01-19", "score": null, "label": null },
+        { "date": "2021-01-20", "score": null, "label": null },
+        { "date": "2021-01-21", "score": null, "label": null },
+        { "date": "2021-01-22", "score": null, "label": null },
+        { "date": "2021-01-23", "score": null, "label": null },
+        { "date": "2021-01-24", "score": null, "label": null },
+        { "date": "2021-01-25", "score": null, "label": null },
+        { "date": "2021-01-26", "score": null, "label": null },
+        { "date": "2021-01-27", "score": null, "label": null },
+        { "date": "2021-01-28", "score": null, "label": null },
+        { "date": "2021-01-29", "score": null, "label": null },
+        { "date": "2021-01-30", "score": null, "label": null },
+        { "date": "2021-01-31", "score": null, "label": null },
+        { "date": "2021-02-01", "score": null, "label": null },
+        { "date": "2021-02-02", "score": null, "label": null },
+        { "date": "2021-02-03", "score": null, "label": null },
+        { "date": "2021-02-04", "score": null, "label": null },
+        { "date": "2021-02-05", "score": null, "label": null },
+        { "date": "2021-02-06", "score": null, "label": null },
+        { "date": "2021-02-07", "score": null, "label": null },
+        { "date": "2021-02-08", "score": null, "label": null },
+        { "date": "2021-02-09", "score": null, "label": null },
+        { "date": "2021-02-10", "score": null, "label": null },
+        { "date": "2021-02-11", "score": null, "label": null },
+        { "date": "2021-02-12", "score": null, "label": null },
+        { "date": "2021-02-13", "score": null, "label": null },
+        { "date": "2021-02-14", "score": null, "label": null },
+        { "date": "2021-02-15", "score": null, "label": null },
+        { "date": "2021-02-16", "score": null, "label": null },
+        { "date": "2021-02-17", "score": null, "label": null },
+        { "date": "2021-02-18", "score": null, "label": null },
+        { "date": "2021-02-19", "score": null, "label": null },
+        { "date": "2021-02-20", "score": null, "label": null },
+        { "date": "2021-02-21", "score": null, "label": null },
+        { "date": "2021-02-22", "score": null, "label": null },
+        { "date": "2021-02-23", "score": null, "label": null },
+        { "date": "2021-02-24", "score": null, "label": null },
+        { "date": "2021-02-25", "score": null, "label": null },
+        { "date": "2021-02-26", "score": null, "label": null },
+        { "date": "2021-02-27", "score": null, "label": null },
+        { "date": "2021-02-28", "score": null, "label": null },
+        { "date": "2021-03-01", "score": null, "label": null },
+        { "date": "2021-03-02", "score": null, "label": null },
+        { "date": "2021-03-03", "score": null, "label": null },
+        { "date": "2021-03-04", "score": null, "label": null },
+        { "date": "2021-03-05", "score": null, "label": null },
+        { "date": "2021-03-06", "score": null, "label": null },
+        { "date": "2021-03-07", "score": null, "label": null },
+        { "date": "2021-03-08", "score": null, "label": null },
+        { "date": "2021-03-09", "score": null, "label": null },
+        { "date": "2021-03-10", "score": null, "label": null },
+        { "date": "2021-03-11", "score": null, "label": null },
+        { "date": "2021-03-12", "score": null, "label": null },
+        { "date": "2021-03-13", "score": null, "label": null },
+        { "date": "2021-03-14", "score": null, "label": null },
+        { "date": "2021-03-15", "score": null, "label": null },
+        { "date": "2021-03-16", "score": null, "label": null },
+        { "date": "2021-03-17", "score": null, "label": null },
+        { "date": "2021-03-18", "score": null, "label": null },
+        { "date": "2021-03-19", "score": null, "label": null },
+        { "date": "2021-03-20", "score": null, "label": null },
+        { "date": "2021-03-21", "score": null, "label": null },
+        { "date": "2021-03-22", "score": null, "label": null },
+        { "date": "2021-03-23", "score": null, "label": null },
+        { "date": "2021-03-24", "score": null, "label": null },
+        { "date": "2021-03-25", "score": null, "label": null },
+        { "date": "2021-03-26", "score": null, "label": null },
+        { "date": "2021-03-27", "score": null, "label": null },
+        { "date": "2021-03-28", "score": null, "label": null },
+        { "date": "2021-03-29", "score": null, "label": null },
+        { "date": "2021-03-30", "score": null, "label": null },
+        { "date": "2021-03-31", "score": null, "label": null },
+        { "date": "2021-04-01", "score": null, "label": null },
+        { "date": "2021-04-02", "score": null, "label": null },
+        { "date": "2021-04-03", "score": null, "label": null },
+        { "date": "2021-04-04", "score": null, "label": null },
+        { "date": "2021-04-05", "score": null, "label": null },
+        { "date": "2021-04-06", "score": null, "label": null },
+        { "date": "2021-04-07", "score": null, "label": null },
+        { "date": "2021-04-08", "score": null, "label": null },
+        { "date": "2021-04-09", "score": null, "label": null },
+        { "date": "2021-04-10", "score": null, "label": null },
+        { "date": "2021-04-11", "score": null, "label": null },
+        { "date": "2021-04-12", "score": null, "label": null },
+        { "date": "2021-04-13", "score": null, "label": null },
+        { "date": "2021-04-14", "score": null, "label": null },
+        { "date": "2021-04-15", "score": null, "label": null },
+        { "date": "2021-04-16", "score": null, "label": null },
+        { "date": "2021-04-17", "score": null, "label": null },
+        { "date": "2021-04-18", "score": null, "label": null },
+        { "date": "2021-04-19", "score": null, "label": null },
+        { "date": "2021-04-20", "score": null, "label": null },
+        { "date": "2021-04-21", "score": null, "label": null },
+        { "date": "2021-04-22", "score": null, "label": null },
+        { "date": "2021-04-23", "score": null, "label": null },
+        { "date": "2021-04-24", "score": null, "label": null },
+        { "date": "2021-04-25", "score": null, "label": null },
+        { "date": "2021-04-26", "score": null, "label": null },
+        { "date": "2021-04-27", "score": null, "label": null },
+        { "date": "2021-04-28", "score": null, "label": null },
+        { "date": "2021-04-29", "score": null, "label": null },
+        { "date": "2021-04-30", "score": null, "label": null },
+        { "date": "2021-05-01", "score": null, "label": null },
+        { "date": "2021-05-02", "score": null, "label": null },
+        { "date": "2021-05-03", "score": null, "label": null },
+        { "date": "2021-05-04", "score": null, "label": null },
+        { "date": "2021-05-05", "score": null, "label": null },
+        { "date": "2021-05-06", "score": null, "label": null },
+        { "date": "2021-05-07", "score": null, "label": null },
+        { "date": "2021-05-08", "score": null, "label": null },
+        { "date": "2021-05-09", "score": null, "label": null },
+        { "date": "2021-05-10", "score": null, "label": null },
+        { "date": "2021-05-11", "score": null, "label": null },
+        { "date": "2021-05-12", "score": null, "label": null },
+        { "date": "2021-05-13", "score": null, "label": null },
+        { "date": "2021-05-14", "score": null, "label": null },
+        { "date": "2021-05-15", "score": 64, "label": "GREED" },
+        { "date": "2021-05-16", "score": 56.36363636363636, "label": "GREED" },
+        { "date": "2021-05-17", "score": 70, "label": "GREED" },
+        { "date": "2021-05-18", "score": 73.84615384615384, "label": "GREED" },
+        { "date": "2021-05-19", "score": 62.857142857142854, "label": "GREED" },
+        { "date": "2021-05-20", "score": 60, "label": "GREED" },
+        { "date": "2021-05-21", "score": 65, "label": "GREED" },
+        { "date": "2021-05-22", "score": 67.05882352941177, "label": "GREED" },
+        { "date": "2021-05-23", "score": 61.11111111111112, "label": "GREED" },
+        {
+            "date": "2021-05-24",
+            "score": 51.57894736842104,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-05-25", "score": 67, "label": "GREED" },
+        { "date": "2021-05-26", "score": 66.66666666666666, "label": "GREED" },
+        { "date": "2021-05-27", "score": 55.45454545454546, "label": "GREED" },
+        { "date": "2021-05-28", "score": 59.1304347826087, "label": "GREED" },
+        { "date": "2021-05-29", "score": 66.66666666666667, "label": "GREED" },
+        { "date": "2021-05-30", "score": 60, "label": "GREED" },
+        {
+            "date": "2021-05-31",
+            "score": 45.38461538461539,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-06-01", "score": 41.48148148148148, "label": "FEAR" },
+        {
+            "date": "2021-06-02",
+            "score": 52.142857142857146,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-06-03",
+            "score": 45.51724137931035,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-06-04",
+            "score": 47.333333333333336,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-06-05", "score": 34.83870967741935, "label": "FEAR" },
+        { "date": "2021-06-06", "score": 37.5, "label": "FEAR" },
+        {
+            "date": "2021-06-07",
+            "score": 46.06060606060605,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-06-08", "score": 44.705882352941174, "label": "FEAR" },
+        { "date": "2021-06-09", "score": 38.85714285714285, "label": "FEAR" },
+        { "date": "2021-06-10", "score": 41.11111111111111, "label": "FEAR" },
+        { "date": "2021-06-11", "score": 36.21621621621622, "label": "FEAR" },
+        { "date": "2021-06-12", "score": 41.05263157894736, "label": "FEAR" },
+        { "date": "2021-06-13", "score": 41.02564102564103, "label": "FEAR" },
+        { "date": "2021-06-14", "score": 39.5, "label": "FEAR" },
+        { "date": "2021-06-15", "score": 39.51219512195122, "label": "FEAR" },
+        { "date": "2021-06-16", "score": 41.42857142857143, "label": "FEAR" },
+        { "date": "2021-06-17", "score": 41.86046511627907, "label": "FEAR" },
+        { "date": "2021-06-18", "score": 42.27272727272727, "label": "FEAR" },
+        {
+            "date": "2021-06-19",
+            "score": 47.55555555555556,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-06-20",
+            "score": 51.30434782608695,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-06-21",
+            "score": 49.78723404255319,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-06-22",
+            "score": 48.33333333333333,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-06-23", "score": 55.10204081632653, "label": "GREED" },
+        { "date": "2021-06-24", "score": 52, "label": "NEUTRAL" },
+        { "date": "2021-06-25", "score": 56.07843137254902, "label": "GREED" },
+        { "date": "2021-06-26", "score": 55, "label": "GREED" },
+        {
+            "date": "2021-06-27",
+            "score": 49.81132075471699,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-06-28", "score": 44.44444444444444, "label": "FEAR" },
+        { "date": "2021-06-29", "score": 41.090909090909086, "label": "FEAR" },
+        { "date": "2021-06-30", "score": 35.357142857142854, "label": "FEAR" },
+        { "date": "2021-07-01", "score": 35.43859649122807, "label": "FEAR" },
+        { "date": "2021-07-02", "score": 41.03448275862068, "label": "FEAR" },
+        {
+            "date": "2021-07-03",
+            "score": 45.08474576271187,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-04",
+            "score": 45.33333333333333,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-05",
+            "score": 49.83606557377048,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-06",
+            "score": 46.774193548387096,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-07",
+            "score": 52.698412698412696,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-07-08", "score": 52.1875, "label": "NEUTRAL" },
+        {
+            "date": "2021-07-09",
+            "score": 49.53846153846154,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-10",
+            "score": 45.151515151515156,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-11",
+            "score": 48.059701492537314,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-12",
+            "score": 50.588235294117645,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-13",
+            "score": 45.79710144927536,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-14",
+            "score": 45.14285714285714,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-07-15", "score": 42.25352112676056, "label": "FEAR" },
+        { "date": "2021-07-16", "score": 43.05555555555556, "label": "FEAR" },
+        {
+            "date": "2021-07-17",
+            "score": 46.02739726027398,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-07-18", "score": 55.4054054054054, "label": "GREED" },
+        {
+            "date": "2021-07-19",
+            "score": 51.46666666666666,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-20",
+            "score": 54.473684210526315,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-07-21", "score": 65.19480519480518, "label": "GREED" },
+        { "date": "2021-07-22", "score": 63.07692307692307, "label": "GREED" },
+        { "date": "2021-07-23", "score": 64.8101265822785, "label": "GREED" },
+        { "date": "2021-07-24", "score": 65, "label": "GREED" },
+        { "date": "2021-07-25", "score": 59.753086419753075, "label": "GREED" },
+        { "date": "2021-07-26", "score": 61.951219512195124, "label": "GREED" },
+        { "date": "2021-07-27", "score": 56.86746987951807, "label": "GREED" },
+        { "date": "2021-07-28", "score": 58.095238095238095, "label": "GREED" },
+        {
+            "date": "2021-07-29",
+            "score": 50.11764705882353,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-30",
+            "score": 49.53488372093023,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-07-31",
+            "score": 46.89655172413792,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-01",
+            "score": 45.68181818181818,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-02",
+            "score": 51.68539325842696,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-08-03", "score": 60.222222222222214, "label": "GREED" },
+        {
+            "date": "2021-08-04",
+            "score": 48.35164835164835,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-08-05", "score": 56.95652173913044, "label": "GREED" },
+        { "date": "2021-08-06", "score": 44.73118279569893, "label": "FEAR" },
+        {
+            "date": "2021-08-07",
+            "score": 45.74468085106382,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-08",
+            "score": 49.26315789473684,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-09",
+            "score": 51.04166666666667,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-08-10", "score": 44.329896907216494, "label": "FEAR" },
+        { "date": "2021-08-11", "score": 57.55102040816327, "label": "GREED" },
+        { "date": "2021-08-12", "score": 42.82828282828283, "label": "FEAR" },
+        { "date": "2021-08-13", "score": 49.4, "label": "NEUTRAL" },
+        {
+            "date": "2021-08-14",
+            "score": 47.128712871287135,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-15",
+            "score": 52.94117647058823,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-16",
+            "score": 53.786407766990294,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-08-17", "score": 60.38461538461538, "label": "GREED" },
+        { "date": "2021-08-18", "score": 69.33333333333333, "label": "GREED" },
+        { "date": "2021-08-19", "score": 63.77358490566037, "label": "GREED" },
+        { "date": "2021-08-20", "score": 60.373831775700936, "label": "GREED" },
+        { "date": "2021-08-21", "score": 61.29629629629629, "label": "GREED" },
+        {
+            "date": "2021-08-22",
+            "score": 48.440366972477065,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-08-23", "score": 43.27272727272727, "label": "FEAR" },
+        {
+            "date": "2021-08-24",
+            "score": 45.04504504504504,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-25",
+            "score": 49.82142857142857,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-26",
+            "score": 54.336283185840706,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-08-27", "score": 63.33333333333333, "label": "GREED" },
+        { "date": "2021-08-28", "score": 48.8695652173913, "label": "NEUTRAL" },
+        { "date": "2021-08-29", "score": 59.655172413793096, "label": "GREED" },
+        {
+            "date": "2021-08-30",
+            "score": 48.376068376068375,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-08-31",
+            "score": 47.11864406779661,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-09-01", "score": 43.36134453781513, "label": "FEAR" },
+        { "date": "2021-09-02", "score": 37.33333333333333, "label": "FEAR" },
+        { "date": "2021-09-03", "score": 40, "label": "FEAR" },
+        { "date": "2021-09-04", "score": 40.49180327868852, "label": "FEAR" },
+        {
+            "date": "2021-09-05",
+            "score": 46.66666666666667,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-09-06", "score": 39.193548387096776, "label": "FEAR" },
+        { "date": "2021-09-07", "score": 41.6, "label": "FEAR" },
+        {
+            "date": "2021-09-08",
+            "score": 54.44444444444444,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-09-09", "score": 55.59055118110236, "label": "GREED" },
+        { "date": "2021-09-10", "score": 59.53125, "label": "GREED" },
+        { "date": "2021-09-11", "score": 68.37209302325581, "label": "GREED" },
+        { "date": "2021-09-12", "score": 67.38461538461539, "label": "GREED" },
+        {
+            "date": "2021-09-13",
+            "score": 83.5114503816794,
+            "label": "EXTREME_GREED"
+        },
+        {
+            "date": "2021-09-14",
+            "score": 89.84848484848484,
+            "label": "EXTREME_GREED"
+        },
+        {
+            "date": "2021-09-15",
+            "score": 86.01503759398494,
+            "label": "EXTREME_GREED"
+        },
+        {
+            "date": "2021-09-16",
+            "score": 82.68656716417911,
+            "label": "EXTREME_GREED"
+        },
+        {
+            "date": "2021-09-17",
+            "score": 78.51851851851852,
+            "label": "EXTREME_GREED"
+        },
+        { "date": "2021-09-18", "score": 72.94117647058825, "label": "GREED" },
+        { "date": "2021-09-19", "score": 61.45985401459855, "label": "GREED" },
+        { "date": "2021-09-20", "score": 57.39130434782608, "label": "GREED" },
+        { "date": "2021-09-21", "score": 56.546762589928065, "label": "GREED" },
+        {
+            "date": "2021-09-22",
+            "score": 50.714285714285715,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-09-23", "score": 58.58156028368794, "label": "GREED" },
+        { "date": "2021-09-24", "score": 58.309859154929576, "label": "GREED" },
+        { "date": "2021-09-25", "score": 59.86013986013986, "label": "GREED" },
+        {
+            "date": "2021-09-26",
+            "score": 49.86111111111111,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-09-27",
+            "score": 45.37931034482759,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-09-28", "score": 42.1917808219178, "label": "FEAR" },
+        {
+            "date": "2021-09-29",
+            "score": 45.85034013605441,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-09-30",
+            "score": 46.08108108108108,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-01", "score": 48.7248322147651, "label": "NEUTRAL" },
+        {
+            "date": "2021-10-02",
+            "score": 47.333333333333336,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-03",
+            "score": 46.092715231788084,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-04",
+            "score": 45.52631578947368,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-05", "score": 45.359477124183, "label": "NEUTRAL" },
+        {
+            "date": "2021-10-06",
+            "score": 49.61038961038961,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-07",
+            "score": 46.58064516129033,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-08",
+            "score": 51.28205128205129,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-09", "score": 44.840764331210195, "label": "FEAR" },
+        { "date": "2021-10-10", "score": 44.55696202531645, "label": "FEAR" },
+        {
+            "date": "2021-10-11",
+            "score": 50.81761006289308,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-12", "score": 49.125, "label": "NEUTRAL" },
+        {
+            "date": "2021-10-13",
+            "score": 46.45962732919254,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-14",
+            "score": 47.777777777777786,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-15",
+            "score": 50.42944785276073,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-16",
+            "score": 48.90243902439024,
+            "label": "NEUTRAL"
+        },
+        {
+            "date": "2021-10-17",
+            "score": 49.57575757575758,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-18", "score": 57.95180722891566, "label": "GREED" },
+        {
+            "date": "2021-10-19",
+            "score": 54.61077844311377,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-20", "score": 59.88095238095239, "label": "GREED" },
+        { "date": "2021-10-21", "score": 59.171597633136095, "label": "GREED" },
+        { "date": "2021-10-22", "score": 66.11764705882352, "label": "GREED" },
+        { "date": "2021-10-23", "score": 62.456140350877185, "label": "GREED" },
+        {
+            "date": "2021-10-24",
+            "score": 52.325581395348834,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-25", "score": 57.341040462427735, "label": "GREED" },
+        {
+            "date": "2021-10-26",
+            "score": 54.367816091954026,
+            "label": "NEUTRAL"
+        },
+        { "date": "2021-10-27", "score": 57.25714285714285, "label": "GREED" }
+    ]
+}
