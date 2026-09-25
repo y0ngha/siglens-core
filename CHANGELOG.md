@@ -1,5 +1,17 @@
 # Changelog
 
+# [1.17.0](https://github.com/y0ngha/siglens-core/compare/v1.16.0...v1.17.0) (2026-09-25)
+
+### Bug Fixes
+
+* **signals:** evaluatePullback·classifyPullback JSDoc과 가드 분기 테스트 보강 ([494942f](https://github.com/y0ngha/siglens-core/commit/494942f2992a92240fba8c184b8386f8f3a3dd73)), closes [#227](https://github.com/y0ngha/siglens-core/issues/227)
+
+### Features
+
+* **agent:** get_bars_indicators pullback 필드 계약과 눌림 판독 전달 규칙 추가 ([694ae99](https://github.com/y0ngha/siglens-core/commit/694ae9950256760cdba0519277b97e5f9c5deed0))
+* **analysis:** 컨플루언스 신뢰도를 서술용으로 철회하고 일봉 Short-Term Washout 블록 추가 ([95e3a52](https://github.com/y0ngha/siglens-core/commit/95e3a52b8458b4d6c8fca694b94ba5086c093436))
+* **signals:** 일봉 단기 과매도 눌림 판독 evaluatePullback 추가 ([8a1ab3b](https://github.com/y0ngha/siglens-core/commit/8a1ab3b79dd5974914cf2470b1c2cb75e6654f07))
+
 # [1.16.0](https://github.com/y0ngha/siglens-core/compare/v1.15.1...v1.16.0) (2026-09-24)
 
 ### Features
