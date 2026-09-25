@@ -6,7 +6,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-09-20.2';
+export const AGENT_PROMPT_VERSION = '2026-09-25.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -179,7 +179,9 @@ function ruleLines(
         available.has('get_news') &&
             `- If get_news returns nothing useful for the period the user asks about, ${newsGapRule}.`,
         available.has('get_bars_indicators') &&
-            '- When you called get_bars_indicators for a symbol question, reflect its confluence reading: at the Detailed level state the score and that it is a rule-based indicator tally, not a forecast; at the Plain level say in words how much the indicators agree, with no score or "/100" figure. If it is null, never guess an agreement: at both levels say briefly that the trading history is too short for this indicator tally (Plain: in one plain clause, no jargon).',
+            '- When you called get_bars_indicators for a symbol question, reflect its confluence reading: at the Detailed level state the score and that it is a rule-based indicator tally, not a forecast (it has no measured forward edge); at the Plain level say in words how much the indicators agree, with no score or "/100" figure. If it is null, never guess an agreement: at both levels say briefly that the trading history is too short for this indicator tally (Plain: in one plain clause, no jargon).',
+        available.has('get_bars_indicators') &&
+            '- Washout reading: when a get_bars_indicators result carries a pullback whose reading is not none, reflect it next to the confluence reading. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200). When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself.',
         available.has('get_quote') &&
             "- If a quote's quoteDelayMinutes is greater than 0, say the quote is delayed by that many minutes; never present it as real-time.",
         '- If a tool returns an error, tell the user what could not be fetched; never fabricate a substitute.',
