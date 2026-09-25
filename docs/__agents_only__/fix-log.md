@@ -223,3 +223,17 @@
   - Rule: (new) SDK를 올릴 때는 어댑터가 분기하는 **열거형 응답값**(stop_reason / finishReason 등)의 union을 구·신 `.d.ts`로 diff한다 — 새 값은 목(mock) 테스트로도 실키 스모크로도 드러나지 않고 catch-all로 조용히 흡수된다
   - Context: `truncated`(max_tokens | model_context_window_exceeded) 하나로 구조화 출력 가드와 MAX_TOKENS_CODE 분기를 함께 태움. 되돌리면 실패하는 테스트 2건 추가
 - Decision (not a violation): tsc-alias 1.9.x는 dist의 모든 상대 import에 `.js`를 붙인다(359파일). TS 5.9 유지 중엔 이득이 없어 `~1.8.17`로 고정 — dist가 게시된 1.14.0 tarball과 바이트 동일함을 확인. 1.9는 TS 6 전환 때 함께 올릴 것
+
+## [Branch claude/siglens-analysis-technique-review-wvfffz | 2026-09-25] — Analysis techniques review R1→R3
+
+### Round 1 findings (required, all fixed)
+
+- Violation 2: `bars as Bar[]` type assertion (readonly → mutable) in `src/domain/signals/pullback.ts` without a justifying why/why-safe comment
+  Rule: MISTAKES.md TypeScript #7 — Using `as` type assertions without explanation
+  Context: Fixed by adding comment explaining the cast is safe and the runtime invariant that justifies it.
+
+- Violation 3: Prompt behavior change (enter/avoid rule, Confluence Assessment lines) had no test coverage in `src/__tests__/domain/analysis/prompt.test.ts`
+  Rule: MISTAKES.md Tests #5.5 — New conditional branches require dedicated test cases
+  Context: Fixed with positive+negative assertion pairs to verify branch behavior and rule enforcement.
+
+### Round 3: approved

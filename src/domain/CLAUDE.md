@@ -136,8 +136,19 @@ and nothing about it could be checked. And the categories were coarser than the 
 warrants: every trend indicator was one bucket, while RSI, StochRSI and Connors RSI —
 three transforms of the same close series, all rendered separately in `## Indicator
 Values` — could each be read as independent confirmation. `evaluateConfluence` already
-answers that question correctly and is the same engine the trading consumer scores with,
-so the section renders its output and the instruction now says *do not recount*.
+answers that question correctly, so the section renders its output and the instruction
+now says *do not recount*.
+
+**The tally is descriptive, not evidence.** It used to be rendered with backtest authority
+because the trading consumer scored with the same engine. That consumer retired the rule on
+2026-09-24, and a re-measurement of this exact daily configuration (point-in-time S&P 500
+2000–2020 + large caps 2024–26) found entry-rule days *below* the baseline over 10 days in
+all five periods and exit-rule days above it in three of five, level with it (−0.01
+point) in a fourth and below it in 2007–09. Every `Reliability:`
+line therefore says "descriptive only — no measured forward edge", and the verdict rules no
+longer treat bullish confluence as a reason for "enter" or bearish confluence as a reason
+for "avoid". Do not reintroduce authority without a forward-return-vs-baseline measurement
+(spec 2026-09-25-pullback-washout-design.md).
 
 `CONFLUENCE_PARAMS_BY_TIMEFRAME` is the one place the rule varies by chart. `1Day`
 restores the thresholds the original backtest used (3 families, `expected` at full
@@ -174,6 +185,27 @@ risk:reward block then found no usable level and vanished; it now says "not meas
 instead. Its legs use raw distances — the noise band already bounds both. A full-bar-range
 floor on the risk leg alone was tried and removed: it flipped 34 of 90 real-chart verdicts
 below 1.0 and made the verdict sentence false.
+
+## Short-term washout (`signals/pullback.ts`)
+
+`evaluatePullback(bars)` reads the last daily bar as a washout inside a long-term uptrend
+(close above MA200, Williams %R(14) ≤ −90), a near washout (−90 < %R ≤ −80 above MA200), a
+washout below MA200, or none. It is the reading siglens-trader switched its rule to on
+2026-09-24 (RSI(2) < 10 above MA200), re-measured on independent data: ahead of the
+any-day-above-MA200 baseline in every period 2000–2026, with MA5-exit trades winning
+66–75%. Williams %R is the classifier because it measured as well as or better than RSI(2)
+and is the oscillator the chart prompt already prints; `rsi2` is reported for reference.
+
+- **Daily only.** The measurement is on daily bars and MA200 on an intraday chart is a
+  different object — `formatDeterministicMetricsSection` renders the block on `1Day` only,
+  and consumers gate on the timeframe too.
+- **Base rates travel with the reading.** `PULLBACK_BASE_RATES` holds the measured sentence
+  per reading. Tool results and the prompt carry it verbatim so a model quotes the figures
+  instead of inventing them. Each sentence opens with "Historical base rate, not an
+  instruction" — the reading names a chart state, never an action.
+- **The interaction with the tally is the point.** On washout days the confluence tally
+  reads bearish about two thirds of the time; without the reading beside it the tally pulls
+  the verdict the wrong way on exactly the charts with the measured edge.
 
 ## Prompt number rendering (`analysis/promptFormat.ts`)
 
