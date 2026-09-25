@@ -153,10 +153,6 @@
   Rule: Test conventions — new helper module requires dedicated .test.ts file
   Context: New helper module added without corresponding test file. Fixed by adding dedicated test file following module sibling convention.
 
-- Violation 4: Untested conditional branch (undefined case)
-  Rule: MISTAKES.md Tests #5.5 — New conditional branches require dedicated test cases
-  Context: Branch handling undefined case added but not covered by test. Fixed by adding test case exercising the undefined path explicitly.
-
 ## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R2
 
 - Violation 3: Test fixture carried provider field not present in CachedNewsDigest interface type
@@ -232,8 +228,14 @@
   Rule: MISTAKES.md TypeScript #7 — Using `as` type assertions without explanation
   Context: Fixed by adding comment explaining the cast is safe and the runtime invariant that justifies it.
 
-- Violation 3: Prompt behavior change (enter/avoid rule, Confluence Assessment lines) had no test coverage in `src/__tests__/domain/analysis/prompt.test.ts`
-  Rule: MISTAKES.md Tests #5.5 — New conditional branches require dedicated test cases
-  Context: Fixed with positive+negative assertion pairs to verify branch behavior and rule enforcement.
-
 ### Round 3: approved
+
+## [PR #227 | feat/siglens-analysis-technique-review | 2026-09-25] — PR-fix round: pullback public API JSDoc & test guards
+
+- Violation 1 (BLOCKER): `evaluatePullback` and `classifyPullback` in `src/domain/signals/pullback.ts` are Tier 2 public API but lacked @param/@returns JSDoc
+  Rule: MISTAKES.md Documentation Sync #4.5 — Tier 2 public functions missing @param/@returns JSDoc
+  Context: Sibling `evaluateConfluence` had full JSDoc. Fixed by adding @param and @returns tags documenting each parameter and return type per CONVENTIONS.md Tier 2 requirement.
+
+- Violation 3 (SUGGESTION): PullbackSnapshot interface fields (reading/close/ma200) lacked one-line JSDoc per field
+  Rule: CONVENTIONS.md — Tier 4 interface fields require per-field JSDoc
+  Context: Type is part of public analysis result shape. Fixed by adding concise JSDoc to each field per CONVENTIONS.md Tier 4 standard.
