@@ -688,9 +688,25 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * stop only fractionally below entry no longer prepends the deterministic
  * `reconciledLevels.riskReward` line with `-0.0%`.
  *
+ * @remarks
+ * **`p16`** — confluence authority withdrawn, washout reading added (spec
+ * 2026-09-25-pullback-washout-design.md). `## Deterministic Metrics` no longer
+ * tells the model to treat a met daily confluence rule as "strong evidence":
+ * every `Reliability:` line now says the tally is descriptive and has no
+ * measured forward edge (re-measured 2000–2026: daily entry-rule days trailed
+ * the baseline in all five periods). On `1Day` charts a new
+ * `### Short-Term Washout (rule engine, 1Day bars)` block renders
+ * `evaluatePullback` — close vs MA200, Williams %R(14), RSI(2), the MA5 exit
+ * reference, the reading and its measured base rate. `entryRecommendation`
+ * rules follow: "enter" accepts a washout-in-uptrend reading in place of the
+ * old "bullish confluence from 2+ categories", and a bearish tally alone is no
+ * longer a reason for "avoid". `### Confluence Assessment` gains two lines
+ * (tally is descriptive; state a washout reading next to it). Bytes change for
+ * every request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p15' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p16' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

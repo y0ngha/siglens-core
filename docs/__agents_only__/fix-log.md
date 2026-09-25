@@ -153,10 +153,6 @@
   Rule: Test conventions — new helper module requires dedicated .test.ts file
   Context: New helper module added without corresponding test file. Fixed by adding dedicated test file following module sibling convention.
 
-- Violation 4: Untested conditional branch (undefined case)
-  Rule: MISTAKES.md Tests #5.5 — New conditional branches require dedicated test cases
-  Context: Branch handling undefined case added but not covered by test. Fixed by adding test case exercising the undefined path explicitly.
-
 ## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R2
 
 - Violation 3: Test fixture carried provider field not present in CachedNewsDigest interface type
@@ -223,3 +219,23 @@
   - Rule: (new) SDK를 올릴 때는 어댑터가 분기하는 **열거형 응답값**(stop_reason / finishReason 등)의 union을 구·신 `.d.ts`로 diff한다 — 새 값은 목(mock) 테스트로도 실키 스모크로도 드러나지 않고 catch-all로 조용히 흡수된다
   - Context: `truncated`(max_tokens | model_context_window_exceeded) 하나로 구조화 출력 가드와 MAX_TOKENS_CODE 분기를 함께 태움. 되돌리면 실패하는 테스트 2건 추가
 - Decision (not a violation): tsc-alias 1.9.x는 dist의 모든 상대 import에 `.js`를 붙인다(359파일). TS 5.9 유지 중엔 이득이 없어 `~1.8.17`로 고정 — dist가 게시된 1.14.0 tarball과 바이트 동일함을 확인. 1.9는 TS 6 전환 때 함께 올릴 것
+
+## [Branch claude/siglens-analysis-technique-review-wvfffz | 2026-09-25] — Analysis techniques review R1→R3
+
+### Round 1 findings (required, all fixed)
+
+- Violation 2: `bars as Bar[]` type assertion (readonly → mutable) in `src/domain/signals/pullback.ts` without a justifying why/why-safe comment
+  Rule: MISTAKES.md TypeScript #7 — Using `as` type assertions without explanation
+  Context: Fixed by adding comment explaining the cast is safe and the runtime invariant that justifies it.
+
+### Round 3: approved
+
+## [PR #227 | feat/siglens-analysis-technique-review | 2026-09-25] — PR-fix round: pullback public API JSDoc & test guards
+
+- Violation 1 (BLOCKER): `evaluatePullback` and `classifyPullback` in `src/domain/signals/pullback.ts` are Tier 2 public API but lacked @param/@returns JSDoc
+  Rule: MISTAKES.md Documentation Sync #4.5 — Tier 2 public functions missing @param/@returns JSDoc
+  Context: Sibling `evaluateConfluence` had full JSDoc. Fixed by adding @param and @returns tags documenting each parameter and return type per CONVENTIONS.md Tier 2 requirement.
+
+- Violation 3 (SUGGESTION): PullbackSnapshot interface fields (reading/close/ma200) lacked one-line JSDoc per field
+  Rule: CONVENTIONS.md — Tier 4 interface fields require per-field JSDoc
+  Context: Type is part of public analysis result shape. Fixed by adding concise JSDoc to each field per CONVENTIONS.md Tier 4 standard.

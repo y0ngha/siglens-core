@@ -105,6 +105,16 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_bars_indicators')?.description).toContain(
             'ma50Pct'
         );
+        // pullback — the 1Day short-term washout reading siglens adds (field names are the contract).
+        const bars = findToolSpec('get_bars_indicators')?.description ?? '';
+        expect(bars).toContain('`pullback`');
+        expect(bars).toContain(
+            'washoutInUptrend | nearWashoutInUptrend | washoutBelowMa200 | none'
+        );
+        expect(bars).toContain('williamsR, rsi2, closeVsMa200Pct, ma5');
+        expect(bars).toContain('`measured`');
+        // confluence is described as descriptive, not as a signal with an edge.
+        expect(bars).toContain('descriptive, with no measured forward edge');
         expect(findToolSpec('get_cached_analysis')?.description).toContain(
             'sinceAnalysis'
         );

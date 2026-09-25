@@ -147,6 +147,21 @@ export type {
     ConfluenceSnapshot,
     EvaluateConfluenceOptions,
 } from './domain/signals/confluence';
+export {
+    classifyPullback,
+    evaluatePullback,
+    PULLBACK_BASE_RATES,
+    PULLBACK_EXIT_MA_PERIOD,
+    PULLBACK_NEAR_WILLIAMS_R,
+    PULLBACK_RSI_PERIOD,
+    PULLBACK_TREND_MA_PERIOD,
+    PULLBACK_WASHOUT_WILLIAMS_R,
+    PULLBACK_WILLIAMS_R_PERIOD,
+} from './domain/signals/pullback';
+export type {
+    PullbackReading,
+    PullbackSnapshot,
+} from './domain/signals/pullback';
 // Exported so consumers stop re-implementing a moving average the library already has.
 export { calculateMA } from './domain/indicators/ma';
 

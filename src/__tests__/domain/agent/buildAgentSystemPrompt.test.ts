@@ -183,6 +183,10 @@ describe('buildAgentSystemPrompt', () => {
     it.each([
         ['get_news', 'If get_news returns nothing useful'],
         ['get_bars_indicators', 'reflect its confluence reading'],
+        [
+            'get_bars_indicators',
+            'Washout reading: when a get_bars_indicators result carries a pullback',
+        ],
         ['get_quote', 'quoteDelayMinutes is greater than 0'],
         ['run_fresh_analysis', 'call run_fresh_analysis right away'],
     ])(
@@ -283,7 +287,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-20.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-09-25.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -292,9 +296,26 @@ describe('buildAgentSystemPrompt', () => {
             'about a symbol → get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
         );
         expect(prompt).toContain('reflect its confluence reading');
+        // 컨플루언스는 예측이 아니라 서술용 집계다 — 측정된 우위가 없다(2026-09-25 재측정).
+        expect(prompt).toContain(
+            'not a forecast (it has no measured forward edge)'
+        );
         // 방향을 묻지 않는 질문(실적·재무·뉴스·의회 거래만)에는 붙이지 않는다.
         expect(prompt).toContain(
             'a question only about earnings, financials, news or congressional trades does not need it'
+        );
+    });
+
+    /** 눌림 판독(pullback)은 과거 기저율로만 전하고, 약세 집계와 함께 나오면 정상 상태라고 밝힌다(2026-09-25). */
+    it('pullback 판독을 컨플루언스 옆에 전하되 매수 지시가 아니라 기저율로 다루게 한다', () => {
+        expect(prompt).toContain(
+            'a historical base rate, never a buy instruction'
+        );
+        expect(prompt).toContain(
+            'When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks'
+        );
+        expect(prompt).toContain(
+            'which has been the riskier case (washoutBelowMa200)'
         );
     });
 

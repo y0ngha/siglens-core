@@ -4596,6 +4596,60 @@ describe('prompt', () => {
                 'Pattern detection, SMC structure, and support/resistance are yours to judge'
             );
         });
+
+        it('treats the tally as descriptive and pairs it with the washout reading', () => {
+            // Re-measured 2026-09: the daily entry rule trailed the baseline in every period,
+            // and on washout days the tally reads bearish about two thirds of the time. The
+            // prompt must not let a bearish tally overrule a measured washout on its own.
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+            expect(result).toContain(
+                'never as the reason for a verdict on its own'
+            );
+            expect(result).toContain(
+                'When ## Deterministic Metrics shows a Short-Term Washout reading other than none, state it next to the tally with its Measured line'
+            );
+            expect(result).toContain(
+                "a bearish tally is that reading's normal state rather than evidence against it"
+            );
+        });
+    });
+
+    describe('entryRecommendation 판단 규칙 (컨플루언스 권위 철회, 2026-09-25)', () => {
+        const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
+        const result = () =>
+            buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+
+        it('"enter"는 bullish confluence 대신 지지 근처 또는 상승 추세 안의 washout 판독을 근거로 받는다', () => {
+            const out = result();
+            expect(out).toContain(
+                '"enter": price near support, or a Short-Term Washout reading of washout in an uptrend in ## Deterministic Metrics (daily charts), + risk level not high'
+            );
+            expect(out).not.toContain('bullish confluence from 2+ categories');
+        });
+
+        it('"avoid"는 약세 집계만으로 정하지 않는다', () => {
+            const out = result();
+            expect(out).toContain(
+                'A bearish indicator tally alone is not a reason for "avoid"'
+            );
+            expect(out).not.toContain('bearish confluence dominates');
+        });
+
+        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 그대로 둔다', () => {
+            expect(result()).toContain(
+                'A met confluence entry rule does not override this'
+            );
+        });
     });
 
     describe('타임프레임별 프롬프트 파라미터', () => {
