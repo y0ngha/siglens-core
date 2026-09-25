@@ -162,6 +162,28 @@ describe('evaluatePullback', () => {
             zero[zero.length - 1] = { ...zero[zero.length - 1]!, close: 0 };
             expect(evaluatePullback(zero)).toBeNull();
         });
+
+        // 아래 세 케이스는 봉 수·마지막 종가 가드를 통과한 입력으로 MA200/%R 가드 자체를 검증한다.
+        it('MA200 창 안의 과거 종가가 비유한값이면 MA200을 만들 수 없어 기권한다', () => {
+            const bars = buildBars(linear(250, 100, 0.5));
+            // 마지막 14봉(%R 창) 밖, MA200 창 안의 봉 — 누적합이 NaN이 된다.
+            bars[100] = { ...bars[100]!, close: NaN };
+            expect(Number.isFinite(bars.at(-1)!.close)).toBe(true);
+            expect(evaluatePullback(bars)).toBeNull();
+        });
+
+        it('MA200이 0 이하이면(음수 가격이 섞인 비정상 계열) 기권한다', () => {
+            // 과거 종가가 음수라 평균이 음수 — 마지막 종가만 양수.
+            const closes = [...Array.from({ length: 249 }, () => -100), 1];
+            expect(evaluatePullback(buildBars(closes))).toBeNull();
+        });
+
+        it('Williams %R을 만들 수 없으면(창 안 고가가 비유한값) 기권한다', () => {
+            const bars = buildBars(linear(250, 100, 0.5));
+            // MA200은 종가만 읽으므로 온전하고, %R 창의 최고가만 NaN이 된다.
+            bars[bars.length - 1] = { ...bars[bars.length - 1]!, high: NaN };
+            expect(evaluatePullback(bars)).toBeNull();
+        });
     });
 });
 

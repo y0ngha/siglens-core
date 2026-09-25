@@ -18,8 +18,11 @@ export type PullbackReading =
 
 /** Result of {@link evaluatePullback}. Every number is taken at the last bar. */
 export interface PullbackSnapshot {
+    /** The reading at the last bar, from {@link classifyPullback}. */
     reading: PullbackReading;
+    /** Last bar's close. */
     close: number;
+    /** {@link PULLBACK_TREND_MA_PERIOD}-bar simple moving average of closes — the trend filter. */
     ma200: number;
     /** `(close - ma200) / ma200 * 100`. */
     closeVsMa200Pct: number;
@@ -73,6 +76,11 @@ export const PULLBACK_BASE_RATES: Readonly<
  *
  * `nearWashoutInUptrend` exists only above MA200: below it, a %R between -90 and -80 has no
  * measured meaning distinct from an ordinary down move.
+ *
+ * @param aboveMa200 - Whether the last close is above its {@link PULLBACK_TREND_MA_PERIOD}-bar average.
+ * @param williamsR - Williams %R over {@link PULLBACK_WILLIAMS_R_PERIOD} bars at the same bar.
+ * @returns The reading; `'none'` when %R is above {@link PULLBACK_NEAR_WILLIAMS_R} (or above
+ *   {@link PULLBACK_WASHOUT_WILLIAMS_R} below MA200).
  */
 export function classifyPullback(
     aboveMa200: boolean,
@@ -102,6 +110,11 @@ const lastOf = (series: readonly (number | null)[]): number | null => {
  * The measurement behind {@link PULLBACK_BASE_RATES} is on **daily** bars only. The
  * function does not know the timeframe; rendering it for an intraday chart would put an
  * unmeasured claim in front of the reader, so callers gate on the timeframe.
+ *
+ * @param bars - Daily bars, oldest first; at least {@link PULLBACK_TREND_MA_PERIOD} are needed.
+ * @returns The snapshot at the last bar, or `null` when the reading cannot be taken (too few
+ *   bars, a non-finite or non-positive last close, an MA200 that is non-finite or non-positive,
+ *   or no Williams %R).
  *
  * @example
  * ```ts

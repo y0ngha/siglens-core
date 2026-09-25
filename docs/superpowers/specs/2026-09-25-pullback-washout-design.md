@@ -51,7 +51,7 @@ P4 2015~20.11 / P5 2024.07~26.09. 기준선 = MA200 위 모든 날. 지표·컨�
 
 ### 2.1 `evaluatePullback(bars): PullbackSnapshot | null` (`domain/signals/pullback.ts`)
 
-- 입력: 일봉(오래된 것부터). 200봉 미만·마지막 종가 비유한/0 이하·%R 없음 → `null`(기권).
+- 입력: 일봉(오래된 것부터). 200봉 미만·마지막 종가 비유한/0 이하·MA200 비유한/0 이하·%R 없음 → `null`(기권).
 - 출력: `reading`, `close`, `ma200`, `closeVsMa200Pct`, `ma5`, `williamsR`, `rsi2`.
 - 분류(`classifyPullback`): %R ≤ −90 → MA200 위 `washoutInUptrend` / 아니면 `washoutBelowMa200`;
   MA200 위 ∧ −90 < %R ≤ −80 → `nearWashoutInUptrend`; 그 외 `none`. MA200 아래의 −80~−90은 측정상 구분되는
