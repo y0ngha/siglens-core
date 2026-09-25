@@ -144,7 +144,7 @@ describe('formatDeterministicMetricsSection', () => {
             reference()
         );
         expect(out).toContain('Entry rule (>= 3 weighted bullish families');
-        expect(out).toContain('thresholds the original backtest used');
+        expect(out).toContain('Reliability: Daily, descriptive only');
     });
 
     it('skips levels inside half the mean bar range when picking the risk:reward pair', () => {
@@ -210,17 +210,21 @@ describe('formatDeterministicMetricsSection', () => {
         );
     });
 
-    it('does not claim the backtest win rate for the family-counting variant', () => {
-        // The measured 70% was produced by a rule that counted signal TYPES. Restoring the
-        // thresholds does not restore the counting unit, and a prompt line that says
-        // otherwise hands the model a validated-sounding number for an unvalidated rule.
+    it('renders the daily rule as descriptive, with the re-measurement instead of the old win rate', () => {
+        // The old 70% came from a rule that counted signal TYPES and was never compared
+        // with a baseline; re-measured (2000–2026) the daily entry rule trailed the
+        // baseline in every period. The prompt must say so rather than lend it authority.
         const out = formatDeterministicMetricsSection(
             enough,
             '1Day',
             reference()
         );
-        expect(out).toContain('not the measured rule itself');
-        expect(out).not.toContain('measured at a 70% win rate');
+        expect(out).toContain(
+            'days with this entry rule met were followed by below-baseline 10-day returns in every period'
+        );
+        expect(out).toContain('not as evidence for or against entering');
+        expect(out).not.toContain('strong evidence');
+        expect(out).not.toContain('70%');
     });
 
     it('leaves the exit threshold below the raised daily entry threshold', () => {
@@ -240,7 +244,8 @@ describe('formatDeterministicMetricsSection', () => {
             '30Min',
             reference()
         );
-        expect(out).toContain('unvalidated parameters');
+        expect(out).toContain('Reliability: Intraday, descriptive only');
+        expect(out).toContain('no measured forward edge on intraday bars');
         expect(out).not.toContain('70% win rate');
     });
 
@@ -386,5 +391,81 @@ describe('formatDeterministicMetricsSection — risk leg', () => {
             'Structural risk:reward from current price = 13.33'
         );
         expect(out).not.toContain('floored');
+    });
+});
+
+describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
+    const shortDaily = bars(CONFLUENCE_MIN_BARS + 5);
+
+    /** 250 daily bars rising, the last one dropping below the 14-bar low — still above MA200. */
+    function washoutBars(): Bar[] {
+        const closes = [
+            ...Array.from({ length: 249 }, (_, i) => 100 + i * 0.5),
+            205,
+        ];
+        return closes.map((close, i) => ({
+            time: 1700000000 + i * 86400,
+            open: close,
+            high: close + 1,
+            low: close - 1,
+            close,
+            volume: 1000 + i,
+        }));
+    }
+
+    it('renders the reading, its inputs and the measured base rate on a daily washout, between the tally and risk:reward', () => {
+        const out = formatDeterministicMetricsSection(
+            washoutBars(),
+            '1Day',
+            reference()
+        );
+        expect(out).toContain(
+            '### Short-Term Washout (rule engine, 1Day bars)'
+        );
+        expect(out).toContain('Reading: washout in an uptrend');
+        expect(out).toMatch(/Williams %R\(14\): -\d/);
+        expect(out).toContain('RSI(2): ');
+        expect(out).toContain('Exit reference MA5: ');
+        expect(out).toContain(
+            'Measured: Historical base rate, not an instruction.'
+        );
+        const washoutAt = out.indexOf('### Short-Term Washout');
+        expect(washoutAt).toBeGreaterThan(
+            out.indexOf('### Indicator Confluence')
+        );
+        expect(washoutAt).toBeLessThan(
+            out.indexOf('### Risk:Reward From Current Price')
+        );
+    });
+
+    it('prints no base rate when the reading is none', () => {
+        const out = formatDeterministicMetricsSection(
+            bars(260, 100, 0.4),
+            '1Day',
+            reference()
+        );
+        expect(out).toContain('Reading: none');
+        expect(out).not.toContain('Measured: Historical base rate');
+    });
+
+    it('says the reading is not measurable below 200 daily bars instead of omitting it', () => {
+        const out = formatDeterministicMetricsSection(
+            shortDaily,
+            '1Day',
+            reference()
+        );
+        expect(out).toContain('### Short-Term Washout');
+        expect(out).toContain(
+            `the reading needs 200 daily bars for MA200 and received ${shortDaily.length}`
+        );
+    });
+
+    it('is not rendered on intraday charts, where it was never measured', () => {
+        const out = formatDeterministicMetricsSection(
+            washoutBars(),
+            '30Min',
+            reference()
+        );
+        expect(out).not.toContain('Short-Term Washout');
     });
 });

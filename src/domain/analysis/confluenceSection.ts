@@ -13,6 +13,13 @@ import {
     CONFLUENCE_MIN_BARS,
     type ConfluenceSnapshot,
 } from '@/domain/signals/confluence';
+import {
+    evaluatePullback,
+    PULLBACK_BASE_RATES,
+    PULLBACK_TREND_MA_PERIOD,
+    type PullbackReading,
+    type PullbackSnapshot,
+} from '@/domain/signals/pullback';
 import type {
     Bar,
     MarketReference,
@@ -24,8 +31,9 @@ import type {
 /**
  * Deterministic chart facts rendered into the analysis prompt.
  *
- * Two numbers the model was previously asked to produce itself now arrive pre-computed:
- * the indicator-confluence tally and the risk:reward available from the current price.
+ * Numbers the model was previously asked to produce itself now arrive pre-computed: the
+ * indicator-confluence tally, the short-term washout reading (daily charts) and the
+ * risk:reward available from the current price.
  *
  * **Why confluence moved out of the model.** The prompt used to instruct: *"Count
  * confirming signals from different categories … Strong confluence: 3+ categories agree."*
@@ -34,8 +42,23 @@ import type {
  * warrants — every trend indicator collapsed into one bucket while RSI, StochRSI and
  * Connors RSI, which are three transforms of the same close series, could each be read as
  * separate confirmation. The rule engine counts **indicator families**, which is the
- * correction, and it is the same engine an auto-trader downstream already scores with, so
- * the two stop drifting apart.
+ * correction.
+ *
+ * **What the tally is not.** It was rendered with backtest authority because an
+ * auto-trader downstream scored with the same engine. That trader retired the rule on
+ * 2026-09-24 after its own measurement, and a re-measurement of this exact daily
+ * configuration (point-in-time S&P 500 2000–2020 plus large caps 2024–26) found days with
+ * the entry rule met followed by *below*-baseline 10-day returns in all five periods, and
+ * exit-rule days by returns above the baseline in three of five periods and level with it in a
+ * fourth (2000–07, 0.01 point below; 2007–09 was below). The tally is rendered as a
+ * description of indicator agreement, not as evidence for or against entering
+ * (docs/superpowers/specs/2026-09-25-pullback-washout-design.md).
+ *
+ * **Why the washout reading is here.** The same re-measurement found the reading
+ * siglens-trader switched to — a short-term washout inside a long-term uptrend — ahead of
+ * its baseline in every period. On those days the tally reads bearish about two thirds of
+ * the time, so without the reading next to it the tally pulls the verdict the wrong way on
+ * exactly the charts where the measured edge is.
  *
  * **Why risk:reward moved out.** Measured over 426 production ticks: the nearest
  * resistance sat *below* the current price 14.6% of the time, and the median upside to the
@@ -73,8 +96,11 @@ export interface TimeframeConfluenceParams {
  * The daily row restores the two **constants** the original backtest used — a threshold of
  * three and `expected` signals counted in full. That backtest ran on daily bars with a
  * ten-day hold and won its comparison at 70% versus 61.5% for an LLM read over the same
- * window, so the daily chart is the one place those constants mean what they were measured
- * to mean.
+ * window. **It did not survive re-measurement against a baseline**: in 2026-09, this daily
+ * configuration's met entry rule trailed the any-day baseline over 10 days in all five
+ * periods tested, and siglens-trader found the original rule indistinguishable from its
+ * baseline over 2015–26. The constants stay (they define the tally the prompt describes);
+ * the authority does not — see {@link CONFLUENCE_RELIABILITY}.
  *
  * It is **not** a restoration of the backtested rule. The engine counts indicator families
  * where the measured rule counted signal types, and that difference is not undone here.
@@ -87,7 +113,8 @@ export interface TimeframeConfluenceParams {
  * signals. A 30-minute bar is not a small daily bar — the same "three signals" threshold
  * is reached far more often and by weaker evidence — so the intraday side trades the
  * backtest's authority for constants that produce a comparable signal rate. **The intraday
- * variant has not been backtested at all.**
+ * variant has not been backtested at all.** (siglens-trader's 1-hour measurement of its own
+ * gated variant found no advantage over the baseline after costs.)
  */
 export const CONFLUENCE_PARAMS_BY_TIMEFRAME: Record<
     Timeframe,
@@ -102,23 +129,23 @@ export const CONFLUENCE_PARAMS_BY_TIMEFRAME: Record<
 };
 
 /**
- * How much authority a met entry rule carries on each timeframe.
+ * How much authority a met rule carries on each timeframe — as measured, none.
  *
- * Mirrors the existing `Timeframe interpretation` line rather than inventing a second,
- * possibly contradictory reliability scale: the daily row is the validated one, the
- * intraday rows are not.
+ * Every row says the same thing in the chart's own terms: the tally describes how many
+ * indicator families agree, and neither rule has a measured forward edge. The daily row
+ * carries the numbers because the daily configuration is the one that was measured
+ * directly; intraday rows point at the 1-hour measurement, the only intraday one there is.
  */
+const INTRADAY_RELIABILITY =
+    'Intraday, descriptive only — the rule has no measured forward edge on intraday bars (1-hour backtests found no advantage over the baseline after costs). Report the tally as how many indicator families agree; do not treat a met entry or exit rule as a reason to enter or exit.';
+
 const CONFLUENCE_RELIABILITY: Record<Timeframe, string> = {
-    '5Min': 'Intraday, unvalidated parameters — treat a met rule as a setup that still needs volume and higher-timeframe confirmation, not as a signal.',
-    '15Min':
-        'Intraday, unvalidated parameters — treat a met rule as a setup to confirm, not as a completed signal.',
-    '30Min':
-        'Intraday, unvalidated parameters — treat a met rule as a setup to confirm, not as a completed signal.',
-    '1Hour':
-        'Intraday, unvalidated parameters — a met rule is meaningful but still wants confirmation from structure or volume.',
-    '4Hour':
-        'Swing horizon. A met rule carries real weight; parameters are the intraday variant, so prefer corroboration from structure.',
-    '1Day': 'Daily horizon, running the thresholds the original backtest used (3 families, expected signals at full weight). The backtest counted signal types rather than indicator families, so this is a stricter variant of the measured rule, not the measured rule itself — treat a met rule as strong evidence, not as a validated 70% setup.',
+    '5Min': INTRADAY_RELIABILITY,
+    '15Min': INTRADAY_RELIABILITY,
+    '30Min': INTRADAY_RELIABILITY,
+    '1Hour': INTRADAY_RELIABILITY,
+    '4Hour': INTRADAY_RELIABILITY,
+    '1Day': 'Daily, descriptive only — measured 2000–2026, days with this entry rule met were followed by below-baseline 10-day returns in every period, and exit-rule days by returns above the baseline in three of five, level with it in a fourth and below it in 2007–09. Report the tally as how many indicator families agree, not as evidence for or against entering.',
 };
 
 function fmtRatio(n: number): string {
@@ -180,6 +207,59 @@ function formatConfluence(
         // them as four confirmations.
         'Counting unit: indicator families. RSI, StochRSI and Connors RSI are one family (they transform the same close series); MACD line/signal/histogram are one; every Bollinger read is one. Do not recount the raw indicator list as independent confirmations.',
     ];
+}
+
+const PULLBACK_HEADER = '### Short-Term Washout (rule engine, 1Day bars)';
+
+const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
+    washoutInUptrend:
+        'washout in an uptrend — close above MA200 and Williams %R(14) at or below -90',
+    nearWashoutInUptrend:
+        'near washout in an uptrend — close above MA200 and Williams %R(14) between -90 and -80',
+    washoutBelowMa200:
+        'washout below MA200 — Williams %R(14) at or below -90 with the close at or under MA200',
+    none: 'none — no short-term washout on this bar',
+};
+
+/**
+ * Render the washout half of the block — daily charts only.
+ *
+ * The inputs precede the reading for the same reason the risk:reward block prints its
+ * levels before its ratio: the model can check the conclusion against the numbers. The
+ * base rate is printed only for a reading that has one; `none` carries no claim.
+ */
+function formatPullback(snapshot: PullbackSnapshot, priceDp: number): string[] {
+    const side = snapshot.close > snapshot.ma200 ? 'above' : 'at or below';
+    const lines = [
+        PULLBACK_HEADER,
+        `Close ${formatNullableNumber(snapshot.close, priceDp)} vs MA200 ${formatNullableNumber(snapshot.ma200, priceDp)} (${formatNullableNumber(snapshot.closeVsMa200Pct)}%, ${side})`,
+        `Williams %R(14): ${formatNullableNumber(snapshot.williamsR)} / RSI(2): ${formatNullableNumber(snapshot.rsi2)}`,
+        `Exit reference MA5: ${formatNullableNumber(snapshot.ma5, priceDp)} — the measured washout is treated as resolved on the first daily close above it, or after about 10 trading days`,
+        `Reading: ${PULLBACK_READING_TEXT[snapshot.reading]}`,
+    ];
+    return snapshot.reading === 'none'
+        ? lines
+        : [...lines, `Measured: ${PULLBACK_BASE_RATES[snapshot.reading]}`];
+}
+
+/**
+ * The washout block for a chart, or nothing on intraday timeframes. The measurement is on
+ * daily bars, and MA200 on an intraday chart is a different object — rendering it there
+ * would put an unmeasured claim in front of the model.
+ */
+function formatPullbackSection(
+    bars: readonly Bar[],
+    timeframe: Timeframe,
+    priceDp: number
+): string[] {
+    if (timeframe !== '1Day') return [];
+    const snapshot = evaluatePullback(bars);
+    return snapshot !== null
+        ? formatPullback(snapshot, priceDp)
+        : [
+              PULLBACK_HEADER,
+              `Not measurable: the reading needs ${PULLBACK_TREND_MA_PERIOD} daily bars for MA200 and received ${bars.length}. This is an absence of measurement, not an absence of a washout.`,
+          ];
 }
 
 /**
@@ -315,12 +395,14 @@ export function formatDeterministicMetricsSection(
                   `Not measurable: the rule needs more than ${CONFLUENCE_MIN_BARS} bars and received ${bars.length}. This is an absence of measurement, not an absence of confluence — judge the indicators yourself for this chart.`,
               ];
 
+    const pullback = formatPullbackSection(bars, timeframe, priceDp);
     const riskReward = formatRiskReward(reference, bars, priceDp);
 
     return [
         DETERMINISTIC_METRICS_HEADER,
         'Computed by a rule engine from the same bars given to you. These are arithmetic facts about this chart — cite them, do not recompute or override them.',
         ...confluence,
+        ...pullback,
         ...riskReward,
     ].join('\n');
 }
