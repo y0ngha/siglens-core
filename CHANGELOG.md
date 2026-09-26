@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.17.1](https://github.com/y0ngha/siglens-core/compare/v1.17.0...v1.17.1) (2026-09-26)
+
+### Bug Fixes
+
+* **analysis:** 눌림 판독의 진입 판정을 룰 엔진이 정하게 한다 ([e1e8061](https://github.com/y0ngha/siglens-core/commit/e1e80615fa54e9661228d63db3f2ea94610bcc71))
+* **signals:** near·MA200 아래 눌림 기저율 문장을 재측정에 맞춘다 ([1c66676](https://github.com/y0ngha/siglens-core/commit/1c66676efe78e765043463099167fb3ec63b01a8))
+
 # [1.17.0](https://github.com/y0ngha/siglens-core/compare/v1.16.0...v1.17.0) (2026-09-25)
 
 ### Bug Fixes
