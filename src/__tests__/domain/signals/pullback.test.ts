@@ -188,6 +188,18 @@ describe('evaluatePullback', () => {
 });
 
 describe('PULLBACK_BASE_RATES', () => {
+    it('near 판독은 최근 기간의 우위가 통계적으로 불분명하다고 밝힌다', () => {
+        expect(PULLBACK_BASE_RATES.nearWashoutInUptrend).toContain(
+            'since 2020 has been statistically indistinguishable from the baseline'
+        );
+    });
+
+    it('MA200 아래 판독의 손실 꼬리는 시기별 배수 범위로 말하고 단일 배수로 과장하지 않는다', () => {
+        const text = PULLBACK_BASE_RATES.washoutBelowMa200;
+        expect(text).toContain('1.3-2.8x by period');
+        expect(text).not.toContain('about 2.7x as frequent');
+    });
+
     it('none을 뺀 모든 판독에 기저율 문장이 있고, 지시가 아니라고 밝힌다', () => {
         const readings: Exclude<PullbackReading, 'none'>[] = [
             'washoutInUptrend',
