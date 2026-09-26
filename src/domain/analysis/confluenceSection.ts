@@ -211,6 +211,22 @@ function formatConfluence(
 
 const PULLBACK_HEADER = '### Short-Term Washout (rule engine, 1Day bars)';
 
+/**
+ * The verdict for the washout reading, decided here rather than by the model.
+ *
+ * Asked to judge it, the model never chose "enter": over 6,070 production analyses
+ * (p9–p16) and a 170-case A/B, `entryRecommendation` was "wait" every time. It read the
+ * reading's normal companions — a bearish tally, a sub-1.0 structural ratio, a red Elder
+ * Impulse, price under the short averages — as missing confirmation, and asked for a
+ * reversal candle or a close back above MA5. That confirmation is exactly what the
+ * measurement found costs the edge (waiting for %R to cross back lost it in every
+ * period). Rewriting the rule alone moved 8–14 of 25 washout days to "enter"; printing the
+ * verdict as a rule-engine value, like the tally and the ratio, moved 25 of 25 and left
+ * every near-washout day at "wait" (docs/superpowers/specs/2026-09-26-washout-entry-verdict-design.md).
+ */
+const WASHOUT_ENTRY_VERDICT =
+    'Entry verdict (rule engine): enter — washout path. Copy "enter" into actionRecommendation.entryRecommendation; do not re-judge it. The entry reference is the snapshot close area, the exit reference is MA5 (or about 10 trading days), and the prose names the downside risks and where the reading fails (a close under MA200). No confirmation candle is required.';
+
 const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
     washoutInUptrend:
         'washout in an uptrend — close above MA200 and Williams %R(14) at or below -90',
@@ -237,9 +253,11 @@ function formatPullback(snapshot: PullbackSnapshot, priceDp: number): string[] {
         `Exit reference MA5: ${formatNullableNumber(snapshot.ma5, priceDp)} — the measured washout is treated as resolved on the first daily close above it, or after about 10 trading days`,
         `Reading: ${PULLBACK_READING_TEXT[snapshot.reading]}`,
     ];
-    return snapshot.reading === 'none'
-        ? lines
-        : [...lines, `Measured: ${PULLBACK_BASE_RATES[snapshot.reading]}`];
+    if (snapshot.reading === 'none') return lines;
+    const measured = `Measured: ${PULLBACK_BASE_RATES[snapshot.reading]}`;
+    return snapshot.reading === 'washoutInUptrend'
+        ? [...lines, WASHOUT_ENTRY_VERDICT, measured]
+        : [...lines, measured];
 }
 
 /**
@@ -341,7 +359,7 @@ function formatRiskReward(
 
     const verdict =
         ratio < 1
-            ? 'Below 1.0: the nearest obstacle above is closer than the nearest support below. Entering here risks more than the next move offers.'
+            ? 'Below 1.0: the nearest obstacle above is closer than the nearest support below. Outside the washout path, entering here risks more than the next move offers.'
             : 'At or above 1.0: there is more room to the next obstacle above than to the support below.';
 
     return [
@@ -352,7 +370,7 @@ function formatRiskReward(
         `Structural risk:reward from current price = ${fmtRatio(ratio)}`,
         verdict,
         // The correlation is the part the model cannot infer from the ratio alone.
-        'Measured downstream: analyses with the strongest indicator agreement carried the WORST ratios (median 0.00 in the highest score band, 1.27 in a middling one). Strong confluence plus a sub-1.0 ratio is a reason to set entryRecommendation to "wait" and name a pullback level, not a reason to enter.',
+        'Measured downstream: analyses with the strongest indicator agreement carried the WORST ratios (median 0.00 in the highest score band, 1.27 in a middling one). Outside the washout path, strong confluence plus a sub-1.0 ratio is a reason to set entryRecommendation to "wait" and name a pullback level, not a reason to enter. On a washout in an uptrend the nearest levels sit a bar or two away on both sides, so this ratio is not the measured edge and does not override the washout verdict.',
     ];
 }
 

@@ -66,9 +66,9 @@ export const PULLBACK_BASE_RATES: Readonly<
     washoutInUptrend:
         'Historical base rate, not an instruction. Daily closes above MA200 with Williams %R(14) at or below -90 were followed by above-baseline 5-day returns in every period backtested (2000-07, 2007-09, 2009-14, 2015-20, 2024-26); trades exited on the first close above MA5 (or after 10 days) won 66-75% of the time. In broad sell-offs the edge was relative, not absolute (2007-09: -0.71% over 10 days vs -1.03% baseline). About 2/3 of these days show a bearish confluence tally; that is the normal state of this reading, not evidence against it.',
     nearWashoutInUptrend:
-        'Historical base rate, not an instruction. Above MA200 with Williams %R(14) between -90 and -80: same direction as the washout reading (above-baseline 5-day returns in every backtested period), with a smaller edge.',
+        'Historical base rate, not an instruction. Above MA200 with Williams %R(14) between -90 and -80: the same direction as the washout reading — 5-day returns were above the baseline in every backtested period, but by a small margin that since 2020 has been statistically indistinguishable from the baseline.',
     washoutBelowMa200:
-        'Historical base rate, not an instruction. Washouts below MA200 rebounded on average, but 10-day losses worse than -10% were about 2.7x as frequent as in the uptrend reading (8.8% vs 3.3% of cases): a higher-risk rebound candidate, not the uptrend reading.',
+        'Historical base rate, not an instruction. Washouts below MA200 rebounded on average, but 10-day losses worse than -10% were more frequent than in the uptrend reading in almost every backtested period (8.8% vs 3.3% pooled; 1.3-2.8x by period): a higher-risk rebound candidate, not the uptrend reading.',
 };
 
 /**

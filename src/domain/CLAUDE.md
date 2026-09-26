@@ -206,6 +206,13 @@ and is the oscillator the chart prompt already prints; `rsi2` is reported for re
 - **The interaction with the tally is the point.** On washout days the confluence tally
   reads bearish about two thirds of the time; without the reading beside it the tally pulls
   the verdict the wrong way on exactly the charts with the measured edge.
+- **The washout verdict is the rule engine's, not the model's.** Asked to judge it, the
+  model never chose "enter" (0 of 6,070 production analyses, p9–p16): it read the reading's
+  normal companions — a bearish tally, a sub-1.0 structural ratio, a red Elder Impulse — as
+  missing confirmation. A `washoutInUptrend` block therefore prints `Entry verdict (rule
+  engine): enter — washout path` and Step 1 tells the model to copy it
+  (spec `2026-09-26-washout-entry-verdict-design.md`). Near and below-MA200 readings carry no
+  verdict — their edge is too thin or their loss tail too heavy to decide in code.
 
 ## Prompt number rendering (`analysis/promptFormat.ts`)
 

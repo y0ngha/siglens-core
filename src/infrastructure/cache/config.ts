@@ -704,9 +704,20 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * (tally is descriptive; state a washout reading next to it). Bytes change for
  * every request.
  *
+ * **`p17`** — washout entry verdict decided by the rule engine (spec
+ * 2026-09-26-washout-entry-verdict-design.md). `entryRecommendation` was never
+ * "enter" in production (0 of 6,070 technical analyses, p9–p16): the model read
+ * a washout's normal companions as missing confirmation. A washout-in-uptrend
+ * block now prints `Entry verdict (rule engine): enter — washout path`; Step 1
+ * puts that path first, says it needs no confirmation and that the confluence
+ * entry/exit rules are neither prerequisite nor veto; the sub-1.0 risk:reward
+ * "prefer wait" rule is scoped to charts outside the washout path. The
+ * near-washout and below-MA200 base-rate sentences are softened to match the
+ * re-measurement. Bytes change on every 1Day request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p16' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p17' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
