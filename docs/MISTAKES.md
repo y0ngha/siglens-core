@@ -603,6 +603,16 @@ and have been removed from this file.
     → When a feature is added as an optional parameter, test suite must verify both:
       (a) The option is accepted (doesn't throw)
       (b) The option materially changes behavior (positive assertion on output, not absence of output)
+
+17. Fire-and-forget async operations in tests must use vi.waitFor, not bare setTimeout
+    → Fire-and-forget operations (e.g., cache writes, background logs) execute without blocking the caller
+    → In tests, synchronizing with these unobserved operations requires proper test utilities (vi.waitFor) not bare setTimeout
+    → vi.waitFor respects Vitest's fake timer modes and retry semantics; setTimeout breaks when mocking time
+    ❌ await new Promise(r => setTimeout(r, 0))  // bare setTimeout; ignores fake timers; unreliable retry
+    ❌ await new Promise(r => setTimeout(r, 100))  // hardcoded delay; flaky on slow CI; tight coupling to implementation
+    ✅ await vi.waitFor(() => expect(logSpy).toHaveBeenCalledWith(...))  // Vitest-aware; respects mocked time
+    ✅ await vi.waitFor(() => expect(cacheSpy).toHaveBeenCalledTimes(1))  // retry-aware; succeeds on first call
+    → Recurring pattern (Round 1 findings: 3 test files): runFinancialsAnalysis.test.ts, runOptionsAnalysis.test.ts, runOverallAnalysis.test.ts all used bare setTimeout for cache-write-failure log synchronization
 ```
 
 ---
