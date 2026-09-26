@@ -213,6 +213,12 @@ and is the oscillator the chart prompt already prints; `rsi2` is reported for re
   engine): enter — washout path` and Step 1 tells the model to copy it
   (spec `2026-09-26-washout-entry-verdict-design.md`). Near and below-MA200 readings carry no
   verdict — their edge is too thin or their loss tail too heavy to decide in code.
+- **News-driven drops suspend the verdict.** The measurement does not cover washouts caused
+  by earnings, guidance or regulatory news — the setup's largest failures. The verdict tells
+  the model not to re-judge, so it must not print on those days: `newsDrivenWashoutEvent`
+  looks for such an event (impact high/medium, not bullish) in the last 3 sessions and the
+  block then prints `Entry verdict (rule engine): none — …`. Consumers that pass no
+  `marketEvents` get the ungated verdict — pass them wherever the drop could be news.
 
 ## Prompt number rendering (`analysis/promptFormat.ts`)
 

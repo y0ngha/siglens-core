@@ -715,9 +715,20 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * near-washout and below-MA200 base-rate sentences are softened to match the
  * re-measurement. Bytes change on every 1Day request.
  *
+ * **`p18`** — the washout verdict stands down on a news-driven drop (same spec,
+ * §8). When an earnings, guidance or regulatory event (impact high/medium,
+ * not bullish) landed within the last 3 sessions, the block prints
+ * `Entry verdict (rule engine): none — …` instead of `enter`, and Step 1 tells
+ * the model to judge that chart itself without citing the base rate. The
+ * `enter` verdict told the model not to re-judge, so ungated it forced "enter"
+ * onto exactly the drops the measurement does not cover (3 of 23 A/B enters
+ * were earnings-window drops). `formatDeterministicMetricsSection` now receives
+ * the prompt's `marketEvents`. Step 1 gains one line, so every 1Day request's
+ * bytes change.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p17' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p18' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

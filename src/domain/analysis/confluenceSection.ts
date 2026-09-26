@@ -22,7 +22,10 @@ import {
 } from '@/domain/signals/pullback';
 import type {
     Bar,
+    MarketEvent,
     MarketReference,
+    NewsCategory,
+    NewsImpact,
     ReferenceLevel,
     ReferenceLevels,
     Timeframe,
@@ -224,8 +227,77 @@ const PULLBACK_HEADER = '### Short-Term Washout (rule engine, 1Day bars)';
  * verdict as a rule-engine value, like the tally and the ratio, moved 25 of 25 and left
  * every near-washout day at "wait" (docs/superpowers/specs/2026-09-26-washout-entry-verdict-design.md).
  */
+/**
+ * Sessions, counted back from the last bar and including it, in which a company event
+ * suspends the washout verdict. A drop that follows an earnings print or a guidance cut
+ * usually lands the same session or the next; three covers a report released after the
+ * close plus the day the washout closed.
+ */
+const WASHOUT_NEWS_LOOKBACK_SESSIONS = 3;
+/** One calendar day. Daily bars are stamped at UTC midnight, so a same-day article is later. */
+const DAY_MS = 86_400_000;
+/**
+ * The drops the skill and the measurement name as not covered — earnings, guidance and
+ * regulatory news were the setup's big failures. M&A and product news are left out: they
+ * rarely produce a washout and did not show up among the failures.
+ */
+const WASHOUT_NEWS_CATEGORIES: readonly NewsCategory[] = [
+    'earnings',
+    'guidance',
+    'regulation',
+];
+const WASHOUT_NEWS_IMPACTS: readonly NewsImpact[] = ['high', 'medium'];
+
+/**
+ * The company event that makes this washout a news-driven drop, or `null`.
+ *
+ * Why the verdict needs this: `WASHOUT_ENTRY_VERDICT` tells the model not to re-judge, so
+ * without a gate it overrides the one case the measurement does not cover. In the A/B that
+ * introduced the verdict, 3 of 23 "enter" days fell within 3 days of an earnings date (one
+ * lost 9.6% on the MA5 exit). The window runs to a day past the last bar because a daily bar
+ * is stamped at UTC midnight and an article from that session is published after it — the
+ * `## Market Events` selection stops at the bar stamp and would miss it.
+ *
+ * Bullish-labelled events are ignored: they do not explain a washout.
+ *
+ * @internal
+ * @param events - Market events for this symbol, any order.
+ * @param bars - Daily bars, oldest first.
+ * @returns The first qualifying event, or `null` when the drop is not news-driven.
+ */
+export function newsDrivenWashoutEvent(
+    events: readonly MarketEvent[],
+    bars: readonly Bar[]
+): MarketEvent | null {
+    const from = bars.at(-WASHOUT_NEWS_LOOKBACK_SESSIONS) ?? bars.at(0);
+    const last = bars.at(-1);
+    if (from === undefined || last === undefined) return null;
+    const fromMs = from.time * 1000;
+    const toMs = last.time * 1000 + DAY_MS;
+    return (
+        events.find(event => {
+            const at = event.publishedAt.getTime();
+            return (
+                at >= fromMs &&
+                at < toMs &&
+                event.sentiment !== 'bullish' &&
+                WASHOUT_NEWS_CATEGORIES.includes(event.category) &&
+                WASHOUT_NEWS_IMPACTS.includes(event.impact)
+            );
+        }) ?? null
+    );
+}
+
 const WASHOUT_ENTRY_VERDICT =
     'Entry verdict (rule engine): enter — washout path. Copy "enter" into actionRecommendation.entryRecommendation; do not re-judge it. The entry reference is the snapshot close area, the exit reference is MA5 (or about 10 trading days), and the prose names the downside risks and where the reading fails (a close under MA200). No confirmation candle is required.';
+
+/**
+ * The suspended verdict names the event itself rather than pointing at `## Market Events`:
+ * that section stops at the last bar's stamp and keeps at most a handful of events, so the
+ * same-session article this gate exists to catch can be absent from it.
+ */
+const washoutNewsVerdict = (event: MarketEvent): string =>
+    `Entry verdict (rule engine): none — a ${event.impact}-impact ${event.category} event (${event.sentiment}, published ${event.publishedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC) landed within the last ${WASHOUT_NEWS_LOOKBACK_SESSIONS} sessions. The measured washout history does not cover news-driven drops, which were its largest failures. Judge entryRecommendation yourself from the event and the chart, and say that the washout base rate does not apply to this drop.`;
 
 const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
     washoutInUptrend:
@@ -244,7 +316,11 @@ const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
  * levels before its ratio: the model can check the conclusion against the numbers. The
  * base rate is printed only for a reading that has one; `none` carries no claim.
  */
-function formatPullback(snapshot: PullbackSnapshot, priceDp: number): string[] {
+function formatPullback(
+    snapshot: PullbackSnapshot,
+    priceDp: number,
+    newsEvent: MarketEvent | null
+): string[] {
     const side = snapshot.close > snapshot.ma200 ? 'above' : 'at or below';
     const lines = [
         PULLBACK_HEADER,
@@ -255,9 +331,12 @@ function formatPullback(snapshot: PullbackSnapshot, priceDp: number): string[] {
     ];
     if (snapshot.reading === 'none') return lines;
     const measured = `Measured: ${PULLBACK_BASE_RATES[snapshot.reading]}`;
-    return snapshot.reading === 'washoutInUptrend'
-        ? [...lines, WASHOUT_ENTRY_VERDICT, measured]
-        : [...lines, measured];
+    if (snapshot.reading !== 'washoutInUptrend') return [...lines, measured];
+    const verdict =
+        newsEvent === null
+            ? WASHOUT_ENTRY_VERDICT
+            : washoutNewsVerdict(newsEvent);
+    return [...lines, verdict, measured];
 }
 
 /**
@@ -268,12 +347,17 @@ function formatPullback(snapshot: PullbackSnapshot, priceDp: number): string[] {
 function formatPullbackSection(
     bars: readonly Bar[],
     timeframe: Timeframe,
-    priceDp: number
+    priceDp: number,
+    events: readonly MarketEvent[]
 ): string[] {
     if (timeframe !== '1Day') return [];
     const snapshot = evaluatePullback(bars);
     return snapshot !== null
-        ? formatPullback(snapshot, priceDp)
+        ? formatPullback(
+              snapshot,
+              priceDp,
+              newsDrivenWashoutEvent(events, bars)
+          )
         : [
               PULLBACK_HEADER,
               `Not measurable: the reading needs ${PULLBACK_TREND_MA_PERIOD} daily bars for MA200 and received ${bars.length}. This is an absence of measurement, not an absence of a washout.`,
@@ -388,7 +472,8 @@ export function formatDeterministicMetricsSection(
     bars: readonly Bar[],
     timeframe: Timeframe,
     reference: MarketReference,
-    priceDp = 2
+    priceDp = 2,
+    events: readonly MarketEvent[] = []
 ): string {
     const { min, expectedWeight } = CONFLUENCE_PARAMS_BY_TIMEFRAME[timeframe];
     // `exitMin` is deliberately not raised alongside `min` on the daily chart. Raising the
@@ -413,7 +498,7 @@ export function formatDeterministicMetricsSection(
                   `Not measurable: the rule needs more than ${CONFLUENCE_MIN_BARS} bars and received ${bars.length}. This is an absence of measurement, not an absence of confluence — judge the indicators yourself for this chart.`,
               ];
 
-    const pullback = formatPullbackSection(bars, timeframe, priceDp);
+    const pullback = formatPullbackSection(bars, timeframe, priceDp, events);
     const riskReward = formatRiskReward(reference, bars, priceDp);
 
     return [

@@ -406,6 +406,17 @@ and have been removed from this file.
       }
    → Always compute calendar dates (by zeroing time components) before comparing, never round milliseconds
 
+4.7. Domain functions must enforce null/NaN output guardrails
+   → Calculations returning invalid outputs must first check feasibility; unavailable or error results must return null (not NaN)
+   → NaN in cached results or prompted data corrupts downstream parsing, sorting, and rendering
+   ❌ const result = calculateIndicator(bars); return result;  // may contain NaN for short/warm-up bars
+   ❌ const changesPercent = (new - old) / old; return changesPercent;  // NaN if old === 0, misranks when sorted
+   ❌ const fib = computeFibonacci(price, pattern); cache.set(key, { target: fib });  // NaN cached indefinitely
+   ✅ const result = calculateIndicator(bars); return Number.isFinite(result) ? result : null;
+   ✅ const changesPercent = (new - old) / old; return Number.isFinite(changesPercent) ? changesPercent : null;
+   ✅ const fib = computeFibonacci(price, pattern); if (!Number.isFinite(fib)) return null; cache.set(key, { target: fib });
+   → Recurring pattern (Issue #8, PR #214 R2 R3): Indicator warm-up NaN, precomputed prompt calculations with NaN changesPercentage, Fibonacci extensions stored negative
+
 5. Port authoring must follow domain/CLAUDE.md conventions
    → Port return/receive DTOs must be defined in domain/types.ts, not co-located in port files
    → @port documentation tags annotate the interface/type contract, not file-level module JSDoc
@@ -665,6 +676,27 @@ and have been removed from this file.
    → Recurring (PR #103 R1–R2): 4+ instances across getEtSessionStatus, isEtRegularSessionOpen, EtSessionStatus type, and MARKET_* constants.
       Pattern: public functions and types have Korean JSDoc; block comments above constants are in Korean.
       Checkpoint before approving: scan all new public exports for Korean text; rewrite to English if found.
+
+4.8. Tier 4 public type fields require one-line JSDoc per field
+   → Each field in exported Tier 4 types (interfaces, type objects) must have /** description */ JSDoc
+   → IDE autocomplete and TypeDoc rendering depend on field-level documentation for consumer clarity
+   ❌ export interface PivotLevels { support: number; resistance: number; }  // fields lack JSDoc
+   ❌ export type TradeOptions { entryPrice: number; targetPrice: number; stopLossPrice: number; }  // no field docs
+   ✅ export interface PivotLevels {
+      /** Support level (lower bound). */
+      support: number;
+      /** Resistance level (upper bound). */
+      resistance: number;
+   }
+   ✅ export type TradeOptions {
+      /** Entry price for the trade. */
+      entryPrice: number;
+      /** Take-profit target price. */
+      targetPrice: number;
+      /** Stop-loss price. */
+      stopLossPrice: number;
+   }
+   → Recurring pattern (PR #214 R1, PR #227 R2): Tier 4 type fields added without per-field JSDoc; consumer IDEs cannot show field hints
 
 5. JSDoc tags reference specific call-sites instead of describing timeless purpose
    → @internal, @param, @returns must describe the function's role independent of any caller
