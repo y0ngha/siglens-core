@@ -3,11 +3,13 @@ import {
     CONFLUENCE_PARAMS_BY_TIMEFRAME,
     DETERMINISTIC_METRICS_HEADER,
     formatDeterministicMetricsSection,
+    newsDrivenWashoutEvent,
 } from '@/domain/analysis/confluenceSection';
 import { CONFLUENCE_MIN_BARS } from '@/domain/signals/confluence';
 import type {
     Bar,
     HorizonReference,
+    MarketEvent,
     MarketReference,
     ReferenceLevel,
     Timeframe,
@@ -456,6 +458,72 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
         expect(out).toContain('No confirmation candle is required.');
     });
 
+    it('suspends the verdict when an earnings event landed in the last sessions — a news-driven drop the measurement does not cover', () => {
+        const bs = washoutBars();
+        const lastMs = bs.at(-1)!.time * 1000;
+        const earnings: MarketEvent = {
+            // 같은 세션의 기사는 봉 스탬프(UTC 자정)보다 늦게 찍힌다.
+            publishedAt: new Date(lastMs + 13 * 3_600_000),
+            category: 'earnings',
+            sentiment: 'bearish',
+            impact: 'high',
+        };
+        const out = formatDeterministicMetricsSection(
+            bs,
+            '1Day',
+            reference(),
+            2,
+            [earnings]
+        );
+        const publishedUtc = new Date(lastMs + 13 * 3_600_000)
+            .toISOString()
+            .slice(0, 16)
+            .replace('T', ' ');
+        expect(out).toContain(
+            `Entry verdict (rule engine): none — a high-impact earnings event (bearish, published ${publishedUtc} UTC) landed within the last 3 sessions.`
+        );
+        // 판정 줄은 이벤트를 직접 적는다 — `## Market Events`는 봉 스탬프에서 끊겨 그 기사가 없을 수 있다.
+        expect(out).not.toContain('see ## Market Events');
+        expect(out).not.toContain('enter — washout path');
+        expect(out).toContain('Reading: washout in an uptrend');
+    });
+
+    it('keeps the enter verdict when the only event is old, bullish or not a company event', () => {
+        const bs = washoutBars();
+        const lastMs = bs.at(-1)!.time * 1000;
+        const day = 86_400_000;
+        const events: MarketEvent[] = [
+            {
+                publishedAt: new Date(lastMs - 5 * day),
+                category: 'earnings',
+                sentiment: 'bearish',
+                impact: 'high',
+            },
+            {
+                publishedAt: new Date(lastMs),
+                category: 'earnings',
+                sentiment: 'bullish',
+                impact: 'high',
+            },
+            {
+                publishedAt: new Date(lastMs),
+                category: 'product',
+                sentiment: 'bearish',
+                impact: 'high',
+            },
+        ];
+        const out = formatDeterministicMetricsSection(
+            bs,
+            '1Day',
+            reference(),
+            2,
+            events
+        );
+        expect(out).toContain(
+            'Entry verdict (rule engine): enter — washout path.'
+        );
+    });
+
     it('prints no entry verdict for a near washout, which stays a model judgment', () => {
         // 상승 추세 끝 14봉 범위(고가 225, 저가 217)의 85% 지점 — %R -85, MA200 위.
         const closes = [
@@ -532,5 +600,118 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             reference()
         );
         expect(out).not.toContain('Short-Term Washout');
+    });
+});
+
+describe('newsDrivenWashoutEvent', () => {
+    const day = 86_400_000;
+    const daily = (n: number): Bar[] =>
+        Array.from({ length: n }, (_, i) => ({
+            time: 1_700_006_400 + i * 86_400,
+            open: 100,
+            high: 101,
+            low: 99,
+            close: 100,
+            volume: 1000,
+        }));
+    const event = (
+        at: number,
+        over: Partial<MarketEvent> = {}
+    ): MarketEvent => ({
+        publishedAt: new Date(at),
+        category: 'earnings',
+        sentiment: 'bearish',
+        impact: 'high',
+        ...over,
+    });
+    const bs = daily(10);
+    const lastMs = bs.at(-1)!.time * 1000;
+    const thirdLastMs = bs.at(-3)!.time * 1000;
+
+    describe('잡는 경우', () => {
+        it('마지막 봉 당일(봉 스탬프 이후) 기사', () => {
+            const e = event(lastMs + 20 * 3_600_000);
+            expect(newsDrivenWashoutEvent([e], bs)).toBe(e);
+        });
+
+        it('3세션 전 봉 스탬프 시각의 기사(창의 시작 경계 포함)', () => {
+            expect(
+                newsDrivenWashoutEvent([event(thirdLastMs)], bs)
+            ).not.toBeNull();
+        });
+
+        it('가이던스·규제 이벤트, 중립 방향, medium 영향도 잡는다', () => {
+            expect(
+                newsDrivenWashoutEvent(
+                    [
+                        event(lastMs, {
+                            category: 'guidance',
+                            sentiment: 'neutral',
+                            impact: 'medium',
+                        }),
+                    ],
+                    bs
+                )
+            ).not.toBeNull();
+            expect(
+                newsDrivenWashoutEvent(
+                    [event(lastMs, { category: 'regulation' })],
+                    bs
+                )
+            ).not.toBeNull();
+        });
+    });
+
+    describe('잡지 않는 경우', () => {
+        it('창보다 오래된 기사, 또는 다음 날 이후 기사', () => {
+            expect(
+                newsDrivenWashoutEvent([event(thirdLastMs - 1)], bs)
+            ).toBeNull();
+            expect(
+                newsDrivenWashoutEvent([event(lastMs + day)], bs)
+            ).toBeNull();
+        });
+
+        it('bullish 방향, 회사 이벤트가 아닌 범주, low·negligible 영향', () => {
+            expect(
+                newsDrivenWashoutEvent(
+                    [event(lastMs, { sentiment: 'bullish' })],
+                    bs
+                )
+            ).toBeNull();
+            expect(
+                newsDrivenWashoutEvent(
+                    [event(lastMs, { category: 'macro' })],
+                    bs
+                )
+            ).toBeNull();
+            expect(
+                newsDrivenWashoutEvent(
+                    [event(lastMs, { category: 'm_and_a' })],
+                    bs
+                )
+            ).toBeNull();
+            expect(
+                newsDrivenWashoutEvent([event(lastMs, { impact: 'low' })], bs)
+            ).toBeNull();
+            expect(
+                newsDrivenWashoutEvent(
+                    [event(lastMs, { impact: 'negligible' })],
+                    bs
+                )
+            ).toBeNull();
+        });
+
+        it('이벤트나 봉이 없으면 null', () => {
+            expect(newsDrivenWashoutEvent([], bs)).toBeNull();
+            expect(newsDrivenWashoutEvent([event(lastMs)], [])).toBeNull();
+        });
+    });
+
+    it('봉이 3개보다 적으면 첫 봉부터 본다', () => {
+        const two = daily(2);
+        expect(
+            newsDrivenWashoutEvent([event(two[0]!.time * 1000)], two)
+        ).not.toBeNull();
     });
 });

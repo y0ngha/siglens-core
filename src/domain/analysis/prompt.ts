@@ -1685,6 +1685,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly.',
         '- Step 1 — Determine entryRecommendation (in this order):',
         '  - Washout path first: when ## Deterministic Metrics prints "Entry verdict (rule engine): enter — washout path", entryRecommendation is "enter". Copy it; do not re-judge it and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the washout close itself. A sub-1.0 structural ratio, a bearish tally, an unmet confluence entry rule, a met exit rule, a red Elder Impulse and a short-term downtrend are that reading\'s normal state: name them as risks in the prose, never as reasons to change the verdict.',
+        '  - When the washout block prints "Entry verdict (rule engine): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the washout base rate as support.',
         '  - "enter" (other charts): price near support + risk level not high.',
         '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a near-washout reading.',
         '  - "avoid": price extended from support, strong resistance overhead, or risk high. A bearish indicator tally alone is not a reason for "avoid" — it has no measured forward edge, and it is the normal state of a short-term washout.',
@@ -2427,7 +2428,8 @@ export function buildAnalysisPrompt(
             bars,
             timeframe,
             marketReference,
-            priceDp
+            priceDp,
+            marketEvents
         ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),

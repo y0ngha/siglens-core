@@ -4690,6 +4690,61 @@ describe('prompt', () => {
             );
         });
 
+        it('뉴스성 급락으로 판정이 보류되면 모델이 직접 판단하고 기저율을 근거로 쓰지 않는다', () => {
+            expect(result()).toContain(
+                'When the washout block prints "Entry verdict (rule engine): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the washout base rate as support.'
+            );
+        });
+
+        it('시장 이벤트가 있으면 결정론 섹션까지 전달되어 washout 판정을 보류시킨다', () => {
+            const DAY = 86_400;
+            const closes = [
+                ...Array.from({ length: 249 }, (_, i) => 100 + i * 0.5),
+                205,
+            ];
+            const daily = closes.map((close, i) => ({
+                time: 1_700_006_400 + i * DAY,
+                open: close,
+                high: close + 1,
+                low: close - 1,
+                close,
+                volume: 1000 + i,
+            }));
+            const lastMs = daily.at(-1)!.time * 1000;
+            const build = (events: MarketEvent[]) =>
+                buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    daily,
+                    makeIndicators(),
+                    [],
+                    '1Day',
+                    undefined,
+                    'equity',
+                    undefined,
+                    'ko',
+                    [],
+                    events
+                );
+            expect(build([])).toContain(
+                'Entry verdict (rule engine): enter — washout path.'
+            );
+            const withEarnings = build([
+                {
+                    publishedAt: new Date(lastMs + 3_600_000),
+                    category: 'earnings',
+                    sentiment: 'bearish',
+                    impact: 'high',
+                },
+            ]);
+            expect(withEarnings).toContain(
+                'Entry verdict (rule engine): none — a high-impact earnings event'
+            );
+            expect(withEarnings).not.toContain(
+                'Entry verdict (rule engine): enter — washout path.'
+            );
+        });
+
         it('컨플루언스 진입·청산 규칙은 어떤 판정의 전제도 거부권도 아니다', () => {
             expect(result()).toContain(
                 'The confluence entry and exit rules are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.'
