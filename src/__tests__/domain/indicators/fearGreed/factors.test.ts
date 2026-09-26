@@ -285,4 +285,67 @@ describe('computeFactorsAtT', () => {
         expect(result).not.toBeNull();
         expect(result!.buySellImb).toBe(0);
     });
+
+    it('returns null when t is past the end of the series (no bar at t)', () => {
+        const bars = genBars(250);
+        const bsv: BuySellVolumeResult[] = bars.map(() => ({
+            buyVolume: 0,
+            sellVolume: 0,
+        }));
+        expect(computeFactorsAtT(bars, bsv, bars.length)).toBeNull();
+    });
+
+    // Warm-up boundary: the first index with a full factor set is exactly
+    // FEAR_GREED_MIN_FACTOR_WINDOW bars of prior history. (Before that the
+    // Volume Profile over the pre-t bars is also unavailable, which is what
+    // short-circuits first.)
+    it('returns null one bar before the FEAR_GREED_MIN_FACTOR_WINDOW warm-up boundary and a value at it', () => {
+        const bars = genBars(250);
+        const bsv: BuySellVolumeResult[] = bars.map(() => ({
+            buyVolume: 0,
+            sellVolume: 0,
+        }));
+        const t = FEAR_GREED_MIN_FACTOR_WINDOW - 1;
+        expect(computeFactorsAtT(bars, bsv, t)).toBeNull();
+        expect(computeFactorsAtT(bars, bsv, t + 1)).not.toBeNull();
+    });
+
+    it('returns volumeZ 0 on an unchanged close even with a volume spike (no directional sign)', () => {
+        const baseBars = genBars(250);
+        const prev = baseBars[baseBars.length - 2];
+        const last = baseBars[baseBars.length - 1];
+        const flatSpike: Bar = {
+            ...last,
+            close: prev.close,
+            volume: 5_000_000,
+        };
+        const bars = [...baseBars.slice(0, -1), flatSpike];
+        const bsv: BuySellVolumeResult[] = bars.map(() => ({
+            buyVolume: 0,
+            sellVolume: 0,
+        }));
+        const result = computeFactorsAtT(bars, bsv, bars.length - 1);
+        expect(result).not.toBeNull();
+        expect(result!.volumeZ).toBe(0);
+    });
+
+    it('returns negative volumeZ when a volume spike lands on a down day (fear)', () => {
+        const baseBars = genBars(250);
+        const prev = baseBars[baseBars.length - 2];
+        const last = baseBars[baseBars.length - 1];
+        const downSpike: Bar = {
+            ...last,
+            close: prev.close - 5,
+            volume: 5_000_000,
+        };
+        const bars = [...baseBars.slice(0, -1), downSpike];
+        const bsv: BuySellVolumeResult[] = bars.map(() => ({
+            buyVolume: 400_000,
+            sellVolume: 600_000,
+        }));
+        const result = computeFactorsAtT(bars, bsv, bars.length - 1);
+        expect(result).not.toBeNull();
+        expect(result!.volumeZ).toBeLessThan(0);
+        expect(result!.buySellImb).toBeCloseTo(-0.2, 10);
+    });
 });

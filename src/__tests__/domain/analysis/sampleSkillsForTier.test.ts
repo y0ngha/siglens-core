@@ -295,5 +295,28 @@ describe('sampleSkillsForTier', () => {
             );
             expect(sampled).toHaveLength(smallCatalog.length);
         });
+
+        it('keeps a duplicated catalog entry deterministic: identical copies tie on rank and stay adjacent', () => {
+            // A loader bug (same file walked twice) yields byte-identical
+            // entries — same hash, same name, same identity — so the ranking
+            // falls through every tie-breaker. The sample must not depend on
+            // input order and the copies must land next to each other.
+            const patterns = makeGroup('pattern');
+            const duplicated = [
+                ...patterns,
+                ...patterns.map(skill => ({ ...skill })),
+            ];
+
+            const sampled = sampleSkillsForTier(duplicated, 'free', 'seed-a');
+            const reversed = sampleSkillsForTier(
+                duplicated.toReversed(),
+                'free',
+                'seed-a'
+            );
+
+            expect(sampled).toHaveLength(3);
+            expect(namesOf(reversed)).toEqual(namesOf(sampled));
+            expect(sampled[0].name).toBe(sampled[1].name);
+        });
     });
 });

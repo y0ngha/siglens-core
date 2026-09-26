@@ -204,4 +204,53 @@ describe('formatChartPatternCandidatesSection', () => {
         );
         expect(section).toContain('### rectangle');
     });
+
+    describe('when geometry cannot be computed at render time', () => {
+        // double_top screened from valid data (see the "(broken)" case above).
+        const bars = makeBars([10, 15, 11, 15.2, 5]);
+        const candidates = candidatesFor(bars, 1);
+
+        it('renders each supplied candidate as "geometry unavailable" when atr is null', () => {
+            expect(candidates.length).toBeGreaterThan(0);
+            const section = formatChartPatternCandidatesSection(
+                candidates,
+                bars,
+                null,
+                2,
+                '1Day'
+            );
+            expect(section).toContain('### double_top — geometry unavailable');
+            expect(section).not.toContain('- Breakout level');
+            expect(section).not.toContain('None detected');
+        });
+
+        it('renders "geometry unavailable" instead of throwing when the bar series is empty', () => {
+            const section = formatChartPatternCandidatesSection(
+                candidates,
+                [],
+                1,
+                2,
+                '1Day'
+            );
+            expect(section).toContain('### double_top — geometry unavailable');
+        });
+    });
+
+    it('omits the "% from last close" suffix when the last close is not a positive price (bad feed tick)', () => {
+        const bars = makeBars([10, 15, 11, 15.2, 5]);
+        const candidates = candidatesFor(bars, 1);
+        const zeroCloseBars: Bar[] = [
+            ...bars.slice(0, -1),
+            { ...bars[bars.length - 1], close: 0 },
+        ];
+        const section = formatChartPatternCandidatesSection(
+            candidates,
+            zeroCloseBars,
+            1,
+            2,
+            '1Day'
+        );
+        expect(section).toMatch(/- Breakout level: \d+\.\d{2}\n/);
+        expect(section).not.toContain('from last close');
+    });
 });

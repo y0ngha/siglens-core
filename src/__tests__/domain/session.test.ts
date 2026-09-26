@@ -6,6 +6,7 @@ import {
     isRegularSessionOpen,
 } from '@/domain/session';
 import { getEtSessionStatus, isEtRegularSessionOpen } from '@/domain/utils';
+import type { MarketSessionSpec } from '@/domain/types';
 
 describe('MarketSessionSpec', () => {
     // 2026-06-22 14:30 UTC = 10:30 ET (Monday) → regular session open.
@@ -79,5 +80,138 @@ describe('ET wrappers — expected literal verdicts for concrete ET boundary ins
         const d = new Date('2026-06-21T14:30:00Z');
         expect(getEtSessionStatus(d)).toBe('weekend');
         expect(isEtRegularSessionOpen(d)).toBe(false);
+    });
+});
+
+describe('getSessionStatus — calendar, DST and custom-spec boundaries', () => {
+    describe('US equity session across daylight-saving changes', () => {
+        it('in EST (winter) 09:30 ET is 14:30 UTC — 14:29 UTC is still closed', () => {
+            // 2026-01-06 (Tuesday), EST = UTC-5
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-01-06T14:29:00Z')
+                )
+            ).toBe('closed');
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-01-06T14:30:00Z')
+                )
+            ).toBe('open');
+        });
+
+        it('the Monday after the spring-forward switch opens at 13:30 UTC, an hour earlier than the prior Friday', () => {
+            // DST starts 2026-03-08. Friday 03-06 is EST, Monday 03-09 is EDT.
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-03-06T13:30:00Z')
+                )
+            ).toBe('closed');
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-03-09T13:30:00Z')
+                )
+            ).toBe('open');
+        });
+
+        it('Friday 16:00 ET close precedes the Saturday weekend verdict', () => {
+            // 2026-06-26 Friday 20:00 UTC = 16:00 EDT → closed (not weekend)
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-06-26T20:00:00Z')
+                )
+            ).toBe('closed');
+            // Friday 23:30 ET is 03:30 UTC Saturday — still Friday locally
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-06-27T03:30:00Z')
+                )
+            ).toBe('closed');
+            // Saturday 10:30 ET
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-06-27T14:30:00Z')
+                )
+            ).toBe('weekend');
+        });
+    });
+
+    describe('US equity session with the exchange calendar', () => {
+        it('a weekday NYSE holiday (Thanksgiving) is closed even at 10:30 ET', () => {
+            // 2026-11-26 Thursday, EST: 15:30 UTC = 10:30 ET
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-11-26T15:30:00Z')
+                )
+            ).toBe('closed');
+        });
+
+        it('the day-after-Thanksgiving half day closes at 13:00 ET, not 16:00', () => {
+            // 2026-11-27 Friday, EST: 17:59 UTC = 12:59 ET, 18:00 UTC = 13:00 ET
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-11-27T17:59:00Z')
+                )
+            ).toBe('open');
+            expect(
+                getSessionStatus(
+                    US_EQUITY_SESSION,
+                    new Date('2026-11-27T18:00:00Z')
+                )
+            ).toBe('closed');
+        });
+    });
+
+    describe('custom scheduled specs', () => {
+        // KRX-like session: 09:00–15:30 KST, no exchange calendar supplied.
+        const krxLike: MarketSessionSpec = {
+            kind: 'scheduled',
+            timeZone: 'Asia/Seoul',
+            openMinute: 9 * 60,
+            closeMinute: 15 * 60 + 30,
+            weekendDays: [0, 6],
+        };
+
+        it('resolves a zone without a pre-built formatter (Asia/Seoul) using spec.closeMinute', () => {
+            // 2026-06-22 Monday: 00:00 UTC = 09:00 KST, 06:29 UTC = 15:29 KST
+            expect(
+                getSessionStatus(krxLike, new Date('2026-06-22T00:00:00Z'))
+            ).toBe('open');
+            expect(
+                getSessionStatus(krxLike, new Date('2026-06-22T06:29:00Z'))
+            ).toBe('open');
+            expect(
+                getSessionStatus(krxLike, new Date('2026-06-22T06:30:00Z'))
+            ).toBe('closed');
+        });
+
+        it('uses the local weekday, not the UTC weekday', () => {
+            // 2026-06-21 Sunday 23:30 UTC = Monday 08:30 KST → closed, not weekend
+            expect(
+                getSessionStatus(krxLike, new Date('2026-06-21T23:30:00Z'))
+            ).toBe('closed');
+            // 2026-06-19 Friday 16:00 UTC = Saturday 01:00 KST → weekend
+            expect(
+                getSessionStatus(krxLike, new Date('2026-06-19T16:00:00Z'))
+            ).toBe('weekend');
+        });
+
+        it('a closeMinuteFor that returns 0 closes the whole day', () => {
+            const holiday: MarketSessionSpec = {
+                ...krxLike,
+                closeMinuteFor: () => 0,
+            };
+            expect(
+                isRegularSessionOpen(holiday, new Date('2026-06-22T03:00:00Z'))
+            ).toBe(false);
+        });
     });
 });

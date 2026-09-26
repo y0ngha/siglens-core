@@ -201,4 +201,49 @@ describe('runEconomicEventAnalysis', () => {
         expect(keys).toHaveLength(2);
         expect(keys[0]).not.toBe(keys[1]);
     });
+
+    describe('캐시 장애 내성', () => {
+        it('캐시 조회가 실패하면 로그만 남기고 LLM 분석 후 같은 키로 캐시에 기록한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await runEconomicEventAnalysis(CPI_INPUT);
+
+            expect(result.status).toBe('done');
+            expect(result.result.sentiment).toBe('bullish');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                mockCacheGet.mock.calls[0][0],
+                result.result,
+                ECONOMIC_EVENT_CACHE_TTL
+            );
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunEconomicEventAnalysis] Cache read failed:',
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 쓰기가 실패해도 분석 결과는 그대로 반환되고 오류는 로그로만 남는다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            const writeError = new Error('redis write failed');
+            mockCacheSet.mockRejectedValueOnce(writeError);
+
+            const result = await runEconomicEventAnalysis(CPI_INPUT);
+
+            expect(result.status).toBe('done');
+            expect(result.result.summaryKo).toBe(mockRawResult.summaryKo);
+            await vi.waitFor(() =>
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunEconomicEventAnalysis] Cache write failed:',
+                    writeError
+                )
+            );
+            errorSpy.mockRestore();
+        });
+    });
 });

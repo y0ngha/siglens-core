@@ -155,4 +155,53 @@ describe('runIndicatorTranslation', () => {
             expect(b.status).toBe('done');
         });
     });
+
+    describe('캐시 장애 내성', () => {
+        it('캐시 조회가 실패하면 로그만 남기고 LLM으로 번역해 캐시에 다시 기록한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await runIndicatorTranslation('cpi_mom');
+
+            expect(result).toEqual({
+                status: 'done',
+                nameKo: '소비자물가지수 월간',
+            });
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                mockCacheGet.mock.calls[0][0],
+                { nameKo: '소비자물가지수 월간' },
+                INDICATOR_TRANSLATION_CACHE_TTL
+            );
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunIndicatorTranslation] Cache read failed:',
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 쓰기가 실패해도 번역 결과는 그대로 반환되고 오류는 로그로만 남는다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            const writeError = new Error('redis write failed');
+            mockCacheSet.mockRejectedValueOnce(writeError);
+
+            const result = await runIndicatorTranslation('cpi_mom');
+
+            expect(result).toEqual({
+                status: 'done',
+                nameKo: '소비자물가지수 월간',
+            });
+            await vi.waitFor(() =>
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunIndicatorTranslation] Cache write failed:',
+                    writeError
+                )
+            );
+            errorSpy.mockRestore();
+        });
+    });
 });

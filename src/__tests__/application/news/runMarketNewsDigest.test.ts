@@ -8,7 +8,8 @@ import { runMarketNewsDigest } from '@/application/news/runMarketNewsDigest';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
-import type { EnrichedNewsItem } from '@/domain/types';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
+import type { EnrichedNewsItem, TierModel } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
@@ -242,5 +243,119 @@ describe('runMarketNewsDigest', () => {
                 );
             }
         );
+    });
+
+    describe('모델 해석', () => {
+        it('MODEL_SPECS에 없는 폐기 모델 문자열은 DeepSeek 기본 모델로 호출한다', async () => {
+            const result = await runMarketNewsDigest({
+                ...baseArgs(),
+                modelId: 'gemini-2.5-flash' as unknown as TierModel,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ model: DEEPSEEK_V4_1_FLASH_MODEL })
+            );
+        });
+
+        it('활성 모델은 그대로 호출한다', async () => {
+            await runMarketNewsDigest(baseArgs());
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ model: 'gemini-3.6-flash' })
+            );
+        });
+    });
+
+    describe('캐시 장애 내성', () => {
+        it('캐시 프로바이더가 없으면(null) 캐시 없이 LLM 결과를 반환한다', async () => {
+            mockCreateCacheProvider.mockReturnValue(null);
+
+            const result = await runMarketNewsDigest(baseArgs());
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
+        it('캐시 조회가 실패하면 로그를 남기고 LLM 경로로 진행한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await runMarketNewsDigest(baseArgs());
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunMarketNewsDigest]',
+                'Cache lookup failed:',
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 쓰기가 실패해도 응답은 done이고 오류는 로그로만 남는다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheSet.mockRejectedValueOnce(new Error('redis write down'));
+
+            const result = await runMarketNewsDigest(baseArgs());
+
+            expect(result.status).toBe('done');
+            await vi.waitFor(() =>
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunMarketNewsDigest]',
+                    'Cache write failed:',
+                    expect.any(Error)
+                )
+            );
+            errorSpy.mockRestore();
+        });
+    });
+
+    describe('빈 다이제스트', () => {
+        it('스키마와 다른 응답은 빈 결과로 정규화해 경고하되 캐시는 기록한다', async () => {
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify({ unexpected: 'shape' })
+            );
+
+            const result = await runMarketNewsDigest(baseArgs());
+
+            expect(result.status).toBe('done');
+            if (result.status === 'done') {
+                expect(result.result.currentDriverKo).toBe('');
+                expect(result.result.keyEventsKo).toEqual([]);
+            }
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[RunMarketNewsDigest]',
+                'Empty digest; raw payload likely malformed',
+                { category: 'crypto' }
+            );
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ currentDriverKo: '' }),
+                NEWS_CACHE_TTL_SECONDS
+            );
+            warnSpy.mockRestore();
+        });
+
+        it('정상 응답은 경고 없이 그대로 반환한다', async () => {
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+
+            const result = await runMarketNewsDigest(baseArgs());
+
+            expect(result).toEqual({ status: 'done', result: mockRawResult });
+            expect(warnSpy).not.toHaveBeenCalled();
+            warnSpy.mockRestore();
+        });
     });
 });
