@@ -438,6 +438,70 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
         );
     });
 
+    it('prints the rule-engine entry verdict for a washout in an uptrend, before the base rate', () => {
+        const out = formatDeterministicMetricsSection(
+            washoutBars(),
+            '1Day',
+            reference()
+        );
+        const verdictAt = out.indexOf(
+            'Entry verdict (rule engine): enter — washout path.'
+        );
+        expect(verdictAt).toBeGreaterThan(
+            out.indexOf('Reading: washout in an uptrend')
+        );
+        expect(verdictAt).toBeLessThan(
+            out.indexOf('Measured: Historical base rate')
+        );
+        expect(out).toContain('No confirmation candle is required.');
+    });
+
+    it('prints no entry verdict for a near washout, which stays a model judgment', () => {
+        // 상승 추세 끝 14봉 범위(고가 225, 저가 217)의 85% 지점 — %R -85, MA200 위.
+        const closes = [
+            ...Array.from({ length: 249 }, (_, i) => 100 + i * 0.5),
+            218.2,
+        ];
+        const nearBars = closes.map((close, i) => ({
+            time: 1700000000 + i * 86400,
+            open: close,
+            high: close + 1,
+            low: close - 1,
+            close,
+            volume: 1000 + i,
+        }));
+        const out = formatDeterministicMetricsSection(
+            nearBars,
+            '1Day',
+            reference()
+        );
+        expect(out).toContain('Reading: near washout in an uptrend');
+        expect(out).toContain('Measured: Historical base rate');
+        expect(out).not.toContain('Entry verdict (rule engine)');
+    });
+
+    it('prints no entry verdict for a washout below MA200', () => {
+        const closes = [
+            ...Array.from({ length: 249 }, (_, i) => 300 - i * 0.5),
+            170,
+        ];
+        const belowBars = closes.map((close, i) => ({
+            time: 1700000000 + i * 86400,
+            open: close,
+            high: close + 1,
+            low: close - 1,
+            close,
+            volume: 1000 + i,
+        }));
+        const out = formatDeterministicMetricsSection(
+            belowBars,
+            '1Day',
+            reference()
+        );
+        expect(out).toContain('Reading: washout below MA200');
+        expect(out).not.toContain('Entry verdict (rule engine)');
+    });
+
     it('prints no base rate when the reading is none', () => {
         const out = formatDeterministicMetricsSection(
             bars(260, 100, 0.4),
@@ -446,6 +510,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
         );
         expect(out).toContain('Reading: none');
         expect(out).not.toContain('Measured: Historical base rate');
+        expect(out).not.toContain('Entry verdict (rule engine)');
     });
 
     it('says the reading is not measurable below 200 daily bars instead of omitting it', () => {

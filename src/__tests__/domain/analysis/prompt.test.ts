@@ -4629,10 +4629,10 @@ describe('prompt', () => {
                 makeIndicators()
             );
 
-        it('"enter"는 bullish confluence 대신 지지 근처 또는 상승 추세 안의 washout 판독을 근거로 받는다', () => {
+        it('"enter"는 bullish confluence 대신 지지 근처를 근거로 받고, 옛 규칙 문구는 남지 않는다', () => {
             const out = result();
             expect(out).toContain(
-                '"enter": price near support, or a Short-Term Washout reading of washout in an uptrend in ## Deterministic Metrics (daily charts), + risk level not high'
+                '"enter" (other charts): price near support + risk level not high.'
             );
             expect(out).not.toContain('bullish confluence from 2+ categories');
         });
@@ -4645,9 +4645,60 @@ describe('prompt', () => {
             expect(out).not.toContain('bearish confluence dominates');
         });
 
-        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 그대로 둔다', () => {
-            expect(result()).toContain(
+        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 washout 경로 밖으로 한정한다', () => {
+            const out = result();
+            expect(out).toContain(
+                'Outside the washout path, before settling on "enter", check the structural risk:reward'
+            );
+            expect(out).toContain(
                 'A met confluence entry rule does not override this'
+            );
+            expect(out).not.toContain(
+                '  - Before settling on "enter", check the structural risk:reward'
+            );
+        });
+    });
+
+    describe('entryRecommendation washout 경로 (룰 엔진 판정, 2026-09-26)', () => {
+        const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
+        const result = () =>
+            buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+
+        it('washout 경로를 가장 먼저 판정하고, 룰 엔진 판정을 재판단 없이 복사하게 한다', () => {
+            const out = result();
+            const washoutAt = out.indexOf(
+                '  - Washout path first: when ## Deterministic Metrics prints "Entry verdict (rule engine): enter — washout path", entryRecommendation is "enter". Copy it; do not re-judge it'
+            );
+            expect(washoutAt).toBeGreaterThan(-1);
+            expect(washoutAt).toBeLessThan(
+                out.indexOf('  - "enter" (other charts):')
+            );
+        });
+
+        it('washout 경로에는 확인 신호를 요구하지 않고, 동반 현상은 판정을 바꾸지 않는 위험으로만 쓴다', () => {
+            const out = result();
+            expect(out).toContain(
+                'do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone)'
+            );
+            expect(out).toContain(
+                'name them as risks in the prose, never as reasons to change the verdict'
+            );
+        });
+
+        it('컨플루언스 진입·청산 규칙은 어떤 판정의 전제도 거부권도 아니다', () => {
+            expect(result()).toContain(
+                'The confluence entry and exit rules are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.'
+            );
+        });
+
+        it('near-washout 판독은 "wait"로 분류한다', () => {
+            expect(result()).toContain(
+                '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a near-washout reading.'
             );
         });
     });
