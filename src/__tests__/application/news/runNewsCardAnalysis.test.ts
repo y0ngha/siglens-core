@@ -220,3 +220,50 @@ describe('runNewsCardAnalysis — 출력 로케일', () => {
         expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
     });
 });
+
+describe('runNewsCardAnalysis — 빈 결과 감지', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('제목·요약이 모두 빠진 응답은 기본값으로 정규화하고 카드 id와 함께 경고한다', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockCallAnalysisAi.mockResolvedValueOnce(
+            JSON.stringify({ unexpected: 'shape' })
+        );
+
+        const result = await runNewsCardAnalysis({
+            item: { ...testNewsItem, id: 'news-card-empty' },
+        });
+
+        expect(result.status).toBe('done');
+        if (result.status === 'done') {
+            expect(result.result.titleKo).toBe('');
+            expect(result.result.summaryKo).toBe('');
+            expect(result.result.bodyKo).toBeNull();
+        }
+        expect(warnSpy).toHaveBeenCalledWith(
+            '[RunNewsCardAnalysis] Empty news card analysis',
+            { id: 'news-card-empty' }
+        );
+        warnSpy.mockRestore();
+    });
+
+    it('요약만 있어도 부분 결과로 보고 경고하지 않는다', async () => {
+        const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockCallAnalysisAi.mockResolvedValueOnce(
+            JSON.stringify({ ...mockRawResult, titleKo: '' })
+        );
+
+        const result = await runNewsCardAnalysis({
+            item: { ...testNewsItem, id: 'news-card-partial' },
+        });
+
+        expect(result.status).toBe('done');
+        if (result.status === 'done') {
+            expect(result.result.summaryKo).toBe(mockRawResult.summaryKo);
+        }
+        expect(warnSpy).not.toHaveBeenCalled();
+        warnSpy.mockRestore();
+    });
+});

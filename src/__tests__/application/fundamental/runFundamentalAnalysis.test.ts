@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { Skill } from '@/domain/types';
+import type { Skill, TierConfig, TierModel } from '@/domain/types';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 vi.mock('@/application/analysis/callAnalysisAi');
@@ -16,6 +16,7 @@ vi.mock('@/domain/analysis/fundamentalPrompt', () => ({
 import { runFundamentalAnalysis } from '@/application/fundamental/runFundamentalAnalysis';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FUNDAMENTAL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
@@ -610,5 +611,270 @@ describe('runFundamentalAnalysis', () => {
                 );
             }
         );
+    });
+
+    describe('섹터 방향성 enrichment', () => {
+        const snapshotArg = () =>
+            mockBuildFundamentalAnalysisPrompt.mock.calls.find(
+                call => call[0] === mockSymbol
+            )?.[1];
+
+        it('프로필 섹터의 당일 등락률과 과거 추이를 snapshot에 매핑하고 섹터 스냅샷은 now 날짜로 조회한다', async () => {
+            (
+                mockDataProvider.getSectorPerformanceSnapshot as Mock
+            ).mockResolvedValue([
+                { sector: 'Energy', changesPercentage: -2.1 },
+                { sector: 'Technology', changesPercentage: 1.25 },
+            ]);
+            (
+                mockDataProvider.getHistoricalSectorPerformance as Mock
+            ).mockResolvedValue([
+                {
+                    date: '2026-05-01',
+                    sector: 'Technology',
+                    changesPercentage: 0.8,
+                },
+                {
+                    date: '2026-04-30',
+                    sector: 'Technology',
+                    changesPercentage: -0.3,
+                },
+            ]);
+
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                now: new Date('2026-05-02T15:00:00Z'),
+            });
+
+            expect(
+                mockDataProvider.getSectorPerformanceSnapshot
+            ).toHaveBeenCalledWith('2026-05-02');
+            expect(
+                mockDataProvider.getHistoricalSectorPerformance
+            ).toHaveBeenCalledWith('Technology');
+            expect(snapshotArg()?.sectorDirection).toEqual({
+                todayChangePct: 1.25,
+                historical: [
+                    { date: '2026-05-01', changePct: 0.8 },
+                    { date: '2026-04-30', changePct: -0.3 },
+                ],
+            });
+        });
+
+        it('섹터 스냅샷에 해당 섹터가 없으면 당일 등락률은 null이다', async () => {
+            (
+                mockDataProvider.getSectorPerformanceSnapshot as Mock
+            ).mockResolvedValue([
+                { sector: 'Energy', changesPercentage: -2.1 },
+            ]);
+
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+            });
+
+            expect(snapshotArg()?.sectorDirection.todayChangePct).toBeNull();
+        });
+
+        it('프로필에 섹터가 없으면 과거 섹터 추이를 조회하지 않고 빈 배열로 둔다', async () => {
+            (mockDataProvider.getProfile as Mock).mockResolvedValue({
+                ...validProfile,
+                sector: null,
+            });
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('done');
+            expect(
+                mockDataProvider.getHistoricalSectorPerformance
+            ).not.toHaveBeenCalled();
+            expect(snapshotArg()?.sectorDirection.historical).toEqual([]);
+        });
+    });
+
+    describe('일일 사용량 한도', () => {
+        const LIMITED_TIER_CONFIG: TierConfig = {
+            ...TEST_TIER_CONFIG,
+            limits: {
+                ...TEST_TIER_CONFIG.limits,
+                analysisPerDay: { free: 1, member: 1, pro: Infinity },
+            },
+            featureFlags: { enableTierRestrictions: true },
+        };
+
+        function makeUsage(analysisCountToday: number) {
+            return {
+                usageRepository: {
+                    getUsageToday: vi.fn().mockResolvedValue({
+                        analysis: analysisCountToday,
+                        chatbot: 0,
+                    }),
+                    recordUsage: vi.fn().mockResolvedValue(undefined),
+                },
+                clientIp: '10.0.0.1',
+            };
+        }
+
+        it('한도를 초과하면 usage_limit_exceeded를 반환하고 provider·LLM·사용량 기록을 모두 건너뛴다', async () => {
+            const usage = makeUsage(1);
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                tier: 'free',
+                tierConfig: LIMITED_TIER_CONFIG,
+                usage,
+            });
+
+            expect(result).toEqual({
+                status: 'error',
+                code: 'usage_limit_exceeded',
+                error: expect.objectContaining({
+                    code: 'analysis_limit_exceeded',
+                    feature: 'analysisPerDay',
+                    tier: 'free',
+                }),
+            });
+            expect(mockLoadSkillsCached).not.toHaveBeenCalled();
+            expect(mockDataProvider.getProfile).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+            expect(usage.usageRepository.recordUsage).not.toHaveBeenCalled();
+        });
+
+        it('캐시 히트도 사용량 1회로 기록한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockRawResult);
+            const usage = makeUsage(0);
+            const now = new Date('2026-05-02T03:00:00Z');
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                tier: 'free',
+                tierConfig: LIMITED_TIER_CONFIG,
+                usage,
+                now,
+            });
+
+            expect(result.status).toBe('cached');
+            expect(usage.usageRepository.recordUsage).toHaveBeenCalledWith({
+                userId: null,
+                ipAddress: '10.0.0.1',
+                actionType: 'analysis',
+                modelUsed: mockModelId,
+                occurredAt: now,
+            });
+        });
+    });
+
+    describe('캐시 우회·장애 내성', () => {
+        it('force=true이면 캐시를 읽지 않고 provider·LLM을 태운다', async () => {
+            mockCacheGet.mockResolvedValue(mockRawResult);
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                force: true,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockDataProvider.getProfile).toHaveBeenCalledTimes(1);
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        });
+
+        it('캐시 프로바이더가 없으면(null) 캐시 없이 LLM 결과를 반환한다', async () => {
+            mockCreateCacheProvider.mockReturnValue(null);
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
+        it('캐시 읽기가 실패하면 로그를 남기고 provider·LLM 경로로 진행한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunFundamental] Cache read failed:',
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 쓰기가 실패해도 응답은 done이고 오류는 로그로만 남는다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheSet.mockRejectedValueOnce(new Error('redis write down'));
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+            });
+
+            expect(result.status).toBe('done');
+            await vi.waitFor(() =>
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunFundamental] Cache write failed:',
+                    expect.any(Error)
+                )
+            );
+            errorSpy.mockRestore();
+        });
+    });
+
+    describe('모델 해석', () => {
+        it('tierConfig에는 있지만 MODEL_SPECS에 없는 폐기 모델은 DeepSeek 기본 모델로 호출한다', async () => {
+            // BYOK 게이트는 tierConfig 목록에 없는 모델에서 throw하므로, 폐기
+            // 모델이 이 폴백까지 오려면 호출자 tierConfig에 남아 있어야 한다.
+            const legacyModel = 'gemini-2.5-flash' as unknown as TierModel;
+            const legacyTierConfig: TierConfig = {
+                ...TEST_TIER_CONFIG,
+                models: {
+                    ...TEST_TIER_CONFIG.models,
+                    free: [...TEST_TIER_CONFIG.models.free, legacyModel],
+                },
+            };
+
+            const result = await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: legacyModel,
+                dataProvider: mockDataProvider,
+                tierConfig: legacyTierConfig,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ model: DEEPSEEK_V4_1_FLASH_MODEL })
+            );
+        });
     });
 });

@@ -49,7 +49,12 @@ vi.mock('@/infrastructure/skills/sampling', async importOriginal => {
     };
 });
 
-import { runAnalysis } from '@/application/market/runAnalysis';
+import {
+    runAnalysis,
+    runAnalysisForOverall,
+} from '@/application/market/runAnalysis';
+import { USER_API_KEY_REQUIRED_MESSAGE } from '@/application/byok/messages';
+import type { UsageRepository } from '@/domain/ports/usageRepository';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
@@ -913,5 +918,396 @@ describe('marketEvents 주입', () => {
 
         const key = mockCacheGet.mock.calls.at(-1)?.[0] as string;
         expect(key).not.toContain(':evt=');
+    });
+});
+
+describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
+        mockLoadSkillsCached.mockResolvedValue({
+            skills: [] as Skill[],
+            skillsDegraded: false,
+        });
+        mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
+        mockComputeFearGreedIndex.mockReturnValue(null);
+        mockEnrichAnalysisWithConfidence.mockReturnValue(mockRawResult);
+        mockPostProcessAnalysisWithReconcile.mockReturnValue(mockRawResult);
+        mockCacheSet.mockResolvedValue(undefined);
+        mockCacheGet.mockResolvedValue(null);
+        mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+    });
+
+    const makeUsageRepository = (analysisCountToday: number) => ({
+        getUsageToday: vi
+            .fn<UsageRepository['getUsageToday']>()
+            .mockResolvedValue({ analysis: analysisCountToday, chatbot: 0 }),
+        recordUsage: vi
+            .fn<UsageRepository['recordUsage']>()
+            .mockResolvedValue(
+                {} as Awaited<ReturnType<UsageRepository['recordUsage']>>
+            ),
+    });
+
+    describe('BYOK 게이트', () => {
+        it('free 티어가 BYOK 모델을 키 없이 요청하면 key_error를 돌려주고 캐시·LLM을 건드리지 않는다', async () => {
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'free' },
+                    modelId: 'claude-opus-5',
+                }
+            );
+
+            expect(result).toEqual({
+                status: 'key_error',
+                code: 'user_api_key_required',
+                error: USER_API_KEY_REQUIRED_MESSAGE,
+                modelId: 'claude-opus-5',
+                tier: 'free',
+            });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('BYOK 모델이라도 userApiKey가 있으면 게이트를 통과하고 그 키로 해당 모델을 호출한다', async () => {
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'free' },
+                    modelId: 'claude-opus-5',
+                    userApiKey: 'sk-user',
+                }
+            );
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    model: 'claude-opus-5',
+                    userApiKey: 'sk-user',
+                })
+            );
+        });
+    });
+
+    describe('일일 사용량 게이트', () => {
+        it('오늘 사용량이 한도에 도달하면 analysis_limit_exceeded를 돌려주고 기록하지 않는다', async () => {
+            const usageRepository = makeUsageRepository(1);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: 'u1', tier: 'free' },
+                    usage: { usageRepository, clientIp: '10.0.0.1' },
+                }
+            );
+
+            expect(result).toEqual({
+                status: 'error',
+                error: {
+                    code: 'analysis_limit_exceeded',
+                    message: 'Daily analysis usage limit exceeded.',
+                    feature: 'analysisPerDay',
+                    tier: 'free',
+                },
+            });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+            expect(usageRepository.recordUsage).not.toHaveBeenCalled();
+        });
+
+        it('한도 미만이면 분석을 수행하고 주입된 시각·모델로 사용량을 1회 기록한다', async () => {
+            const usageRepository = makeUsageRepository(0);
+            const occurredAt = new Date('2026-08-02T10:00:00.000Z');
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierConfig: restrictedTierConfig,
+                    tierContext: { userId: 'u1', tier: 'free' },
+                    modelId: 'gemini-3.6-flash',
+                    usage: {
+                        usageRepository,
+                        clientIp: '10.0.0.1',
+                        userId: 'u1',
+                        occurredAt,
+                    },
+                }
+            );
+
+            expect(result.status).toBe('done');
+            expect(usageRepository.getUsageToday).toHaveBeenCalledWith(
+                expect.any(String),
+                occurredAt
+            );
+            expect(usageRepository.recordUsage).toHaveBeenCalledTimes(1);
+            expect(usageRepository.recordUsage).toHaveBeenCalledWith({
+                userId: 'u1',
+                ipAddress: '10.0.0.1',
+                actionType: 'analysis',
+                modelUsed: 'gemini-3.6-flash',
+                occurredAt,
+            });
+        });
+    });
+
+    describe('캐시 장애 내성', () => {
+        it('캐시 조회가 실패하면 로그만 남기고 LLM 분석으로 진행한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunAnalysis] Cache read failed:',
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 쓰기가 실패해도 done 결과는 그대로 반환되고 오류는 로그로만 남는다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            const writeError = new Error('redis write failed');
+            mockCacheSet.mockRejectedValueOnce(writeError);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            await vi.waitFor(() =>
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunAnalysis] Cache write failed:',
+                    writeError
+                )
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 프로바이더가 없으면 조회·기록 없이 LLM 결과를 반환한다', async () => {
+            mockCreateCacheProvider.mockReturnValueOnce(null);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('캐시 미스 시 marketDataProvider 필수', () => {
+        it('provider 없이 캐시 미스가 나면 LLM 호출 전에 throw한다', async () => {
+            await expect(
+                runAnalysis(mockSymbol, mockCompanyName, mockTimeframe)
+            ).rejects.toThrow('options.marketDataProvider is required');
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('Fear & Greed 일봉 조회', () => {
+        it('1Day가 아닌 타임프레임은 공포탐욕 계산용 일봉을 별도로 조회한다', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Hour',
+                false,
+                'AAPL.US',
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'member' },
+                }
+            );
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
+            expect(mockFetchBarsWithIndicators).toHaveBeenNthCalledWith(
+                1,
+                fakeProvider,
+                mockSymbol,
+                '1Hour',
+                'AAPL.US'
+            );
+            expect(mockFetchBarsWithIndicators).toHaveBeenNthCalledWith(
+                2,
+                fakeProvider,
+                mockSymbol,
+                '1Day',
+                'AAPL.US'
+            );
+        });
+
+        it('1Day 타임프레임은 이미 받은 봉을 재사용해 일봉을 다시 조회하지 않는다', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Day',
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            expect(mockComputeFearGreedIndex).toHaveBeenCalledWith(
+                mockBarsData.bars,
+                mockBarsData.indicators.buySellVolume
+            );
+        });
+
+        it('일봉 조회가 실패해도 공포탐욕 없이(undefined) 분석을 계속한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            mockFetchBarsWithIndicators
+                .mockResolvedValueOnce(mockBarsData)
+                .mockRejectedValueOnce(new Error('daily bars 503'));
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Hour',
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'member' },
+                }
+            );
+
+            expect(result.status).toBe('done');
+            expect(mockComputeFearGreedIndex).not.toHaveBeenCalled();
+            // 7번째 인자 = fearGreed 스냅샷
+            expect(mockBuildAnalysisPrompt.mock.calls.at(-1)?.[6]).toBe(
+                undefined
+            );
+            expect(errorSpy).toHaveBeenCalledWith(
+                expect.stringContaining('FearGreed daily fetch/compute failed'),
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+    });
+
+    describe('stable 스킬 다이제스트가 비어 있을 때', () => {
+        it('system 프롬프트에 빈 구분자를 붙이지 않고 기본 시스템 프롬프트만 보낸다', async () => {
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: '',
+                dynamic: 'mock-dynamic',
+            });
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({ system: AI_SYSTEM_PROMPT })
+            );
+        });
+    });
+
+    describe('runAnalysisForOverall (필터 미적용 내부 변형)', () => {
+        it('캐시 히트 시 free 티어여도 필터되지 않은 원본(riskLevel 포함)을 result로 돌려준다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockRawResult);
+
+            const result = await runAnalysisForOverall(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { tierContext: { userId: null, tier: 'free' } }
+            );
+
+            expect(result.status).toBe('cached');
+            if (result.status !== 'cached') return;
+            expect(result.result.riskLevel).toBe('low');
+            expect(result.result.keyLevels).toEqual(mockRawResult.keyLevels);
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('options를 생략해도 기본 티어로 캐시를 조회해 원본을 반환한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockRawResult);
+
+            const result = await runAnalysisForOverall(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe
+            );
+
+            expect(result.status).toBe('cached');
+            expect(mockCacheGet).toHaveBeenCalledTimes(1);
+        });
+
+        it('캐시 미스 시 free 티어여도 필터 없는 원본을 result로 반환하고 unfilteredResult는 없다', async () => {
+            const result = await runAnalysisForOverall(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier: 'free' },
+                }
+            );
+
+            expect(result.status).toBe('done');
+            if (result.status !== 'done') return;
+            expect(result.result.riskLevel).toBe('low');
+            expect(result.result.analyzedAt).toEqual(expect.any(String));
+            expect('unfilteredResult' in result).toBe(false);
+            expect(mockCacheSet).toHaveBeenCalledTimes(1);
+        });
     });
 });

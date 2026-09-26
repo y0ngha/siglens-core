@@ -209,4 +209,83 @@ describe('runBriefing', () => {
             expect(prompt).toContain('"vixLevel": 21.7');
         });
     });
+
+    describe('캐시 장애 내성', () => {
+        it('캐시 조회가 실패하면 로그만 남기고 LLM 브리핑 후 같은 키로 캐시에 기록한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await runBriefing(MARKET_DATA, US_CONTEXT);
+
+            expect(result.status).toBe('done');
+            expect(result.briefing.summary).toBe(mockBriefingRaw.summary);
+            expect(mockCallBriefingAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                mockCacheGet.mock.calls[0][0],
+                {
+                    briefing: result.briefing,
+                    generatedAt: '2026-08-02T10:00:00.000Z',
+                },
+                MARKET_BRIEFING_CACHE_TTL
+            );
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunBriefing] Cache read failed:',
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 쓰기가 실패해도 브리핑은 그대로 반환되고 오류는 로그로만 남는다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            const writeError = new Error('redis write failed');
+            mockCacheSet.mockRejectedValueOnce(writeError);
+
+            const result = await runBriefing(MARKET_DATA, US_CONTEXT);
+
+            expect(result.status).toBe('done');
+            expect(result.briefing.summary).toBe(mockBriefingRaw.summary);
+            await vi.waitFor(() =>
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunBriefing] Cache write failed:',
+                    writeError
+                )
+            );
+            errorSpy.mockRestore();
+        });
+    });
+
+    describe('빈 브리핑', () => {
+        it('LLM 응답에 summary가 없으면 경고를 남기고 빈 summary로 done을 반환한다', async () => {
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+            mockCallBriefingAi.mockResolvedValueOnce(
+                JSON.stringify({ highlights: ['부분 응답'] })
+            );
+
+            const result = await runBriefing(MARKET_DATA, US_CONTEXT);
+
+            expect(result.status).toBe('done');
+            expect(result.briefing.summary).toBe('');
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[RunBriefing] Empty briefing — summary field absent'
+            );
+            warnSpy.mockRestore();
+        });
+
+        it('summary가 있으면 빈 브리핑 경고를 남기지 않는다', async () => {
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+
+            await runBriefing(MARKET_DATA, US_CONTEXT);
+
+            expect(warnSpy).not.toHaveBeenCalled();
+            warnSpy.mockRestore();
+        });
+    });
 });

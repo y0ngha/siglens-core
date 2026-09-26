@@ -783,3 +783,115 @@ describe('buildFundamentalAnalysisPrompt — ## Derived Metrics (computed) (spec
         expect(prompt).toContain('- Days to Next Earnings: N/A');
     });
 });
+
+describe('buildFundamentalAnalysisPrompt — missing and degenerate inputs', () => {
+    const NOW = new Date('2025-07-20T00:00:00Z');
+    const build = (snapshot: FundamentalSnapshot): string =>
+        buildFundamentalAnalysisPrompt(
+            TEST_SYMBOL,
+            snapshot,
+            [],
+            'ko',
+            'USD',
+            NOW
+        );
+
+    it('renders missing CEO and description as N/A, never "null"/"undefined"', () => {
+        const prompt = build({
+            ...TEST_SNAPSHOT,
+            profile: { ...TEST_SNAPSHOT.profile, ceo: null, description: null },
+        });
+        expect(prompt).toContain('- CEO: N/A');
+        expect(prompt).toContain('- Description: N/A');
+    });
+
+    it('renders a missing price-target consensus as N/A and withholds the upside line', () => {
+        const prompt = build({
+            ...TEST_SNAPSHOT,
+            currentPrice: 200,
+            futureDirection: {
+                ...TEST_SNAPSHOT.futureDirection,
+                priceTargetConsensus: null,
+            },
+        });
+        expect(prompt).toContain('- Price Target: N/A');
+        expect(prompt).toMatch(/- Price Target Upside: N\/A /);
+    });
+
+    it('withholds the P/E premium for a loss-making subject (negative P/E) even with a valid peer median', () => {
+        const prompt = build({
+            ...TEST_SNAPSHOT,
+            valuation: { ...TEST_SNAPSHOT.valuation, per: -12 },
+            peers: [
+                {
+                    symbol: 'P1',
+                    companyName: 'P1',
+                    marketCap: 1,
+                    per: 20,
+                    psr: null,
+                },
+                {
+                    symbol: 'P2',
+                    companyName: 'P2',
+                    marketCap: 1,
+                    per: 40,
+                    psr: null,
+                },
+            ],
+        });
+        expect(prompt).toContain(
+            '- Peer Median P/E: 30.0 (premium/discount vs peers: N/A)'
+        );
+    });
+
+    it('takes the middle value as the peer median for an odd peer count', () => {
+        const prompt = build({
+            ...TEST_SNAPSHOT,
+            valuation: { ...TEST_SNAPSHOT.valuation, per: 33 },
+            peers: [
+                {
+                    symbol: 'P1',
+                    companyName: 'P1',
+                    marketCap: 1,
+                    per: 40,
+                    psr: null,
+                },
+                {
+                    symbol: 'P2',
+                    companyName: 'P2',
+                    marketCap: 1,
+                    per: 10,
+                    psr: null,
+                },
+                {
+                    symbol: 'P3',
+                    companyName: 'P3',
+                    marketCap: 1,
+                    per: 30,
+                    psr: null,
+                },
+            ],
+        });
+        // sorted [10, 30, 40] -> 30; (33 - 30) / 30 = +10.0%
+        expect(prompt).toContain(
+            '- Peer Median P/E: 30.0 (premium/discount vs peers: +10.0%)'
+        );
+    });
+
+    it('analyst buy share is N/A when every grade count is zero (no coverage), not 0% or NaN', () => {
+        const prompt = build({
+            ...TEST_SNAPSHOT,
+            futureDirection: {
+                ...TEST_SNAPSHOT.futureDirection,
+                gradesConsensus: {
+                    strongBuy: 0,
+                    buy: 0,
+                    hold: 0,
+                    sell: 0,
+                    strongSell: 0,
+                },
+            },
+        });
+        expect(prompt).toContain('- Analyst Grades Buy Share: N/A');
+    });
+});

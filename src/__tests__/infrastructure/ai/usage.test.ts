@@ -89,6 +89,24 @@ describe('extractGeminiUsage', () => {
             outputTokens: 60,
         });
     });
+
+    it('treats absent cache/candidate counts as zero (no cache hit, blocked response with no output)', () => {
+        expect(extractGeminiUsage({ promptTokenCount: 1200 })).toEqual({
+            promptTokens: 1200,
+            cachedTokens: 0,
+            cacheWriteTokens: 0,
+            outputTokens: 0,
+        });
+    });
+
+    it('returns all-zero usage for an empty usageMetadata object', () => {
+        expect(extractGeminiUsage({})).toEqual({
+            promptTokens: 0,
+            cachedTokens: 0,
+            cacheWriteTokens: 0,
+            outputTokens: 0,
+        });
+    });
 });
 
 describe('extractOpenAIUsage', () => {
@@ -145,6 +163,30 @@ describe('extractOpenAIUsage', () => {
             cachedTokens: 1600,
             cacheWriteTokens: 0,
             outputTokens: 80,
+        });
+    });
+
+    it('treats an input_tokens_details without cached_tokens as zero cached tokens', () => {
+        expect(
+            extractOpenAIUsage({
+                input_tokens: 700,
+                input_tokens_details: {},
+                output_tokens: 30,
+            })
+        ).toEqual({
+            promptTokens: 700,
+            cachedTokens: 0,
+            cacheWriteTokens: 0,
+            outputTokens: 30,
+        });
+    });
+
+    it('treats missing input_tokens/output_tokens as zero', () => {
+        expect(extractOpenAIUsage({})).toEqual({
+            promptTokens: 0,
+            cachedTokens: 0,
+            cacheWriteTokens: 0,
+            outputTokens: 0,
         });
     });
 });

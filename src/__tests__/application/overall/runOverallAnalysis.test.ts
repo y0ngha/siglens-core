@@ -7,6 +7,8 @@ vi.mock('@/application/market/runAnalysis');
 vi.mock('@/application/news/runNewsAnalysis');
 vi.mock('@/application/market/barsApi');
 vi.mock('@/application/usage');
+vi.mock('@/application/fundamental/runFundamentalAnalysis');
+vi.mock('@/application/options/runOptionsAnalysis');
 
 import { runOverallAnalysis } from '@/application/overall/runOverallAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
@@ -14,6 +16,8 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { runAnalysisForOverall } from '@/application/market/runAnalysis';
 import { runNewsAnalysis } from '@/application/news/runNewsAnalysis';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import { runFundamentalAnalysis } from '@/application/fundamental/runFundamentalAnalysis';
+import { runOptionsAnalysis } from '@/application/options/runOptionsAnalysis';
 import {
     checkAnalysisUsageAllowed,
     recordAnalysisUsageSafely,
@@ -23,7 +27,10 @@ import type { RunOverallAnalysisOptions } from '@/application/overall/types';
 import type {
     AnalysisResponse,
     EnrichedNewsItem,
+    FundamentalAnalysisResponse,
     MarketEvent,
+    OptionsAnalysisResponse,
+    OptionsSnapshot,
     NewsAnalysisResponse,
     OverallAnalysisResponse,
     PriorAnalysis,
@@ -38,6 +45,8 @@ const mockRunNewsAnalysis = runNewsAnalysis as Mock;
 const mockFetchBarsWithIndicators = fetchBarsWithIndicators as Mock;
 const mockCheckAnalysisUsageAllowed = checkAnalysisUsageAllowed as Mock;
 const mockRecordAnalysisUsageSafely = recordAnalysisUsageSafely as Mock;
+const mockRunFundamentalAnalysis = runFundamentalAnalysis as Mock;
+const mockRunOptionsAnalysis = runOptionsAnalysis as Mock;
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -106,6 +115,61 @@ const mockNewsItem: EnrichedNewsItem = {
     },
 };
 
+const mockFundamentalResult: FundamentalAnalysisResponse = {
+    overallConclusionKo: '펀더멘털 결론.',
+    categoryAssessments: [],
+    riskFactorsKo: [],
+    overallSentiment: 'neutral',
+};
+
+const mockOptionsResult: OptionsAnalysisResponse = {
+    summary: '옵션 포지셔닝 요약.',
+    perExpiration: [],
+    signals: [],
+    analyzedAt: '2026-09-01T00:00:00.000Z',
+};
+
+/** Options snapshot whose only expiration is far in the future. */
+const FUTURE_EXPIRATION = '2099-01-15';
+const futureOptionsSnapshot: OptionsSnapshot = {
+    symbol: 'AAPL',
+    underlyingPrice: 200,
+    chains: [
+        {
+            expirationDate: FUTURE_EXPIRATION,
+            daysToExpiration: 9999,
+            calls: [],
+            puts: [],
+        },
+    ],
+    capturedAt: '2026-09-01T00:00:00.000Z',
+};
+
+/** Options snapshot whose only expiration is already in the past. */
+const expiredOptionsSnapshot: OptionsSnapshot = {
+    ...futureOptionsSnapshot,
+    chains: [
+        {
+            expirationDate: '2000-01-21',
+            daysToExpiration: 0,
+            calls: [],
+            puts: [],
+        },
+    ],
+};
+
+function makeUsage(): NonNullable<RunOverallAnalysisOptions['usage']> {
+    return {
+        usageRepository: {
+            recordUsage: vi.fn(),
+            getUsageToday: vi.fn().mockResolvedValue(0),
+        },
+        clientIp: '203.0.113.10',
+        userId: 'u1',
+        occurredAt: new Date(),
+    };
+}
+
 // Stub providers — never called in the crypto test path.
 const stubFundamentalProvider = {} as FundamentalDataProvider;
 const stubMarketDataProvider = {} as MarketDataProvider;
@@ -129,6 +193,11 @@ function baseOptions(): RunOverallAnalysisOptions {
         fundamentalProvider: stubFundamentalProvider,
         marketDataProvider: stubMarketDataProvider,
     };
+}
+
+/** `baseOptions()` switched to equity so the fundamental/options axes run. */
+function equityOptions(): RunOverallAnalysisOptions {
+    return { ...baseOptions(), assetClass: 'equity' };
 }
 
 describe('runOverallAnalysis', () => {
@@ -159,6 +228,16 @@ describe('runOverallAnalysis', () => {
 
         mockCheckAnalysisUsageAllowed.mockResolvedValue(true);
         mockRecordAnalysisUsageSafely.mockResolvedValue(undefined);
+
+        // Equity-only axes (crypto `baseOptions()` never reaches them)
+        mockRunFundamentalAnalysis.mockResolvedValue({
+            status: 'done',
+            result: mockFundamentalResult,
+        });
+        mockRunOptionsAnalysis.mockResolvedValue({
+            status: 'done',
+            result: mockOptionsResult,
+        });
     });
 
     describe('cache hit', () => {
@@ -869,6 +948,671 @@ describe('runOverallAnalysis', () => {
             );
             expect(call).toBeDefined();
             expect(call?.[5]).toMatchObject({ priorAnalyses, marketEvents });
+        });
+    });
+
+    describe('사전 게이트 (축 호출 전)', () => {
+        it('티어가 허용하지 않는 타임프레임 → error/technical, 어떤 축도 호출하지 않는다', async () => {
+            // tier 생략 → DEFAULT_TIER(free) — free는 '1Day'만 허용한다.
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                timeframe: '1Hour',
+            });
+
+            expect(result.status).toBe('error');
+            if (result.status === 'error') {
+                expect(result.axis).toBe('technical');
+            }
+            expect(mockRunAnalysisForOverall).not.toHaveBeenCalled();
+            expect(mockRunNewsAnalysis).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('BYOK 모델 + 비-pro 티어 + 키 없음 → key_error, 축을 돌리지 않는다', async () => {
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                modelId: 'claude-opus-5',
+                tier: 'free',
+            });
+
+            expect(result).toMatchObject({
+                status: 'key_error',
+                code: 'user_api_key_required',
+                modelId: 'claude-opus-5',
+                tier: 'free',
+            });
+            expect(mockRunAnalysisForOverall).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('BYOK 모델이라도 userApiKey가 있으면 통과하고 그 키로 LLM을 호출한다', async () => {
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                modelId: 'claude-opus-5',
+                tier: 'free',
+                userApiKey: 'sk-user',
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    model: 'claude-opus-5',
+                    userApiKey: 'sk-user',
+                })
+            );
+        });
+
+        it('일일 한도 초과 → limit_error, 축·LLM 모두 호출하지 않고 사용량도 기록하지 않는다', async () => {
+            mockCheckAnalysisUsageAllowed.mockResolvedValueOnce(false);
+
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                tier: 'free',
+                usage: makeUsage(),
+            });
+
+            expect(result).toMatchObject({
+                status: 'limit_error',
+                code: 'usage_limit_exceeded',
+            });
+            expect(mockCheckAnalysisUsageAllowed).toHaveBeenCalledTimes(1);
+            expect(mockRunAnalysisForOverall).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+            expect(mockRecordAnalysisUsageSafely).not.toHaveBeenCalled();
+        });
+
+        it('한도 내면 tier·usage로 검사한 뒤 분석을 진행하고 사용량을 정확히 1회 기록한다', async () => {
+            const usage = makeUsage();
+            const now = new Date('2026-09-26T00:00:00.000Z');
+
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                tier: 'free',
+                usage,
+                now,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCheckAnalysisUsageAllowed).toHaveBeenCalledWith(
+                usage,
+                'free',
+                now,
+                expect.anything()
+            );
+            expect(mockRecordAnalysisUsageSafely).toHaveBeenCalledTimes(1);
+            expect(mockRecordAnalysisUsageSafely).toHaveBeenCalledWith(
+                usage,
+                'deepseek-v4.1-flash',
+                now
+            );
+        });
+
+        it('tier를 생략하면 usage가 있어도 한도 검사를 건너뛴다 (하위 호환 경로)', async () => {
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                usage: makeUsage(),
+            });
+
+            expect(mockCheckAnalysisUsageAllowed).not.toHaveBeenCalled();
+            expect(result.status).toBe('done');
+        });
+
+        it('newsItems도 레거시 news 배열도 없으면 축 호출 전에 throw한다', async () => {
+            const { newsItems: _omit, ...withoutNews } = baseOptions();
+
+            await expect(runOverallAnalysis(withoutNews)).rejects.toThrow(
+                /missing news items/
+            );
+            expect(mockRunAnalysisForOverall).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('news 입력의 두 가지 형태', () => {
+        it('레거시 news 배열은 뉴스 데이터로 해석되어 news 축에 전달된다', async () => {
+            const { newsItems: _omit, ...withoutNewsItems } = baseOptions();
+
+            const result = await runOverallAnalysis({
+                ...withoutNewsItems,
+                news: [mockNewsItem],
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ news: [mockNewsItem] })
+            );
+        });
+
+        it('news 객체는 축별 옵션으로 펼쳐져 최상위 기본값(userApiKey)을 덮어쓴다 — 데이터는 newsItems에서 온다', async () => {
+            const controller = new AbortController();
+
+            await runOverallAnalysis({
+                ...baseOptions(),
+                userApiKey: 'sk-top',
+                signal: controller.signal,
+                news: { userApiKey: 'sk-news' },
+            });
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userApiKey: 'sk-news',
+                    news: [mockNewsItem],
+                    force: false,
+                    signal: controller.signal,
+                })
+            );
+        });
+    });
+
+    describe('equity 경로 — fundamental·options 축', () => {
+        it('options 스냅샷이 없으면 options 축을 건너뛰고 fundamental 축만 추가로 돈다', async () => {
+            const result = await runOverallAnalysis(equityOptions());
+
+            expect(result.status).toBe('done');
+            expect(mockRunFundamentalAnalysis).toHaveBeenCalledTimes(1);
+            expect(mockRunOptionsAnalysis).not.toHaveBeenCalled();
+        });
+
+        it('미래 만기가 있는 스냅샷이면 가장 가까운 만기로 options 축을 호출한다', async () => {
+            const result = await runOverallAnalysis({
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockRunOptionsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    snapshot: futureOptionsSnapshot,
+                    expirationDate: FUTURE_EXPIRATION,
+                })
+            );
+        });
+
+        it('스냅샷의 만기가 전부 지났으면 options 축을 호출하지 않고 분석은 계속된다', async () => {
+            const result = await runOverallAnalysis({
+                ...equityOptions(),
+                optionsSnapshot: expiredOptionsSnapshot,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockRunOptionsAnalysis).not.toHaveBeenCalled();
+        });
+
+        it('assetClass를 생략하면 equity로 취급해 fundamental 축을 돌린다', async () => {
+            const { assetClass: _omit, ...withoutAssetClass } = baseOptions();
+
+            const result = await runOverallAnalysis(withoutAssetClass);
+
+            expect(result.status).toBe('done');
+            expect(mockRunFundamentalAnalysis).toHaveBeenCalledTimes(1);
+        });
+
+        it('crypto는 스냅샷이 있어도 fundamental·options 축을 모두 건너뛴다', async () => {
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockRunFundamentalAnalysis).not.toHaveBeenCalled();
+            expect(mockRunOptionsAnalysis).not.toHaveBeenCalled();
+        });
+
+        it('tier를 생략하면 하위 축에 DEFAULT_TIER(free)를, 지정하면 그 값을 넘긴다', async () => {
+            await runOverallAnalysis({
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+            });
+            expect(mockRunFundamentalAnalysis).toHaveBeenLastCalledWith(
+                expect.objectContaining({ tier: 'free' })
+            );
+            expect(mockRunOptionsAnalysis).toHaveBeenLastCalledWith(
+                expect.objectContaining({ tier: 'free' })
+            );
+
+            await runOverallAnalysis({
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+                tier: 'pro',
+            });
+            expect(mockRunFundamentalAnalysis).toHaveBeenLastCalledWith(
+                expect.objectContaining({ tier: 'pro' })
+            );
+            expect(mockRunOptionsAnalysis).toHaveBeenLastCalledWith(
+                expect.objectContaining({ tier: 'pro' })
+            );
+        });
+
+        it('signal·최상위 force를 네 축 모두에 전달하고 usage는 어느 축에도 넘기지 않는다', async () => {
+            const controller = new AbortController();
+            const usage = makeUsage();
+
+            await runOverallAnalysis({
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+                signal: controller.signal,
+                force: true,
+                usage,
+            });
+
+            for (const mock of [
+                mockRunFundamentalAnalysis,
+                mockRunNewsAnalysis,
+                mockRunOptionsAnalysis,
+            ]) {
+                const args = mock.mock.calls[0]![0] as Record<string, unknown>;
+                expect(args.signal).toBe(controller.signal);
+                expect(args.force).toBe(true);
+                expect(args).not.toHaveProperty('usage');
+            }
+            const technicalCall = mockRunAnalysisForOverall.mock.calls[0]!;
+            expect(technicalCall[3]).toBe(true); // effectiveTechnicalForce
+            expect(technicalCall[5]).toMatchObject({
+                signal: controller.signal,
+            });
+            expect(technicalCall[5]).not.toHaveProperty('usage');
+        });
+
+        it('options 결과의 analyzedAt만 다르면 overall 캐시 키가 같다 (휘발 필드 제거)', async () => {
+            const snapshotOptions = {
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+            };
+            await runOverallAnalysis(snapshotOptions);
+            const firstKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            mockCacheGet.mockClear();
+            mockRunOptionsAnalysis.mockResolvedValueOnce({
+                status: 'cached',
+                result: {
+                    ...mockOptionsResult,
+                    analyzedAt: '2026-09-20T12:34:56.000Z',
+                },
+            });
+            await runOverallAnalysis(snapshotOptions);
+            const secondKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            expect(secondKey).toBe(firstKey);
+        });
+
+        it('options 결과의 내용이 바뀌면 overall 캐시 키도 바뀐다', async () => {
+            const snapshotOptions = {
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+            };
+            await runOverallAnalysis(snapshotOptions);
+            const firstKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            mockCacheGet.mockClear();
+            mockRunOptionsAnalysis.mockResolvedValueOnce({
+                status: 'done',
+                result: { ...mockOptionsResult, summary: '다른 요약.' },
+            });
+            await runOverallAnalysis(snapshotOptions);
+            const secondKey = mockCacheGet.mock.calls[0]![0] as string;
+
+            expect(secondKey).not.toBe(firstKey);
+        });
+    });
+
+    describe('축 오류 매핑 (equity)', () => {
+        it('technical 축 key_error → axis:technical, error에 key_error 결과 객체를 그대로 싣는다', async () => {
+            const keyError = {
+                status: 'key_error',
+                code: 'user_api_key_required',
+                error: 'key required',
+                modelId: 'claude-opus-5',
+                tier: 'free',
+            };
+            mockRunAnalysisForOverall.mockResolvedValueOnce(keyError);
+
+            const result = await runOverallAnalysis(baseOptions());
+
+            expect(result).toEqual({
+                status: 'error',
+                axis: 'technical',
+                error: keyError,
+            });
+        });
+
+        it('fundamental 축 fetch_failed(메시지 있음) → axis:fundamental, 메시지를 전달한다', async () => {
+            mockRunFundamentalAnalysis.mockResolvedValueOnce({
+                status: 'error',
+                code: 'fetch_failed',
+                error: 'FMP 503',
+            });
+
+            const result = await runOverallAnalysis(equityOptions());
+
+            expect(result).toEqual({
+                status: 'error',
+                axis: 'fundamental',
+                error: 'FMP 503',
+            });
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('fundamental 축 fetch_failed(메시지 없음) → code로 대체한다', async () => {
+            mockRunFundamentalAnalysis.mockResolvedValueOnce({
+                status: 'error',
+                code: 'fetch_failed',
+            });
+
+            const result = await runOverallAnalysis(equityOptions());
+
+            expect(result).toEqual({
+                status: 'error',
+                axis: 'fundamental',
+                error: 'fetch_failed',
+            });
+        });
+
+        it('fundamental 축 key_error → error에 결과 객체를 그대로 싣는다', async () => {
+            const keyError = {
+                status: 'key_error',
+                code: 'user_api_key_required',
+                error: 'key required',
+                modelId: 'claude-opus-5',
+                tier: 'free',
+            };
+            mockRunFundamentalAnalysis.mockResolvedValueOnce(keyError);
+
+            const result = await runOverallAnalysis(equityOptions());
+
+            expect(result).toEqual({
+                status: 'error',
+                axis: 'fundamental',
+                error: keyError,
+            });
+        });
+
+        it('news 축 key_error → axis:news, error에 결과 객체를 그대로 싣는다', async () => {
+            const keyError = {
+                status: 'key_error',
+                code: 'user_api_key_required',
+                error: 'key required',
+                modelId: 'claude-opus-5',
+                tier: 'free',
+            };
+            mockRunNewsAnalysis.mockResolvedValueOnce(keyError);
+
+            const result = await runOverallAnalysis(baseOptions());
+
+            expect(result).toEqual({
+                status: 'error',
+                axis: 'news',
+                error: keyError,
+            });
+        });
+
+        it.each([
+            [
+                'limit_error',
+                {
+                    status: 'limit_error',
+                    code: 'usage_limit_exceeded',
+                    error: 'limit',
+                },
+            ],
+            [
+                'key_error',
+                {
+                    status: 'key_error',
+                    code: 'user_api_key_required',
+                    error: 'key required',
+                    modelId: 'claude-opus-5',
+                    tier: 'free',
+                },
+            ],
+        ])(
+            'options 축 %s → axis:options, LLM을 호출하지 않는다',
+            async (_label, axisResult) => {
+                mockRunOptionsAnalysis.mockResolvedValueOnce(axisResult);
+
+                const result = await runOverallAnalysis({
+                    ...equityOptions(),
+                    optionsSnapshot: futureOptionsSnapshot,
+                });
+
+                expect(result).toEqual({
+                    status: 'error',
+                    axis: 'options',
+                    error: axisResult,
+                });
+                expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+            }
+        );
+
+        it('fundamental 축 miss_no_trigger → 전체 miss_no_trigger', async () => {
+            mockRunFundamentalAnalysis.mockResolvedValueOnce({
+                status: 'miss_no_trigger',
+            });
+
+            const result = await runOverallAnalysis(equityOptions());
+
+            expect(result.status).toBe('miss_no_trigger');
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('options 축 miss_no_trigger → 전체 miss_no_trigger', async () => {
+            mockRunOptionsAnalysis.mockResolvedValueOnce({
+                status: 'miss_no_trigger',
+            });
+
+            const result = await runOverallAnalysis({
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+            });
+
+            expect(result.status).toBe('miss_no_trigger');
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        /**
+         * `newsData === null && !newsAxisAbsent` 가드: union에 새 상태가 생기면
+         * 뉴스 축이 조용히 빠진 분석이 캐시에 굳는다. 알 수 없는 상태로 그
+         * 경로를 흉내 내 가드가 살아 있는지 고정한다.
+         */
+        it('news 축이 알 수 없는 상태를 돌려주면 뉴스가 빠진 분석을 만들지 않고 error로 막는다', async () => {
+            mockRunNewsAnalysis.mockResolvedValueOnce({
+                status: 'submitted',
+                jobId: 'legacy',
+            });
+
+            const result = await runOverallAnalysis(baseOptions());
+
+            expect(result).toEqual({
+                status: 'error',
+                axis: 'news',
+                error: 'News analysis returned no result',
+            });
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('캐시 장애·부재 시 동작', () => {
+        it('캐시 읽기가 실패하면 로그만 남기고 LLM으로 진행해 done을 반환한다', async () => {
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            try {
+                const result = await runOverallAnalysis(baseOptions());
+
+                expect(result.status).toBe('done');
+                expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunOverallAnalysis] Cache read failed:',
+                    expect.any(Error)
+                );
+            } finally {
+                errorSpy.mockRestore();
+            }
+        });
+
+        it('캐시 프로바이더가 없으면(null) 읽기·쓰기 없이 LLM 결과를 반환하고 사용량을 기록한다', async () => {
+            mockCreateCacheProvider.mockReturnValue(null);
+
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                usage: makeUsage(),
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+            expect(mockRecordAnalysisUsageSafely).toHaveBeenCalledTimes(1);
+        });
+
+        it('정규 키와 peek 키는 서로 다른 키이며, 정규 키는 읽기에 쓴 키와 같다', async () => {
+            await runOverallAnalysis(baseOptions());
+
+            const readKey = mockCacheGet.mock.calls[0]![0] as string;
+            const writtenKeys = mockCacheSet.mock.calls.map(
+                c => c[0] as string
+            );
+            expect(writtenKeys).toHaveLength(2);
+            expect(writtenKeys[0]).toBe(readKey);
+            expect(writtenKeys[1]).not.toBe(readKey);
+        });
+
+        it('정규·peek 캐시 쓰기가 실패해도 결과는 done이고 각각 로그가 남는다', async () => {
+            mockCacheSet.mockRejectedValue(new Error('write failed'));
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            try {
+                const result = await runOverallAnalysis(baseOptions());
+
+                expect(result.status).toBe('done');
+                await vi.waitFor(() => {
+                    expect(errorSpy).toHaveBeenCalledWith(
+                        '[RunOverallAnalysis] Cache write failed:',
+                        expect.any(Error)
+                    );
+                    expect(errorSpy).toHaveBeenCalledWith(
+                        '[RunOverallAnalysis] Peek cache write failed:',
+                        expect.any(Error)
+                    );
+                });
+            } finally {
+                errorSpy.mockRestore();
+            }
+        });
+    });
+
+    describe('LLM 호출 전후 저하(degrade) 경로', () => {
+        it('캐시 미스인데 marketDataProvider가 없으면 LLM 호출 전에 throw한다', async () => {
+            const { marketDataProvider: _omit, ...withoutProvider } =
+                baseOptions();
+
+            await expect(runOverallAnalysis(withoutProvider)).rejects.toThrow(
+                /marketDataProvider is required/
+            );
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('marketDataProvider가 없어도 캐시 히트면 정상 반환한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockOverallResult);
+            const { marketDataProvider: _omit, ...withoutProvider } =
+                baseOptions();
+
+            const result = await runOverallAnalysis(withoutProvider);
+
+            expect(result.status).toBe('cached');
+        });
+
+        it('Fear & Greed 계산이 던지면 sentiment 없이 분석을 계속한다', async () => {
+            // indicators 누락 = 프로바이더가 비정상 페이로드를 돌려준 경우.
+            mockFetchBarsWithIndicators.mockResolvedValue({ bars: [] });
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            try {
+                const result = await runOverallAnalysis(baseOptions());
+
+                expect(result.status).toBe('done');
+                expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+                expect(errorSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('FearGreed computation failed'),
+                    expect.any(Error)
+                );
+            } finally {
+                errorSpy.mockRestore();
+            }
+        });
+
+        it('1Day가 아닌 타임프레임에서 이력용 봉 페치만 실패하면 이력 섹션 없이 분석을 계속한다', async () => {
+            mockFetchBarsWithIndicators.mockImplementation(
+                async (_provider: unknown, _symbol: string, tf: string) => {
+                    if (tf === '1Day') {
+                        return { bars: [], indicators: { buySellVolume: [] } };
+                    }
+                    throw new Error('intraday bars down');
+                }
+            );
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+
+            try {
+                const result = await runOverallAnalysis({
+                    ...baseOptions(),
+                    timeframe: '1Hour',
+                    tier: 'pro',
+                    priorAnalyses: [
+                        {
+                            generatedAt: new Date('2020-01-01T00:00:00.000Z'),
+                            trend: 'bullish',
+                            riskLevel: 'medium',
+                        },
+                    ],
+                });
+
+                expect(result.status).toBe('done');
+                expect(errorSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Prior-analysis bars fetch failed'),
+                    expect.any(Error)
+                );
+                const prompt = (
+                    mockCallAnalysisAi.mock.calls.at(-1)![0] as {
+                        prompt: string;
+                    }
+                ).prompt;
+                expect(prompt).not.toContain('## Prior Analyses');
+            } finally {
+                errorSpy.mockRestore();
+            }
+        });
+
+        it('헤드라인·시나리오가 모두 빈 응답이면 경고를 남기되 결과는 그대로 캐시한다', async () => {
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify({
+                    ...mockOverallResult,
+                    headlineKo: '',
+                    scenarios: [],
+                })
+            );
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+
+            try {
+                const result = await runOverallAnalysis(baseOptions());
+
+                expect(result.status).toBe('done');
+                expect(warnSpy).toHaveBeenCalledWith(
+                    '[RunOverallAnalysis] Empty overall analysis',
+                    { symbol: 'AAPL' }
+                );
+                expect(mockCacheSet).toHaveBeenCalledTimes(2);
+            } finally {
+                warnSpy.mockRestore();
+            }
         });
     });
 });

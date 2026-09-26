@@ -10,10 +10,12 @@ import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
     Skill,
+    TierConfig,
     TierModel,
 } from '@/domain/types';
 
@@ -70,6 +72,24 @@ const mockRawResult = {
     overallSummaryKo: '뉴스 종합 요약.',
     sentiment: 'bullish' as const,
     keyTakeawaysKo: [],
+};
+
+/** 스키마에 맞는 정상 응답 — 정규화 후에도 값이 그대로 보존된다. */
+const mockValidAnalysis = {
+    currentDriverKo: '신제품 발표가 주가 흐름을 주도한다.',
+    keyEventsKo: ['애플 신제품 발표'],
+    upcomingEventsKo: ['7월 실적 발표'],
+    overallSentiment: 'bullish' as const,
+};
+
+/** free 티어 일일 분석 1회로 제한하고 한도 체크를 켠 설정. */
+const LIMITED_TIER_CONFIG: TierConfig = {
+    ...TEST_TIER_CONFIG,
+    limits: {
+        ...TEST_TIER_CONFIG.limits,
+        analysisPerDay: { free: 1, member: 1, pro: Infinity },
+    },
+    featureFlags: { enableTierRestrictions: true },
 };
 
 function baseArgs() {
@@ -215,5 +235,253 @@ describe('runNewsAnalysis', () => {
                 );
             }
         );
+    });
+
+    describe('BYOK 게이트', () => {
+        it('비-pro 티어가 BYOK 모델을 키 없이 요청하면 key_error를 반환하고 아무것도 로드하지 않는다', async () => {
+            const result = await runNewsAnalysis({
+                ...baseArgs(),
+                modelId: 'gemini-3.1-pro-preview',
+                tier: 'member',
+                tierConfig: TEST_TIER_CONFIG,
+            });
+
+            expect(result).toEqual({
+                status: 'key_error',
+                code: 'user_api_key_required',
+                error: expect.any(String),
+                modelId: 'gemini-3.1-pro-preview',
+                tier: 'member',
+            });
+            expect(mockLoadSkillsCached).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('BYOK 모델이라도 userApiKey가 있으면 통과하고 키를 LLM 호출에 전달한다', async () => {
+            const result = await runNewsAnalysis({
+                ...baseArgs(),
+                modelId: 'gemini-3.1-pro-preview',
+                tier: 'member',
+                tierConfig: TEST_TIER_CONFIG,
+                userApiKey: 'usr-key',
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    model: 'gemini-3.1-pro-preview',
+                    userApiKey: 'usr-key',
+                })
+            );
+        });
+    });
+
+    describe('일일 사용량 한도', () => {
+        const NOW = new Date('2026-05-02T03:00:00Z');
+
+        function makeUsage(analysisCountToday: number) {
+            return {
+                usageRepository: {
+                    getUsageToday: vi.fn().mockResolvedValue({
+                        analysis: analysisCountToday,
+                        chatbot: 0,
+                    }),
+                    recordUsage: vi.fn().mockResolvedValue(undefined),
+                },
+                clientIp: '10.0.0.1',
+            };
+        }
+
+        it('한도를 초과하면 usage_limit_exceeded를 반환하고 캐시·LLM·사용량 기록을 모두 건너뛴다', async () => {
+            const usage = makeUsage(1);
+
+            const result = await runNewsAnalysis({
+                ...baseArgs(),
+                tier: 'free',
+                tierConfig: LIMITED_TIER_CONFIG,
+                usage,
+                now: NOW,
+            });
+
+            expect(result).toEqual({
+                status: 'error',
+                code: 'usage_limit_exceeded',
+                error: expect.objectContaining({
+                    code: 'analysis_limit_exceeded',
+                    feature: 'analysisPerDay',
+                    tier: 'free',
+                }),
+            });
+            expect(usage.usageRepository.getUsageToday).toHaveBeenCalledWith(
+                expect.any(String),
+                NOW
+            );
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+            expect(usage.usageRepository.recordUsage).not.toHaveBeenCalled();
+        });
+
+        it('한도 이내면 분석을 진행하고 LLM 완료 후 사용량을 1회 기록한다', async () => {
+            const usage = makeUsage(0);
+
+            const result = await runNewsAnalysis({
+                ...baseArgs(),
+                tier: 'free',
+                tierConfig: LIMITED_TIER_CONFIG,
+                usage,
+                now: NOW,
+            });
+
+            expect(result.status).toBe('done');
+            expect(usage.usageRepository.recordUsage).toHaveBeenCalledTimes(1);
+            expect(usage.usageRepository.recordUsage).toHaveBeenCalledWith({
+                userId: null,
+                ipAddress: '10.0.0.1',
+                actionType: 'analysis',
+                modelUsed: mockModelId,
+                occurredAt: NOW,
+            });
+        });
+
+        it('tier를 생략하면 한도 조회 없이 진행하되 사용량은 기록한다', async () => {
+            const usage = makeUsage(99);
+
+            const result = await runNewsAnalysis({
+                ...baseArgs(),
+                tierConfig: LIMITED_TIER_CONFIG,
+                usage,
+            });
+
+            expect(result.status).toBe('done');
+            expect(usage.usageRepository.getUsageToday).not.toHaveBeenCalled();
+            expect(usage.usageRepository.recordUsage).toHaveBeenCalledTimes(1);
+        });
+
+        it('캐시 히트도 사용량 1회로 기록한다', async () => {
+            mockCacheGet.mockResolvedValueOnce(mockValidAnalysis);
+            const usage = makeUsage(0);
+
+            const result = await runNewsAnalysis({
+                ...baseArgs(),
+                tier: 'free',
+                tierConfig: LIMITED_TIER_CONFIG,
+                usage,
+                now: NOW,
+            });
+
+            expect(result.status).toBe('cached');
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+            expect(usage.usageRepository.recordUsage).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('캐시 우회·장애 내성', () => {
+        it('force=true이면 캐시를 읽지 않고 LLM을 태운 뒤 결과를 다시 쓴다', async () => {
+            mockCacheGet.mockResolvedValue(mockValidAnalysis);
+
+            const result = await runNewsAnalysis({
+                ...baseArgs(),
+                force: true,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheSet).toHaveBeenCalledTimes(1);
+        });
+
+        it('캐시 프로바이더가 없으면(null) 캐시 없이 LLM 결과를 반환한다', async () => {
+            mockCreateCacheProvider.mockReturnValue(null);
+
+            const result = await runNewsAnalysis(baseArgs());
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
+        it('캐시 읽기가 실패하면 로그를 남기고 LLM 경로로 진행한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheGet.mockRejectedValueOnce(new Error('redis down'));
+
+            const result = await runNewsAnalysis(baseArgs());
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunNewsAnalysis] Cache read failed:',
+                expect.any(Error)
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('캐시 쓰기가 실패해도 응답은 done이고 오류는 로그로만 남는다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => {});
+            mockCacheSet.mockRejectedValueOnce(new Error('redis write down'));
+
+            const result = await runNewsAnalysis(baseArgs());
+
+            expect(result.status).toBe('done');
+            await vi.waitFor(() =>
+                expect(errorSpy).toHaveBeenCalledWith(
+                    '[RunNewsAnalysis] Cache write failed:',
+                    expect.any(Error)
+                )
+            );
+            errorSpy.mockRestore();
+        });
+    });
+
+    describe('LLM 응답 정규화', () => {
+        it('정상 응답은 정규화해 반환·캐시하고 빈 결과 경고를 남기지 않는다', async () => {
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify(mockValidAnalysis)
+            );
+
+            const result = await runNewsAnalysis(baseArgs());
+
+            expect(result).toEqual({
+                status: 'done',
+                result: mockValidAnalysis,
+            });
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                expect.any(String),
+                mockValidAnalysis,
+                NEWS_CACHE_TTL_SECONDS
+            );
+            expect(warnSpy).not.toHaveBeenCalled();
+            warnSpy.mockRestore();
+        });
+
+        it('스키마와 다른 JSON 응답은 빈 결과로 정규화하고 경고를 남긴다', async () => {
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => {});
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify({ unexpected: 'shape' })
+            );
+
+            const result = await runNewsAnalysis(baseArgs());
+
+            expect(result.status).toBe('done');
+            if (result.status === 'done') {
+                expect(result.result.currentDriverKo).toBe('');
+                expect(result.result.keyEventsKo).toEqual([]);
+            }
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Empty news analysis'),
+                { symbol: 'AAPL' }
+            );
+            warnSpy.mockRestore();
+        });
     });
 });

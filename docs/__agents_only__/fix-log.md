@@ -172,3 +172,9 @@
 
 ### Round 3: approved
 
+## [PR #230 | feat/test-only-minor-refactor | 2026-09-26] — Test file assertion precision
+
+- Violation: Test title vs assertion mismatch — test promised format validation but didn't check
+  Rule: Tests — test description must match assertion behavior; vacuous assertions provide no verification
+  Context: analysisInput.test.ts test title indicated "16-char hex fingerprint" validation but assertion only checked definition (expect(...).toBeDefined()). Fixed by adding toMatch(/^[0-9a-f]{16}$/) to verify format.
+
