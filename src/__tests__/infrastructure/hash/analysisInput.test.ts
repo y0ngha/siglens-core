@@ -138,7 +138,10 @@ describe('hashSkillCatalog', () => {
     });
 
     it('빈 카탈로그도 16자 hex fingerprint를 낸다', () => {
-        expect(hashSkillCatalog([])).toBe(hashAnalysisInput('[]'));
+        const fingerprint = hashSkillCatalog([]);
+
+        expect(fingerprint).toMatch(/^[0-9a-f]{16}$/);
+        expect(fingerprint).toBe(hashAnalysisInput('[]'));
     });
 });
 

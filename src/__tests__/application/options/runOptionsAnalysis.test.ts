@@ -8,8 +8,8 @@ import { runOptionsAnalysis } from '@/application/options/runOptionsAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { OPTIONS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
-import type { OptionsSnapshot, TierConfig, TierModel } from '@/domain/types';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
+import type { OptionsSnapshot, TierConfig, TierModel } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;

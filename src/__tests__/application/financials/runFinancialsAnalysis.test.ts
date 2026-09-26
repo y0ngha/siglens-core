@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
-import type { Skill, TierConfig, TierModel } from '@/domain/types';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
+import type { Skill, TierConfig, TierModel } from '@/domain/types';
 
 vi.mock('@/application/analysis/callAnalysisAi');
 vi.mock('@/infrastructure/cache/redis');

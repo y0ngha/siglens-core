@@ -16,12 +16,12 @@ vi.mock('@/domain/analysis/fundamentalPrompt', () => ({
 import { runFundamentalAnalysis } from '@/application/fundamental/runFundamentalAnalysis';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FUNDAMENTAL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
-import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
 
 const mockBuildFundamentalAnalysisPrompt =

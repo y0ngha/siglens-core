@@ -10,6 +10,7 @@ import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 import type {
     EarningsCalendarItem,
     EnrichedNewsItem,
@@ -17,7 +18,6 @@ import type {
     TierConfig,
     TierModel,
 } from '@/domain/types';
-import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
