@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.17.2](https://github.com/y0ngha/siglens-core/compare/v1.17.1...v1.17.2) (2026-09-26)
+
+### Bug Fixes
+
+* **analysis:** 뉴스성 급락이면 눌림 진입 판정을 보류한다 ([17c19ab](https://github.com/y0ngha/siglens-core/commit/17c19abb5462ccfcad428400e8572518d6ab070d))
+
 ## [1.17.1](https://github.com/y0ngha/siglens-core/compare/v1.17.0...v1.17.1) (2026-09-26)
 
 ### Bug Fixes
