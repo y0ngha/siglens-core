@@ -9,6 +9,7 @@ import type {
     AssetClass,
     CurrencyCode,
     EarningsCalendarItem,
+    EconomicCalendarEvent,
     EnrichedNewsItem,
     ModelId,
     NewsAnalysisResponse,
@@ -37,6 +38,20 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     news: ReadonlyArray<EnrichedNewsItem>;
     /** Upcoming or recent earnings calendar entries for the symbol. */
     upcomingCalendar: readonly EarningsCalendarItem[];
+    /**
+     * Scheduled macro-economic releases (FOMC, CPI, etc.) — spec 2026-09-28.
+     * Filtering (country, impact, date window) is the caller's responsibility;
+     * this option only sorts ascending and caps at 12 rows for the prompt.
+     * Renders a `## Macro Calendar` section when non-empty and folds a
+     * fingerprint of every rendered field
+     * (`date|event|impact|actual|estimate|previous|unit`) into the
+     * cache-input hash and skill-sampling seed, so any change to a rendered
+     * row (a filled-in `actual`, a revised `estimate`/`previous`) invalidates
+     * the cached analysis. Defaults to `[]`, which keeps the prompt, cache key, and
+     * sampling seed byte-identical to every call site that predates this
+     * option.
+     */
+    macroCalendar?: readonly EconomicCalendarEvent[];
     /**
      * Resolved subscription tier.
      *
