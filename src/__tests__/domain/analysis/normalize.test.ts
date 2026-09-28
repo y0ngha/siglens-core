@@ -137,6 +137,27 @@ describe('normalizePriceScenario', () => {
     it('null이면 null을 반환한다', () => {
         expect(normalizePriceScenario(null)).toBeNull();
     });
+
+    // LLM이 스키마의 { targets, condition } 대신 targets 배열만 내는 경우가 있다
+    // (2026-09-28 A/B: 32회 중 2회). 버리면 목표가가 통째로 사라지므로 targets로 받는다.
+    it('bare 배열이면 targets로 감싸고 condition은 빈 문자열로 둔다', () => {
+        expect(
+            normalizePriceScenario([
+                { price: 229.5, basis: 'Fib ext 161.8% (Medium)' },
+                { price: 'x', basis: 'invalid' },
+            ])
+        ).toEqual({
+            targets: [{ price: 229.5, basis: 'Fib ext 161.8% (Medium)' }],
+            condition: '',
+        });
+    });
+
+    it('빈 배열이면 targets가 빈 시나리오를 반환한다', () => {
+        expect(normalizePriceScenario([])).toEqual({
+            targets: [],
+            condition: '',
+        });
+    });
 });
 
 describe('normalizePriceTargets', () => {
@@ -146,6 +167,19 @@ describe('normalizePriceTargets', () => {
             bearish: { targets: [], condition: '' },
         });
         expect(result).toBeDefined();
+    });
+
+    it('양쪽이 bare 배열이어도 목표가를 보존한다', () => {
+        const result = normalizePriceTargets({
+            bullish: [{ price: 250, basis: 'Fib ext 127.2%' }],
+            bearish: [{ price: 200, basis: 'Fib 61.8%' }],
+        });
+        expect(result.bullish?.targets).toEqual([
+            { price: 250, basis: 'Fib ext 127.2%' },
+        ]);
+        expect(result.bearish?.targets).toEqual([
+            { price: 200, basis: 'Fib 61.8%' },
+        ]);
     });
 
     it('null이면 null PriceTargets를 반환한다', () => {

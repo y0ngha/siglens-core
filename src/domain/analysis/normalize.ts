@@ -102,8 +102,21 @@ export function normalizePriceTarget(v: unknown): PriceTarget | null {
     return { price, basis: asString(o.basis) };
 }
 
-/** @internal Normalizes a price scenario. */
+/**
+ * @internal Normalizes a price scenario.
+ *
+ * The model sometimes returns a side as a bare `targets` array instead of the
+ * schema's `{ targets, condition }` object (2 of 32 DeepSeek runs in the
+ * 2026-09-28 A/B). Dropping it would erase every target on that side, so a
+ * bare array is read as the targets with an empty condition.
+ */
 export function normalizePriceScenario(v: unknown): PriceScenario | null {
+    if (Array.isArray(v)) {
+        return {
+            targets: compact(v.map(normalizePriceTarget)),
+            condition: '',
+        };
+    }
     const o = asObject(v);
     if (!o) return null;
     return {
