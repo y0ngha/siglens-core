@@ -595,7 +595,15 @@ describe('runNewsAnalysis', () => {
                 'earnings-dates',
                 '2026-07-25',
                 'macro-calendar',
-                '2026-07-30 12:00:00|CPI MoM|High|null|0.3|0.2|%',
+                JSON.stringify([
+                    '2026-07-30 12:00:00',
+                    'CPI MoM',
+                    'High',
+                    null,
+                    0.3,
+                    0.2,
+                    '%',
+                ]),
             ]);
         });
 

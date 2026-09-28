@@ -210,19 +210,35 @@ function formatMacroCalendarRow(
 }
 
 /**
- * Render the `## Macro Calendar` section: date-ascending, capped to
- * {@link MACRO_CALENDAR_MAX_ROWS} rows regardless of input order (spec
- * 2026-09-28 §1). The builder below only calls this when `macroCalendar` is
- * non-empty (`hasMacroCalendar`) — an empty `events` is not part of this
- * function's contract.
+ * @internal
+ * Select and order the macro-calendar rows the prompt actually renders:
+ * date-ascending, capped to {@link MACRO_CALENDAR_MAX_ROWS}, regardless of
+ * input order (spec 2026-09-28 §1). Exported so
+ * `macroCalendarFingerprintParts` (`infrastructure/hash/analysisInput.ts`)
+ * shares this exact selection instead of re-deriving it — otherwise a
+ * change to a row beyond the cap (never rendered) could still invalidate
+ * the cache, or a differently-derived cap could fingerprint a row the
+ * prompt never shows (PR #232 review suggestion 2).
+ */
+export function selectMacroCalendarRows(
+    events: readonly EconomicCalendarEvent[]
+): EconomicCalendarEvent[] {
+    return events
+        .toSorted((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
+        .slice(0, MACRO_CALENDAR_MAX_ROWS);
+}
+
+/**
+ * Render the `## Macro Calendar` section (spec 2026-09-28 §1). The builder
+ * below only calls this when `macroCalendar` is non-empty
+ * (`hasMacroCalendar`) — an empty `events` is not part of this function's
+ * contract.
  */
 function formatMacroCalendarSection(
     events: readonly EconomicCalendarEvent[],
     now: Date | undefined
 ): string {
-    const rows = events
-        .toSorted((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0))
-        .slice(0, MACRO_CALENDAR_MAX_ROWS)
+    const rows = selectMacroCalendarRows(events)
         .map(event => formatMacroCalendarRow(event, now))
         .join('\n');
     return `## Macro Calendar (scheduled economic releases — source data)\n${rows}`;

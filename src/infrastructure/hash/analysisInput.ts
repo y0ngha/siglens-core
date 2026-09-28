@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { selectMacroCalendarRows } from '@/domain/analysis/newsPrompt';
 import type { EconomicCalendarEvent, Skill } from '@/domain/types';
 
 /** Length of the hex prefix (~64 bits) used for analysis cache input hashing. Collision probability is negligible at expected cardinalities. */
@@ -94,31 +95,49 @@ export function hashSkillCatalog(skills: readonly Skill[]): string {
 
 /**
  * @internal
- * Sorted `date|event|impact|actual|estimate|previous|unit` fingerprint parts
- * for a macro-calendar event set (spec 2026-09-28 §3, review round 1 finding
- * 5) — every field the news prompt's `## Macro Calendar` section actually
- * renders (`formatMacroCalendarRow`, `newsPrompt.ts`), not just a subset.
+ * Sorted, unambiguously-serialized fingerprint parts for a macro-calendar
+ * event set (spec 2026-09-28 §3, review round 1 finding 5, PR #232 review
+ * suggestions 1–2). Each part is `JSON.stringify([date, event, impact,
+ * actual, estimate, previous, unit])` — every field the news prompt's `##
+ * Macro Calendar` section actually renders (`formatMacroCalendarRow`,
+ * `newsPrompt.ts`), not just a subset, and JSON-array-encoded rather than
+ * `|`-joined so an `event` name containing a literal `|` cannot collide
+ * with a field boundary (e.g. `'A|B'` + `impact:'C'` vs. `event:'A'` +
+ * fields containing `'B|C'` previously hashed identically).
+ *
+ * Selects rows via {@link selectMacroCalendarRows} — the SAME date-ascending
+ * sort + 12-row cap the prompt itself applies — so a change to a row beyond
+ * the cap (never rendered into the prompt) does not invalidate the cache,
+ * and the fingerprint can never cover a row the prompt omits.
+ *
  * Shared between `runNewsAnalysis`'s input hash and its skill-sampling seed
- * so both invalidate whenever any rendered field changes, including
- * `estimate`/`previous` (an initial estimate revision, or a previous-period
- * restatement, changes prompt bytes exactly like `actual` being filled in —
- * excluding them would serve a stale cached analysis for a re-estimated or
- * restated release).
+ * so both invalidate whenever any rendered field of a rendered row changes,
+ * including `estimate`/`previous` (an initial estimate revision, or a
+ * previous-period restatement, changes prompt bytes exactly like `actual`
+ * being filled in — excluding them would serve a stale cached analysis for
+ * a re-estimated or restated release).
  *
  * Empty input produces an empty array, so a caller that spreads the result
  * into a hash string or seed-parts array (rather than appending it
  * unconditionally) keeps every pre-macro-calendar input byte-identical.
  *
  * @param macroCalendar - Macro calendar events forwarded to the news prompt.
- * @returns Sorted fingerprint strings, one per event.
+ * @returns Sorted fingerprint strings, one per rendered event.
  */
 export function macroCalendarFingerprintParts(
     macroCalendar: readonly EconomicCalendarEvent[]
 ): string[] {
-    return macroCalendar
-        .map(
-            e =>
-                `${e.date}|${e.event}|${e.impact}|${e.actual ?? 'null'}|${e.estimate ?? 'null'}|${e.previous ?? 'null'}|${e.unit}`
+    return selectMacroCalendarRows(macroCalendar)
+        .map(e =>
+            JSON.stringify([
+                e.date,
+                e.event,
+                e.impact,
+                e.actual,
+                e.estimate,
+                e.previous,
+                e.unit,
+            ])
         )
         .toSorted();
 }
