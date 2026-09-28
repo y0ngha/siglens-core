@@ -202,6 +202,7 @@ export async function runOverallAnalysis(
         newsItems: newsItemsInput,
         news: newsField,
         upcomingCalendar,
+        macroCalendar,
         optionsSnapshot,
         options: optionsAxisOptions,
         force: topLevelForce,
@@ -348,11 +349,18 @@ export async function runOverallAnalysis(
                 modelId,
                 news: resolvedNewsItems,
                 upcomingCalendar,
+                macroCalendar,
                 tier: topLevelTier ?? DEFAULT_TIER,
                 userApiKey: topLevelUserApiKey,
                 reasoning,
                 locale: options.locale,
                 currency: options.currency,
+                // review round 1 finding 9: this was missing — a crypto
+                // overall run built an equity-framed news prompt that,
+                // since `assetClass` is not part of the news cache key,
+                // could be written under the exact key a standalone
+                // crypto `/news` call reads.
+                assetClass,
                 ...(newsFieldIsArray
                     ? undefined
                     : (newsField as object | undefined)),

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { Skill } from '@/domain/types';
+import type { EconomicCalendarEvent, Skill } from '@/domain/types';
 
 /** Length of the hex prefix (~64 bits) used for analysis cache input hashing. Collision probability is negligible at expected cardinalities. */
 const ANALYSIS_INPUT_HASH_LENGTH = 16;
@@ -90,6 +90,37 @@ export function hashSkillCatalog(skills: readonly Skill[]): string {
             .toSorted((a, b) => a.name.localeCompare(b.name, 'en'))
     );
     return hashAnalysisInput(serialized);
+}
+
+/**
+ * @internal
+ * Sorted `date|event|impact|actual|estimate|previous|unit` fingerprint parts
+ * for a macro-calendar event set (spec 2026-09-28 §3, review round 1 finding
+ * 5) — every field the news prompt's `## Macro Calendar` section actually
+ * renders (`formatMacroCalendarRow`, `newsPrompt.ts`), not just a subset.
+ * Shared between `runNewsAnalysis`'s input hash and its skill-sampling seed
+ * so both invalidate whenever any rendered field changes, including
+ * `estimate`/`previous` (an initial estimate revision, or a previous-period
+ * restatement, changes prompt bytes exactly like `actual` being filled in —
+ * excluding them would serve a stale cached analysis for a re-estimated or
+ * restated release).
+ *
+ * Empty input produces an empty array, so a caller that spreads the result
+ * into a hash string or seed-parts array (rather than appending it
+ * unconditionally) keeps every pre-macro-calendar input byte-identical.
+ *
+ * @param macroCalendar - Macro calendar events forwarded to the news prompt.
+ * @returns Sorted fingerprint strings, one per event.
+ */
+export function macroCalendarFingerprintParts(
+    macroCalendar: readonly EconomicCalendarEvent[]
+): string[] {
+    return macroCalendar
+        .map(
+            e =>
+                `${e.date}|${e.event}|${e.impact}|${e.actual ?? 'null'}|${e.estimate ?? 'null'}|${e.previous ?? 'null'}|${e.unit}`
+        )
+        .toSorted();
 }
 
 /**

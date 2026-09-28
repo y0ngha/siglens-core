@@ -3,10 +3,11 @@ import {
     analysisSeed,
     hashAnalysisInput,
     hashSkillCatalog,
+    macroCalendarFingerprintParts,
     MAX_INT32,
     normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
-import type { Skill } from '@/domain/types';
+import type { EconomicCalendarEvent, Skill } from '@/domain/types';
 
 const makeSkill = (name: string, overrides: Partial<Skill> = {}): Skill => ({
     name,
@@ -183,5 +184,94 @@ describe('normalizeSkillsForHash', () => {
         const input = [makeSkill('b'), makeSkill('a')];
         normalizeSkillsForHash(input);
         expect(input.map(s => s.name)).toEqual(['b', 'a']);
+    });
+});
+
+describe('macroCalendarFingerprintParts', () => {
+    const makeEvent = (
+        overrides: Partial<EconomicCalendarEvent> = {}
+    ): EconomicCalendarEvent => ({
+        date: '2026-10-01 08:30:00',
+        event: 'Core PCE Price Index MoM',
+        impact: 'High',
+        actual: null,
+        estimate: 0.3,
+        previous: 0.2,
+        unit: '%',
+        ...overrides,
+    });
+
+    it('빈 배열은 빈 배열을 반환한다 (기존 호출과 바이트 동일성 보장)', () => {
+        expect(macroCalendarFingerprintParts([])).toEqual([]);
+    });
+
+    it('각 이벤트를 date|event|impact|actual|estimate|previous|unit 형식으로 직렬화한다 (렌더되는 필드 전체)', () => {
+        const result = macroCalendarFingerprintParts([
+            makeEvent({ actual: 0.3, estimate: 0.3, previous: 0.2 }),
+        ]);
+        expect(result).toEqual([
+            '2026-10-01 08:30:00|Core PCE Price Index MoM|High|0.3|0.3|0.2|%',
+        ]);
+    });
+
+    it('actual이 null이면 리터럴 문자열 "null"로 직렬화한다', () => {
+        const result = macroCalendarFingerprintParts([
+            makeEvent({ actual: null }),
+        ]);
+        expect(result).toEqual([
+            '2026-10-01 08:30:00|Core PCE Price Index MoM|High|null|0.3|0.2|%',
+        ]);
+    });
+
+    it('actual 값이 채워지면(null → 숫자) fingerprint가 달라진다 — 재분석 트리거', () => {
+        const before = macroCalendarFingerprintParts([
+            makeEvent({ actual: null }),
+        ]);
+        const after = macroCalendarFingerprintParts([
+            makeEvent({ actual: 0.3 }),
+        ]);
+        expect(before).not.toEqual(after);
+    });
+
+    it('estimate·previous 변경도 fingerprint를 바꾼다 (렌더되는 필드는 전부 반영 — review round 1 finding 5)', () => {
+        // 초기 추정치 수정이나 이전 기간 재작성도 프롬프트 바이트를 바꾼다 —
+        // actual이 채워질 때와 동일한 이유로 캐시가 무효화되어야 한다.
+        const a = macroCalendarFingerprintParts([
+            makeEvent({ estimate: 0.3, previous: 0.2 }),
+        ]);
+        const b = macroCalendarFingerprintParts([
+            makeEvent({ estimate: 0.5, previous: 0.9 }),
+        ]);
+        expect(a).not.toEqual(b);
+    });
+
+    it('impact 변경도 fingerprint를 바꾼다', () => {
+        const low = macroCalendarFingerprintParts([
+            makeEvent({ impact: 'Low' }),
+        ]);
+        const high = macroCalendarFingerprintParts([
+            makeEvent({ impact: 'High' }),
+        ]);
+        expect(low).not.toEqual(high);
+    });
+
+    it('unit 변경도 fingerprint를 바꾼다', () => {
+        const pct = macroCalendarFingerprintParts([makeEvent({ unit: '%' })]);
+        const none = macroCalendarFingerprintParts([makeEvent({ unit: '' })]);
+        expect(pct).not.toEqual(none);
+    });
+
+    it('입력 순서와 무관하게 정렬된 결과를 반환한다', () => {
+        const eventA = makeEvent({ date: '2026-10-01 08:30:00', event: 'A' });
+        const eventB = makeEvent({ date: '2026-10-05 08:30:00', event: 'B' });
+        expect(macroCalendarFingerprintParts([eventB, eventA])).toEqual(
+            macroCalendarFingerprintParts([eventA, eventB])
+        );
+    });
+
+    it('입력 배열을 변경하지 않는다', () => {
+        const input = [makeEvent({ event: 'B' }), makeEvent({ event: 'A' })];
+        macroCalendarFingerprintParts(input);
+        expect(input.map(e => e.event)).toEqual(['B', 'A']);
     });
 });

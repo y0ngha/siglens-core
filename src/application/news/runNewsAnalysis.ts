@@ -34,6 +34,7 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
     analysisSeed,
     hashAnalysisInput,
+    macroCalendarFingerprintParts,
     normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
@@ -43,24 +44,29 @@ import {
 } from '@/infrastructure/skills/sampling';
 
 /**
- * Derive a deterministic hash of the news set, calendar, tier, and sampled skills.
+ * Derive a deterministic hash of the news set, calendar, tier, sampled
+ * skills, and (when present) the macro calendar.
  *
- * Mirrors `submitNewsAnalysis`'s `hashNewsInput` — kept local to avoid a
- * shared abstraction between the submit and run paths. Cache keys produced by
- * both paths are byte-identical for the same input so a cache entry written by
- * one path is readable by the other.
+ * `macroFingerprintParts` is appended only when non-empty (spec 2026-09-28
+ * §3) — an empty macro calendar (every call site before that option existed)
+ * hashes the exact same string as before, so pre-existing cache entries stay
+ * valid.
  */
 function hashNewsInput(
     newsIds: readonly string[],
     earningsDates: readonly string[],
     tier: string,
-    skills: readonly Skill[]
+    skills: readonly Skill[],
+    macroFingerprintParts: readonly string[]
 ): string {
     const sortedIds = newsIds.toSorted().join(',');
     const sortedDates = earningsDates.toSorted().join(',');
     const skillFingerprint = JSON.stringify(normalizeSkillsForHash(skills));
+    const base = `${tier}|${sortedIds}|${sortedDates}|${skillFingerprint}`;
     return hashAnalysisInput(
-        `${tier}|${sortedIds}|${sortedDates}|${skillFingerprint}`
+        macroFingerprintParts.length > 0
+            ? `${base}|${macroFingerprintParts.join(',')}`
+            : base
     );
 }
 
@@ -101,6 +107,7 @@ export async function runNewsAnalysis(
         modelId,
         news,
         upcomingCalendar,
+        macroCalendar = [],
     } = options;
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
@@ -151,6 +158,10 @@ export async function runNewsAnalysis(
     const { skills } = await loadSkillsCached();
     const newsIds = news.map(n => n.id);
     const earningsDates = upcomingCalendar.map(c => c.earningsDate);
+    // Empty when `macroCalendar` is omitted/[] — spreading zero extra parts
+    // keeps the seed identical to every call site before this option existed
+    // (spec 2026-09-28 §3).
+    const macroFingerprintParts = macroCalendarFingerprintParts(macroCalendar);
     const skillSampling = createSkillSamplingPlan(skills, tier, [
         'news',
         symbol,
@@ -161,12 +172,16 @@ export async function runNewsAnalysis(
         ...newsIds.toSorted(),
         'earnings-dates',
         ...earningsDates.toSorted(),
+        ...(macroFingerprintParts.length > 0
+            ? ['macro-calendar', ...macroFingerprintParts]
+            : []),
     ]);
     const inputHash = hashNewsInput(
         newsIds,
         earningsDates,
         tier,
-        skillSampling.skills
+        skillSampling.skills,
+        macroFingerprintParts
     );
     const cacheKey = buildNewsCacheKey(
         symbol,
@@ -206,7 +221,8 @@ export async function runNewsAnalysis(
         options.assetClass ?? 'equity',
         locale,
         options.currency,
-        occurredAt
+        occurredAt,
+        macroCalendar
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

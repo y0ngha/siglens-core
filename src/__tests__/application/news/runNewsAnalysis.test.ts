@@ -4,15 +4,31 @@ import type { Mock } from 'vitest';
 vi.mock('@/application/analysis/callAnalysisAi');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
+// Passthrough spy (review round 1 finding 2): keeps the REAL sampling
+// behavior (so every other test's skill selection is unaffected) while
+// recording the exact `seedParts` array `runNewsAnalysis` builds — the only
+// way to assert on that array's content, since it never appears in any
+// return value or side effect.
+vi.mock('@/infrastructure/skills/sampling', async () => {
+    const actual = await vi.importActual<
+        typeof import('@/infrastructure/skills/sampling')
+    >('@/infrastructure/skills/sampling');
+    return {
+        ...actual,
+        createSkillSamplingPlan: vi.fn(actual.createSkillSamplingPlan),
+    };
+});
 
 import { runNewsAnalysis } from '@/application/news/runNewsAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 import type {
     EarningsCalendarItem,
+    EconomicCalendarEvent,
     EnrichedNewsItem,
     Skill,
     TierConfig,
@@ -22,6 +38,24 @@ import type {
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
+const mockCreateSkillSamplingPlan = createSkillSamplingPlan as Mock;
+
+/**
+ * Finds this call's `seedParts` (3rd positional arg) by content — never by
+ * a fixed `mock.calls` index, which can silently pick up a stale call left
+ * over from another invocation in the same test.
+ */
+function findSeedParts(symbol: string): readonly string[] {
+    const call = mockCreateSkillSamplingPlan.mock.calls.find(c =>
+        (c[2] as readonly string[]).includes(symbol)
+    );
+    if (call === undefined) {
+        throw new Error(
+            `No createSkillSamplingPlan call found for symbol ${symbol}`
+        );
+    }
+    return call[2] as readonly string[];
+}
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -482,6 +516,137 @@ describe('runNewsAnalysis', () => {
                 { symbol: 'AAPL' }
             );
             warnSpy.mockRestore();
+        });
+    });
+
+    describe('macro calendar (spec 2026-09-28)', () => {
+        function makeMacroEvent(
+            overrides: Partial<EconomicCalendarEvent> = {}
+        ): EconomicCalendarEvent {
+            return {
+                date: '2026-07-30 12:00:00',
+                event: 'CPI MoM',
+                impact: 'High',
+                actual: null,
+                estimate: 0.3,
+                previous: 0.2,
+                unit: '%',
+                ...overrides,
+            };
+        }
+
+        it('전달되면 LLM 프롬프트에 Macro Calendar 섹션이 렌더된다', async () => {
+            await runNewsAnalysis({
+                ...baseArgs(),
+                macroCalendar: [makeMacroEvent()],
+            });
+
+            const call = mockCallAnalysisAi.mock.calls.at(-1)![0] as {
+                prompt: string;
+            };
+            expect(call.prompt).toContain(
+                '## Macro Calendar (scheduled economic releases — source data)'
+            );
+            expect(call.prompt).toContain('CPI MoM');
+        });
+
+        it('macroCalendar 생략 시 캐시 키가 정확히 고정된 값이다 (review round 1 finding 2)', async () => {
+            // sha256('free|news-001|2026-07-25|[]').slice(0,16) — re-derived
+            // independently (see PR review notes) and confirmed against the
+            // current (post-macro-calendar-feature, macro-omitted) code
+            // path, not merely trusted from the reviewer's number.
+            await runNewsAnalysis(baseArgs());
+
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p7:719732b6711a0154'
+            );
+        });
+
+        it('macroCalendar 생략 시 seedParts가 이 옵션이 생기기 전 목록과 정확히 같다', async () => {
+            await runNewsAnalysis(baseArgs());
+
+            expect(findSeedParts('AAPL')).toEqual([
+                'news',
+                'AAPL',
+                mockModelId,
+                'reasoning-off',
+                'free',
+                'news-ids',
+                'news-001',
+                'earnings-dates',
+                '2026-07-25',
+            ]);
+        });
+
+        it('macroCalendar가 있으면 seedParts에 macro-calendar 지문이 추가된다', async () => {
+            await runNewsAnalysis({
+                ...baseArgs(),
+                macroCalendar: [makeMacroEvent()],
+            });
+
+            expect(findSeedParts('AAPL')).toEqual([
+                'news',
+                'AAPL',
+                mockModelId,
+                'reasoning-off',
+                'free',
+                'news-ids',
+                'news-001',
+                'earnings-dates',
+                '2026-07-25',
+                'macro-calendar',
+                '2026-07-30 12:00:00|CPI MoM|High|null|0.3|0.2|%',
+            ]);
+        });
+
+        it('생략과 명시적 빈 배열은 동일한 캐시 키를 쓴다 (바이트 동일성)', async () => {
+            await runNewsAnalysis(baseArgs());
+            const omittedKey = mockCacheGet.mock.calls.at(-1)![0] as string;
+
+            mockCacheGet.mockClear();
+            await runNewsAnalysis({ ...baseArgs(), macroCalendar: [] });
+            const explicitEmptyKey = mockCacheGet.mock.calls.at(
+                -1
+            )![0] as string;
+
+            expect(explicitEmptyKey).toBe(omittedKey);
+        });
+
+        it('macroCalendar가 있으면 없을 때와 다른 캐시 키를 쓴다', async () => {
+            await runNewsAnalysis(baseArgs());
+            const withoutMacroKey = mockCacheGet.mock.calls.at(
+                -1
+            )![0] as string;
+
+            mockCacheGet.mockClear();
+            await runNewsAnalysis({
+                ...baseArgs(),
+                macroCalendar: [makeMacroEvent()],
+            });
+            const withMacroKey = mockCacheGet.mock.calls.at(-1)![0] as string;
+
+            expect(withMacroKey).not.toBe(withoutMacroKey);
+        });
+
+        it('같은 이벤트라도 actual이 채워지면 캐시 키가 달라진다 (재분석 트리거)', async () => {
+            await runNewsAnalysis({
+                ...baseArgs(),
+                macroCalendar: [makeMacroEvent({ actual: null })],
+            });
+            const beforeReleaseKey = mockCacheGet.mock.calls.at(
+                -1
+            )![0] as string;
+
+            mockCacheGet.mockClear();
+            await runNewsAnalysis({
+                ...baseArgs(),
+                macroCalendar: [makeMacroEvent({ actual: 0.3 })],
+            });
+            const afterReleaseKey = mockCacheGet.mock.calls.at(
+                -1
+            )![0] as string;
+
+            expect(afterReleaseKey).not.toBe(beforeReleaseKey);
         });
     });
 });
