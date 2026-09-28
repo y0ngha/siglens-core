@@ -66,7 +66,7 @@ import { detectSignals } from '@/domain/signals';
 import { screenChartPatterns } from '@/domain/patterns';
 import type {
     AnalysisResponse,
-    AssembledPrompt,
+    TechnicalAssembledPrompt,
     AssetClass,
     Bar,
     CandlePatternEntry,
@@ -101,9 +101,14 @@ import type {
 import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
 import { buildIndicatorStateSection } from '@/domain/analysis/indicatorState';
 import {
+    CHART_OVERLAY_CANDIDATES_SECTION_HEADER,
+    formatChartOverlayCandidatesSection,
+} from '@/domain/analysis/chartOverlayCandidatesSection';
+import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     formatChartPatternCandidatesSection,
 } from '@/domain/analysis/chartPatternCandidatesSection';
+import { buildOverlayCandidates } from '@/domain/overlays/buildOverlayCandidates';
 import {
     computeMarketReference,
     formatFibRatio,
@@ -1617,19 +1622,10 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Every target MUST include a non-empty basis explaining the rationale (supporting indicator, pattern measurement, swing level, etc.). If a basis cannot be provided, exclude that target entirely instead of returning it with an empty basis.',
         `- priceTargets may cite a chart-pattern measured-move target only when that pattern appears in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}. For any other pattern, cite its key prices as a basis but never a pattern-derived target number — see the geometry Writing Rules for how a target actually gets computed.`,
         '',
-        '### Trendline Detection',
-        '- Return 0 to 3 trendlines maximum',
-        '- Derive trendlines from the swing points in ## Smart Money Concepts (SMC) and the bar data, reusing their exact time/price values verbatim. Use real swing points as endpoints rather than inventing levels.',
-        '- ascending: connect higher lows (at least 2 clear swing low points)',
-        '- descending: connect lower highs (at least 2 clear swing high points)',
-        '- Use the Unix timestamp values from the provided bar data for the time field. Each bar row begins with [ts:<unix_timestamp>] — copy this exact integer value into the time field. Do not calculate or guess timestamps.',
-        '- Only include a trendline when 2 or more clear swing points are identifiable',
-        '- If no clear trendlines exist, return an empty array',
-        '',
-        '### trendlines vs patternLines',
-        '- trendlines: Overall price trendlines visible on the full chart (ascending support / descending resistance). These are independent of any specific pattern.',
-        '- patternLines (inside patternSummaries): Structural lines that define a specific pattern (e.g. wedge upper/lower boundaries, neckline). These belong to a particular pattern and are rendered as part of that pattern overlay.',
-        '- Do not duplicate a trendline in patternLines or vice versa.',
+        '### trendlineIds',
+        `- Pick 0 to 3 ids from the Trendlines group of ${CHART_OVERLAY_CANDIDATES_SECTION_HEADER} that best describe the chart now (more touches and a recent second anchor weigh more). Copy ids verbatim; never invent one.`,
+        '- Return [] when that group is absent or no listed line matters.',
+        '- Pattern boundaries (wedge edges, necklines) are drawn from the pattern candidate itself — do not look for them here.',
         '',
         // NOTE: Individual indicator interpretation guidelines (ATR, OBV, Parabolic SAR, Supertrend,
         // MFI, Williams %R, Keltner, CMF, Donchian, SMC, Squeeze Momentum) are intentionally omitted here
@@ -1780,14 +1776,9 @@ const buildAnalysisRequest = (
                   '- When the pattern does NOT appear there, read the chart yourself and fill geometry from what you see — but still never compute the target number itself.',
                   '- Omit geometry entirely (do not guess) when you cannot identify a usable breakout level and extreme level.',
                   '',
-                  '### patternLines Writing Rules',
-                  '- patternLines is an optional field. Include it only when detected: true and the pattern has diagonal trendlines (e.g., wedge upper/lower trendlines, neckline).',
-                  '- Each entry must have: label (Korean, e.g. "상단 추세선", "하단 추세선", "넥라인"), start { time, price }, end { time, price }.',
-                  '- For time values: each bar row begins with [ts:<unix_timestamp>] — copy this exact integer value. Do not calculate or guess.',
-                  '- For wedge patterns (ascending/descending): include upper trendline and lower trendline as two separate entries.',
-                  '- For head-and-shoulders / double-top / double-bottom: include the neckline as one entry.',
-                  '- start and end should span the full visible range of the pattern (from the first swing point to the most recent touch).',
-                  '- If no clear trendlines can be identified, omit patternLines entirely.',
+                  '### candidateId Writing Rules',
+                  `- For a detected: true pattern that matches a candidate in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}, set candidateId to that candidate's "Candidate id" verbatim.`,
+                  '- Otherwise (detected: false, or a pattern that section does not list) set candidateId to null. Never invent an id.',
                   '',
                   'Skills pattern list to analyze:',
                   ...patternSkills.map(s => `- ${s.name}`),
@@ -1814,6 +1805,7 @@ const buildAnalysisRequest = (
                   '  1. strategyName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match one strategy skill name from the list below.',
                   '  2. trend: every entry MUST include `trend` as one of bullish/bearish/neutral. Set based on the skill\'s own analysis instructions; use "neutral" when the analysis is inconclusive.',
                   "  3. summary: non-empty Korean markdown text following the skill's format.",
+                  `  4. candidateIds: the ids from ${CHART_OVERLAY_CANDIDATES_SECTION_HEADER} this verdict actually relies on — divergence strategy → Divergences, fibonacci strategy → Fibonacci, Elliott wave → Elliott waves (first id = your primary count, optional second id = an alternate count). Copy ids verbatim; [] when none applies.`,
                   '',
                   'Strategy skill list to analyze:',
                   ...strategySkills.map(s => `- ${s.name}`),
@@ -2109,7 +2101,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *
  * Composes the prompt the worker LLM consumes to produce an
  * `AnalysisResponse`, split into a stable/dynamic pair (spec §3.4,
- * {@link AssembledPrompt}) — Design C ("skills-to-system split") rather than
+ * {@link TechnicalAssembledPrompt}) — Design C ("skills-to-system split") rather than
  * the earlier stable-first designs:
  *
  * - `stable` — ONLY the `always_on` skill digests (`core`, name-sorted,
@@ -2205,7 +2197,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   market profile (see {@link CurrencyCode} — core never derives it from the
  *   symbol). Drives the listing framing sentence and price precision (`KRW` →
  *   whole won). Defaults to `'USD'`.
- * @returns `{ stable, dynamic }` — see {@link AssembledPrompt}.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2224,7 +2216,7 @@ export function buildAnalysisPrompt(
     priorAnalyses?: readonly PriorAnalysis[],
     marketEvents?: readonly MarketEvent[],
     currency: CurrencyCode = 'USD'
-): AssembledPrompt {
+): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
     // detection pass runs a single time per prompt build.
@@ -2302,7 +2294,30 @@ export function buildAnalysisPrompt(
         timeframe,
         { assetClass, currency }
     );
+    // Every drawable overlay candidate for this prompt (spec 2026-09-28
+    // §2.1) — printed into `## Chart Overlay Candidates (computed)` below and
+    // handed back to the caller so `resolveChartOverlays` can join the
+    // model's referenced ids against this exact list after the call.
+    const {
+        candidates: overlayCandidates,
+        failedBuilders: overlayBuildFailures,
+    } = buildOverlayCandidates({
+        bars,
+        atr: atrForPatternGeometry,
+        rsi: indicators.rsi,
+        patternCandidates,
+        marketReference,
+        fmt: { timeframe, priceDp },
+    });
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
+    const overlayCandidatesSection =
+        formatChartOverlayCandidatesSection(overlayCandidates);
+    // `## Chart Pattern Candidates` only prints `- Candidate id:` for ids
+    // actually present here — `patternOverlayId` can name an id for a hit
+    // `buildOverlayCandidates` skipped (see that file's JSDoc).
+    const offeredPatternOverlayIds = new Set(
+        overlayCandidates.filter(c => c.kind === 'pattern').map(c => c.id)
+    );
 
     const assetContext =
         assetClass === 'crypto'
@@ -2413,8 +2428,10 @@ export function buildAnalysisPrompt(
             bars,
             atrForPatternGeometry,
             priceDp,
-            timeframe
+            timeframe,
+            offeredPatternOverlayIds
         ),
+        ...(overlayCandidatesSection !== '' ? [overlayCandidatesSection] : []),
         formatMarketReferenceSection(
             marketReference,
             timeframe,
@@ -2456,5 +2473,7 @@ export function buildAnalysisPrompt(
     return {
         stable: stableSections.join('\n\n'),
         dynamic: dynamicSections.join('\n\n'),
+        overlayCandidates,
+        overlayBuildFailures,
     };
 }

@@ -45,7 +45,10 @@ function point(
 }
 
 /** @internal Value of the OLS line through `points` (`{index,price}`), evaluated at bar index `x`. */
-function evaluateTrendlineAt(points: readonly PivotPoint[], x: number): number {
+export function evaluateTrendlineAt(
+    points: readonly PivotPoint[],
+    x: number
+): number {
     const n = points.length;
     const xMean = points.reduce((sum, p) => sum + p.index, 0) / n;
     const yMean = points.reduce((sum, p) => sum + p.price, 0) / n;

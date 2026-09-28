@@ -18,6 +18,8 @@ vi.mock('@/domain/analysis/prompt', () => ({
     buildAnalysisPrompt: vi.fn(() => ({
         stable: 'mock-stable',
         dynamic: 'mock-dynamic',
+        overlayCandidates: [],
+        overlayBuildFailures: [],
     })),
 }));
 vi.mock('@/domain/indicators/fearGreed', () => ({
@@ -1239,6 +1241,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             mockBuildAnalysisPrompt.mockReturnValueOnce({
                 stable: '',
                 dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: [],
             });
 
             await runAnalysis(
@@ -1253,6 +1257,199 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
                 expect.objectContaining({ system: AI_SYSTEM_PROMPT })
             );
+        });
+    });
+
+    describe('차트 오버레이 resolve (spec 2026-09-28)', () => {
+        const overlayCandidate = {
+            id: 'pattern:double_bottom:1705312200',
+            kind: 'pattern' as const,
+            skill: 'double_bottom',
+            promptLine: 'p',
+            segments: [
+                {
+                    from: { time: 1705312200, price: 100 },
+                    to: { time: 1705312200, price: 105 },
+                    role: 'pattern',
+                    style: 'solid' as const,
+                    pane: 'price' as const,
+                },
+            ],
+            levels: [],
+            labels: [],
+        };
+
+        it('patternSummaries[].candidateId가 offered 후보와 일치하면 chartOverlays에 1건 실린다', async () => {
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [overlayCandidate],
+                overlayBuildFailures: [],
+            });
+            const reconciledWithCandidate: AnalysisResponse = {
+                ...mockRawResult,
+                patternSummaries: [
+                    {
+                        id: 'pattern_0',
+                        patternName: 'double_bottom',
+                        skillName: 'Double Bottom',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '패턴 요약',
+                        confidenceWeight: 0.8,
+                        candidateId: overlayCandidate.id,
+                    },
+                ],
+            };
+            mockEnrichAnalysisWithConfidence.mockReturnValueOnce(
+                reconciledWithCandidate
+            );
+            mockPostProcessAnalysisWithReconcile.mockReturnValueOnce(
+                reconciledWithCandidate
+            );
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify(reconciledWithCandidate)
+            );
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            expect(
+                result.status === 'done'
+                    ? result.unfilteredResult.chartOverlays
+                    : undefined
+            ).toEqual([
+                {
+                    id: overlayCandidate.id,
+                    kind: overlayCandidate.kind,
+                    skill: overlayCandidate.skill,
+                    segments: overlayCandidate.segments,
+                    levels: overlayCandidate.levels,
+                    labels: overlayCandidate.labels,
+                    sourceRef: 'pattern_0',
+                    variant: 'primary',
+                },
+            ]);
+        });
+
+        it('offered 후보에 없는 id는 chartOverlays에서 빠지고 unknown id 경고를 남긴다', async () => {
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [overlayCandidate],
+                overlayBuildFailures: [],
+            });
+            const reconciledWithUnknownId: AnalysisResponse = {
+                ...mockRawResult,
+                patternSummaries: [
+                    {
+                        id: 'pattern_0',
+                        patternName: 'double_bottom',
+                        skillName: 'Double Bottom',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '패턴 요약',
+                        confidenceWeight: 0.8,
+                        candidateId: 'pattern:made_up:0',
+                    },
+                ],
+            };
+            mockEnrichAnalysisWithConfidence.mockReturnValueOnce(
+                reconciledWithUnknownId
+            );
+            mockPostProcessAnalysisWithReconcile.mockReturnValueOnce(
+                reconciledWithUnknownId
+            );
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify(reconciledWithUnknownId)
+            );
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            expect(
+                result.status === 'done'
+                    ? result.unfilteredResult.chartOverlays
+                    : undefined
+            ).toEqual([]);
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[ChartOverlays] unknown candidate id',
+                expect.objectContaining({
+                    unknownIds: ['pattern:made_up:0'],
+                })
+            );
+            // Offered 1, referenced 0 → the referral-rate anomaly fires too.
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[ChartOverlays] no candidate referenced',
+                expect.objectContaining({ offered: 1 })
+            );
+            warnSpy.mockRestore();
+        });
+
+        it('후보 빌더가 실패하면 candidate builder failed 경고에 kind를 남긴다', async () => {
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: ['elliott'],
+            });
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[ChartOverlays] candidate builder failed',
+                expect.objectContaining({ kinds: ['elliott'] })
+            );
+            warnSpy.mockRestore();
+        });
+
+        it('후보가 하나도 제시되지 않았으면 no candidate referenced 경고를 남기지 않는다', async () => {
+            // Module-level mock returns `overlayCandidates: []`.
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            const messages = warnSpy.mock.calls.map(call => call[0]);
+            expect(messages).not.toContain(
+                '[ChartOverlays] no candidate referenced'
+            );
+            warnSpy.mockRestore();
         });
     });
 

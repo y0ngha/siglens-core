@@ -736,10 +736,21 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * (computed)`, and four signals (52-week high/low, gap up/down) now feed skill
  * gating (not the confluence tally), so cached analyses built on the old
  * catalogue are stale.
+ * **`p20`** — chart overlay candidate ids (spec 2026-09-28-chart-overlays).
+ * `## Chart Pattern Candidates (computed)` gains a `Candidate id:` line per
+ * geometry-bearing candidate, and a new `## Chart Overlay Candidates
+ * (computed)` section lists trendline/divergence/fibonacci/elliott
+ * candidates by id. `patternSummaries[].candidateId`,
+ * `strategyResults[].candidateIds`, and `trendlineIds` replace the old
+ * `patternLines` skeleton and the free-form `trendlines` array — the model
+ * now selects logic-drawn overlays by id instead of authoring coordinates.
+ * `runAnalysis` joins the referenced ids against the offered candidates
+ * (`resolveChartOverlays`) after the model call. Bytes change on every
+ * request.
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p19' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p20' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

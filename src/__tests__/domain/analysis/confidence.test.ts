@@ -838,6 +838,46 @@ describe('confidence', () => {
                 UNMATCHED_SKILL_CONFIDENCE_WEIGHT
             );
         });
+
+        describe('chartOverlays 정규화 (spec 2026-09-28)', () => {
+            const validOverlay = {
+                id: 'pattern:double_bottom:1',
+                kind: 'pattern',
+                skill: 'double_bottom',
+                sourceRef: 'pattern_0',
+                variant: 'primary',
+                segments: [
+                    {
+                        from: { time: 1, price: 10 },
+                        to: { time: 5, price: 12 },
+                        role: 'pattern',
+                        style: 'solid',
+                        pane: 'price',
+                    },
+                ],
+                levels: [],
+                labels: [],
+            };
+
+            it('유효한 chartOverlays 항목을 그대로 보존한다', () => {
+                const result = normalizeCachedAnalysisResponse({
+                    chartOverlays: [validOverlay],
+                });
+                expect(result.chartOverlays).toEqual([validOverlay]);
+            });
+
+            it('malformed 항목(kind 오류)은 탈락시킨다', () => {
+                const result = normalizeCachedAnalysisResponse({
+                    chartOverlays: [{ ...validOverlay, kind: 'bogus' }],
+                });
+                expect(result.chartOverlays).toEqual([]);
+            });
+
+            it('chartOverlays가 없는 옛 캐시는 빈 배열로 정규화한다', () => {
+                const result = normalizeCachedAnalysisResponse({});
+                expect(result.chartOverlays).toEqual([]);
+            });
+        });
     });
 
     describe('enrichAnalysisWithConfidence — low-confidence patterns are kept', () => {
