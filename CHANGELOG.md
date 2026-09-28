@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.0.1](https://github.com/y0ngha/siglens-core/compare/v2.0.0...v2.0.1) (2026-09-28)
+
+### Bug Fixes
+
+* **normalize:** priceTargets 한쪽이 bare 배열이어도 목표가 보존 ([99b4fa2](https://github.com/y0ngha/siglens-core/commit/99b4fa2093d7d6d4d72dd092001d314d618b5eee))
+
 # [2.0.0](https://github.com/y0ngha/siglens-core/compare/v1.18.0...v2.0.0) (2026-09-28)
 
 ### Bug Fixes
