@@ -124,7 +124,7 @@ type SkillGating =
 `triggers`는 `detectSignals`가 내보내는 `SignalType`(또는 캔들 패턴명)이어야 한다.
 카탈로그는 **양방향 대칭**으로, 강세/약세 미러가 쌍을 이룬다(`confirmed.ts`).
 
-전체 `SignalType`(34종):
+전체 `SignalType`(40종 — 32 confirmed + 8 expected):
 ```
 rsi_oversold / rsi_overbought
 rsi_bullish_divergence / rsi_bearish_divergence
@@ -133,6 +133,7 @@ macd_bullish_cross / macd_bearish_cross
 macd_histogram_bullish_convergence / macd_histogram_bearish_convergence
 bollinger_lower_bounce / bollinger_upper_breakout
 bollinger_squeeze_bullish / bollinger_squeeze_bearish
+bollinger_percentb_oversold / bollinger_percentb_overbought
 supertrend_bullish_flip / supertrend_bearish_flip
 parabolic_sar_flip / parabolic_sar_bearish_flip
 ichimoku_cloud_breakout / ichimoku_cloud_breakdown
@@ -143,6 +144,8 @@ mfi_oversold_bounce / mfi_overbought_reversal
 keltner_upper_breakout / keltner_lower_breakout
 squeeze_momentum_bullish / squeeze_momentum_bearish
 support_proximity_bullish / resistance_proximity_bearish
+new_52w_high / new_52w_low
+gap_up / gap_down
 ```
 
 소비 측(`siglens`)의 `validate-skills` CI가 모든 `triggers`를 이 카탈로그(+ 캔들

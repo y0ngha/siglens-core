@@ -12,8 +12,9 @@ import { detectSignals } from '@/domain/signals';
 /**
  * Minimum weighted **indicator-family** count required for a trigger.
  *
- * Deliberately not a count of signal *types*. The 36 members of {@link SignalType}
- * derive from only 14 indicators — RSI contributes 4 types, MACD 4, Bollinger 6 — so
+ * Deliberately not a count of signal *types*. The 36 members of {@link SignalType} this
+ * rule counts (the four 52-week-extreme and gap types are left out of the tally) derive
+ * from only 14 indicators — RSI contributes 4 types, MACD 4, Bollinger 6 — so
  * counting types treats transforms of the same close series as independent votes. In
  * production 16% of the snapshots that reached "3 types" spanned only two indicators
  * (`bollinger_lower_bounce` + `bollinger_percentb_oversold` + `rsi_oversold`).
@@ -172,6 +173,24 @@ const SIGNAL_FAMILY: Readonly<Record<string, string>> = {
     support_proximity_bullish: 'level',
     resistance_proximity_bearish: 'level',
 };
+
+/**
+ * Detector outputs kept out of the tally entirely — the 52-week-extreme and gap
+ * detectors.
+ *
+ * Every threshold and weight above was set (or re-measured) on the indicator catalogue
+ * alone; these price-structure types have never been measured as confluence votes. Left
+ * to the `SIGNAL_FAMILY` fallback each would become a family of its own and a full vote,
+ * so a gap on the trigger bar alone could lift a 1.5-family reading past `min` —
+ * changing every trigger with no evidence behind it. They stay in `detectSignals` for
+ * skill gating and other consumers; they are only filtered out of the snapshot here.
+ */
+const CONFLUENCE_EXCLUDED_TYPES: ReadonlySet<SignalType> = new Set([
+    'new_52w_high',
+    'new_52w_low',
+    'gap_up',
+    'gap_down',
+]);
 
 /**
  * The `ExpectedSignalType` members, as a runtime set.
@@ -531,14 +550,21 @@ function htfTrendOf(
     return classifyTrend(mutable, calculateIndicators(mutable));
 }
 
-/** Direction-filtered signal types, de-duplicated and sorted for a stable snapshot. */
+/**
+ * Direction-filtered signal types, minus {@link CONFLUENCE_EXCLUDED_TYPES},
+ * de-duplicated and sorted for a stable snapshot.
+ */
 function typesOf(
     signals: readonly { type: SignalType; direction: string }[],
     direction: 'bullish' | 'bearish'
 ): string[] {
     const set = new Set<string>();
     for (const s of signals) {
-        if (s.direction === direction && typeof s.type === 'string')
+        if (
+            s.direction === direction &&
+            typeof s.type === 'string' &&
+            !CONFLUENCE_EXCLUDED_TYPES.has(s.type)
+        )
             set.add(s.type);
     }
     return [...set].sort();

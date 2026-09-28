@@ -12,6 +12,7 @@ import {
     RSI_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
 import { calculateMA } from '@/domain/indicators/ma';
+import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import {
     CCI_BEARISH_CROSS_LEVEL,
     CCI_BULLISH_CROSS_LEVEL,
@@ -21,6 +22,9 @@ import {
     CMF_BULLISH_CROSS_LEVEL,
     CROSS_LOOKBACK_BARS,
     DMI_ADX_TREND_THRESHOLD,
+    FIFTY_TWO_WEEK_LOOKBACK_DAYS,
+    FIFTY_TWO_WEEK_MIN_COVERAGE_DAYS,
+    GAP_MIN_ATR_MULT,
     GOLDEN_CROSS_FAST_PERIOD,
     GOLDEN_CROSS_SLOW_PERIOD,
     MFI_OVERBOUGHT_LEVEL,
@@ -762,5 +766,117 @@ export function detectSqueezeMomentumBearish(
         direction: 'bearish',
         phase: 'confirmed',
         detectedAt: idx,
+    };
+}
+
+// ─── Price-structure detectors (52-week extremes, gaps) ──────────────────────
+// Read bars only (plus ATR for the gap floor). Not measured for confluence —
+// `evaluateConfluence` leaves them out of its tally.
+
+/**
+ * Bars in the 52-week window `[last.time − 365d, last.time)`, or `null` when
+ * there are fewer than 2 bars or the window's first bar is younger than
+ * `FIFTY_TWO_WEEK_MIN_COVERAGE_DAYS` — the history does not reach back a
+ * year. Time-based on purpose: on any timeframe the detector fires only when
+ * a year of bars is actually present.
+ */
+function fiftyTwoWeekWindow(bars: Bar[]): Bar[] | null {
+    if (bars.length < 2) return null;
+    const lastTime = bars[bars.length - 1].time;
+    const from = lastTime - FIFTY_TWO_WEEK_LOOKBACK_DAYS * SECONDS_PER_DAY;
+    const window = bars.filter(bar => bar.time >= from && bar.time < lastTime);
+    if (window.length === 0) return null;
+    const coveredFrom =
+        lastTime - FIFTY_TWO_WEEK_MIN_COVERAGE_DAYS * SECONDS_PER_DAY;
+    return window[0].time <= coveredFrom ? window : null;
+}
+
+/** @internal Detects a close above every high of the prior 52 weeks (bullish confirmed signal). */
+export function detectNew52WeekHigh(
+    bars: Bar[],
+    _indicators: IndicatorResult
+): Signal | null {
+    const window = fiftyTwoWeekWindow(bars);
+    if (window === null) return null;
+    const lastIdx = bars.length - 1;
+    const priorHigh = window.reduce(
+        (max, bar) => Math.max(max, bar.high),
+        -Infinity
+    );
+    if (bars[lastIdx].close <= priorHigh) return null;
+    return {
+        type: 'new_52w_high',
+        direction: 'bullish',
+        phase: 'confirmed',
+        detectedAt: lastIdx,
+    };
+}
+
+/**
+ * @internal Detects a close below every low of the prior 52 weeks (bearish
+ * confirmed signal). Mirror of {@link detectNew52WeekHigh}.
+ */
+export function detectNew52WeekLow(
+    bars: Bar[],
+    _indicators: IndicatorResult
+): Signal | null {
+    const window = fiftyTwoWeekWindow(bars);
+    if (window === null) return null;
+    const lastIdx = bars.length - 1;
+    const priorLow = window.reduce(
+        (min, bar) => Math.min(min, bar.low),
+        Infinity
+    );
+    if (bars[lastIdx].close >= priorLow) return null;
+    return {
+        type: 'new_52w_low',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: lastIdx,
+    };
+}
+
+/** Smallest gap that counts: `GAP_MIN_ATR_MULT × ATR` at the last bar, or 0 when ATR is unavailable. */
+function minGapSize(indicators: IndicatorResult): number {
+    const atr = indicators.atr[indicators.atr.length - 1];
+    return typeof atr === 'number' && Number.isFinite(atr) && atr > 0
+        ? GAP_MIN_ATR_MULT * atr
+        : 0;
+}
+
+/** @internal Detects the last bar's low opening a gap above the previous bar's high (bullish confirmed signal). */
+export function detectGapUp(
+    bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    if (bars.length < 2) return null;
+    const lastIdx = bars.length - 1;
+    const gap = bars[lastIdx].low - bars[lastIdx - 1].high;
+    if (gap <= 0 || gap < minGapSize(indicators)) return null;
+    return {
+        type: 'gap_up',
+        direction: 'bullish',
+        phase: 'confirmed',
+        detectedAt: lastIdx,
+    };
+}
+
+/**
+ * @internal Detects the last bar's high opening a gap below the previous
+ * bar's low (bearish confirmed signal). Mirror of {@link detectGapUp}.
+ */
+export function detectGapDown(
+    bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    if (bars.length < 2) return null;
+    const lastIdx = bars.length - 1;
+    const gap = bars[lastIdx - 1].low - bars[lastIdx].high;
+    if (gap <= 0 || gap < minGapSize(indicators)) return null;
+    return {
+        type: 'gap_down',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: lastIdx,
     };
 }

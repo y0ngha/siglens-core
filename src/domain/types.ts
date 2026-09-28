@@ -1010,6 +1010,7 @@ export type MultiCandlePattern =
     | 'ladder_bottom'
     | 'tweezers_bottom'
     | 'downside_gap_two_rabbits'
+    | 'above_the_stomach'
     // 하락 반전
     | 'bearish_engulfing'
     | 'bearish_harami'
@@ -1026,11 +1027,17 @@ export type MultiCandlePattern =
     | 'advance_block'
     | 'tweezers_top'
     | 'upside_gap_two_crows'
+    | 'below_the_stomach'
     // 지속
     | 'upside_gap_tasuki'
     | 'downside_gap_tasuki'
     | 'on_neck'
-    | 'in_neck';
+    | 'in_neck'
+    | 'rising_three_methods'
+    | 'falling_three_methods'
+    // 3선 타격 — 이름은 전통 명칭, 방향은 측정값(getMultiPatternTrend 참고)
+    | 'bullish_three_line_strike'
+    | 'bearish_three_line_strike';
 
 /**
  * Detected single-bar pattern entry.
@@ -2041,7 +2048,11 @@ export type ConfirmedSignalType =
     | 'cmf_bearish_flip'
     | 'mfi_overbought_reversal'
     | 'parabolic_sar_bearish_flip'
-    | 'squeeze_momentum_bearish';
+    | 'squeeze_momentum_bearish'
+    | 'new_52w_high'
+    | 'new_52w_low'
+    | 'gap_up'
+    | 'gap_down';
 
 /**
  * Anticipation signals — early warnings that may or may not develop.
@@ -2067,7 +2078,7 @@ export interface Signal {
     readonly direction: SignalDirection;
     /** Whether this is a confirmed event or an early anticipation. */
     readonly phase: SignalPhase;
-    /** Unix timestamp (seconds) of the bar that triggered detection. */
+    /** Index of the triggering bar in `bars` (every detector returns the index, not a timestamp). */
     readonly detectedAt: number;
 }
 
@@ -3957,12 +3968,17 @@ export type ChartPatternId =
     | 'symmetrical_triangle'
     | 'ascending_wedge'
     | 'descending_wedge'
+    | 'ascending_channel'
+    | 'descending_channel'
+    | 'broadening_formation'
     | 'bull_flag'
     | 'bear_flag'
     | 'pennant'
+    | 'high_tight_flag'
     | 'rectangle'
     | 'cup_and_handle'
-    | 'rounding_bottom';
+    | 'rounding_bottom'
+    | 'rounding_top';
 
 /** Swing direction of a confirmed pivot extreme (public: reachable via {@link PatternCandidate.pivots}). */
 export type PivotKind = 'high' | 'low';
@@ -3984,7 +4000,8 @@ export interface PatternCandidate {
     /**
      * The exact pivots the classifier matched on, ascending by index —
      * present whenever a `classifiers.ts` shape matcher produced this
-     * candidate. `patternGeometry.ts` computes geometry directly from these
+     * candidate (for `high_tight_flag`, the pole's base low and top high,
+     * which are bar extremes rather than zigzag pivots). `patternGeometry.ts` computes geometry directly from these
      * (never by re-extracting pivots over `[startIndex, endIndex]`, which
      * could reconstruct a different pivot set than the one actually
      * matched). Absent only for a hand-built candidate (e.g. a test
