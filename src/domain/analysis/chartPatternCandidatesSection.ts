@@ -4,11 +4,11 @@ import {
     decimalPlacesOf,
 } from '@/domain/analysis/patternTargets';
 import {
-    formatBarDateTime,
+    formatBarDate,
     formatNullableNumber,
     formatSignedPercent,
 } from '@/domain/analysis/promptFormat';
-import { MS_PER_SECOND } from '@/domain/constants/time';
+import { patternOverlayId } from '@/domain/overlays/patternOverlays';
 import type {
     Bar,
     PatternCandidate,
@@ -27,20 +27,7 @@ export const CHART_PATTERN_CANDIDATES_SECTION_HEADER =
  * test can assert the exact hint/no-restriction wording survives edits.
  */
 export const CHART_PATTERN_CANDIDATES_SECTION_INTRO =
-    'These candidates come from a heuristic pre-screener. They are hints, not an exhaustive list and not a verdict: confirm or reject each by the actual shape, and report any other pattern you can clearly see even if it is not listed here — an approximate textbook shape is enough. For a listed candidate you confirm, copy its geometry; for any other pattern you report, fill geometry from the bars yourself.';
-
-/**
- * @internal `YYYY-MM-DD` from a bar's Unix-seconds `time` on a daily chart,
- * `YYYY-MM-DD HH:MM UTC` on an intraday one — a date-only stamp collapses
- * every key point of an hourly pattern onto the same calendar day (real-data
- * defect: an hourly double bottom printed both troughs and the neckline all
- * dated the same day, with no way to tell them apart).
- */
-function barDate(unixSeconds: number, timeframe: Timeframe): string {
-    const date = new Date(unixSeconds * MS_PER_SECOND);
-    if (timeframe === '1Day') return date.toISOString().slice(0, 10);
-    return `${formatBarDateTime(date.getTime())} UTC`;
-}
+    "These candidates come from a heuristic pre-screener. They are hints, not an exhaustive list and not a verdict: confirm or reject each by the actual shape, and report any other pattern you can clearly see even if it is not listed here — an approximate textbook shape is enough. For a listed candidate you confirm, copy its geometry; for any other pattern you report, fill geometry from the bars yourself. For a candidate you confirm, set that pattern's candidateId to its Candidate id.";
 
 /**
  * `<price> (from ±x.xx% distance line)` — this file's shared "level + %
@@ -77,6 +64,8 @@ function isBroken(
 function formatCandidate(
     candidate: PatternCandidate,
     geometry: PatternGeometry | null,
+    overlayId: string | null,
+    offeredOverlayIds: ReadonlySet<string>,
     lastClose: number,
     priceDp: number,
     timeframe: Timeframe
@@ -90,10 +79,20 @@ function formatCandidate(
             ? `- Key points: ${geometry.keyPoints
                   .map(
                       p =>
-                          `${p.label} ${formatNullableNumber(p.price, priceDp)} (${barDate(p.time, timeframe)})`
+                          `${p.label} ${formatNullableNumber(p.price, priceDp)} (${formatBarDate(p.time, timeframe)})`
                   )
                   .join(', ')}`
             : '- Key points: N/A';
+    // Only print the id when a matching overlay candidate was actually
+    // offered — `patternOverlayId` names it deterministically even for a
+    // hit `buildPatternOverlayCandidates` skipped (e.g. a flag with
+    // `endIndex <= startIndex`, or fewer than 2 in-range pivots), and
+    // printing an unoffered id would let the model reference something
+    // `resolveChartOverlays` cannot find.
+    const candidateIdLine =
+        overlayId !== null && offeredOverlayIds.has(overlayId)
+            ? `\n- Candidate id: ${overlayId}`
+            : '';
 
     // Recompute the anchor/targets through `computePatternTargets` — the ONE
     // shared math `ai-levels.ts` uses when a model copies breakout/extreme/
@@ -132,7 +131,7 @@ function formatCandidate(
     );
 
     return [
-        `### ${candidate.id} (${status})`,
+        `### ${candidate.id} (${status})${candidateIdLine}`,
         keyPointsLine,
         formatLevelLine('Breakout level', breakoutLevel, lastClose, priceDp),
         // The measured-move anchor, printed as breakout ∓ height so a model
@@ -185,13 +184,21 @@ function formatCandidate(
  *   precision the rest of the technical prompt uses).
  * @param timeframe - Bar resolution; key-point dates render date-only on
  *   `'1Day'` and `YYYY-MM-DD HH:MM UTC` on every intraday timeframe.
+ * @param offeredOverlayIds - Ids of the `kind: 'pattern'` overlay candidates
+ *   the caller already built (`buildOverlayCandidates`/`buildPatternOverlayCandidates`).
+ *   `patternOverlayId` names a candidate deterministically even when no
+ *   drawable overlay was built for it (flag with `endIndex <= startIndex`,
+ *   fewer than 2 in-range pivots) — the `- Candidate id:` line only prints
+ *   when the id is actually in this set, so the model never references an id
+ *   `resolveChartOverlays` cannot resolve.
  */
 export function formatChartPatternCandidatesSection(
     candidates: readonly PatternCandidate[],
     bars: readonly Bar[],
     atr: number | null,
     priceDp: number,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    offeredOverlayIds: ReadonlySet<string>
 ): string {
     if (candidates.length === 0) {
         return [
@@ -202,15 +209,18 @@ export function formatChartPatternCandidatesSection(
     }
 
     const lastClose = bars.length > 0 ? bars[bars.length - 1].close : NaN;
-    const blocks = candidates.map(candidate =>
-        formatCandidate(
+    const blocks = candidates.map(candidate => {
+        const geometry = computeCandidateGeometry(candidate, bars, atr ?? 0);
+        return formatCandidate(
             candidate,
-            computeCandidateGeometry(candidate, bars, atr ?? 0),
+            geometry,
+            geometry !== null ? patternOverlayId(candidate, bars) : null,
+            offeredOverlayIds,
             lastClose,
             priceDp,
             timeframe
-        )
-    );
+        );
+    });
 
     return [
         CHART_PATTERN_CANDIDATES_SECTION_HEADER,

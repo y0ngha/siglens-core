@@ -36,7 +36,6 @@ import type {
     OverallAnalysisResponse,
     OverallScenario,
     OverallScenarioName,
-    PatternLine,
     PatternResult,
     PriceScenario,
     PriceTarget,
@@ -47,7 +46,6 @@ import type {
     StrategyResult,
     Trend,
     Trendline,
-    TrendlineDirection,
     TrendlinePoint,
 } from '@/domain/types';
 
@@ -204,10 +202,6 @@ const CHART_DISPLAY_TYPE_VALUES = Object.keys({
     marker: true,
     region: true,
 } satisfies Record<ChartDisplayType, true>).toSorted();
-const TRENDLINE_DIRECTION_VALUES = Object.keys({
-    ascending: true,
-    descending: true,
-} satisfies Record<TrendlineDirection, true>).toSorted();
 const ENTRY_RECOMMENDATION_VALUES = Object.keys({
     enter: true,
     wait: true,
@@ -478,11 +472,6 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         bearish: priceScenarioSample,
     };
     const keyPriceSample: KeyPrice = { label: '넥라인', price: 150 };
-    const patternLineSample: PatternLine = {
-        label: '상단',
-        start: { time: 1, price: 10 },
-        end: { time: 2, price: 20 },
-    };
     const patternSample: Required<PatternResult> = {
         id: 'p1',
         patternName: 'head_and_shoulders',
@@ -491,8 +480,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         trend: 'bearish',
         summary: '요약',
         keyPrices: [keyPriceSample],
-        patternLines: [patternLineSample],
-        timeRange: { start: 1, end: 2 },
+        candidateId: 'pattern:head_and_shoulders:1',
         confidenceWeight: 0.8,
         renderConfig: {
             show: true,
@@ -507,12 +495,13 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             invalidationLevel: 155,
         },
     };
-    const strategySample: StrategyResult = {
+    const strategySample: Required<StrategyResult> = {
         id: 's1',
         strategyName: 'trend-follow',
         trend: 'bullish',
         summary: '요약',
         confidenceWeight: 0.5,
+        candidateIds: ['ew:up:1714521600:6'],
     };
     const candleSample: CandlePatternSummary = {
         id: 'c1',
@@ -557,6 +546,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         strategyResults: [strategySample],
         candlePatterns: [candleSample],
         trendlines: [trendlineSample],
+        chartOverlays: [],
         actionRecommendation: actionSample,
         analyzedAt: '2026-05-30T00:00:00Z',
     };
@@ -564,8 +554,21 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
     // `analyzedAt` is server-set during polling (pollAnalysis overwrites it with
     // now.toISOString()) and intentionally absent from the schema, so the
     // expected LLM-output key-set is the response's keys minus `analyzedAt`.
+    // `chartOverlays` (spec 2026-09-28) is likewise absent from the schema —
+    // it is resolved by core from the model's referenced ids
+    // (`resolveChartOverlays`, Task A9/A10), never authored directly by the model.
+    // `trendlines` (id-bearing `Trendline[]`) is replaced by `trendlineIds`
+    // (spec 2026-09-28 §2.4) — the model picks ids from the overlay candidate
+    // list instead of authoring coordinates; `resolveChartOverlays` derives
+    // `trendlines` from the resolved ids after the model call.
     const expectedLlmKeys = Object.keys(sample)
-        .filter(key => key !== 'analyzedAt')
+        .filter(
+            key =>
+                key !== 'analyzedAt' &&
+                key !== 'chartOverlays' &&
+                key !== 'trendlines'
+        )
+        .concat('trendlineIds')
         .toSorted();
 
     it('top-level key-set matches the response interface (minus server-set analyzedAt)', () => {
@@ -656,34 +659,19 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             TECHNICAL_RESPONSE_SCHEMA,
             'patternSummaries'
         );
-        expect(sortedRequired(pattern)).toEqual(sortedKeys(patternSample));
-        expect(propertyKeys(pattern)).toEqual(sortedKeys(patternSample));
+        const patternSampleKeys = sortedKeys(patternSample);
+        expect(sortedRequired(pattern)).toEqual(patternSampleKeys);
+        expect(propertyKeys(pattern)).toEqual(patternSampleKeys);
         expect(pattern.additionalProperties).toBe(false);
         expect(nestedEnumValues(pattern, 'trend')).toEqual(TREND_VALUES);
         // optional fields → nullable
         expect(propType(pattern, 'keyPrices')).toEqual(['array', 'null']);
-        expect(propType(pattern, 'patternLines')).toEqual(['array', 'null']);
-        expect(propType(pattern, 'timeRange')).toEqual(['null', 'object']);
         expect(propType(pattern, 'renderConfig')).toEqual(['null', 'object']);
 
         const keyPrice = nestedItems(pattern, 'keyPrices');
         expect(sortedRequired(keyPrice)).toEqual(sortedKeys(keyPriceSample));
         expect(propertyKeys(keyPrice)).toEqual(sortedKeys(keyPriceSample));
         expect(keyPrice.additionalProperties).toBe(false);
-
-        const patternLine = nestedItems(pattern, 'patternLines');
-        expect(sortedRequired(patternLine)).toEqual(
-            sortedKeys(patternLineSample)
-        );
-        expect(propertyKeys(patternLine)).toEqual(
-            sortedKeys(patternLineSample)
-        );
-        expect(patternLine.additionalProperties).toBe(false);
-
-        const timeRange = objectProp(pattern, 'timeRange');
-        expect(sortedRequired(timeRange)).toEqual(['end', 'start']);
-        expect(propertyKeys(timeRange)).toEqual(['end', 'start']);
-        expect(timeRange.additionalProperties).toBe(false);
 
         const renderConfig = objectProp(pattern, 'renderConfig');
         expect(sortedRequired(renderConfig)).toEqual(
@@ -717,19 +705,11 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         expect(nestedEnumValues(candle, 'trend')).toEqual(TREND_VALUES);
     });
 
-    it('nested trendlines schema matches the interface', () => {
-        const trendline = nestedItems(TECHNICAL_RESPONSE_SCHEMA, 'trendlines');
-        expect(sortedRequired(trendline)).toEqual(sortedKeys(trendlineSample));
-        expect(propertyKeys(trendline)).toEqual(sortedKeys(trendlineSample));
-        expect(trendline.additionalProperties).toBe(false);
-        expect(nestedEnumValues(trendline, 'direction')).toEqual(
-            TRENDLINE_DIRECTION_VALUES
-        );
-
-        const start = objectProp(trendline, 'start');
-        expect(sortedRequired(start)).toEqual(sortedKeys(trendlinePointSample));
-        expect(propertyKeys(start)).toEqual(sortedKeys(trendlinePointSample));
-        expect(start.additionalProperties).toBe(false);
+    it('trendlineIds is a plain string array (spec 2026-09-28 §2.4 — the model picks overlay candidate ids, never authors coordinates)', () => {
+        const trendlineIds = TECHNICAL_RESPONSE_SCHEMA.properties
+            .trendlineIds as { type: string; items: { type: string } };
+        expect(trendlineIds.type).toBe('array');
+        expect(trendlineIds.items.type).toBe('string');
     });
 
     it('nested actionRecommendation schema matches the interface (nullable object, optionals nullable)', () => {

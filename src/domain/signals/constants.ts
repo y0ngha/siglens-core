@@ -2,6 +2,20 @@
 /** @internal Lookback window (bars) for cross-based confirmed signals. */
 export const CROSS_LOOKBACK_BARS = 3;
 
+// Price-structure confirmed signals (52-week extremes, gaps)
+/** @internal Calendar lookback (days) of the 52-week high/low window `[last − 365d, last)`. */
+export const FIFTY_TWO_WEEK_LOOKBACK_DAYS = 365;
+/**
+ * @internal Minimum history (days) the 52-week window must reach back: its
+ * first bar must sit at least this far before the last bar, otherwise the
+ * "52-week" extreme is really a shorter one and the detector abstains. The
+ * week of slack under {@link FIFTY_TWO_WEEK_LOOKBACK_DAYS} absorbs weekends
+ * and holidays at the window's start.
+ */
+export const FIFTY_TWO_WEEK_MIN_COVERAGE_DAYS = 358;
+/** @internal Minimum gap size (last bar vs. previous bar range) as a multiple of ATR(14); ignored when ATR is unavailable. */
+export const GAP_MIN_ATR_MULT = 0.25;
+
 // Anticipation signal thresholds
 /** @internal Lookback window (bars) for divergence pivot search. */
 export const DIVERGENCE_LOOKBACK_BARS = 20;

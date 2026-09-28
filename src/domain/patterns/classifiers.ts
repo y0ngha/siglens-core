@@ -6,6 +6,7 @@ import type {
     PivotPoint,
 } from '@/domain/types';
 import {
+    CHANNEL_PARALLEL_ATR_PER_BAR,
     CURVATURE_VERTEX_MID_HI,
     CURVATURE_VERTEX_MID_LO,
     CUP_HANDLE_MAX_DEPTH_RATIO,
@@ -17,7 +18,11 @@ import {
     FLAT_SLOPE_ATR_PER_BAR,
     HS_HEAD_MIN_ATR,
     HS_SHOULDER_TOLERANCE,
-    ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT,
+    HTF_FLAG_MAX_RETRACE,
+    HTF_FLAG_MIN_BARS,
+    HTF_POLE_MAX_BARS,
+    HTF_POLE_MIN_GAIN,
+    ROUNDING_MIN_DEPTH_ATR_MULT,
     SINGULAR_MATRIX_DET_EPSILON,
     TRENDLINE_PIVOT_WINDOW,
 } from '@/domain/patterns/constants';
@@ -273,14 +278,34 @@ export const classifyHeadAndShoulders: PatternClassifier =
 export const classifyInverseHeadAndShoulders: PatternClassifier =
     fivePivotHeadAndShouldersClassifier('low', 'inverse_head_and_shoulders');
 
-// ─── Group 3: trendline pairs (triangles / wedges / rectangle) ────────────
+// ─── Group 3: trendline pairs (triangles / wedges / channels / rectangle) ─
+
+/**
+ * Splits a same-direction trendline pair (both rising or both falling):
+ * parallel within `CHANNEL_PARALLEL_ATR_PER_BAR` → channel, lows steeper than
+ * highs by more than that → converging wedge, otherwise (diverging) neither.
+ */
+function sameDirectionPairShape(
+    slopeHigh: number,
+    slopeLow: number,
+    channelId: ChartPatternId,
+    wedgeId: ChartPatternId
+): ChartPatternId | null {
+    if (Math.abs(slopeHigh - slopeLow) <= CHANNEL_PARALLEL_ATR_PER_BAR)
+        return channelId;
+    if (slopeLow - slopeHigh > CHANNEL_PARALLEL_ATR_PER_BAR) return wedgeId;
+    return null;
+}
 
 /**
  * @internal
  * Fits independent least-squares trendlines through the last
  * `TRENDLINE_PIVOT_WINDOW` pivots' highs and lows and classifies the pair by
  * the flat/rising/falling table in the design doc. Emits at most one
- * candidate — the six shapes are mutually exclusive by construction.
+ * candidate — the nine shapes are mutually exclusive by construction: the
+ * slope categories pick the row, and within the both-rising / both-falling
+ * rows the channel (parallel) and wedge (converging) conditions cannot both
+ * hold.
  */
 export const classifyTrendlinePatterns: PatternClassifier = (
     pivots,
@@ -305,10 +330,21 @@ export const classifyTrendlinePatterns: PatternClassifier = (
     if (cH === 'flat' && cL === 'rising') id = 'ascending_triangle';
     else if (cH === 'falling' && cL === 'flat') id = 'descending_triangle';
     else if (cH === 'falling' && cL === 'rising') id = 'symmetrical_triangle';
-    else if (cH === 'rising' && cL === 'rising' && sL > sH)
-        id = 'ascending_wedge';
-    else if (cH === 'falling' && cL === 'falling' && sH < sL)
-        id = 'descending_wedge';
+    else if (cH === 'rising' && cL === 'falling') id = 'broadening_formation';
+    else if (cH === 'rising' && cL === 'rising')
+        id = sameDirectionPairShape(
+            sH,
+            sL,
+            'ascending_channel',
+            'ascending_wedge'
+        );
+    else if (cH === 'falling' && cL === 'falling')
+        id = sameDirectionPairShape(
+            sH,
+            sL,
+            'descending_channel',
+            'descending_wedge'
+        );
     else if (cH === 'flat' && cL === 'flat') id = 'rectangle';
 
     if (id === null) return [];
@@ -486,12 +522,93 @@ function buildFlagContext(
     };
 }
 
+/** Index of the first bar in `[from, to]` whose `pick` value beats every earlier one under `better`. */
+function extremeIndex(
+    bars: readonly Bar[],
+    from: number,
+    to: number,
+    pick: (bar: Bar) => number,
+    better: (candidate: number, best: number) => boolean
+): number {
+    let best = from;
+    for (let i = from + 1; i <= to; i++) {
+        if (better(pick(bars[i]), pick(bars[best]))) best = i;
+    }
+    return best;
+}
+
+/**
+ * High tight flag over the right edge of the chart, from bars alone (a
+ * percentage rule — no pivots, no ATR).
+ *
+ * Pole top = the highest high among the last `FLAG_CONSOLIDATION_MAX_BARS + 1`
+ * bars (the flag is a flag-length pause, not a base), followed by at least
+ * `HTF_FLAG_MIN_BARS` bars and not exceeded by any bar in its own pole
+ * lookback. Pole base = the lowest low within `HTF_POLE_MAX_BARS` bars before
+ * the top; the top must stand at least `HTF_POLE_MIN_GAIN` above it. Flag =
+ * every bar after the top, which may give back at most `HTF_FLAG_MAX_RETRACE`
+ * of the top.
+ *
+ * The attached `pivots` are the two anchors the rule matched on — base
+ * (`low`) and top (`high`) — so `patternGeometry.ts` reads the pole from them
+ * instead of re-deriving it.
+ */
+function detectHighTightFlag(bars: readonly Bar[]): PatternCandidate | null {
+    const lastIndex = bars.length - 1;
+    const peakIndex = extremeIndex(
+        bars,
+        Math.max(0, lastIndex - FLAG_CONSOLIDATION_MAX_BARS),
+        lastIndex,
+        bar => bar.high,
+        (candidate, best) => candidate > best
+    );
+    if (lastIndex - peakIndex < HTF_FLAG_MIN_BARS) return null;
+
+    const peakHigh = bars[peakIndex].high;
+    const poleStart = Math.max(0, peakIndex - HTF_POLE_MAX_BARS);
+    // A higher high earlier in the pole lookback means this bar is a lower
+    // high inside a longer consolidation, not the top of a pole.
+    if (bars.slice(poleStart, peakIndex).some(bar => bar.high > peakHigh))
+        return null;
+
+    const baseIndex = extremeIndex(
+        bars,
+        poleStart,
+        peakIndex,
+        bar => bar.low,
+        (candidate, best) => candidate < best
+    );
+    const baseLow = bars[baseIndex].low;
+    if (!(baseLow > 0) || (peakHigh - baseLow) / baseLow < HTF_POLE_MIN_GAIN)
+        return null;
+
+    const flagLow = Math.min(...bars.slice(peakIndex + 1).map(bar => bar.low));
+    if ((peakHigh - flagLow) / peakHigh > HTF_FLAG_MAX_RETRACE) return null;
+
+    return {
+        id: 'high_tight_flag',
+        startIndex: baseIndex,
+        endIndex: lastIndex,
+        pivots: [
+            { index: baseIndex, price: baseLow, kind: 'low' },
+            { index: peakIndex, price: peakHigh, kind: 'high' },
+        ],
+    };
+}
+
 /**
  * @internal
- * bull_flag / bear_flag / pennant over the shared pole+consolidation
- * geometry. Not mutually exclusive by construction (a flat, converging
- * consolidation after an up-pole can plausibly read as both a bull flag and
- * a pennant) — recall-biased, so both are emitted when both fit.
+ * high_tight_flag / bull_flag / bear_flag / pennant.
+ *
+ * high_tight_flag is checked first and, when it matches, is the ONLY
+ * candidate emitted — the same right-edge pause would otherwise also read as
+ * a bull flag or pennant, and the high-tight-flag doc is the specific one
+ * (the same way cup_and_handle replaces rounding_bottom).
+ *
+ * Otherwise, over the shared pole+consolidation geometry: not mutually
+ * exclusive by construction (a flat, converging consolidation after an
+ * up-pole can plausibly read as both a bull flag and a pennant) —
+ * recall-biased, so both are emitted when both fit.
  *
  * bull_flag: up pole + consolidation closes drifting flat-or-down. bear_flag:
  * down pole + consolidation closes drifting flat-or-up (mirrored). pennant:
@@ -504,6 +621,10 @@ export const classifyFlagsAndPennants: PatternClassifier = (
     bars,
     atr
 ) => {
+    if (atr <= 0) return [];
+    const highTightFlag = detectHighTightFlag(bars);
+    if (highTightFlag) return [highTightFlag];
+
     const ctx = buildFlagContext(pivots, bars, atr);
     if (!ctx) return [];
 
@@ -543,7 +664,7 @@ export const classifyFlagsAndPennants: PatternClassifier = (
     return results;
 };
 
-// ─── Group 5: curvature (rounding bottom, cup & handle) ───────────────────
+// ─── Group 5: curvature (rounding bottom / top, cup & handle) ─────────────
 
 interface RoundingFit {
     startIndex: number;
@@ -551,21 +672,26 @@ interface RoundingFit {
     depth: number;
 }
 
+/** Which way the fitted arc must curve: a bottom is convex (U), a top concave (dome). */
+type RoundingShape = 'bottom' | 'top';
+
 /**
- * Fits a convex (`a > 0`) quadratic through the given low pivots and checks
- * the rounding-bottom shape conditions: vertex within the middle half of the
- * index span, and rim-to-bottom depth of at least
- * `ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr`. `null` when fewer than 4
- * points or any condition fails.
+ * Fits a quadratic through the given pivots — low pivots for a bottom, high
+ * pivots for a top — and checks the rounding shape conditions: convex
+ * (`a > 0`) for a bottom or concave (`a < 0`) for a top, vertex within the
+ * middle half of the index span, and rim-to-extreme depth of at least
+ * `ROUNDING_MIN_DEPTH_ATR_MULT * atr`. `null` when fewer than 4 points or any
+ * condition fails.
  */
-function fitRoundingBottom(
+function fitRounding(
     points: readonly PivotPoint[],
-    atr: number
+    atr: number,
+    shape: RoundingShape
 ): RoundingFit | null {
     if (points.length < 4) return null;
 
     const fit = fitQuadratic(points.map(p => ({ x: p.index, y: p.price })));
-    if (!fit || fit.a <= 0) return null;
+    if (!fit || (shape === 'bottom' ? fit.a <= 0 : fit.a >= 0)) return null;
 
     const startIndex = points[0].index;
     const endIndex = points[points.length - 1].index;
@@ -580,17 +706,15 @@ function fitRoundingBottom(
     const hi = startIndex + span * CURVATURE_VERTEX_MID_HI;
     if (vertexX < lo || vertexX > hi) return null;
 
+    // Symmetric for both shapes: the rim is the extreme opposite the vertex.
     const prices = points.map(p => p.price);
-    const rim = Math.max(...prices);
-    const bottom = Math.min(...prices);
-    const depth = rim - bottom;
-    if (depth < ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr) return null;
+    const depth = Math.max(...prices) - Math.min(...prices);
+    if (depth < ROUNDING_MIN_DEPTH_ATR_MULT * atr) return null;
 
     return { startIndex, endIndex, depth };
 }
 
 /**
- * @internal
  * rounding_bottom / cup_and_handle over the low pivots (>= 4 required,
  * including a provisional trailing low if the caller extracted pivots with
  * `includeProvisional: true`).
@@ -603,20 +727,16 @@ function fitRoundingBottom(
  * base, so re-emitting rounding_bottom would be redundant, not extra recall.
  * Otherwise falls back to a plain rounding_bottom fit over all the lows.
  */
-export const classifyCurvaturePatterns: PatternClassifier = (
-    pivots,
-    _bars,
-    atr
-) => {
-    if (atr <= 0) return [];
-
-    const lows = pivots.filter(p => p.kind === 'low');
+function classifyRoundedBase(
+    lows: readonly PivotPoint[],
+    atr: number
+): PatternCandidate[] {
     if (lows.length < 4) return [];
 
     if (lows.length >= 5) {
         const cupLows = lows.slice(0, -1);
         const handleLow = lows[lows.length - 1];
-        const cup = fitRoundingBottom(cupLows, atr);
+        const cup = fitRounding(cupLows, atr, 'bottom');
         if (cup) {
             const rightEdgeLow = cupLows[cupLows.length - 1].price;
             const handleDepth = rightEdgeLow - handleLow.price;
@@ -636,7 +756,7 @@ export const classifyCurvaturePatterns: PatternClassifier = (
         }
     }
 
-    const rounding = fitRoundingBottom(lows, atr);
+    const rounding = fitRounding(lows, atr, 'bottom');
     if (!rounding) return [];
     return [
         {
@@ -644,6 +764,39 @@ export const classifyCurvaturePatterns: PatternClassifier = (
             startIndex: rounding.startIndex,
             endIndex: rounding.endIndex,
             pivots: lows,
+        },
+    ];
+}
+
+/**
+ * @internal
+ * Curvature group: rounding_bottom / cup_and_handle over the low pivots (see
+ * `classifyRoundedBase`) plus rounding_top over the high pivots — the mirror
+ * fit (concave dome, same vertex and depth rules). The two read disjoint
+ * pivot sets, so a rounding_top is emitted independently of whatever the
+ * lows produced.
+ */
+export const classifyCurvaturePatterns: PatternClassifier = (
+    pivots,
+    _bars,
+    atr
+) => {
+    if (atr <= 0) return [];
+
+    const base = classifyRoundedBase(
+        pivots.filter(p => p.kind === 'low'),
+        atr
+    );
+    const highs = pivots.filter(p => p.kind === 'high');
+    const top = fitRounding(highs, atr, 'top');
+    if (!top) return base;
+    return [
+        ...base,
+        {
+            id: 'rounding_top',
+            startIndex: top.startIndex,
+            endIndex: top.endIndex,
+            pivots: highs,
         },
     ];
 };

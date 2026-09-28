@@ -15,8 +15,14 @@ import {
     makeBars,
     makeHLBars,
 } from '@/__tests__/domain/patterns/helpers';
-import { EXTREME_MATCH_ATR_MULT } from '@/domain/patterns/constants';
-import type { PatternCandidate } from '@/domain/types';
+import {
+    CHANNEL_PARALLEL_ATR_PER_BAR,
+    EXTREME_MATCH_ATR_MULT,
+    FLAG_CONSOLIDATION_MAX_BARS,
+    HTF_FLAG_MIN_BARS,
+    HTF_POLE_MAX_BARS,
+} from '@/domain/patterns/constants';
+import type { Bar, PatternCandidate } from '@/domain/types';
 
 const ATR = 1;
 
@@ -276,6 +282,27 @@ describe('classifyTrendlinePatterns', () => {
             closer: 20,
             expectedId: 'rectangle',
         },
+        {
+            name: 'ascending_channel: 둘 다 상승, 기울기가 같음(평행)',
+            seed: 10,
+            targets: [20, 5, 22, 7],
+            closer: 25,
+            expectedId: 'ascending_channel',
+        },
+        {
+            name: 'descending_channel: 둘 다 하락, 기울기가 같음(평행)',
+            seed: 10,
+            targets: [20, 5, 18, 3],
+            closer: 20,
+            expectedId: 'descending_channel',
+        },
+        {
+            name: 'broadening_formation: 고점 상승 + 저점 하락 (확산)',
+            seed: 10,
+            targets: [20, 5, 22, 3],
+            closer: 25,
+            expectedId: 'broadening_formation',
+        },
     ];
 
     it.each(cases)('$name', ({ seed, targets, closer, expectedId }) => {
@@ -291,13 +318,51 @@ describe('classifyTrendlinePatterns', () => {
         expect(candidates[0].startIndex).toBeLessThan(candidates[0].endIndex);
     });
 
-    it('고점/저점이 둘 다 상승하지만 기울기가 같으면(쐐기 조건 미충족) 감지하지 않는다', () => {
-        // sH === sL (both rising by the same rate) matches no row in the
-        // table: not a wedge (needs sL > sH), not flat/falling anywhere.
-        const bars = makeAlternatingPivotBars(10, [20, 5, 22, 7], 25);
+    it('고점/저점이 둘 다 상승하지만 고점이 더 가파르면(확산) 감지하지 않는다', () => {
+        // sH = 2 > sL = 0.5: neither parallel (channel) nor converging
+        // (wedge) — no row in the table matches.
+        const bars = makeAlternatingPivotBars(10, [20, 5, 24, 6], 25);
         const pivots = extractPivots(bars, ATR);
 
         expect(classifyTrendlinePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    // sH = 1 (highs 20 -> 22) / -1 (highs 20 -> 18); the second low sets
+    // sL = sH + offset, landing just inside or just past
+    // CHANNEL_PARALLEL_ATR_PER_BAR (0.02) at atr = 1.
+    it.each([
+        {
+            name: '상승: 기울기 차 0.019 (≤ tol) → ascending_channel',
+            targets: [20, 5, 22, 7.038],
+            closer: 25,
+            expectedId: 'ascending_channel',
+        },
+        {
+            name: '상승: 기울기 차 0.021 (> tol) → ascending_wedge',
+            targets: [20, 5, 22, 7.042],
+            closer: 25,
+            expectedId: 'ascending_wedge',
+        },
+        {
+            name: '하락: 기울기 차 0.019 (≤ tol) → descending_channel',
+            targets: [20, 5, 18, 3.038],
+            closer: 20,
+            expectedId: 'descending_channel',
+        },
+        {
+            name: '하락: 기울기 차 0.021 (> tol) → descending_wedge',
+            targets: [20, 5, 18, 3.042],
+            closer: 20,
+            expectedId: 'descending_wedge',
+        },
+    ])('채널/쐐기 경계 — $name', ({ targets, closer, expectedId }) => {
+        expect(CHANNEL_PARALLEL_ATR_PER_BAR).toBe(0.02);
+        const bars = makeAlternatingPivotBars(10, targets, closer);
+        const pivots = extractPivots(bars, ATR);
+
+        const candidates = classifyTrendlinePatterns(pivots, bars, ATR);
+
+        expect(candidates.map(c => c.id)).toEqual([expectedId]);
     });
 
     it('기울기가 정확히 FLAT_SLOPE_ATR_PER_BAR 이면 flat으로 판정한다 (느슨한 경계)', () => {
@@ -485,11 +550,162 @@ describe('classifyFlagsAndPennants', () => {
     });
 });
 
+describe('classifyFlagsAndPennants — high_tight_flag', () => {
+    /**
+     * Pole: `poleBars + 1` point bars (high = low) rising linearly from
+     * `base` (index 0) to `peak` (index `poleBars`), then explicit
+     * [high, low] flag bars.
+     */
+    function htfBars(
+        base: number,
+        peak: number,
+        poleBars: number,
+        flag: Array<[high: number, low: number]>
+    ): Bar[] {
+        const pole = Array.from(
+            { length: poleBars + 1 },
+            (_, i): [number, number] => {
+                const price = base + ((peak - base) * i) / poleBars;
+                return [price, price];
+            }
+        );
+        return makeHLBars([...pole, ...flag]);
+    }
+
+    const classify = (bars: Bar[]) =>
+        classifyFlagsAndPennants(
+            extractPivots(bars, ATR, { includeProvisional: true }),
+            bars,
+            ATR
+        );
+    const ids = (bars: Bar[]) => classify(bars).map(c => c.id);
+
+    it('90%+ 폴 뒤 25% 이내로 조정하는 깃발이면 high_tight_flag를 폴 기저~마지막 봉 구간으로 방출한다', () => {
+        const bars = htfBars(100, 200, 20, [
+            [195, 185],
+            [190, 175],
+            [188, 170],
+            [185, 172],
+        ]);
+
+        expect(classify(bars)).toEqual([
+            {
+                id: 'high_tight_flag',
+                startIndex: 0,
+                endIndex: 24,
+                pivots: [
+                    { index: 0, price: 100, kind: 'low' },
+                    { index: 20, price: 200, kind: 'high' },
+                ],
+            },
+        ]);
+    });
+
+    it('같은 구간이 bull_flag에도 맞으면 high_tight_flag만 방출한다', () => {
+        // Same tight drift as the bull_flag case above, but the pole starts
+        // at 50 instead of 90: 50 -> 109 is a 118% run, so the bull_flag this
+        // geometry otherwise produces is replaced by high_tight_flag.
+        const poleCloses = Array.from(
+            { length: 20 },
+            (_, i) => 50 + (59 * i) / 19
+        );
+        const driftCloses = [107.6, 107.5, 107.4, 107.3, 107.2, 107.1];
+        const bars = makeBars([...poleCloses, ...driftCloses]);
+
+        expect(ids(bars)).toEqual(['high_tight_flag']);
+    });
+
+    it.each([
+        { name: '상승률 정확히 90% → 방출', peak: 190, expected: true },
+        { name: '상승률 90% 미만 → 미방출', peak: 189.9, expected: false },
+    ])('폴 상승률 경계 — $name', ({ peak, expected }) => {
+        const bars = htfBars(100, peak, 20, [
+            [185, 180],
+            [184, 178],
+            [186, 181],
+        ]);
+        expect(ids(bars).includes('high_tight_flag')).toBe(expected);
+    });
+
+    it.each([
+        { name: '조정 정확히 25% → 방출', flagLow: 150, expected: true },
+        { name: '조정 25% 초과 → 미방출', flagLow: 149.9, expected: false },
+    ])('깃발 조정 경계 — $name', ({ flagLow, expected }) => {
+        const bars = htfBars(100, 200, 20, [
+            [195, 180],
+            [190, flagLow],
+            [192, 170],
+        ]);
+        expect(ids(bars).includes('high_tight_flag')).toBe(expected);
+    });
+
+    it.each([
+        {
+            name: `폴 ${HTF_POLE_MAX_BARS}봉 → 방출`,
+            poleBars: HTF_POLE_MAX_BARS,
+            expected: true,
+        },
+        {
+            // The base slides one bar outside the window; the lowest low left
+            // inside it (≈102.2) no longer supports a 90% run to 190.
+            name: `폴 ${HTF_POLE_MAX_BARS + 1}봉 → 미방출`,
+            poleBars: HTF_POLE_MAX_BARS + 1,
+            expected: false,
+        },
+    ])('폴 길이 경계 — $name', ({ poleBars, expected }) => {
+        const bars = htfBars(100, 190, poleBars, [
+            [185, 180],
+            [184, 178],
+            [186, 181],
+        ]);
+        expect(ids(bars).includes('high_tight_flag')).toBe(expected);
+    });
+
+    it('폴 기저 저가가 0 이하이면(상승률 계산 불가) 방출하지 않는다', () => {
+        const bars = htfBars(0, 200, 20, [
+            [195, 185],
+            [190, 175],
+            [188, 170],
+        ]);
+        expect(ids(bars)).not.toContain('high_tight_flag');
+    });
+
+    it('atr가 0 이하이면 high_tight_flag 조건을 만족해도 방출하지 않는다', () => {
+        const bars = htfBars(100, 200, 20, [
+            [195, 185],
+            [190, 175],
+            [188, 170],
+        ]);
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+        expect(classifyFlagsAndPennants(pivots, bars, 0)).toEqual([]);
+    });
+
+    it(`고점 뒤 봉이 HTF_FLAG_MIN_BARS(${HTF_FLAG_MIN_BARS})개 미만이면 방출하지 않는다`, () => {
+        const bars = htfBars(100, 200, 20, [
+            [195, 185],
+            [190, 175],
+        ]);
+        expect(ids(bars)).not.toContain('high_tight_flag');
+    });
+
+    it(`고점이 마지막 FLAG_CONSOLIDATION_MAX_BARS(${FLAG_CONSOLIDATION_MAX_BARS})봉 창보다 오래되면(깃발이 너무 길면) 방출하지 않는다`, () => {
+        // The real top (200) sits 31 bars before the last bar; the highest
+        // bar inside the trailing window (199) has that higher top in its
+        // own pole lookback, so it is not a pole top.
+        const flag: Array<[number, number]> = Array.from(
+            { length: FLAG_CONSOLIDATION_MAX_BARS + 1 },
+            (_, i) => (i === 5 ? [199, 185] : [190, 180])
+        );
+        const bars = htfBars(100, 200, 20, flag);
+        expect(ids(bars)).not.toContain('high_tight_flag');
+    });
+});
+
 describe('classifyCurvaturePatterns', () => {
     it('rounding_bottom: 저점 4개가 U자형(convex)이고 정점이 중앙 절반에 있으면 감지한다', () => {
         // Low pivots at (2,10),(4,4),(6,2),(8,9) — a convex U with its
         // vertex inside the middle half of [2,8] and depth (10-2=8) well
-        // past ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT(2) * atr.
+        // past ROUNDING_MIN_DEPTH_ATR_MULT(2) * atr.
         const bars = makeAlternatingPivotBars(
             15,
             [20, 10, 20, 4, 20, 2, 20, 9],
@@ -526,7 +742,7 @@ describe('classifyCurvaturePatterns', () => {
         ]);
     });
 
-    it('컵 깊이가 정확히 ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr 이면 감지한다 (느슨한 경계)', () => {
+    it('컵 깊이가 정확히 ROUNDING_MIN_DEPTH_ATR_MULT * atr 이면 감지한다 (느슨한 경계)', () => {
         // Same U-shape as the textbook case, scaled so rim(4) - bottom(2)
         // = 2 exactly, matching 2 * atr(1).
         const bars = makeAlternatingPivotBars(
@@ -622,11 +838,11 @@ describe('classifyCurvaturePatterns', () => {
         expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
     });
 
-    it('컵 깊이가 ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT * atr 미만이면 rounding_bottom을 감지하지 않는다', () => {
+    it('컵 깊이가 ROUNDING_MIN_DEPTH_ATR_MULT * atr 미만이면 rounding_bottom을 감지하지 않는다', () => {
         // Lows at (2,10.45),(4,10.05),(6,10.05),(8,10.45) lie exactly on the
         // shallow convex parabola y = 0.05*(x-5)^2 + 10 — vertex at x=5 sits
         // well inside the middle-half window [3.5, 6.5], but depth
-        // (10.45-10.05=0.4) is below ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT(2) *
+        // (10.45-10.05=0.4) is below ROUNDING_MIN_DEPTH_ATR_MULT(2) *
         // atr(1) = 2. Rejects on the depth check specifically, not vertex.
         const bars = makeAlternatingPivotBars(
             15,
@@ -678,6 +894,72 @@ describe('classifyCurvaturePatterns', () => {
 
         expect(stripPivots(candidates)).toEqual([
             { id: 'rounding_bottom', startIndex: 2, endIndex: 10 },
+        ]);
+    });
+});
+
+describe('classifyCurvaturePatterns — rounding_top', () => {
+    /** High pivots at x = 1, 3, 5, 7 with the given prices (hand-built). */
+    const highs = (prices: number[]): PivotPoint[] =>
+        prices.map((price, i) => ({ index: 1 + 2 * i, price, kind: 'high' }));
+    const bars = makeBars(Array.from({ length: 10 }, () => 100));
+
+    it('고점 4개가 돔형(concave)이고 정점이 중앙 절반에 있으면 rounding_top을 방출한다', () => {
+        // Mirror of the textbook rounding_bottom lows (10, 4, 2, 9) → 20 − y.
+        const pivots = highs([10, 16, 18, 11]);
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([
+            { id: 'rounding_top', startIndex: 1, endIndex: 7, pivots },
+        ]);
+    });
+
+    it('돔 깊이가 정확히 ROUNDING_MIN_DEPTH_ATR_MULT * atr 이면 방출한다 (느슨한 경계)', () => {
+        // Mirror of the rounding_bottom depth-boundary case: peak 18 − rim 16 = 2.
+        const pivots = highs([16, 17.5, 18, 16.25]);
+
+        expect(
+            stripPivots(classifyCurvaturePatterns(pivots, bars, ATR))
+        ).toEqual([{ id: 'rounding_top', startIndex: 1, endIndex: 7 }]);
+    });
+
+    it('돔 깊이가 ROUNDING_MIN_DEPTH_ATR_MULT * atr 미만이면 방출하지 않는다', () => {
+        const pivots = highs([9.55, 9.95, 9.95, 9.55]);
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('고점이 U자형(convex)이면 rounding_top이 아니다', () => {
+        const pivots = highs([10, 4, 2, 9]);
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('정점이 구간 가장자리에 붙으면(edge-hugging arc) rounding_top이 아니다', () => {
+        // Mirror of the edge-vertex rounding_bottom case: vertex at x = 7.
+        const pivots = highs([4.2, 10.2, 13.8, 15]);
+
+        expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
+    });
+
+    it('저점 U와 고점 돔이 함께 있으면 rounding_bottom과 rounding_top을 독립적으로 모두 방출한다', () => {
+        // Lows: the textbook U (10, 4, 2, 9) at x = 2..8; highs: its mirror
+        // dome 22 − y (12, 18, 20, 13) at x = 1..7.
+        const pivots: PivotPoint[] = [
+            { index: 1, price: 12, kind: 'high' },
+            { index: 2, price: 10, kind: 'low' },
+            { index: 3, price: 18, kind: 'high' },
+            { index: 4, price: 4, kind: 'low' },
+            { index: 5, price: 20, kind: 'high' },
+            { index: 6, price: 2, kind: 'low' },
+            { index: 7, price: 13, kind: 'high' },
+            { index: 8, price: 9, kind: 'low' },
+        ];
+
+        expect(
+            stripPivots(classifyCurvaturePatterns(pivots, bars, ATR))
+        ).toEqual([
+            { id: 'rounding_bottom', startIndex: 2, endIndex: 8 },
+            { id: 'rounding_top', startIndex: 1, endIndex: 7 },
         ]);
     });
 });

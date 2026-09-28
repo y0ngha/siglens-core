@@ -500,4 +500,76 @@ describe('planCheck tier gating', () => {
 
         expect(result.actionRecommendation).not.toHaveProperty('planCheck');
     });
+
+    describe('chartOverlays (spec 2026-09-28)', () => {
+        const patternOverlay = {
+            id: 'pattern:double_bottom:1',
+            kind: 'pattern' as const,
+            skill: 'double_bottom',
+            sourceRef: 'pattern_0',
+            variant: 'primary' as const,
+            segments: [],
+            levels: [],
+            labels: [],
+        };
+        const trendlineOverlay = {
+            id: 'tl:support:1:3',
+            kind: 'trendline' as const,
+            skill: 'trendline',
+            sourceRef: 'trendlines',
+            variant: 'primary' as const,
+            segments: [],
+            levels: [],
+            labels: [],
+        };
+
+        it('defaults to [] when the source analysis has no chartOverlays', () => {
+            const filtered = filterAnalysisResult(
+                makeAnalysisResponse(),
+                'pro',
+                restrictedConfig
+            );
+            expect(expectFilteredResult(filtered).chartOverlays).toEqual([]);
+        });
+
+        it('member tier (full_detail + skill_detection) keeps both kinds', () => {
+            const filtered = filterAnalysisResult(
+                makeAnalysisResponse({
+                    chartOverlays: [patternOverlay, trendlineOverlay],
+                }),
+                'member',
+                restrictedConfig
+            );
+            expect(expectFilteredResult(filtered).chartOverlays).toEqual([
+                patternOverlay,
+                trendlineOverlay,
+            ]);
+        });
+
+        it('drops trendline overlays without full_detail, keeps pattern overlays with skill_detection', () => {
+            const filtered = filterAnalysisResult(
+                makeAnalysisResponse({
+                    chartOverlays: [patternOverlay, trendlineOverlay],
+                }),
+                'free',
+                restrictedConfig
+            );
+            expect(expectFilteredResult(filtered).chartOverlays).toEqual([
+                patternOverlay,
+            ]);
+        });
+
+        it('drops pattern overlays without skill_detection even when full_detail is granted', () => {
+            const filtered = filterAnalysisResult(
+                makeAnalysisResponse({
+                    chartOverlays: [patternOverlay, trendlineOverlay],
+                }),
+                'member',
+                denySkillDetectionConfig
+            );
+            expect(expectFilteredResult(filtered).chartOverlays).toEqual([
+                trendlineOverlay,
+            ]);
+        });
+    });
 });

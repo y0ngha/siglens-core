@@ -104,8 +104,137 @@ describe('candle-detection', () => {
         });
 
         describe('MULTI_CANDLE_PATTERN_BUFFER 상수', () => {
-            it('3봉 패턴 감지를 위해 2의 값을 갖는다', () => {
-                expect(MULTI_CANDLE_PATTERN_BUFFER).toBe(2);
+            it('5봉 패턴 감지를 위해 4의 값을 갖는다', () => {
+                expect(MULTI_CANDLE_PATTERN_BUFFER).toBe(4);
+            });
+        });
+
+        describe('창 시작 부근의 5봉 패턴', () => {
+            it('버퍼 봉 4개와 창 첫 봉으로 이루어진 rising_three_methods를 barIndex 0에서 감지하고 그 봉의 단봉 라벨(bullish_belt_hold)은 억제한다', () => {
+                // extended index 0–3 = buffer, 4 = detection window start
+                const pattern: Bar[] = [
+                    makeBar(0, { open: 100, high: 111, low: 99, close: 110 }),
+                    makeBar(1, { open: 109, high: 110, low: 106, close: 107 }),
+                    makeBar(2, { open: 107, high: 108, low: 104, close: 105 }),
+                    makeBar(3, { open: 105, high: 106, low: 102, close: 103 }),
+                    makeBar(4, {
+                        open: 102.5,
+                        high: 116,
+                        low: 102,
+                        close: 115,
+                    }),
+                ];
+                const rest: Bar[] = Array.from(
+                    { length: CANDLE_PATTERN_DETECTION_BARS - 1 },
+                    (_, i) => makeHammerBar(5 + i)
+                );
+                const bars = [...pattern, ...rest];
+                expect(bars).toHaveLength(
+                    CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER
+                );
+
+                const result = detectCandlePatternEntries(bars);
+
+                expect(result.find(e => e.barIndex === 0)).toEqual({
+                    barIndex: 0,
+                    patternType: 'multi',
+                    singlePattern: null,
+                    multiPattern: 'rising_three_methods',
+                });
+                expect(
+                    result.filter(
+                        e => e.barIndex === 0 && e.patternType === 'single'
+                    )
+                ).toEqual([]);
+            });
+        });
+
+        describe('짧은 몸통 뒤의 stomach 모양', () => {
+            it('직전 봉이 장대봉이 아니면 stomach로 묶지 않고 두 봉의 단봉 라벨을 그대로 둔다', () => {
+                // spinning top 두 개(제외 대상) 뒤에 bearish dragonfly doji와
+                // midpoint 위에서 시작하는 bullish belt hold. 느슨한 stomach
+                // 규칙은 이 쌍을 above_the_stomach로 묶어 두 단봉 라벨을 삼켰다.
+                const bars: Bar[] = [
+                    makeBar(0, { open: 90, high: 92, low: 88, close: 90.5 }),
+                    makeBar(1, { open: 94, high: 96, low: 92, close: 94.5 }),
+                    makeBar(2, { open: 100.5, high: 101, low: 80, close: 100 }),
+                    makeBar(3, {
+                        open: 100.5,
+                        high: 106,
+                        low: 100.3,
+                        close: 105.5,
+                    }),
+                ];
+
+                expect(detectCandlePatternEntries(bars)).toEqual([
+                    {
+                        barIndex: 2,
+                        patternType: 'single',
+                        singlePattern: 'dragonfly_doji',
+                        multiPattern: null,
+                    },
+                    {
+                        barIndex: 3,
+                        patternType: 'single',
+                        singlePattern: 'bullish_belt_hold',
+                        multiPattern: null,
+                    },
+                ]);
+            });
+        });
+
+        describe('4봉 패턴의 관여 봉', () => {
+            it('three-line strike의 b1(단봉으로는 bullish_belt_hold)까지 4봉 모두를 단봉에서 제외한다', () => {
+                const normal: Bar[] = Array.from(
+                    { length: CANDLE_PATTERN_DETECTION_BARS - 4 },
+                    (_, i) => makeBar(i)
+                );
+                const start = normal.length;
+                // b1: 아래꼬리 없는 긴 양봉 → 단봉 bullish_belt_hold
+                // b2: b1 몸통 밖에서 시작 → three_white_soldiers 불성립
+                const strike: Bar[] = [
+                    makeBar(start, {
+                        open: 100,
+                        high: 106,
+                        low: 100,
+                        close: 105,
+                    }),
+                    makeBar(start + 1, {
+                        open: 105.5,
+                        high: 111,
+                        low: 104,
+                        close: 110,
+                    }),
+                    makeBar(start + 2, {
+                        open: 109,
+                        high: 116,
+                        low: 108,
+                        close: 115,
+                    }),
+                    makeBar(start + 3, {
+                        open: 116,
+                        high: 117,
+                        low: 97,
+                        close: 98,
+                    }),
+                ];
+                const result = detectCandlePatternEntries([
+                    ...normal,
+                    ...strike,
+                ]);
+                const lastIndex = CANDLE_PATTERN_DETECTION_BARS - 1;
+
+                expect(result.find(e => e.barIndex === lastIndex)).toEqual({
+                    barIndex: lastIndex,
+                    patternType: 'multi',
+                    singlePattern: null,
+                    multiPattern: 'bullish_three_line_strike',
+                });
+                expect(
+                    result.filter(
+                        e => e.patternType === 'single' && e.barIndex >= start
+                    )
+                ).toEqual([]);
             });
         });
 

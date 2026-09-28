@@ -84,10 +84,13 @@ Fetching is a consumer concern; the rule is not.
 
 Three things it does that a naive "count the signals" version does not:
 
-- **Counts indicator families, not signal types.** The 36 members of `SignalType` derive
-  from 14 indicators — RSI contributes 4, MACD 4, Bollinger 6 — so counting types treats
-  transforms of one close series as independent votes. `SIGNAL_FAMILY` collapses them;
-  unmapped types fall back to their own name so a new detector is never worth zero.
+- **Counts indicator families, not signal types.** The 36 counted members of `SignalType`
+  derive from 14 indicators — RSI contributes 4, MACD 4, Bollinger 6 — so counting types
+  treats transforms of one close series as independent votes. `SIGNAL_FAMILY` collapses
+  them; unmapped types fall back to their own name so a new detector is never worth zero.
+  The four price-structure types (`new_52w_high`/`low`, `gap_up`/`down`) are the exception:
+  they have never been measured as votes, so `CONFLUENCE_EXCLUDED_TYPES` keeps them out of
+  the snapshot rather than letting each become a full-vote family.
 - **Weighs `expected` phase at half.** `support_proximity_bullish` is a positional state,
   not a completed cross. Phase is recovered from the type name (the two unions are
   disjoint), which keeps `phase` out of the snapshot so previously stored snapshots stay

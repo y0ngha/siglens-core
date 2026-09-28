@@ -11,14 +11,14 @@ import {
     normalizeIndicatorGuideResult,
     normalizeKeyPrice,
     normalizeTrendlinePoint,
-    normalizePatternLine,
-    normalizeTimeRange,
     normalizeTrendline,
     normalizePatternSummary,
     normalizePatternGeometry,
     normalizeStrategyResult,
     normalizeCandlePatternSummary,
     normalizeActionRecommendation,
+    normalizeIdList,
+    normalizeChartOverlay,
 } from '@/domain/analysis/normalize';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import type { ActionRecommendation, AnalysisResponse } from '@/domain/types';
@@ -219,20 +219,6 @@ describe('normalizeTrendlinePoint', () => {
     });
 });
 
-describe('normalizePatternLine', () => {
-    it('유효한 PatternLine을 반환한다', () => {
-        const result = normalizePatternLine({
-            start: { time: 1000, price: 100 },
-            end: { time: 2000, price: 110 },
-        });
-        expect(result).toBeDefined();
-    });
-
-    it('null이면 null을 반환한다', () => {
-        expect(normalizePatternLine(null)).toBeNull();
-    });
-});
-
 describe('normalizeTrendline', () => {
     it('유효한 Trendline을 반환한다', () => {
         const result = normalizeTrendline({
@@ -272,7 +258,7 @@ describe('normalizePatternSummary', () => {
         expect(normalizePatternSummary({ skillName: 'Y' })).toBeNull();
     });
 
-    it('keyPrices/patternLines 키가 없거나 배열이 아니면 [] 아닌 undefined가 된다', () => {
+    it('keyPrices 키가 없거나 배열이 아니면 [] 아닌 undefined가 된다', () => {
         // 소스는 `Array.isArray(...) ? compact(...) : undefined` 이므로
         // 누락/비배열은 빈 배열이 아니라 undefined로 구분된다.
         const missing = normalizePatternSummary({
@@ -280,16 +266,13 @@ describe('normalizePatternSummary', () => {
             skillName: 'Y',
         });
         expect(missing?.keyPrices).toBeUndefined();
-        expect(missing?.patternLines).toBeUndefined();
 
         const nonArray = normalizePatternSummary({
             patternName: 'X',
             skillName: 'Y',
             keyPrices: 'notarray',
-            patternLines: 42,
         });
         expect(nonArray?.keyPrices).toBeUndefined();
-        expect(nonArray?.patternLines).toBeUndefined();
     });
 
     it('keyPrices 배열의 무효 원소를 걸러내고 유효한 KeyPrice만 남긴다', () => {
@@ -326,6 +309,29 @@ describe('normalizePatternSummary', () => {
             skillName: 'Y',
         });
         expect(result?.geometry).toBeUndefined();
+    });
+
+    it('candidateId(spec 2026-09-28)가 비어있지 않은 문자열이면 그대로 전달한다', () => {
+        const result = normalizePatternSummary({
+            patternName: 'X',
+            skillName: 'Y',
+            candidateId: 'pattern:double_top:1714521600',
+        });
+        expect(result?.candidateId).toBe('pattern:double_top:1714521600');
+    });
+
+    it('candidateId가 없거나 빈 문자열이면 undefined', () => {
+        expect(
+            normalizePatternSummary({ patternName: 'X', skillName: 'Y' })
+                ?.candidateId
+        ).toBeUndefined();
+        expect(
+            normalizePatternSummary({
+                patternName: 'X',
+                skillName: 'Y',
+                candidateId: '',
+            })?.candidateId
+        ).toBeUndefined();
     });
 });
 
@@ -484,6 +490,25 @@ describe('normalizeStrategyResult', () => {
 
     it('null이면 null을 반환한다', () => {
         expect(normalizeStrategyResult(null)).toBeNull();
+    });
+
+    it('candidateIds(spec 2026-09-28)가 배열이면 비문자열/빈문자열을 걸러 전달한다', () => {
+        const result = normalizeStrategyResult({
+            strategyName: 'Breakout',
+            trend: 'bullish',
+            summary: 'x',
+            candidateIds: ['ew:up:1:6', '', 42, null, 'ew:up:2:5'],
+        });
+        expect(result?.candidateIds).toEqual(['ew:up:1:6', 'ew:up:2:5']);
+    });
+
+    it('candidateIds가 배열이 아니면 undefined', () => {
+        const result = normalizeStrategyResult({
+            strategyName: 'Breakout',
+            trend: 'bullish',
+            summary: 'x',
+        });
+        expect(result?.candidateIds).toBeUndefined();
     });
 });
 
@@ -706,32 +731,72 @@ describe('normalizeActionRecommendation', () => {
     });
 });
 
-describe('normalizeTimeRange', () => {
-    it('유효한 start와 end를 가진 객체를 반환한다', () => {
-        const result = normalizeTimeRange({ start: 1000, end: 2000 });
-        expect(result).toEqual({ start: 1000, end: 2000 });
+describe('normalizeIdList (spec 2026-09-28)', () => {
+    it('non-array 값이면 []', () => {
+        expect(normalizeIdList(null)).toEqual([]);
+        expect(normalizeIdList('not-an-array')).toEqual([]);
     });
 
-    it('null이면 undefined를 반환한다', () => {
-        expect(normalizeTimeRange(null)).toBeUndefined();
+    it('빈 문자열/문자열 아닌 원소를 걸러낸다', () => {
+        expect(normalizeIdList(['a', '', 1, null, 'b'])).toEqual(['a', 'b']);
+    });
+});
+
+describe('normalizeChartOverlay (spec 2026-09-28)', () => {
+    const validOverlay = {
+        id: 'pattern:double_top:1714521600',
+        kind: 'pattern',
+        skill: 'double_top',
+        sourceRef: 'double_top_0',
+        variant: 'primary',
+        segments: [
+            {
+                from: { time: 1, price: 10 },
+                to: { time: 5, price: 12 },
+                role: 'pattern',
+                style: 'solid',
+                pane: 'price',
+            },
+        ],
+        levels: [{ price: 11, fromTime: 5, label: 'breakout' }],
+        labels: [],
+    };
+
+    it('정상 형태를 그대로 통과시킨다', () => {
+        const result = normalizeChartOverlay(validOverlay);
+        expect(result).toEqual(validOverlay);
     });
 
-    it('객체가 아닌 값이면 undefined를 반환한다', () => {
-        expect(normalizeTimeRange('invalid')).toBeUndefined();
-        expect(normalizeTimeRange(42)).toBeUndefined();
-        expect(normalizeTimeRange([])).toBeUndefined();
+    it('kind가 유효 집합 밖이면 null', () => {
+        expect(
+            normalizeChartOverlay({ ...validOverlay, kind: 'bogus' })
+        ).toBeNull();
     });
 
-    it('start가 없으면 undefined를 반환한다', () => {
-        expect(normalizeTimeRange({ end: 2000 })).toBeUndefined();
+    it('segments도 levels도 없으면 null', () => {
+        expect(
+            normalizeChartOverlay({ ...validOverlay, segments: [], levels: [] })
+        ).toBeNull();
     });
 
-    it('end가 없으면 undefined를 반환한다', () => {
-        expect(normalizeTimeRange({ start: 1000 })).toBeUndefined();
+    it('id가 없거나 객체가 아니면 null', () => {
+        expect(normalizeChartOverlay(null)).toBeNull();
+        expect(normalizeChartOverlay({ ...validOverlay, id: 42 })).toBeNull();
     });
 
-    it('start 또는 end가 숫자가 아닌 타입이면 undefined를 반환한다', () => {
-        expect(normalizeTimeRange({ start: 'abc', end: 2000 })).toBeUndefined();
-        expect(normalizeTimeRange({ start: 1000, end: null })).toBeUndefined();
+    it('variant가 alternate가 아니면 primary로 정규화한다', () => {
+        expect(
+            normalizeChartOverlay({ ...validOverlay, variant: 'bogus' })
+                ?.variant
+        ).toBe('primary');
+    });
+
+    it('옛 캐시의 patternLines 같은 낯선 필드는 조용히 무시한다', () => {
+        const result = normalizeChartOverlay({
+            ...validOverlay,
+            patternLines: [{ points: [] }],
+            timeRange: { start: 1, end: 5 },
+        });
+        expect(result).toEqual(validOverlay);
     });
 });

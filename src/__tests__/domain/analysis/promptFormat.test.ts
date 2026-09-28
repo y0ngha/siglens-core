@@ -14,6 +14,7 @@ import {
     priceDecimalPlaces,
     sharedPriceDecimalPlaces,
     stripLlmJsonFence,
+    parseCalendarDate,
 } from '@/domain/analysis/promptFormat';
 
 // ─────────────────────────────────────────
@@ -377,5 +378,26 @@ describe('formatPlainNumber', () => {
         expect(formatPlainNumber(null)).toBe('N/A');
         expect(formatPlainNumber(undefined)).toBe('N/A');
         expect(formatPlainNumber(Number.NaN)).toBe('N/A');
+    });
+});
+
+// Timezone-independent pin for the FMP naive-timestamp fix: a local-time parse
+// only diverges on a runner with a non-zero UTC offset, and CI runs in UTC, so
+// the rendered-row test in newsPrompt.test.ts alone cannot fail there.
+describe('parseCalendarDate', () => {
+    it('reads a naive FMP timestamp as UTC and flags it for a UTC label', () => {
+        const parsed = parseCalendarDate('2025-05-05 00:30:00');
+        expect(parsed?.date.toISOString()).toBe('2025-05-05T00:30:00.000Z');
+        expect(parsed?.labelUtc).toBe(true);
+    });
+
+    it('keeps an explicit zone and does not label it UTC', () => {
+        const parsed = parseCalendarDate('2025-05-05T00:30:00+09:00');
+        expect(parsed?.date.toISOString()).toBe('2025-05-04T15:30:00.000Z');
+        expect(parsed?.labelUtc).toBe(false);
+    });
+
+    it('returns null for an unparseable string', () => {
+        expect(parseCalendarDate('not a date')).toBeNull();
     });
 });

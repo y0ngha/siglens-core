@@ -1010,6 +1010,7 @@ export type MultiCandlePattern =
     | 'ladder_bottom'
     | 'tweezers_bottom'
     | 'downside_gap_two_rabbits'
+    | 'above_the_stomach'
     // 하락 반전
     | 'bearish_engulfing'
     | 'bearish_harami'
@@ -1026,11 +1027,17 @@ export type MultiCandlePattern =
     | 'advance_block'
     | 'tweezers_top'
     | 'upside_gap_two_crows'
+    | 'below_the_stomach'
     // 지속
     | 'upside_gap_tasuki'
     | 'downside_gap_tasuki'
     | 'on_neck'
-    | 'in_neck';
+    | 'in_neck'
+    | 'rising_three_methods'
+    | 'falling_three_methods'
+    // 3선 타격 — 이름은 전통 명칭, 방향은 측정값(getMultiPatternTrend 참고)
+    | 'bullish_three_line_strike'
+    | 'bearish_three_line_strike';
 
 /**
  * Detected single-bar pattern entry.
@@ -1410,6 +1417,10 @@ export interface FibonacciProjection {
     high: number;
     /** Swing low price used as the lower anchor. */
     low: number;
+    /** `bars` index of the swing-high anchor. */
+    highIndex: number;
+    /** `bars` index of the swing-low anchor. */
+    lowIndex: number;
     /** Whether the most recent leg is an up-leg (`up`) or down-leg (`down`). */
     direction: SwingLegDirection;
     /** Retracement levels (23.6%–78.6%) within the high–low range. */
@@ -1435,6 +1446,12 @@ export interface AbcExtensionProjection {
     b: number;
     /** Price at point C — the confirmed retracement swing after B. */
     c: number;
+    /** `bars` index of point A. */
+    aIndex: number;
+    /** `bars` index of point B. */
+    bIndex: number;
+    /** `bars` index of point C. */
+    cIndex: number;
     /** Direction of the A→B leg (the leg the extension continues). */
     direction: SwingLegDirection;
     /** Extension levels (100%–261.8%) projected from C in the A→B direction. */
@@ -1470,15 +1487,6 @@ export interface PriceTargets {
 }
 
 /**
- * Diagonal trendline owned by a specific pattern (e.g. wedge boundary, neckline).
- */
-export interface PatternLine {
-    label: string;
-    start: TrendlinePoint;
-    end: TrendlinePoint;
-}
-
-/**
  * AI summary of a chart pattern detection (used inside `patternSummaries`).
  */
 export interface PatternSummary {
@@ -1496,10 +1504,12 @@ export interface PatternSummary {
     summary: string;
     /** Optional labelled price points (e.g. neckline). */
     keyPrices?: KeyPrice[];
-    /** Optional diagonal lines for chart overlay. */
-    patternLines?: PatternLine[];
-    /** Time range of the pattern (Unix timestamps in seconds). */
-    timeRange?: { start: number; end: number };
+    /**
+     * Id of the `OverlayCandidate` this pattern was confirmed from (spec
+     * 2026-09-28 §2.3). Set by the model from `## Chart Pattern Candidates
+     * (computed)`; absent for a pattern the pre-screener did not list.
+     */
+    candidateId?: string;
     /** Confidence weight inherited from the matching skill. */
     confidenceWeight: number;
     /**
@@ -1547,6 +1557,12 @@ export interface StrategyResult {
     summary: string;
     /** Confidence weight inherited from the strategy skill. */
     confidenceWeight: number;
+    /**
+     * Ids of the `OverlayCandidate`s this verdict relies on (divergence /
+     * fibonacci / elliott). For elliott, index 0 is the primary count and
+     * index 1 the alternate.
+     */
+    candidateIds?: string[];
 }
 
 /**
@@ -1754,6 +1770,8 @@ export interface AnalysisResponse {
     candlePatterns: CandlePatternSummary[];
     /** Diagonal trendlines visible on the full chart. */
     trendlines: Trendline[];
+    /** Logic-drawn overlays the model referenced (spec 2026-09-28). Absent on pre-p19 cache entries. */
+    chartOverlays?: ChartOverlay[];
     /** Long-position trading recommendation. */
     actionRecommendation?: ActionRecommendation;
     /** ISO 8601 timestamp of when this analysis was performed. */
@@ -1787,6 +1805,8 @@ export interface FilteredAnalysisResponse {
     candlePatterns: CandlePatternSummary[] | null;
     /** Diagonal trendlines visible on the full chart. */
     trendlines: Trendline[] | null;
+    /** Logic-drawn overlays the model referenced (spec 2026-09-28). Absent on pre-p19 cache entries. */
+    chartOverlays?: ChartOverlay[];
     /** Long-position trading recommendation with gated subfields. */
     actionRecommendation: FilteredActionRecommendation | null;
     /** ISO 8601 timestamp of when this analysis was performed. */
@@ -1879,6 +1899,13 @@ export interface AssembledPrompt {
     dynamic: string;
 }
 
+/** {@link buildAnalysisPrompt}'s result: the prompt halves plus the overlay candidates it printed, so the caller resolves the model's ids against the exact same list. */
+export interface TechnicalAssembledPrompt extends AssembledPrompt {
+    overlayCandidates: readonly OverlayCandidate[];
+    /** Overlay builders that threw during this prompt build (their kinds offered nothing). */
+    overlayBuildFailures: readonly OverlayKind[];
+}
+
 /**
  * A verbatim copy of the prompt actually sent to the model for one fresh
  * generation, handed to the consumer via `SubmitAnalysisOptions.onPromptAssembled`
@@ -1931,6 +1958,8 @@ export interface RawAnalysisResponse {
     strategyResults?: unknown;
     candlePatterns?: unknown;
     trendlines?: unknown;
+    trendlineIds?: unknown;
+    chartOverlays?: unknown;
     actionRecommendation?: unknown;
     analyzedAt?: unknown;
 }
@@ -2048,7 +2077,11 @@ export type ConfirmedSignalType =
     | 'cmf_bearish_flip'
     | 'mfi_overbought_reversal'
     | 'parabolic_sar_bearish_flip'
-    | 'squeeze_momentum_bearish';
+    | 'squeeze_momentum_bearish'
+    | 'new_52w_high'
+    | 'new_52w_low'
+    | 'gap_up'
+    | 'gap_down';
 
 /**
  * Anticipation signals — early warnings that may or may not develop.
@@ -2074,7 +2107,7 @@ export interface Signal {
     readonly direction: SignalDirection;
     /** Whether this is a confirmed event or an early anticipation. */
     readonly phase: SignalPhase;
-    /** Unix timestamp (seconds) of the bar that triggered detection. */
+    /** Index of the triggering bar in `bars` (every detector returns the index, not a timestamp). */
     readonly detectedAt: number;
 }
 
@@ -3964,12 +3997,17 @@ export type ChartPatternId =
     | 'symmetrical_triangle'
     | 'ascending_wedge'
     | 'descending_wedge'
+    | 'ascending_channel'
+    | 'descending_channel'
+    | 'broadening_formation'
     | 'bull_flag'
     | 'bear_flag'
     | 'pennant'
+    | 'high_tight_flag'
     | 'rectangle'
     | 'cup_and_handle'
-    | 'rounding_bottom';
+    | 'rounding_bottom'
+    | 'rounding_top';
 
 /** Swing direction of a confirmed pivot extreme (public: reachable via {@link PatternCandidate.pivots}). */
 export type PivotKind = 'high' | 'low';
@@ -3991,7 +4029,8 @@ export interface PatternCandidate {
     /**
      * The exact pivots the classifier matched on, ascending by index —
      * present whenever a `classifiers.ts` shape matcher produced this
-     * candidate. `patternGeometry.ts` computes geometry directly from these
+     * candidate (for `high_tight_flag`, the pole's base low and top high,
+     * which are bar extremes rather than zigzag pivots). `patternGeometry.ts` computes geometry directly from these
      * (never by re-extracting pivots over `[startIndex, endIndex]`, which
      * could reconstruct a different pivot set than the one actually
      * matched). Absent only for a hand-built candidate (e.g. a test
@@ -4071,4 +4110,111 @@ export interface NormalizedUsage {
     cacheWriteTokens: number;
     /** Output tokens. */
     outputTokens: number;
+}
+
+// =============================================================================
+// Chart overlays (spec 2026-09-28) — logic-drawn coordinates the model only
+// selects by id. Times are bar Unix seconds, never array indices, so a stored
+// overlay stays put when newer bars arrive.
+// =============================================================================
+
+export type OverlayKind =
+    'pattern' | 'trendline' | 'divergence' | 'fibonacci' | 'elliott';
+
+/** Which chart pane a segment belongs to — only a divergence's oscillator line is off the price pane. */
+export type OverlayPane = 'price' | 'rsi';
+
+export type OverlayLineStyle = 'solid' | 'dashed';
+
+export type OverlayLabelPosition = 'above' | 'below';
+
+/** `alternate` only for an elliott count the model listed second. */
+export type OverlayVariant = 'primary' | 'alternate';
+
+export interface OverlayPoint {
+    /** Bar Unix seconds. */
+    time: number;
+    price: number;
+}
+
+export interface OverlaySegment {
+    from: OverlayPoint;
+    to: OverlayPoint;
+    /** e.g. `pattern`, `boundary_upper`, `pole`, `support`, `anchor`, `wave_3`, `price`, `rsi`. */
+    role: string;
+    style: OverlayLineStyle;
+    pane: OverlayPane;
+}
+
+/** Horizontal line from `fromTime` to the chart's right edge. */
+export interface OverlayLevel {
+    price: number;
+    fromTime: number;
+    label: string;
+}
+
+export interface OverlayLabel {
+    at: OverlayPoint;
+    text: string;
+    position: OverlayLabelPosition;
+}
+
+/** A drawable candidate offered to the model in the prompt. */
+export interface OverlayCandidate {
+    /** Deterministic id, e.g. `pattern:double_bottom:1714521600`. */
+    id: string;
+    kind: OverlayKind;
+    /** Skill this candidate illustrates (skill file stem, `ChartPatternId`, or `trendline`). */
+    skill: string;
+    /** One prompt line describing the candidate (dates, prices, score). */
+    promptLine: string;
+    segments: OverlaySegment[];
+    levels: OverlayLevel[];
+    labels: OverlayLabel[];
+}
+
+/** A candidate the model referenced, ready to render. */
+export interface ChartOverlay extends Omit<OverlayCandidate, 'promptLine'> {
+    /** Result item that referenced it: `patternSummaries[].id`, `strategyResults[].id`, or `'trendlines'`. */
+    sourceRef: string;
+    variant: OverlayVariant;
+}
+
+/** Formatting context for candidate prompt lines. */
+export interface OverlayFormat {
+    timeframe: Timeframe;
+    priceDp: number;
+}
+
+/** Both pivots of a regular RSI divergence, as bars indices (first < second). */
+export interface RsiDivergencePair {
+    first: number;
+    second: number;
+}
+
+export type RsiDivergenceKind = 'bullish' | 'bearish';
+
+/** {@link resolveChartOverlays} output. */
+/** {@link buildOverlayCandidates} output: the candidates plus the kinds whose builder threw. */
+export interface OverlayCandidateBuild {
+    candidates: OverlayCandidate[];
+    failedBuilders: OverlayKind[];
+}
+
+export interface ResolvedChartOverlays {
+    chartOverlays: ChartOverlay[];
+    /** Trendlines derived from resolved trendline overlays (legacy `trendlines` field). */
+    trendlines: Trendline[];
+    /** Referenced ids with no matching candidate (model invented them). */
+    unknownIds: string[];
+}
+
+/** @internal Inputs {@link buildAnalysisPrompt} already has in scope, passed to {@link buildOverlayCandidates}. */
+export interface OverlayCandidateInput {
+    bars: readonly Bar[];
+    atr: number | null;
+    rsi: readonly (number | null)[];
+    patternCandidates: readonly PatternCandidate[];
+    marketReference: MarketReference;
+    fmt: OverlayFormat;
 }

@@ -98,6 +98,16 @@ describe('getMultiPatternTrend', () => {
                 'bullish'
             );
         });
+
+        it('above_the_stomach는 "bullish"를 반환한다', () => {
+            expect(getMultiPatternTrend('above_the_stomach')).toBe('bullish');
+        });
+
+        it('rising_three_methods는 "bullish"를 반환한다', () => {
+            expect(getMultiPatternTrend('rising_three_methods')).toBe(
+                'bullish'
+            );
+        });
     });
 
     describe('하락 다봉 패턴일 때', () => {
@@ -120,6 +130,30 @@ describe('getMultiPatternTrend', () => {
         it('upside_gap_two_crows는 "bearish"를 반환한다', () => {
             expect(getMultiPatternTrend('upside_gap_two_crows')).toBe(
                 'bearish'
+            );
+        });
+
+        it('below_the_stomach는 "bearish"를 반환한다', () => {
+            expect(getMultiPatternTrend('below_the_stomach')).toBe('bearish');
+        });
+
+        it('falling_three_methods는 "bearish"를 반환한다', () => {
+            expect(getMultiPatternTrend('falling_three_methods')).toBe(
+                'bearish'
+            );
+        });
+    });
+
+    describe('이름과 반대 방향으로 측정된 다봉 패턴일 때 (three-line strike)', () => {
+        it('bullish_three_line_strike는 측정 방향대로 "bearish"를 반환한다', () => {
+            expect(getMultiPatternTrend('bullish_three_line_strike')).toBe(
+                'bearish'
+            );
+        });
+
+        it('bearish_three_line_strike는 측정 방향대로 "bullish"를 반환한다', () => {
+            expect(getMultiPatternTrend('bearish_three_line_strike')).toBe(
+                'bullish'
             );
         });
     });

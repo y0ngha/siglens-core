@@ -26,6 +26,7 @@ import { OVERALL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import type { RunOverallAnalysisOptions } from '@/application/overall/types';
 import type {
     AnalysisResponse,
+    EconomicCalendarEvent,
     EnrichedNewsItem,
     FundamentalAnalysisResponse,
     MarketEvent,
@@ -1099,6 +1100,70 @@ describe('runOverallAnalysis', () => {
                     force: false,
                     signal: controller.signal,
                 })
+            );
+        });
+    });
+
+    describe('macroCalendar (spec 2026-09-28 §5)', () => {
+        const MACRO_EVENT: EconomicCalendarEvent = {
+            date: '2026-08-01 12:00:00',
+            event: 'CPI MoM',
+            impact: 'High',
+            actual: null,
+            estimate: 0.3,
+            previous: 0.2,
+            unit: '%',
+        };
+
+        it('최상위 macroCalendar를 news 축의 runNewsAnalysis 호출에 변형 없이 그대로 전달한다', async () => {
+            await runOverallAnalysis({
+                ...baseOptions(),
+                macroCalendar: [MACRO_EVENT],
+            });
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ macroCalendar: [MACRO_EVENT] })
+            );
+        });
+
+        it('생략하면 news 축에도 undefined가 간다 (runNewsAnalysis 자체 기본값 [] 사용)', async () => {
+            await runOverallAnalysis(baseOptions());
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ macroCalendar: undefined })
+            );
+        });
+    });
+
+    describe('assetClass 전달 (review round 1 finding 9)', () => {
+        // baseOptions()는 assetClass: 'crypto' — 이 값이 news 축까지 전달되지
+        // 않으면 crypto로 돌린 overall 호출이 equity로 프레이밍된 뉴스
+        // 프롬프트를 만들고, buildNewsCacheKey가 assetClass를 키에 넣지
+        // 않으므로 그 결과가 실제 crypto `/news` 호출과 같은 캐시 키에
+        // 쓰일 수 있었다(발견된 기존 버그).
+        it('crypto 최상위 assetClass를 news 축의 runNewsAnalysis 호출에 그대로 전달한다', async () => {
+            await runOverallAnalysis(baseOptions());
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ assetClass: 'crypto' })
+            );
+        });
+
+        it('equity 최상위 assetClass도 news 축에 그대로 전달한다', async () => {
+            await runOverallAnalysis(equityOptions());
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ assetClass: 'equity' })
+            );
+        });
+
+        it('생략하면 news 축에도 undefined가 간다 (runNewsAnalysis 자체 기본값 equity 사용)', async () => {
+            const { assetClass: _omit, ...withoutAssetClass } = baseOptions();
+
+            await runOverallAnalysis(withoutAssetClass);
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ assetClass: undefined })
             );
         });
     });

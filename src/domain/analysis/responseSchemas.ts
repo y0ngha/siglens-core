@@ -305,20 +305,6 @@ const TREND_SCHEMA = {
 } as const;
 
 /**
- * Shared schema for {@link TrendlinePoint} (`{ time, price }`), reused by both
- * `trendlines` endpoints and each pattern's `patternLines` endpoints.
- */
-const TRENDLINE_POINT_SCHEMA = {
-    type: 'object',
-    properties: {
-        time: { type: 'number' },
-        price: { type: 'number' },
-    },
-    required: ['time', 'price'],
-    additionalProperties: false,
-} as const;
-
-/**
  * Shared schema for {@link KeyPrice} (`{ label, price }`), used inside each
  * pattern's `keyPrices` array.
  */
@@ -386,7 +372,7 @@ const PRICE_SCENARIO_SCHEMA = {
  * `optionsOiStale` in {@link OVERALL_RESPONSE_SCHEMA}:
  *   - `actionRecommendation?` → nullable object (`type: ['object', 'null']`);
  *   - `signals[].strength?` → nullable string enum;
- *   - pattern `keyPrices?` / `patternLines?` / `timeRange?` / `renderConfig?`,
+ *   - pattern `keyPrices?` / `renderConfig?`,
  *     and every optional `actionRecommendation` field → nullable.
  *
  * `analyzedAt` is intentionally omitted: it is server-set during polling
@@ -471,28 +457,10 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                         type: ['array', 'null'],
                         items: KEY_PRICE_SCHEMA,
                     },
-                    patternLines: {
-                        type: ['array', 'null'],
-                        items: {
-                            type: 'object',
-                            properties: {
-                                label: { type: 'string' },
-                                start: TRENDLINE_POINT_SCHEMA,
-                                end: TRENDLINE_POINT_SCHEMA,
-                            },
-                            required: ['label', 'start', 'end'],
-                            additionalProperties: false,
-                        },
-                    },
-                    timeRange: {
-                        type: ['object', 'null'],
-                        properties: {
-                            start: { type: 'number' },
-                            end: { type: 'number' },
-                        },
-                        required: ['start', 'end'],
-                        additionalProperties: false,
-                    },
+                    // Id of the `## Chart Pattern Candidates (computed)` block
+                    // this pattern was confirmed from (spec 2026-09-28 §2.3);
+                    // `null` for a pattern the pre-screener did not list.
+                    candidateId: { type: ['string', 'null'] },
                     confidenceWeight: { type: 'number' },
                     renderConfig: {
                         type: ['object', 'null'],
@@ -536,8 +504,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     'trend',
                     'summary',
                     'keyPrices',
-                    'patternLines',
-                    'timeRange',
+                    'candidateId',
                     'confidenceWeight',
                     'renderConfig',
                     'geometry',
@@ -555,6 +522,9 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     trend: TREND_SCHEMA,
                     summary: { type: 'string' },
                     confidenceWeight: { type: 'number' },
+                    // Ids of the `## Chart Overlay Candidates (computed)`
+                    // entries this verdict relies on (spec 2026-09-28 §2.4).
+                    candidateIds: { type: 'array', items: { type: 'string' } },
                 },
                 required: [
                     'id',
@@ -562,6 +532,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     'trend',
                     'summary',
                     'confidenceWeight',
+                    'candidateIds',
                 ],
                 additionalProperties: false,
             },
@@ -581,22 +552,10 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                 additionalProperties: false,
             },
         },
-        trendlines: {
-            type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    direction: {
-                        type: 'string',
-                        enum: ['ascending', 'descending'],
-                    },
-                    start: TRENDLINE_POINT_SCHEMA,
-                    end: TRENDLINE_POINT_SCHEMA,
-                },
-                required: ['direction', 'start', 'end'],
-                additionalProperties: false,
-            },
-        },
+        // Ids picked from the `### Trendlines` group of `## Chart Overlay
+        // Candidates (computed)` (spec 2026-09-28 §2.4); `resolveChartOverlays`
+        // joins these against the offered candidates after the model call.
+        trendlineIds: { type: 'array', items: { type: 'string' } },
         actionRecommendation: {
             type: ['object', 'null'],
             properties: {
@@ -641,7 +600,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
         'patternSummaries',
         'strategyResults',
         'candlePatterns',
-        'trendlines',
+        'trendlineIds',
         'actionRecommendation',
     ],
     additionalProperties: false,

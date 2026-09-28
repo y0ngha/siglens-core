@@ -6,9 +6,11 @@ import {
 } from '@/domain/analysis/newsPrompt';
 import type {
     EarningsCalendarItem,
+    EconomicCalendarEvent,
     EnrichedNewsItem,
     Skill,
 } from '@/domain/types';
+import newsPromptPreMacroCalendarGolden from './fixtures/newsPromptPreMacroCalendar.golden.json';
 
 // `buildNewsAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4
 // assembly split) — this file's call sites (both the 4-arg and 5-arg
@@ -515,5 +517,348 @@ describe('buildNewsAnalysisPrompt — sentiment tally + age + calendar offsets (
             []
         );
         expect(dynamic).not.toMatch(/\(\d+[hd] ago\)/);
+    });
+});
+
+// ─── Macro Calendar (spec 2026-09-28) ─────────────────────────────────────────
+
+describe('buildNewsAnalysisPrompt — macro calendar (spec 2026-09-28)', () => {
+    const MACRO_NOW = new Date('2025-04-28T12:00:00Z');
+
+    const MACRO_EVENT_CPI: EconomicCalendarEvent = {
+        date: '2025-07-30 12:00:00',
+        event: 'CPI MoM',
+        impact: 'High',
+        actual: null,
+        estimate: 0.3,
+        previous: 0.2,
+        unit: '%',
+    };
+
+    const MACRO_EVENT_FOMC: EconomicCalendarEvent = {
+        date: '2025-05-05 12:00:00',
+        event: 'Interest Rate Decision',
+        impact: 'High',
+        actual: 4.5,
+        estimate: 4.5,
+        previous: 4.75,
+        unit: '%',
+    };
+
+    describe('backward compatibility — byte-identical to the pre-macro-calendar baseline', () => {
+        // Captured by running the 9-arg overload BEFORE macroCalendar existed
+        // (spec 2026-09-28 backward-compat requirement) — same fixtures as
+        // the top-level describe block above.
+        const GOLDEN = newsPromptPreMacroCalendarGolden;
+
+        it('omitting macroCalendar produces byte-identical output to the captured baseline', () => {
+            const result = buildNewsAnalysisPromptRaw(
+                TEST_SYMBOL,
+                'Apple Inc.',
+                [NEWS_ITEM_1, NEWS_ITEM_2],
+                [UPCOMING_EARNINGS],
+                [NEWS_SKILL_HIGH],
+                'equity',
+                'ko',
+                'USD',
+                MACRO_NOW
+            );
+            expect(result).toEqual(GOLDEN);
+        });
+
+        it('passing an explicit empty macroCalendar produces byte-identical output', () => {
+            const result = buildNewsAnalysisPromptRaw(
+                TEST_SYMBOL,
+                'Apple Inc.',
+                [NEWS_ITEM_1, NEWS_ITEM_2],
+                [UPCOMING_EARNINGS],
+                [NEWS_SKILL_HIGH],
+                'equity',
+                'ko',
+                'USD',
+                MACRO_NOW,
+                []
+            );
+            expect(result).toEqual(GOLDEN);
+        });
+    });
+
+    it('renders the Macro Calendar section header when non-empty', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [MACRO_EVENT_CPI]
+        );
+        expect(dynamic).toContain(
+            '## Macro Calendar (scheduled economic releases — source data)'
+        );
+    });
+
+    it('sorts rows ascending by date regardless of input order', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [MACRO_EVENT_CPI, MACRO_EVENT_FOMC]
+        );
+        const idxFomc = dynamic.indexOf('Interest Rate Decision');
+        const idxCpi = dynamic.indexOf('CPI MoM');
+        expect(idxFomc).toBeGreaterThan(-1);
+        expect(idxCpi).toBeGreaterThan(-1);
+        expect(idxFomc).toBeLessThan(idxCpi);
+    });
+
+    it('renders both rows without crashing when two events share the same date (sort tie)', () => {
+        const sameDate = '2025-06-01 08:30:00';
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [
+                { ...MACRO_EVENT_CPI, date: sameDate },
+                { ...MACRO_EVENT_FOMC, date: sameDate },
+            ]
+        );
+        expect(dynamic).toContain('CPI MoM');
+        expect(dynamic).toContain('Interest Rate Decision');
+    });
+
+    it('caps at 12 rows even when more are supplied, keeping the earliest (fed out of order so only sort-then-cap can pass)', () => {
+        // Deliberately reversed + shuffled (not ascending) — review round 1
+        // finding 3: an already-ascending fixture would still pass if the
+        // sort step were silently dropped and only `.slice(0, 12)` ran on
+        // the input order, since the earliest 12 happen to also be first.
+        const ascending: EconomicCalendarEvent[] = Array.from(
+            { length: 15 },
+            (_, i) => ({
+                date: `2025-08-${String(i + 1).padStart(2, '0')} 12:00:00`,
+                event: `Event ${i + 1}`,
+                impact: 'Medium' as const,
+                actual: null,
+                estimate: null,
+                previous: null,
+                unit: '',
+            })
+        );
+        const shuffleOrder = [14, 2, 9, 0, 11, 5, 13, 1, 7, 3, 10, 4, 12, 6, 8];
+        const events = shuffleOrder.map(i => ascending[i]!);
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            events
+        );
+        expect(dynamic).toContain('Event 1 ');
+        expect(dynamic).toContain('Event 12');
+        expect(dynamic).not.toContain('Event 13');
+        expect(dynamic).not.toContain('Event 14');
+        expect(dynamic).not.toContain('Event 15');
+    });
+
+    it('renders null actual/estimate/previous as an em dash', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [MACRO_EVENT_CPI]
+        );
+        expect(dynamic).toContain('actual — / estimate 0.3 / previous 0.2 %');
+    });
+
+    it('renders non-null numeric fields without trailing-zero padding', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [MACRO_EVENT_FOMC]
+        );
+        expect(dynamic).toContain(
+            'actual 4.5 / estimate 4.5 / previous 4.75 %'
+        );
+    });
+
+    it('computes the relative-day offset from the UTC-normalized timestamp, exact at a day-boundary-crossing hour (review round 1 finding 1)', () => {
+        // 00:30:00 is the boundary-crossing case: interpreted as *local* time
+        // (the pre-fix bug) instead of UTC, a positive-offset zone (e.g.
+        // KST, UTC+9) rolls this back onto the PREVIOUS UTC calendar day —
+        // "in 6 days" instead of the correct "in 7 days" from MACRO_NOW
+        // (2025-04-28T12:00:00Z). An exact string assertion (not a regex)
+        // is required so this test actually fails on the old bug rather
+        // than passing on either day count.
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [{ ...MACRO_EVENT_FOMC, date: '2025-05-05 00:30:00' }]
+        );
+        expect(dynamic).toContain(
+            '- 2025-05-05 00:30:00 UTC (in 7 days) | Interest Rate Decision | impact High | actual 4.5 / estimate 4.5 / previous 4.75 %'
+        );
+    });
+
+    it('labels a naive macro timestamp as UTC even without a relative-day offset', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            undefined,
+            undefined,
+            undefined,
+            [MACRO_EVENT_FOMC]
+        );
+        expect(dynamic).toContain(
+            '2025-05-05 12:00:00 UTC | Interest Rate Decision'
+        );
+        expect(dynamic).not.toMatch(/\(in \d+ days?\)/);
+    });
+
+    it('does not append a trailing unit suffix when unit is empty', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [{ ...MACRO_EVENT_CPI, unit: '' }]
+        );
+        expect(dynamic).toContain('previous 0.2\n');
+        expect(dynamic).not.toContain('previous 0.2 \n');
+    });
+
+    it('mentions macro calendar in the intro sentence only when non-empty', () => {
+        const withMacro = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [MACRO_EVENT_CPI]
+        ).dynamic;
+        expect(withMacro).toContain(
+            'card metadata, earnings calendar, and macro calendar.'
+        );
+
+        const withoutMacro = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW
+        ).dynamic;
+        expect(withoutMacro).toContain('card metadata, and earnings calendar.');
+        expect(withoutMacro).not.toContain('macro calendar');
+    });
+
+    it('adds the macro Data Boundary rule and "macro release dates" only when non-empty', () => {
+        const withMacro = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [MACRO_EVENT_CPI]
+        ).dynamic;
+        expect(withMacro).toContain(
+            'Macro calendar rows are scheduled releases, not news.'
+        );
+        expect(withMacro).toContain(
+            'regulatory events, macro release dates, prices, volume'
+        );
+
+        const withoutMacro = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'equity',
+            'ko',
+            'USD',
+            MACRO_NOW
+        ).dynamic;
+        expect(withoutMacro).not.toContain(
+            'Macro calendar rows are scheduled releases'
+        );
+        expect(withoutMacro).toContain('regulatory events, prices, volume');
+    });
+
+    it('renders the Macro Calendar section for crypto too', () => {
+        const { dynamic } = buildNewsAnalysisPromptRaw(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [],
+            [],
+            [],
+            'crypto',
+            'ko',
+            'USD',
+            MACRO_NOW,
+            [MACRO_EVENT_CPI]
+        );
+        expect(dynamic).toContain(
+            '## Macro Calendar (scheduled economic releases — source data)'
+        );
     });
 });
