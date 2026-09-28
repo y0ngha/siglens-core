@@ -74,6 +74,11 @@ describe('public API exports', () => {
         expect(scoreToLabel(10)).toBe('EXTREME_FEAR');
     });
 
+    it('exports the MA-stack classifier from package entrypoint', () => {
+        // siglens' get_bars_indicators derived.maStack reads this instead of a local copy.
+        expect(typeof coreApi.classifyMaStack).toBe('function');
+    });
+
     it('exports the indicator-confluence rule from package entrypoint', () => {
         // Consumers (trader, backtests) must drive the same rule from one place —
         // a second implementation is how the two silently drift apart.

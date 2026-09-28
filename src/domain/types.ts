@@ -1202,6 +1202,13 @@ export interface IndicatorLevelOptions {
 export type PriceVsLevel = 'above' | 'below' | 'unknown';
 /** Ordering of the fast/slow EMAs: stacked bullishly, bearishly, or interleaved. */
 export type EmaStackState = 'aligned_up' | 'aligned_down' | 'mixed';
+/**
+ * Ordering of the latest simple-moving-average values across periods:
+ * `'bullish'` when they strictly decrease as the period grows
+ * (MA5 > MA20 > MA60 …), `'bearish'` when they strictly increase, `'mixed'`
+ * otherwise. Returned by `classifyMaStack`.
+ */
+export type MaStackDirection = 'bullish' | 'bearish' | 'mixed';
 /** Swing sequence shape: higher-highs/higher-lows, lower-highs/lower-lows, or neither. */
 export type SwingStructureState = 'HH_HL' | 'LH_LL' | 'mixed';
 /** Whether the window is directionally trending or range-bound. */
