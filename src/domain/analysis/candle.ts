@@ -196,6 +196,20 @@ function detect2CandlePattern(prev: Bar, curr: Bar): MultiCandlePattern | null {
             return 'in_neck';
     }
 
+    // Above / Below the Stomach — checked last, so every pair an older 2-bar
+    // label already claims keeps that label; the stomach is a fallback. The
+    // prior bar must be a long body, like every other two-bar reversal here:
+    // without it the rule matched 12.4% of daily bars (NVDA/TSLA/SPY,
+    // 2024-01..2026-09; 2.0% with it) and swallowed the single-bar labels of
+    // ordinary pairs. `isLongBody` also rules out a zero-body prior bar, which
+    // `isBullishBar` (close >= open) would otherwise count as bullish. Only
+    // the open is compared with the prior midpoint: a bullish (bearish) curr
+    // that opens at/above (at/below) it closes there too.
+    if (prevBear && prevLong && currBull && curr.open >= midpoint(prev))
+        return 'above_the_stomach';
+    if (prevBull && prevLong && currBear && curr.open <= midpoint(prev))
+        return 'below_the_stomach';
+
     return null;
 }
 
@@ -423,21 +437,86 @@ function detect3CandlePattern(
     return null;
 }
 
+/**
+ * Three-line strike: three same-colour bars with consecutively extending
+ * closes, then a fourth bar that opens beyond the third close and closes
+ * beyond the first open, wiping out the run. The fourth bar's colour is
+ * implied by those two bounds, so it is not checked separately.
+ */
+function detect4CandlePattern(
+    b1: Bar,
+    b2: Bar,
+    b3: Bar,
+    b4: Bar
+): MultiCandlePattern | null {
+    if (
+        isBullishBar(b1) &&
+        isBullishBar(b2) &&
+        isBullishBar(b3) &&
+        b2.close > b1.close &&
+        b3.close > b2.close &&
+        b4.open >= b3.close &&
+        b4.close < b1.open
+    )
+        return 'bullish_three_line_strike';
+
+    if (
+        isBearishBar(b1) &&
+        isBearishBar(b2) &&
+        isBearishBar(b3) &&
+        b2.close < b1.close &&
+        b3.close < b2.close &&
+        b4.open <= b3.close &&
+        b4.close > b1.open
+    )
+        return 'bearish_three_line_strike';
+
+    return null;
+}
+
+/**
+ * Rising / falling three methods: a long first bar, three non-long bars held
+ * inside its high–low range, then a long bar in the first bar's direction
+ * that closes beyond the first close.
+ */
+function detect5CandlePattern(
+    b1: Bar,
+    b2: Bar,
+    b3: Bar,
+    b4: Bar,
+    b5: Bar
+): MultiCandlePattern | null {
+    if (!isLongBody(b1) || !isLongBody(b5)) return null;
+    const heldInside = [b2, b3, b4].every(
+        bar => !isLongBody(bar) && bar.high <= b1.high && bar.low >= b1.low
+    );
+    if (!heldInside) return null;
+
+    if (isBullishBar(b1) && isBullishBar(b5) && b5.close > b1.close)
+        return 'rising_three_methods';
+    if (isBearishBar(b1) && isBearishBar(b5) && b5.close < b1.close)
+        return 'falling_three_methods';
+
+    return null;
+}
+
 // ─── Multi Candle Pattern ─────────────────────────────────────────────────────
 
 /**
  * @internal Multi-bar candle pattern detector.
  *
- * Detect a 2- or 3-bar {@link MultiCandlePattern} ending at the last bar.
+ * Detect a 2- to 5-bar {@link MultiCandlePattern} ending at the last bar.
  *
- * Examines the final 3 bars (or 2 when only 2 are available) and returns
- * the first matching pattern. 3-bar formations (morning star, evening star,
- * three white soldiers, three inside / outside, abandoned baby, etc.) take
- * priority over 2-bar formations (engulfing, harami, piercing line, dark
- * cloud cover, tweezers, on-neck, in-neck, etc.). Returns `null` when no
- * pattern matches or when fewer than 2 bars are provided.
+ * Examines the final 5 bars (fewer when fewer are available) and returns the
+ * first matching pattern, longest formation first: 5-bar (rising / falling
+ * three methods), then 4-bar (three-line strike), then 3-bar (morning star,
+ * evening star, three white soldiers, three inside / outside, abandoned
+ * baby, etc.), then 2-bar (engulfing, harami, piercing line, dark cloud
+ * cover, tweezers, on-neck, in-neck, and above / below the stomach as the
+ * last fallback). Returns `null` when no pattern matches or when fewer than
+ * 2 bars are provided.
  *
- * @param bars - OHLCV bars sorted oldest-first; only the last 3 are read.
+ * @param bars - OHLCV bars sorted oldest-first; only the last 5 are read.
  * @returns The detected multi-bar pattern label, or `null` if none.
  *
  * @see detectCandlePattern
@@ -452,6 +531,27 @@ export function detectMultiCandlePattern(
 
     const last = bars[n - 1];
     const prev = bars[n - 2];
+
+    if (n >= 5) {
+        const result = detect5CandlePattern(
+            bars[n - 5],
+            bars[n - 4],
+            bars[n - 3],
+            prev,
+            last
+        );
+        if (result !== null) return result;
+    }
+
+    if (n >= 4) {
+        const result = detect4CandlePattern(
+            bars[n - 4],
+            bars[n - 3],
+            prev,
+            last
+        );
+        if (result !== null) return result;
+    }
 
     if (n >= 3) {
         const prev2 = bars[n - 3];

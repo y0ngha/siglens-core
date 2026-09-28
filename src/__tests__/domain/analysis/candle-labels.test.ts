@@ -55,6 +55,12 @@ describe('getMultiCandlePatternLabel', () => {
         it('morning_star는 "샛별형"을 반환한다', () => {
             expect(getMultiCandlePatternLabel('morning_star')).toBe('샛별형');
         });
+
+        it('rising_three_methods는 "상승 삼법형"을 반환한다', () => {
+            expect(getMultiCandlePatternLabel('rising_three_methods')).toBe(
+                '상승 삼법형'
+            );
+        });
     });
 });
 

@@ -50,7 +50,7 @@ export const HS_HEAD_MIN_ATR = 1.0;
  */
 export const EXTREME_MATCH_ATR_MULT = 1.0;
 
-// ─── Trendline-based patterns (triangles / wedges / rectangle) ─────────────
+// ─── Trendline-based patterns (triangles / wedges / channels / rectangle) ──
 
 /**
  * @internal
@@ -69,6 +69,16 @@ export const FLAT_SLOPE_ATR_PER_BAR = 0.05;
  * far outside any plausible triangle/wedge/rectangle boundary.
  */
 export const TRENDLINE_PIVOT_WINDOW = 8;
+
+/**
+ * @internal
+ * Trendline family: maximum difference between the ATR-normalized high and
+ * low slopes (ATR per bar) for a same-direction pair to count as parallel —
+ * a channel rather than a wedge. A wedge must converge by more than this, so
+ * a nearly parallel pair no longer reads as a wedge: the siglens wedge skill
+ * already rejected those as channels ("convergence under 15% is a channel").
+ */
+export const CHANNEL_PARALLEL_ATR_PER_BAR = 0.02;
 
 // ─── Flags / pennants ───────────────────────────────────────────────────────
 
@@ -107,6 +117,24 @@ export const FLAG_CONSOLIDATION_MAX_BARS = 30;
  */
 export const FLAG_CHANNEL_MAX_RANGE_ATR = 3.0;
 
+// ─── High tight flag ────────────────────────────────────────────────────────
+// A bar-count approximation of Bulkowski's definition (a 90%+ rise within
+// about two months, then a pause giving back no more than 20–25%). Daily bars
+// are the only timeframe where a 90% run inside 40 bars is plausible, so on
+// intraday charts the classifier effectively never fires.
+
+/** @internal High tight flag: minimum pole rise, base low → pole high, as a fraction (0.9 = +90%). */
+export const HTF_POLE_MIN_GAIN = 0.9;
+
+/** @internal High tight flag: maximum bars from the pole's base low to its high. */
+export const HTF_POLE_MAX_BARS = 40;
+
+/** @internal High tight flag: maximum pullback below the pole high during the flag, as a fraction of that high. */
+export const HTF_FLAG_MAX_RETRACE = 0.25;
+
+/** @internal High tight flag: minimum bars after the pole high before the flag counts. */
+export const HTF_FLAG_MIN_BARS = 3;
+
 // ─── Cup & handle / rounding ────────────────────────────────────────────────
 
 /**
@@ -120,29 +148,30 @@ export const CUP_HANDLE_MAX_DEPTH_RATIO = 0.5;
 
 /**
  * @internal
- * Rounding bottom / cup & handle: lower bound (fraction of span) within which
- * the quadratic-fit vertex must fall to count as a genuine "bottom" rather
- * than an edge-hugging arc (a vertex right at the start of the window is a
- * partial curve, not a rounded bottom shape).
+ * Rounding bottom / top, cup & handle: lower bound (fraction of span) within
+ * which the quadratic-fit vertex must fall to count as a genuine bottom (or
+ * top) rather than an edge-hugging arc (a vertex right at the start of the
+ * window is a partial curve, not a rounded shape).
  */
 export const CURVATURE_VERTEX_MID_LO = 0.25;
 
 /**
  * @internal
- * Rounding bottom / cup & handle: upper bound (fraction of span) within which
- * the quadratic-fit vertex must fall to count as a genuine "bottom" rather
- * than an edge-hugging arc (a vertex right at the end of the window is a
- * partial curve, not a rounded bottom shape).
+ * Rounding bottom / top, cup & handle: upper bound (fraction of span) within
+ * which the quadratic-fit vertex must fall to count as a genuine bottom (or
+ * top) rather than an edge-hugging arc (a vertex right at the end of the
+ * window is a partial curve, not a rounded shape).
  */
 export const CURVATURE_VERTEX_MID_HI = 0.75;
 
 /**
  * @internal
- * Rounding bottom: minimum cup depth (rim - bottom), as an ATR multiple, per
- * the design doc's literal "2*atr" rule — shallower curves are treated as
- * noise rather than a meaningful rounding-bottom formation.
+ * Rounding bottom / top: minimum depth between the rim and the extreme of the
+ * fitted pivots, as an ATR multiple, per the design doc's literal "2*atr"
+ * rule — shallower curves are treated as noise rather than a meaningful
+ * rounding formation.
  */
-export const ROUNDING_BOTTOM_MIN_DEPTH_ATR_MULT = 2;
+export const ROUNDING_MIN_DEPTH_ATR_MULT = 2;
 
 // ─── Linear-algebra helpers ─────────────────────────────────────────────────
 

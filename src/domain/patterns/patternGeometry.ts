@@ -177,7 +177,7 @@ function headAndShouldersGeometry(
     };
 }
 
-// ─── Trendline-pair family: triangles / wedges / rectangle ─────────────────
+// ─── Trendline-pair family: triangles / wedges / channels / rectangle ─────
 
 function trendlineGeometry(
     candidate: PatternCandidate,
@@ -202,11 +202,17 @@ function trendlineGeometry(
     if (!(resistanceAtLast > supportAtLast)) return null;
     // Textbook measured move for triangles/wedges/rectangles is the height at
     // the pattern's widest point — its start, where the lines are furthest
-    // apart for a converging pattern (and equal everywhere for a rectangle).
-    // The gap at the last bar is the narrowest point and would understate it.
-    const startX = Math.min(...pivots.map(p => p.index));
+    // apart for a converging pattern (and equal everywhere for a rectangle or
+    // channel). The gap at the last bar is the narrowest point and would
+    // understate it. A broadening formation diverges, so its widest point is
+    // the other end: the line read point itself.
+    const widestX =
+        candidate.id === 'broadening_formation'
+            ? lineX
+            : Math.min(...pivots.map(p => p.index));
     const widestHeight =
-        evaluateTrendlineAt(highs, startX) - evaluateTrendlineAt(lows, startX);
+        evaluateTrendlineAt(highs, widestX) -
+        evaluateTrendlineAt(lows, widestX);
 
     let direction: PatternBreakoutDirection;
     switch (candidate.id) {
@@ -223,9 +229,10 @@ function trendlineGeometry(
             direction = 'up';
             break;
         default:
-            // rectangle / symmetrical_triangle: textbook direction is
-            // genuinely undetermined until the break — bias toward the side
-            // price sits closer to right now.
+            // rectangle / symmetrical_triangle / ascending_channel /
+            // descending_channel / broadening_formation: textbook direction
+            // is genuinely undetermined until the break — bias toward the
+            // side price sits closer to right now.
             direction =
                 lastClose - supportAtLast >= resistanceAtLast - lastClose
                     ? 'up'
@@ -339,6 +346,46 @@ function flagGeometry(
     };
 }
 
+/**
+ * High tight flag — the bull_flag rule on the pole the classifier matched:
+ * breakout at the pole top (the flag's upper edge), invalidation at the flag
+ * low, height = pole top − pole base, so the printed extreme level is the
+ * pole base itself. Reads the base/top anchors from `candidate.pivots`; the
+ * pole can be up to `HTF_POLE_MAX_BARS` long, so it cannot be re-derived from
+ * `FLAG_POLE_LOOKBACK_BARS` the way `flagGeometry` does for bull_flag.
+ */
+function highTightFlagGeometry(
+    candidate: PatternCandidate,
+    bars: readonly Bar[]
+): PatternGeometry | null {
+    const base = candidate.pivots?.find(p => p.kind === 'low');
+    const top = candidate.pivots?.find(p => p.kind === 'high');
+    if (!base || !top || top.index >= candidate.endIndex) return null;
+
+    const flagLows = bars
+        .slice(top.index + 1, candidate.endIndex + 1)
+        .map(bar => bar.low);
+    const flagLow = Math.min(...flagLows);
+    const flagLowIndex = top.index + 1 + flagLows.indexOf(flagLow);
+
+    const height = top.price - base.price;
+    if (!Number.isFinite(height) || height <= 0) return null;
+
+    return {
+        keyPoints: [
+            point('flagpole base', base.index, base.price, bars),
+            point('flagpole top', top.index, top.price, bars),
+            point('flag lower channel', flagLowIndex, flagLow, bars),
+        ],
+        breakoutLevel: top.price,
+        height,
+        measuredTarget: top.price + height,
+        conservativeTarget: top.price + height * HALF,
+        invalidationLevel: flagLow,
+        direction: 'up',
+    };
+}
+
 // ─── Curvature family: rounding bottom / cup & handle ──────────────────────
 
 function curvatureGeometry(
@@ -394,6 +441,49 @@ function curvatureGeometry(
     };
 }
 
+/**
+ * Rounding top — `curvatureGeometry`'s rounding_bottom rule mirrored: the rim
+ * is the swing LOW bounding the dome (the lowest bar low from the first high
+ * pivot to the pattern end), the top is the highest matched high pivot,
+ * breakout is the rim, direction down, invalidation at the top.
+ */
+function roundingTopGeometry(
+    candidate: PatternCandidate,
+    bars: readonly Bar[]
+): PatternGeometry | null {
+    const highs = (candidate.pivots ?? []).filter(p => p.kind === 'high');
+    if (highs.length === 0) return null;
+
+    const topPrice = Math.max(...highs.map(p => p.price));
+    const topPoint = highs.find(p => p.price === topPrice)!;
+
+    const spanStart = highs[0].index;
+    const rim = bars
+        .slice(spanStart, candidate.endIndex + 1)
+        .map((bar, offset) => ({ index: spanStart + offset, price: bar.low }))
+        .filter(p => Number.isFinite(p.price) && p.price > 0)
+        .reduce<{ index: number; price: number } | null>(
+            (best, p) => (best === null || p.price < best.price ? p : best),
+            null
+        );
+    if (rim === null) return null;
+    const depth = topPrice - rim.price;
+    if (!Number.isFinite(depth) || depth <= 0) return null;
+
+    return {
+        keyPoints: [
+            point('rim', rim.index, rim.price, bars),
+            point('top', topPoint.index, topPoint.price, bars),
+        ],
+        breakoutLevel: rim.price,
+        height: depth,
+        measuredTarget: rim.price - depth,
+        conservativeTarget: rim.price - depth * HALF,
+        invalidationLevel: topPrice,
+        direction: 'down',
+    };
+}
+
 // ─── Dispatcher ─────────────────────────────────────────────────────────────
 
 /**
@@ -439,15 +529,22 @@ export function computeCandidateGeometry(
             case 'symmetrical_triangle':
             case 'ascending_wedge':
             case 'descending_wedge':
+            case 'ascending_channel':
+            case 'descending_channel':
+            case 'broadening_formation':
             case 'rectangle':
                 return trendlineGeometry(candidate, bars);
             case 'bull_flag':
             case 'bear_flag':
             case 'pennant':
                 return flagGeometry(candidate, bars);
+            case 'high_tight_flag':
+                return highTightFlagGeometry(candidate, bars);
             case 'cup_and_handle':
             case 'rounding_bottom':
                 return curvatureGeometry(candidate, bars);
+            case 'rounding_top':
+                return roundingTopGeometry(candidate, bars);
         }
     } catch {
         return null;

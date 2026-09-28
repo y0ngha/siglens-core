@@ -754,7 +754,9 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 라인을 추가한다(정밀도 2번째 웨이브, spec §A1-A5).
         // p16 은 컨플루언스 신뢰도 문구를 "측정된 우위 없음"으로 바꾸고, 1Day에
         // Short-Term Washout 블록을 추가하며 entryRecommendation 규칙을 고친다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p18');
+        // p19 는 탐지 목록을 넓힌다 — 캔들 6종·차트 패턴 5종이 프롬프트의 캔들/패턴
+        // 후보 줄에, 신호 4종이 스킬 게이팅에 새로 나타난다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p19');
     });
 });
 
