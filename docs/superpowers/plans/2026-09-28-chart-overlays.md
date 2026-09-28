@@ -49,7 +49,7 @@
 | `domain/analysis/filterAnalysisResult.ts` (수정) | tier별 오버레이 제거 |
 | `domain/analysis/prompt.ts` (수정) | 후보 생성·섹션 삽입·작성 규칙·반환 타입 |
 | `application/market/runAnalysis.ts` (수정) | resolve 호출·로그 |
-| `infrastructure/cache/config.ts` (수정) | `PROMPT_TEMPLATE_VERSION` p18→p19 |
+| `infrastructure/cache/config.ts` (수정) | `PROMPT_TEMPLATE_VERSION` p19→p20 |
 | `index.ts`, `index.client.ts` (수정) | 타입 export 추가, `PatternLine` 제거 |
 
 ### siglens (`src/`)
@@ -112,7 +112,7 @@ mkdir -p docs/superpowers/plans && cp ../siglens-core/docs/superpowers/plans/202
 ```
 - [ ] **Step 3:** `AnalysisResponse`와 `FilteredAnalysisResponse` 둘 다 `trendlines` 아래에 추가:
 ```ts
-    /** Logic-drawn overlays the model referenced (spec 2026-09-28). Absent on pre-p19 cache entries. */
+    /** Logic-drawn overlays the model referenced (spec 2026-09-28). Absent on pre-p20 cache entries. */
     chartOverlays?: ChartOverlay[];
 ```
 - [ ] **Step 4:** `RawAnalysisResponse`에 `trendlineIds?: unknown; chartOverlays?: unknown;` 추가.
@@ -1402,10 +1402,10 @@ dynamic 섹션 배열에서 `formatChartPatternCandidatesSection(...)` 바로 �
 ```
 (application 레이어의 기존 로그 방식이 `console.info`를 안 쓰면 `console.log`로 맞춘다 — grep으로 확인.)
 - [ ] **Step 2:** runAnalysis 테스트: LLM 목 응답에 `patternSummaries[0].candidateId`로 실제 후보 id(목 bars에서 나온 것)를 넣었을 때 `result.chartOverlays`가 1건, 없는 id를 넣으면 0건 + `console.warn` 호출(`vi.spyOn`) — 목 bars에서 후보가 안 나오면 `buildAnalysisPrompt`를 부분 목킹하지 말고 bars를 `double-top.json` 픽스처로 바꾼다.
-- [ ] **Step 3:** `config.ts`: `PROMPT_TEMPLATE_VERSION = 'p19'`, 바로 위 변경 이력 주석 관례가 있으면 한 줄 추가(“p19: chart overlay candidate ids”).
+- [ ] **Step 3:** `config.ts`: `PROMPT_TEMPLATE_VERSION = 'p20'`, 바로 위 변경 이력 주석 관례가 있으면 한 줄 추가(“p20: chart overlay candidate ids”).
 - [ ] **Step 4:** `index.ts`/`index.client.ts`: 타입 export에서 `PatternLine` 삭제, `ChartOverlay`, `OverlayKind`, `OverlayPane`, `OverlayPoint`, `OverlaySegment`, `OverlayLevel`, `OverlayLabel`, `OverlayLineStyle`, `OverlayLabelPosition`, `OverlayVariant` 추가(기존 알파벳/그룹 순서 따름). `index.test.ts`류가 export 목록을 단언하면 갱신.
 - [ ] **Step 5:** 게이트: `yarn typecheck && yarn lint && yarn test src/__tests__/domain/overlays src/__tests__/domain/analysis src/__tests__/domain/signals src/__tests__/application/market src/__tests__/index.test.ts src/__tests__/index.client.test.ts`.
-- [ ] **Step 6:** Commit 표시: `feat(analysis): resolve chart overlays after the model call (p19)`
+- [ ] **Step 6:** Commit 표시: `feat(analysis): resolve chart overlays after the model call (p20)`
 
 ### Task A13: core 리뷰·PR·릴리스
 
@@ -1800,7 +1800,7 @@ interface ChartOverlayMenuProps {
 
 ### Task B9: 개발 서버 실측
 
-- [ ] **Step 1:** dev 서버를 별도 포트로(`PORT=3100 yarn dev` — 기존 dev 서버를 죽이지 않게). 실제 분석은 LLM 비용·쿨다운이 있으므로, 브라우저에서 분석 결과 응답을 가로채거나(서버 액션 응답) 개발용 목을 쓴다: `useAnalysis`가 받는 분석에 `chartOverlays`가 없으면 확인할 수 없으니, **로컬 전용** 방법으로 — 분석 캐시(Redis)에 p19 키로 오버레이가 든 결과를 심거나, core 오버레이로 실제 분석 1회 실행(BYOK/기본 키, 1Day 한 종목).
+- [ ] **Step 1:** dev 서버를 별도 포트로(`PORT=3100 yarn dev` — 기존 dev 서버를 죽이지 않게). 실제 분석은 LLM 비용·쿨다운이 있으므로, 브라우저에서 분석 결과 응답을 가로채거나(서버 액션 응답) 개발용 목을 쓴다: `useAnalysis`가 받는 분석에 `chartOverlays`가 없으면 확인할 수 없으니, **로컬 전용** 방법으로 — 분석 캐시(Redis)에 p20 키로 오버레이가 든 결과를 심거나, core 오버레이로 실제 분석 1회 실행(BYOK/기본 키, 1Day 한 종목).
 - [ ] **Step 2:** Chrome(claude-in-chrome)으로: 헤더에 `차트 작도 · N` 표시, 드롭다운 체크 토글 시 선 표시/숨김, 새로고침 후 체크 상태 유지, 다이버전스 켜고 RSI 패인 켰을 때 RSI 선, 엘리어트 라벨 1–5, '원본' 카드 `차트에서 보기` 강조, 모바일 폭(390px)에서 헤더 넘침 없음, 콘솔 에러 0.
 - [ ] **Step 3:** 이상 시 수정 → 스코프 게이트 → 재확인.
 

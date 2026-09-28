@@ -4,6 +4,7 @@ import {
     classifyCurvaturePatterns,
     classifyDoubleTripleBottom,
     classifyDoubleTripleTop,
+    classifyFlagsAndPennants,
     classifyHeadAndShoulders,
     classifyInverseHeadAndShoulders,
     classifyTrendlinePatterns,
@@ -224,6 +225,20 @@ describe('computeCandidateGeometry', () => {
             expect(computeCandidateGeometry(candidate, bars, ATR)).toBeNull();
         });
 
+        it.each(['rounding_top', 'high_tight_flag'] as const)(
+            '%s without pivots',
+            id => {
+                const bars = makeBars([10, 15, 10, 20, 10]);
+                expect(
+                    computeCandidateGeometry(
+                        { id, startIndex: 0, endIndex: 4 },
+                        bars,
+                        ATR
+                    )
+                ).toBeNull();
+            }
+        );
+
         it('pivots present but too few for the pattern (fewer than 2 same-kind extremes)', () => {
             const bars = makeBars([10, 15, 11]);
             const candidate: PatternCandidate = {
@@ -356,6 +371,68 @@ describe('computeCandidateGeometry', () => {
         });
     });
 
+    describe('trendline-pair family: ascending_channel / descending_channel (rectangle rule)', () => {
+        it('ascending_channel: direction by the side price sits closer to; parallel lines → same height everywhere', () => {
+            // highs (1,20)/(3,22)/(5,24 provisional), lows (2,5)/(4,7): both
+            // lines rise 1/bar. Last close 24 sits on resistance -> up.
+            const bars = makeHLBars([10, 20, 5, 22, 7, 24].map(v => [v, v]));
+            const candidate = deriveCandidate(
+                bars,
+                ATR,
+                classifyTrendlinePatterns,
+                'ascending_channel'
+            );
+            const geometry = computeCandidateGeometry(candidate, bars, ATR);
+            expect(geometry).not.toBeNull();
+            expect(geometry!.direction).toBe('up');
+            expect(geometry!.breakoutLevel).toBeCloseTo(24, 5);
+            expect(geometry!.invalidationLevel).toBeCloseTo(8, 5);
+            expect(geometry!.height).toBeCloseTo(16, 5);
+            expect(geometry!.measuredTarget).toBeCloseTo(40, 5);
+        });
+
+        it('descending_channel: same rule, lines falling in parallel', () => {
+            // highs (1,40)/(3,38)/(5,36 provisional), lows (2,25)/(4,23):
+            // both lines fall 1/bar. Last close 36 sits on resistance -> up.
+            const bars = makeHLBars([30, 40, 25, 38, 23, 36].map(v => [v, v]));
+            const candidate = deriveCandidate(
+                bars,
+                ATR,
+                classifyTrendlinePatterns,
+                'descending_channel'
+            );
+            const geometry = computeCandidateGeometry(candidate, bars, ATR);
+            expect(geometry).not.toBeNull();
+            expect(geometry!.direction).toBe('up');
+            expect(geometry!.breakoutLevel).toBeCloseTo(36, 5);
+            expect(geometry!.height).toBeCloseTo(14, 5);
+        });
+    });
+
+    describe('trendline-pair family: broadening_formation', () => {
+        // highs (1,20)/(3,22)/(5,21 provisional) rise 0.25/bar, lows
+        // (2,5)/(4,3) fall 1/bar — the lines diverge.
+        const bars = makeHLBars([10, 20, 5, 22, 3, 21].map(v => [v, v]));
+        const candidate = deriveCandidate(
+            bars,
+            ATR,
+            classifyTrendlinePatterns,
+            'broadening_formation'
+        );
+
+        it('height is the WIDEST gap — at the last bar for a diverging pattern, not at its start', () => {
+            const geometry = computeCandidateGeometry(candidate, bars, ATR);
+            expect(geometry).not.toBeNull();
+            // Last close 21 sits nearer resistance (21.5) than support (2).
+            expect(geometry!.direction).toBe('up');
+            expect(geometry!.breakoutLevel).toBeCloseTo(21.5, 5);
+            expect(geometry!.invalidationLevel).toBeCloseTo(2, 5);
+            // At x=5: 21.5 − 2 = 19.5; at the start (x=1) only 20.5 − 6 = 14.5.
+            expect(geometry!.height).toBeCloseTo(19.5, 5);
+            expect(geometry!.measuredTarget).toBeCloseTo(41, 5);
+        });
+    });
+
     describe('flag/pennant family: bull_flag', () => {
         const poleCloses = Array.from({ length: 20 }, (_, i) => 90 + i);
         const driftCloses = [107.6, 107.5, 107.4, 107.3, 107.2, 107.1];
@@ -453,6 +530,170 @@ describe('computeCandidateGeometry', () => {
                 'bottom',
             ]);
             expect(geometry!.invalidationLevel).toBe(2); // no handle -> bottom
+        });
+    });
+
+    describe('flag/pennant family: high_tight_flag (bull_flag rule, pole base = extreme)', () => {
+        // Pole 100 -> 200 over 20 point bars, then a 4-bar flag bottoming at 170.
+        const pole = Array.from({ length: 21 }, (_, i): [number, number] => [
+            100 + 5 * i,
+            100 + 5 * i,
+        ]);
+        const bars = makeHLBars([
+            ...pole,
+            [195, 185],
+            [190, 175],
+            [188, 170],
+            [185, 172],
+        ]);
+        const candidate = deriveCandidate(
+            bars,
+            ATR,
+            classifyFlagsAndPennants,
+            'high_tight_flag'
+        );
+
+        it('breakout at the pole top, height = pole length, invalidation at the flag low', () => {
+            const geometry = computeCandidateGeometry(candidate, bars, ATR);
+            expect(geometry).not.toBeNull();
+            expect(geometry!.direction).toBe('up');
+            expect(geometry!.breakoutLevel).toBe(200);
+            expect(geometry!.height).toBe(100);
+            expect(geometry!.measuredTarget).toBe(300);
+            expect(geometry!.conservativeTarget).toBe(250);
+            expect(geometry!.invalidationLevel).toBe(170);
+            expect(geometry!.keyPoints.map(p => p.label)).toEqual([
+                'flagpole base',
+                'flagpole top',
+                'flag lower channel',
+            ]);
+        });
+    });
+
+    describe('high_tight_flag / rounding_top: unusable anchors → null', () => {
+        const bars = makeHLBars(
+            [100, 150, 200, 190, 185, 180].map(v => [v, v])
+        );
+
+        it('high_tight_flag whose top is the last bar (no flag bars)', () => {
+            const candidate: PatternCandidate = {
+                id: 'high_tight_flag',
+                startIndex: 0,
+                endIndex: 2,
+                pivots: [
+                    { index: 0, price: 100, kind: 'low' },
+                    { index: 2, price: 200, kind: 'high' },
+                ],
+            };
+            expect(computeCandidateGeometry(candidate, bars, ATR)).toBeNull();
+        });
+
+        it('high_tight_flag whose base is not below its top', () => {
+            const candidate: PatternCandidate = {
+                id: 'high_tight_flag',
+                startIndex: 0,
+                endIndex: 5,
+                pivots: [
+                    { index: 0, price: 200, kind: 'low' },
+                    { index: 2, price: 200, kind: 'high' },
+                ],
+            };
+            expect(computeCandidateGeometry(candidate, bars, ATR)).toBeNull();
+        });
+
+        it('rounding_top whose rim is not below its top', () => {
+            const candidate: PatternCandidate = {
+                id: 'rounding_top',
+                startIndex: 3,
+                endIndex: 5,
+                pivots: [
+                    { index: 3, price: 170, kind: 'high' },
+                    { index: 5, price: 175, kind: 'high' },
+                ],
+            };
+            // every bar low in [3, 5] (180+) sits above the top (175)
+            expect(computeCandidateGeometry(candidate, bars, ATR)).toBeNull();
+        });
+
+        it('rounding_top with no usable (positive) bar low in its span', () => {
+            const zeroBars = makeHLBars([
+                [10, 0],
+                [12, 0],
+                [11, 0],
+            ]);
+            const candidate: PatternCandidate = {
+                id: 'rounding_top',
+                startIndex: 0,
+                endIndex: 2,
+                pivots: [
+                    { index: 0, price: 10, kind: 'high' },
+                    { index: 1, price: 12, kind: 'high' },
+                ],
+            };
+            expect(
+                computeCandidateGeometry(candidate, zeroBars, ATR)
+            ).toBeNull();
+        });
+    });
+
+    describe('curvature family: rounding_top (rounding_bottom mirrored)', () => {
+        // Mirror of the rounding_bottom fixture (40 − y): highs 30, 36, 38,
+        // 31 at x = 2..8 form the dome; every low sits at 20.
+        const bars = makeAlternatingPivotBars(
+            25,
+            [20, 30, 20, 36, 20, 38, 20, 31],
+            20
+        );
+        const candidate = deriveCandidate(
+            bars,
+            ATR,
+            classifyCurvaturePatterns,
+            'rounding_top'
+        );
+
+        it('breakout at the rim (lowest low across the dome), target below by the dome depth', () => {
+            const geometry = computeCandidateGeometry(candidate, bars, ATR);
+            expect(geometry).not.toBeNull();
+            expect(geometry!.direction).toBe('down');
+            expect(geometry!.breakoutLevel).toBe(20);
+            expect(geometry!.height).toBe(18); // 38 - 20
+            expect(geometry!.measuredTarget).toBe(2);
+            expect(geometry!.conservativeTarget).toBe(11);
+            expect(geometry!.invalidationLevel).toBe(38);
+            expect(geometry!.keyPoints.map(p => p.label)).toEqual([
+                'rim',
+                'top',
+            ]);
+        });
+    });
+
+    describe('curvature family: rounding_top rim span bounds (mirror of the bottom case)', () => {
+        it('rim = lowest low between the first high pivot and the pattern end', () => {
+            // 40 − y mirror of the rounding_bottom span fixture: index 1 (just
+            // before the first high) and index 9 (just after endIndex 8) are
+            // 10 < 17, so widening the min-low scan by one bar either way
+            // picks the wrong rim.
+            const bars = makeHLBars(
+                [0, 10, 30, 20, 36, 20, 38, 17, 31, 10].map(v => [v, v])
+            );
+            const candidate: PatternCandidate = {
+                id: 'rounding_top',
+                startIndex: 2,
+                endIndex: 8,
+                pivots: [
+                    { index: 2, price: 30, kind: 'high' },
+                    { index: 4, price: 36, kind: 'high' },
+                    { index: 6, price: 38, kind: 'high' },
+                    { index: 8, price: 31, kind: 'high' },
+                ],
+            };
+            const geometry = computeCandidateGeometry(candidate, bars, ATR);
+            expect(geometry).not.toBeNull();
+            expect(geometry!.breakoutLevel).toBe(17);
+            expect(geometry!.keyPoints.find(p => p.label === 'rim')?.time).toBe(
+                bars[7]!.time
+            );
+            expect(geometry!.height).toBe(21); // 38 - 17
         });
     });
 

@@ -726,7 +726,17 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * the prompt's `marketEvents`. Step 1 gains one line, so every 1Day request's
  * bytes change.
  *
- * **`p19`** — chart overlay candidate ids (spec 2026-09-28-chart-overlays).
+ * **`p19`** — detector catalogue widened (spec
+ * 2026-09-28-pattern-signal-expansion-design.md): six multi-candle labels
+ * (above/below the stomach, rising/falling three methods, bullish/bearish
+ * three-line strike), five chart-pattern candidates (rounding top, high tight
+ * flag, ascending/descending channel, broadening formation — near-parallel
+ * pairs that used to read as wedges now read as channels) can now appear in
+ * the prompt's candle-pattern lines and `## Chart Pattern Candidates
+ * (computed)`, and four signals (52-week high/low, gap up/down) now feed skill
+ * gating (not the confluence tally), so cached analyses built on the old
+ * catalogue are stale.
+ * **`p20`** — chart overlay candidate ids (spec 2026-09-28-chart-overlays).
  * `## Chart Pattern Candidates (computed)` gains a `Candidate id:` line per
  * geometry-bearing candidate, and a new `## Chart Overlay Candidates
  * (computed)` section lists trendline/divergence/fibonacci/elliott
@@ -740,7 +750,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p19' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p20' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.

@@ -98,15 +98,6 @@
   Context: The new rules lacked any test cases verifying their behavior. Fixed in Round 2 by adding assertions for each new rule.
 
 
-## [PR | feat/deepseek-stall-gemini-fallback | 2026-09-15] — Fallback provider routing & model dispatch R1→R3
-
-- Violation 2 (R1 REQUIRED b): groundedNumbers epsilon constant scaled by value magnitude (±3500 at 3.5e12) instead of fixed tolerance
-  Rule: Infrastructure Functions — numeric parsing tolerance scaling
-  Context: Epsilon defense against float rounding in structured LLM output parsing. Depends on asset price order of magnitude; accepted as design.
-
-
-
-
 ## [PR #210 | feat/peek-market-news-digest-cache | 2026-09-17] — Review findings R1
 
 - Violation 1: Parameter type of public function tagged @internal but not exported from index
@@ -124,14 +115,6 @@
   Context: R1 recommendation finding. Parameterized test using it.each(PROMPTS) relied on a partial array that didn't include all analysisSystemBase-derived prompts. Fixed in R2 by adding FINANCIALS and CONGRESS with their persona first lines pinned as literals, ensuring all 8 prompts are exercised by the shared test table.
 
 ## [Branch feat/precomputed-prompt-data | 2026-09-19] — Precomputed prompt data R1→R6
-
-- Violation 4 (R2 REQUIRED): Printed numbers computed from different inputs than numbers the app later recomputes (candidates section vs ai-levels divergence)
-  Rule: Infrastructure Functions — prompt output must match app-computed values; round inputs to printed precision first and share one computePatternTargets function
-  Context: Pattern targets and risk:reward in prompts were computed on-the-fly from raw price data; app recomputed from model's text output with different rounding, causing mismatches. Fixed by pre-rounding all inputs to printed precision and sharing the calculation.
-
-- Violation 5 (R2 REQUIRED, multiple locations): Prompt-rule contradictions — guideline instructing model to compute (measured move / pattern height) next to rule forbidding it; keyPrices label examples inviting target entries vs. no-target rule
-  Rule: MISTAKES.md Documentation Sync — prompt rules and examples must be synchronized when new rules are added
-  Context: Precomputed data prompts mixed computed-move guidance (old pattern) with a strict no-synthesis rule (new); examples showed trade targets while rule forbade them. Fixed by removing contradictory instructions and updating all examples to match enforced rule.
 
 - Violation 8 (R5 REQUIRED): Geometry defined from wrong pivot kind — cup/rounding-bottom rim calculated from low pivots instead of bounding high pivot
   Rule: Pattern geometry — boundary pivots must use the correct type (high for cup rim, low for valley bottom)
@@ -178,3 +161,11 @@
   Rule: Tests — test description must match assertion behavior; vacuous assertions provide no verification
   Context: analysisInput.test.ts test title indicated "16-char hex fingerprint" validation but assertion only checked definition (expect(...).toBeDefined()). Fixed by adding toMatch(/^[0-9a-f]{16}$/) to verify format.
 
+
+## [feat/pattern-signal-expansion Round 1 | feat/pattern-signal-expansion | 2026-09-28]
+- Violation: new 2-bar candle label (above/below_the_stomach) added as a "fallback" without measuring its effect one level up (entries/prompt selection) — it matched 12.7% of real daily bars and changed the prompt's latest-candle selection in ~48% of windows
+  - Rule: (new) A new detector must be measured on real bars at the consumer level (what the prompt/selection actually shows), not only at the function it was added to; "fallback" at one layer is not "unchanged" at the next
+  - Context: Tightened with isLongBody(prev) like sibling 2-bar patterns (2.0% hits, 10.5% windows), documented impact in spec + PUBLIC_API, added an entries-level test.
+- Violation: inclusive (≥/≤) spec boundaries not pinned by tests; off-by-one comparator mutations passed the suite
+  - Rule: MISTAKES Tests §5.5 — boundary-equality cases required when the spec defines inclusive bounds
+  - Context: Added equality-boundary tests for stomach midpoint, three-line strike b4.open==b3.close, falling three methods b5.close==b1.close; rounding_top rim span-bound test.

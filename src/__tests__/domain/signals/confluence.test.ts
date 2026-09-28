@@ -15,6 +15,8 @@ import {
     signalFamily,
     VOLUME_FAMILIES,
 } from '@/domain/signals/confluence';
+import { detectSignals } from '@/domain/signals';
+import { calculateIndicators } from '@/domain/indicators';
 import type {
     ConfluenceParams,
     ConfluenceSnapshot,
@@ -70,8 +72,9 @@ function snapshot(over: Partial<ConfluenceSnapshot> = {}): ConfluenceSnapshot {
 }
 
 /**
- * core가 실제로 내보내는 시그널 타입 전수. 계열 매핑이 카탈로그를 빠짐없이 덮는지
- * 검증하는 데 쓴다 — 새 디텍터가 추가되면 이 목록도 타입 오류로 함께 깨진다.
+ * 컨플루언스가 집계하는 시그널 타입 전수. 계열 매핑이 카탈로그를 빠짐없이 덮는지
+ * 검증하는 데 쓴다. 가격 구조 4종(52주 신고·신저, 갭 상승·하락)은 집계에서 빠지므로
+ * 여기 없다 — 아래 '가격 구조 신호는 컨플루언스 집계에서 제외된다'가 따로 고정한다.
  */
 const CONFIRMED: ConfirmedSignalType[] = [
     'rsi_oversold',
@@ -780,6 +783,75 @@ describe('evaluateConfluence', () => {
             }
         });
     });
+});
+
+describe('가격 구조 신호는 컨플루언스 집계에서 제외된다', () => {
+    const PRICE_STRUCTURE = [
+        'new_52w_high',
+        'new_52w_low',
+        'gap_up',
+        'gap_down',
+    ];
+
+    /**
+     * 400 daily bars trending by `step`, whose last bar gaps 1.5 past the
+     * previous bar in the trend direction — a fresh 52-week extreme and a
+     * gap on the same bar.
+     */
+    function trendWithGap(step: number): Bar[] {
+        const bars = Array.from({ length: 400 }, (_, i) => {
+            const c = 100 + i * step;
+            return {
+                time: 1_600_000_000 + i * 86_400,
+                open: c,
+                high: c * 1.001,
+                low: c * 0.999,
+                close: c,
+                volume: 1000 + i,
+            };
+        });
+        const prev = bars[bars.length - 2];
+        const c = step > 0 ? prev.high + 2 : prev.low - 2;
+        return [
+            ...bars.slice(0, -1),
+            {
+                ...bars[bars.length - 1],
+                open: c,
+                high: c + 0.5,
+                low: c - 0.5,
+                close: c,
+            },
+        ];
+    }
+
+    it.each([
+        { name: '상승', step: 0.1, direction: 'bullish' as const },
+        { name: '하락', step: -0.1, direction: 'bearish' as const },
+    ])(
+        '$name: detectSignals에는 잡히지만 스냅샷 집계에는 없다 — 나머지 타입은 그대로',
+        ({ step, direction }) => {
+            const bars = trendWithGap(step);
+            const detected = detectSignals(bars, calculateIndicators(bars))
+                .filter(sig => sig.direction === direction)
+                .map(sig => sig.type as string);
+            expect(
+                detected.filter(t => PRICE_STRUCTURE.includes(t))
+            ).toHaveLength(2);
+
+            const snap = evaluateConfluence(bars, { timeframe: '1Day' })!;
+            const counted =
+                direction === 'bullish' ? snap.bullish : snap.bearish;
+            const fresh =
+                direction === 'bullish' ? snap.freshBullish : snap.freshBearish;
+
+            expect(counted).toEqual(
+                [...new Set(detected)]
+                    .filter(t => !PRICE_STRUCTURE.includes(t))
+                    .sort()
+            );
+            expect(fresh.filter(t => PRICE_STRUCTURE.includes(t))).toEqual([]);
+        }
+    );
 });
 
 function fallingBars(): Bar[] {

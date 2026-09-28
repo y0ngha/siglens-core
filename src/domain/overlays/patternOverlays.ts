@@ -18,6 +18,9 @@ const TRENDLINE_FAMILY = new Set([
     'symmetrical_triangle',
     'ascending_wedge',
     'descending_wedge',
+    'ascending_channel',
+    'descending_channel',
+    'broadening_formation',
     'rectangle',
 ]);
 const FLAG_FAMILY = new Set(['bull_flag', 'bear_flag', 'pennant']);

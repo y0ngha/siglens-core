@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
 import type { Bar } from '@/domain/types';
 import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
 import {
@@ -116,5 +117,43 @@ describe('buildPatternOverlayCandidates', () => {
                 f.atr
             )
         ).toEqual([]);
+    });
+
+    it('channels and broadening formations draw two regression boundaries', () => {
+        // Rising parallel channel: highs 104/108/112, lows 100/104/108.
+        const bars = makeHLBars([
+            [102, 100],
+            [104, 102],
+            [102, 100.5],
+            [106, 104],
+            [108, 106],
+            [106, 104.5],
+            [110, 108],
+            [112, 110],
+            [110, 108.5],
+            [111, 109],
+        ]).map((b, i) => ({ ...b, time: 1000 + i }));
+        const pivots = [
+            { index: 1, price: 104, kind: 'high' as const },
+            { index: 2, price: 100.5, kind: 'low' as const },
+            { index: 4, price: 108, kind: 'high' as const },
+            { index: 5, price: 104.5, kind: 'low' as const },
+            { index: 7, price: 112, kind: 'high' as const },
+            { index: 8, price: 108.5, kind: 'low' as const },
+        ];
+        for (const id of [
+            'ascending_channel',
+            'broadening_formation',
+        ] as const) {
+            const [c] = buildPatternOverlayCandidates(
+                [{ id, startIndex: 1, endIndex: 8, pivots }],
+                bars,
+                1
+            );
+            expect(c?.segments.map(s => s.role).toSorted()).toEqual([
+                'boundary_lower',
+                'boundary_upper',
+            ]);
+        }
     });
 });

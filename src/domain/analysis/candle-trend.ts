@@ -36,6 +36,10 @@ const BULLISH_MULTI_PATTERNS: ReadonlySet<MultiCandlePattern> = new Set([
     'ladder_bottom',
     'tweezers_bottom',
     'downside_gap_two_rabbits',
+    'above_the_stomach',
+    'rising_three_methods',
+    // Measured direction, not the traditional name — see getMultiPatternTrend.
+    'bearish_three_line_strike',
 ]);
 
 const BEARISH_MULTI_PATTERNS: ReadonlySet<MultiCandlePattern> = new Set([
@@ -54,6 +58,10 @@ const BEARISH_MULTI_PATTERNS: ReadonlySet<MultiCandlePattern> = new Set([
     'advance_block',
     'tweezers_top',
     'upside_gap_two_crows',
+    'below_the_stomach',
+    'falling_three_methods',
+    // Measured direction, not the traditional name — see getMultiPatternTrend.
+    'bullish_three_line_strike',
 ]);
 
 /** @internal Single patterns excluded from trend scoring. */
@@ -94,6 +102,14 @@ export function getSinglePatternTrend(pattern: CandlePattern): Trend {
  * `'bearish'` for reversal-down / continuation-down formations (dark cloud
  * cover, evening star, three black crows, etc.), and `'neutral'` for the
  * remaining formations (on-neck, in-neck, tasuki gaps, etc.).
+ *
+ * The three-line strike pair is mapped by **measured** direction, not by its
+ * traditional name: Bulkowski (*Encyclopedia of Candlestick Charts*) found
+ * the "bullish" three-line strike acting as a bearish reversal 65% of the
+ * time and the "bearish" one as a bullish reversal 84% of the time. So
+ * `bullish_three_line_strike` returns `'bearish'` and
+ * `bearish_three_line_strike` returns `'bullish'` — the labels keep the
+ * names chartists search for, the trend carries what the pattern did.
  *
  * @param pattern - The pattern returned by {@link detectMultiCandlePattern}.
  * @returns The trend label.

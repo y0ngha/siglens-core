@@ -40,6 +40,7 @@ export const MULTI_CANDLE_PATTERN_LABELS: Record<MultiCandlePattern, string> = {
     ladder_bottom: '사다리 바닥형',
     tweezers_bottom: '집게 바닥형',
     downside_gap_two_rabbits: '하방갭 두 토끼형',
+    above_the_stomach: '어보브 더 스토막',
     bearish_engulfing: '하락 장악형',
     bearish_harami: '하락 잉태형',
     bearish_harami_cross: '하락 잉태 십자형',
@@ -55,10 +56,15 @@ export const MULTI_CANDLE_PATTERN_LABELS: Record<MultiCandlePattern, string> = {
     advance_block: '전진 블록형',
     tweezers_top: '집게 천장형',
     upside_gap_two_crows: '상방갭 두 까마귀형',
+    below_the_stomach: '빌로우 더 스토막',
     upside_gap_tasuki: '상방갭 타스키형',
     downside_gap_tasuki: '하방갭 타스키형',
     on_neck: '온넥형',
     in_neck: '인넥형',
+    rising_three_methods: '상승 삼법형',
+    falling_three_methods: '하락 삼법형',
+    bullish_three_line_strike: '상승 삼선 타격형',
+    bearish_three_line_strike: '하락 삼선 타격형',
 };
 
 // ─── Label Accessor Functions ─────────────────────────────────────────────────
