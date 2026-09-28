@@ -44,6 +44,6 @@ describe('buildOverlayCandidates — non-forward segments', () => {
             } as unknown as MarketReference,
             fmt: { timeframe: '1Day', priceDp: 2 },
         });
-        expect(out.map(c => c.id)).toEqual(['ew:good']);
+        expect(out.candidates.map(c => c.id)).toEqual(['ew:good']);
     });
 });

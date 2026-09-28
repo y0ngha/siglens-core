@@ -81,13 +81,20 @@ function collectRefs(
     return [...patternRefs, ...strategyRefs, ...trendRefs];
 }
 
-function toTrendline(o: ChartOverlay): Trendline {
+/**
+ * A trendline candidate carries exactly one segment (`trendlineCandidates.ts`);
+ * an overlay without one — e.g. a malformed cached entry — yields no legacy line.
+ */
+function toTrendline(o: ChartOverlay): Trendline[] {
     const [s] = o.segments;
-    return {
-        direction: s.role === 'support' ? 'ascending' : 'descending',
-        start: s.from,
-        end: s.to,
-    };
+    if (!s) return [];
+    return [
+        {
+            direction: s.role === 'support' ? 'ascending' : 'descending',
+            start: s.from,
+            end: s.to,
+        },
+    ];
 }
 
 /**
@@ -127,7 +134,7 @@ export function resolveChartOverlays(
         chartOverlays,
         trendlines: chartOverlays
             .filter(o => o.kind === 'trendline')
-            .map(toTrendline),
+            .flatMap(toTrendline),
         unknownIds,
     };
 }

@@ -19,6 +19,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         stable: 'mock-stable',
         dynamic: 'mock-dynamic',
         overlayCandidates: [],
+        overlayBuildFailures: [],
     })),
 }));
 vi.mock('@/domain/indicators/fearGreed', () => ({
@@ -1241,6 +1242,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 stable: '',
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [],
+                overlayBuildFailures: [],
             });
 
             await runAnalysis(
@@ -1282,6 +1284,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 stable: 'mock-stable',
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [overlayCandidate],
+                overlayBuildFailures: [],
             });
             const reconciledWithCandidate: AnalysisResponse = {
                 ...mockRawResult,
@@ -1341,6 +1344,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 stable: 'mock-stable',
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [overlayCandidate],
+                overlayBuildFailures: [],
             });
             const reconciledWithUnknownId: AnalysisResponse = {
                 ...mockRawResult,
@@ -1395,6 +1399,33 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             expect(warnSpy).toHaveBeenCalledWith(
                 '[ChartOverlays] no candidate referenced',
                 expect.objectContaining({ offered: 1 })
+            );
+            warnSpy.mockRestore();
+        });
+
+        it('후보 빌더가 실패하면 candidate builder failed 경고에 kind를 남긴다', async () => {
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: ['elliott'],
+            });
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(warnSpy).toHaveBeenCalledWith(
+                '[ChartOverlays] candidate builder failed',
+                expect.objectContaining({ kinds: ['elliott'] })
             );
             warnSpy.mockRestore();
         });

@@ -1,4 +1,9 @@
-import type { OverlayCandidate, OverlayCandidateInput } from '@/domain/types';
+import type {
+    OverlayCandidate,
+    OverlayCandidateBuild,
+    OverlayCandidateInput,
+    OverlayKind,
+} from '@/domain/types';
 import { buildPatternOverlayCandidates } from '@/domain/overlays/patternOverlays';
 import { buildTrendlineCandidates } from '@/domain/overlays/trendlineCandidates';
 import { buildDivergenceCandidates } from '@/domain/overlays/divergenceCandidates';
@@ -13,31 +18,39 @@ import { buildElliottCandidates } from '@/domain/overlays/elliottCandidates';
 export const runsForward = (c: OverlayCandidate): boolean =>
     c.segments.every(s => s.to.time > s.from.time);
 
-const safely = (build: () => OverlayCandidate[]): OverlayCandidate[] => {
-    try {
-        return build();
-    } catch {
-        return [];
-    }
-};
-
 /**
  * @internal
  * Every overlay candidate for one prompt (spec 2026-09-28 §2.1). Each builder
- * is isolated: one throwing never costs the others or the analysis.
+ * is isolated: one throwing never costs the others or the analysis. The
+ * domain layer cannot log, so a failed builder's kind is returned in
+ * `failedBuilders` for the application layer to report.
  */
 export function buildOverlayCandidates(
     input: OverlayCandidateInput
-): OverlayCandidate[] {
+): OverlayCandidateBuild {
     const { bars, rsi, patternCandidates, marketReference, fmt } = input;
     const atr = input.atr ?? 0;
-    return [
-        ...safely(() =>
-            buildPatternOverlayCandidates(patternCandidates, bars, atr)
-        ),
-        ...safely(() => buildTrendlineCandidates(bars, atr, fmt)),
-        ...safely(() => buildDivergenceCandidates(bars, rsi, fmt)),
-        ...safely(() => buildFibonacciCandidates(marketReference, bars, fmt)),
-        ...safely(() => buildElliottCandidates(bars, atr, fmt)),
-    ].filter(runsForward);
+    const builders: ReadonlyArray<[OverlayKind, () => OverlayCandidate[]]> = [
+        [
+            'pattern',
+            () => buildPatternOverlayCandidates(patternCandidates, bars, atr),
+        ],
+        ['trendline', () => buildTrendlineCandidates(bars, atr, fmt)],
+        ['divergence', () => buildDivergenceCandidates(bars, rsi, fmt)],
+        [
+            'fibonacci',
+            () => buildFibonacciCandidates(marketReference, bars, fmt),
+        ],
+        ['elliott', () => buildElliottCandidates(bars, atr, fmt)],
+    ];
+    const failedBuilders: OverlayKind[] = [];
+    const candidates = builders.flatMap(([kind, build]) => {
+        try {
+            return build();
+        } catch {
+            failedBuilders.push(kind);
+            return [];
+        }
+    });
+    return { candidates: candidates.filter(runsForward), failedBuilders };
 }

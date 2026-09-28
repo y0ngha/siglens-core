@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
 import type { Bar } from '@/domain/types';
 import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
+import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
 import {
     buildPatternOverlayCandidates,
     patternOverlayId,
@@ -155,5 +156,25 @@ describe('buildPatternOverlayCandidates', () => {
                 'boundary_upper',
             ]);
         }
+    });
+
+    it('skips a candidate whose geometry exists but has fewer than 2 pivots inside its range', () => {
+        const f = doubleTop as Fixture;
+        const [hit] = screenChartPatterns(f.bars, f.atr).filter(
+            c => c.id === 'double_top'
+        );
+        // Same pivots (geometry still computes), but the range now covers one pivot.
+        const firstPivot = hit.pivots![0].index;
+        const narrowed = {
+            ...hit,
+            startIndex: firstPivot,
+            endIndex: firstPivot,
+        };
+        expect(
+            computeCandidateGeometry(narrowed, f.bars, f.atr)
+        ).not.toBeNull();
+        expect(
+            buildPatternOverlayCandidates([narrowed], f.bars, f.atr)
+        ).toEqual([]);
     });
 });

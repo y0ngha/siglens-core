@@ -33,9 +33,9 @@ import {
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
-import { resolveChartOverlays } from '@/domain/overlays';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
+import { resolveChartOverlays } from '@/domain/overlays';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
@@ -295,21 +295,22 @@ async function runAnalysisImpl(
         });
 
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
-    const { stable, dynamic, overlayCandidates } = buildAnalysisPrompt(
-        symbol,
-        companyName,
-        bars,
-        indicators,
-        skillSampling.skills,
-        timeframe,
-        fearGreed ?? undefined,
-        options.assetClass ?? 'equity',
-        options.positionBucket,
-        locale,
-        priorAnalysisCandidates,
-        marketEventCandidates,
-        options.currency
-    );
+    const { stable, dynamic, overlayCandidates, overlayBuildFailures } =
+        buildAnalysisPrompt(
+            symbol,
+            companyName,
+            bars,
+            indicators,
+            skillSampling.skills,
+            timeframe,
+            fearGreed ?? undefined,
+            options.assetClass ?? 'equity',
+            options.positionBucket,
+            locale,
+            priorAnalysisCandidates,
+            marketEventCandidates,
+            options.currency
+        );
 
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
@@ -373,6 +374,13 @@ async function runAnalysisImpl(
         reconciled,
         normalizeIdList(asObject(rawResult)?.trendlineIds)
     );
+    if (overlayBuildFailures.length > 0) {
+        console.warn('[ChartOverlays] candidate builder failed', {
+            symbol,
+            timeframe,
+            kinds: overlayBuildFailures,
+        });
+    }
     if (resolvedOverlays.unknownIds.length > 0) {
         console.warn('[ChartOverlays] unknown candidate id', {
             symbol,

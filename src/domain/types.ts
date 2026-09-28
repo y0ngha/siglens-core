@@ -1895,6 +1895,8 @@ export interface AssembledPrompt {
 /** {@link buildAnalysisPrompt}'s result: the prompt halves plus the overlay candidates it printed, so the caller resolves the model's ids against the exact same list. */
 export interface TechnicalAssembledPrompt extends AssembledPrompt {
     overlayCandidates: readonly OverlayCandidate[];
+    /** Overlay builders that threw during this prompt build (their kinds offered nothing). */
+    overlayBuildFailures: readonly OverlayKind[];
 }
 
 /**
@@ -4186,6 +4188,12 @@ export interface RsiDivergencePair {
 export type RsiDivergenceKind = 'bullish' | 'bearish';
 
 /** {@link resolveChartOverlays} output. */
+/** {@link buildOverlayCandidates} output: the candidates plus the kinds whose builder threw. */
+export interface OverlayCandidateBuild {
+    candidates: OverlayCandidate[];
+    failedBuilders: OverlayKind[];
+}
+
 export interface ResolvedChartOverlays {
     chartOverlays: ChartOverlay[];
     /** Trendlines derived from resolved trendline overlays (legacy `trendlines` field). */

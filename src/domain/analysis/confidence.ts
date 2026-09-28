@@ -22,6 +22,7 @@ import {
 import {
     normalizeActionRecommendation,
     normalizeCandlePatternSummary,
+    normalizeChartOverlay,
     normalizeIndicatorGuideResult,
     normalizeKeyLevels,
     normalizePatternSummary,
@@ -29,7 +30,6 @@ import {
     normalizeRiskLevel,
     normalizeStrategyResult,
     normalizeTrend,
-    normalizeChartOverlay,
     normalizeTrendline,
 } from '@/domain/analysis/normalize';
 import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';

@@ -101,13 +101,13 @@ import type {
 import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
 import { buildIndicatorStateSection } from '@/domain/analysis/indicatorState';
 import {
-    CHART_PATTERN_CANDIDATES_SECTION_HEADER,
-    formatChartPatternCandidatesSection,
-} from '@/domain/analysis/chartPatternCandidatesSection';
-import {
     CHART_OVERLAY_CANDIDATES_SECTION_HEADER,
     formatChartOverlayCandidatesSection,
 } from '@/domain/analysis/chartOverlayCandidatesSection';
+import {
+    CHART_PATTERN_CANDIDATES_SECTION_HEADER,
+    formatChartPatternCandidatesSection,
+} from '@/domain/analysis/chartPatternCandidatesSection';
 import { buildOverlayCandidates } from '@/domain/overlays/buildOverlayCandidates';
 import {
     computeMarketReference,
@@ -2197,7 +2197,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   market profile (see {@link CurrencyCode} — core never derives it from the
  *   symbol). Drives the listing framing sentence and price precision (`KRW` →
  *   whole won). Defaults to `'USD'`.
- * @returns `{ stable, dynamic, overlayCandidates }` — see {@link TechnicalAssembledPrompt}.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2298,7 +2298,10 @@ export function buildAnalysisPrompt(
     // §2.1) — printed into `## Chart Overlay Candidates (computed)` below and
     // handed back to the caller so `resolveChartOverlays` can join the
     // model's referenced ids against this exact list after the call.
-    const overlayCandidates = buildOverlayCandidates({
+    const {
+        candidates: overlayCandidates,
+        failedBuilders: overlayBuildFailures,
+    } = buildOverlayCandidates({
         bars,
         atr: atrForPatternGeometry,
         rsi: indicators.rsi,
@@ -2471,5 +2474,6 @@ export function buildAnalysisPrompt(
         stable: stableSections.join('\n\n'),
         dynamic: dynamicSections.join('\n\n'),
         overlayCandidates,
+        overlayBuildFailures,
     };
 }

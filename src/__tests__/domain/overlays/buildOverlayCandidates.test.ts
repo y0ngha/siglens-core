@@ -35,22 +35,23 @@ describe('buildOverlayCandidates', () => {
             marketReference: EMPTY_MARKET_REFERENCE,
             fmt: FMT,
         });
-        expect(out.some(c => c.kind === 'pattern')).toBe(true);
+        expect(out.candidates.some(c => c.kind === 'pattern')).toBe(true);
+        expect(out.failedBuilders).toEqual([]);
     });
 
-    it('never throws — a builder that fails is dropped, the rest still return', () => {
+    it('never throws — a failing builder is reported, the rest still return', () => {
         const f = doubleTop as Fixture;
-        expect(() =>
-            buildOverlayCandidates({
-                bars: f.bars,
-                atr: f.atr,
-                rsi: f.bars.map(() => 50),
-                patternCandidates: screenChartPatterns(f.bars, f.atr),
-                // Forces buildFibonacciCandidates to throw (reads ref[key].fibProjection).
-                marketReference: null as unknown as MarketReference,
-                fmt: FMT,
-            })
-        ).not.toThrow();
+        const out = buildOverlayCandidates({
+            bars: f.bars,
+            atr: f.atr,
+            rsi: f.bars.map(() => 50),
+            patternCandidates: screenChartPatterns(f.bars, f.atr),
+            // Forces buildFibonacciCandidates to throw (reads ref[key].fibProjection).
+            marketReference: null as unknown as MarketReference,
+            fmt: FMT,
+        });
+        expect(out.failedBuilders).toEqual(['fibonacci']);
+        expect(out.candidates.some(c => c.kind === 'pattern')).toBe(true);
     });
 });
 
