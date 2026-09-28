@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.1.0](https://github.com/y0ngha/siglens-core/compare/v2.0.1...v2.1.0) (2026-09-28)
+
+### Features
+
+* add public classifyMaStack MA-stack classifier ([519d666](https://github.com/y0ngha/siglens-core/commit/519d66626e055fe078778491e63914d6ca458ed9))
+
 ## [2.0.1](https://github.com/y0ngha/siglens-core/compare/v2.0.0...v2.0.1) (2026-09-28)
 
 ### Bug Fixes
