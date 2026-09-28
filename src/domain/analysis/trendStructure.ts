@@ -80,6 +80,8 @@ export function classifyStackOrder(
  *
  * @param indicators Output of `calculateIndicators`; only `indicators.ma` is read.
  * @param periods MA periods to compare, shortest first. Defaults to `MA_DEFAULT_PERIODS`.
+ * @returns The stack direction, or `null` when fewer than two of `periods` have
+ *   a finite latest value.
  */
 export function classifyMaStack(
     indicators: IndicatorResult,

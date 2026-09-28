@@ -180,3 +180,9 @@
 - Violation: cache fingerprint excluded rendered fields (estimate/previous) with a false justification; public JSDoc/PUBLIC_API drifted
   - Rule: MISTAKES Config&State — every field that changes prompt bytes belongs in the cache key
   - Context: Fingerprint now covers all rendered fields; JSDoc and PUBLIC_API synced.
+
+## [PR #234 | feat/classify-ma-stack | 2026-09-28] — Tier 2 public export JSDoc missing @returns
+
+- Violation: classifyMaStack public export lacked required @returns JSDoc tag
+  - Rule: MISTAKES.md TypeScript 4.5 — Tier 2 public functions must have @param and @returns JSDoc tags
+  - Context: New Tier 2 function added to src/domain/analysis/trendStructure.ts without @returns documentation. Fixed by adding @returns tag.
