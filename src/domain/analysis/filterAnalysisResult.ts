@@ -218,6 +218,9 @@ export function filterAnalysisResult(
             : null,
         candlePatterns: allowPartialDetail ? result.candlePatterns : null,
         trendlines: allowFullDetail ? result.trendlines : null,
+        chartOverlays: (result.chartOverlays ?? []).filter(overlay =>
+            overlay.kind === 'trendline' ? allowFullDetail : allowSkillDetection
+        ),
         actionRecommendation: filterActionRecommendation(
             result.actionRecommendation,
             allowedDepth

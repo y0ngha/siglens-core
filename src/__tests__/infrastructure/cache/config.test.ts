@@ -754,7 +754,10 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 라인을 추가한다(정밀도 2번째 웨이브, spec §A1-A5).
         // p16 은 컨플루언스 신뢰도 문구를 "측정된 우위 없음"으로 바꾸고, 1Day에
         // Short-Term Washout 블록을 추가하며 entryRecommendation 규칙을 고친다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p18');
+        // p17 은 washout 진입 판정을 룰 엔진이 내리게 하고, p18 은 뉴스로 인한
+        // 하락에서 그 판정을 유보한다. p19 는 차트 오버레이 후보 id를 추가한다
+        // (spec 2026-09-28-chart-overlays).
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p19');
     });
 });
 

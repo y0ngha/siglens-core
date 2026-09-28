@@ -1,0 +1,120 @@
+import { describe, expect, it } from 'vitest';
+import type { Bar } from '@/domain/types';
+import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
+import {
+    buildPatternOverlayCandidates,
+    patternOverlayId,
+} from '@/domain/overlays/patternOverlays';
+import hsTextbook from '@/__tests__/domain/patterns/fixtures/hs-textbook.json';
+import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
+import ascendingTriangle from '@/__tests__/domain/patterns/fixtures/ascending-triangle.json';
+import bullFlag from '@/__tests__/domain/patterns/fixtures/bull-flag.json';
+import cupAndHandle from '@/__tests__/domain/patterns/fixtures/cup-and-handle.json';
+
+interface Fixture {
+    atr: number;
+    bars: Bar[];
+}
+const build = (f: Fixture) =>
+    buildPatternOverlayCandidates(
+        screenChartPatterns(f.bars, f.atr),
+        f.bars,
+        f.atr
+    );
+const barTimes = (f: Fixture) => new Set(f.bars.map(b => b.time));
+
+describe('buildPatternOverlayCandidates', () => {
+    it('head & shoulders: 5-pivot polyline + a sloped neckline segment, no level, LS/H/RS labels', () => {
+        const f = hsTextbook as Fixture;
+        const hs = build(f).find(c =>
+            c.id.startsWith('pattern:head_and_shoulders:')
+        )!;
+        expect(hs.kind).toBe('pattern');
+        expect(hs.skill).toBe('head-and-shoulders');
+        // 4 polyline legs through the 5 pivots + 1 neckline segment.
+        expect(hs.segments).toHaveLength(5);
+        const neckline = hs.segments.find(s => s.role === 'neckline')!;
+        expect(neckline).toBeDefined();
+        expect(neckline.style).toBe('dashed');
+        expect(neckline.pane).toBe('price');
+        // Extended to the chart's right edge.
+        expect(neckline.to.time).toBe(f.bars[f.bars.length - 1].time);
+        // No horizontal breakout level for H&S — the neckline segment replaces it.
+        expect(hs.levels).toEqual([]);
+        expect(hs.labels.map(l => l.text)).toEqual(['LS', 'H', 'RS']);
+    });
+
+    it('double top: polyline through the matched window and a neckline level', () => {
+        const dt = build(doubleTop as Fixture).find(c =>
+            c.id.startsWith('pattern:double_top:')
+        )!;
+        expect(dt.segments.length).toBeGreaterThanOrEqual(2);
+        expect(dt.levels[0].label).toBe('breakout');
+    });
+
+    it('triangle: exactly an upper and a lower boundary', () => {
+        const tri = build(ascendingTriangle as Fixture).find(c =>
+            c.id.includes('ascending_triangle')
+        )!;
+        expect(tri.segments.map(s => s.role).toSorted()).toEqual([
+            'boundary_lower',
+            'boundary_upper',
+        ]);
+    });
+
+    it('flag: pole plus two channel edges from geometry', () => {
+        const flag = build(bullFlag as Fixture).find(c =>
+            c.id.includes('bull_flag')
+        )!;
+        expect(flag.segments.map(s => s.role).toSorted()).toEqual([
+            'channel_lower',
+            'channel_upper',
+            'pole',
+        ]);
+    });
+
+    it('every point sits on a real bar time and segments run forward in time', () => {
+        for (const f of [
+            hsTextbook,
+            doubleTop,
+            ascendingTriangle,
+            bullFlag,
+            cupAndHandle,
+        ] as Fixture[]) {
+            const times = barTimes(f);
+            for (const c of build(f)) {
+                for (const s of c.segments) {
+                    expect(times.has(s.from.time)).toBe(true);
+                    expect(times.has(s.to.time)).toBe(true);
+                    expect(s.to.time).toBeGreaterThan(s.from.time);
+                }
+                for (const l of c.levels)
+                    expect(times.has(l.fromTime)).toBe(true);
+            }
+        }
+    });
+
+    it('id is deterministic and matches patternOverlayId', () => {
+        const f = doubleTop as Fixture;
+        const screened = screenChartPatterns(f.bars, f.atr);
+        const out = buildPatternOverlayCandidates(screened, f.bars, f.atr);
+        expect(out.map(c => c.id)).toEqual(
+            screened
+                .filter(s =>
+                    out.some(o => o.id === patternOverlayId(s, f.bars))
+                )
+                .map(s => patternOverlayId(s, f.bars))
+        );
+    });
+
+    it('skips a candidate with no geometry (hand-built, no pivots)', () => {
+        const f = doubleTop as Fixture;
+        expect(
+            buildPatternOverlayCandidates(
+                [{ id: 'double_top', startIndex: 1, endIndex: 5 }],
+                f.bars,
+                f.atr
+            )
+        ).toEqual([]);
+    });
+});

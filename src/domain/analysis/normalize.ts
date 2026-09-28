@@ -2,12 +2,12 @@ import type {
     ActionRecommendation,
     AnalysisSignal,
     CandlePatternSummary,
+    ChartOverlay,
     EntryRecommendation,
     IndicatorGuideResult,
     KeyLevel,
     KeyLevels,
     KeyPrice,
-    PatternLine,
     PatternTargetGeometry,
     PlanCheck,
     PriceScenario,
@@ -172,28 +172,6 @@ export function normalizeTrendlinePoint(v: unknown): TrendlinePoint | null {
     return { time, price };
 }
 
-/** @internal Normalizes a pattern line. */
-export function normalizePatternLine(v: unknown): PatternLine | null {
-    const o = asObject(v);
-    if (!o) return null;
-    const start = normalizeTrendlinePoint(o.start);
-    const end = normalizeTrendlinePoint(o.end);
-    if (!start || !end) return null;
-    return { label: asString(o.label), start, end };
-}
-
-/** @internal Normalizes a time range. */
-export function normalizeTimeRange(
-    v: unknown
-): { start: number; end: number } | undefined {
-    const o = asObject(v);
-    if (!o) return undefined;
-    const start = asNumber(o.start);
-    const end = asNumber(o.end);
-    if (start === undefined || end === undefined) return undefined;
-    return { start, end };
-}
-
 const PATTERN_GEOMETRY_DIRECTIONS = ['up', 'down'] as const;
 
 function isFinitePositive(n: number | undefined): n is number {
@@ -263,9 +241,6 @@ export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
     const keyPricesArr = Array.isArray(o.keyPrices)
         ? compact(o.keyPrices.map(normalizeKeyPrice))
         : undefined;
-    const patternLinesArr = Array.isArray(o.patternLines)
-        ? compact(o.patternLines.map(normalizePatternLine))
-        : undefined;
 
     return {
         patternName,
@@ -274,8 +249,9 @@ export function normalizePatternSummary(v: unknown): RawPatternSummary | null {
         trend: normalizeTrend(o.trend),
         summary: asString(o.summary),
         keyPrices: keyPricesArr,
-        patternLines: patternLinesArr,
-        timeRange: normalizeTimeRange(o.timeRange),
+        ...(typeof o.candidateId === 'string' && o.candidateId !== ''
+            ? { candidateId: o.candidateId }
+            : {}),
         geometry: normalizePatternGeometry(o.geometry),
     };
 }
@@ -290,6 +266,9 @@ export function normalizeStrategyResult(v: unknown): RawStrategyResult | null {
         strategyName,
         trend: normalizeTrend(o.trend),
         summary: asString(o.summary),
+        ...(Array.isArray(o.candidateIds)
+            ? { candidateIds: normalizeIdList(o.candidateIds) }
+            : {}),
     };
 }
 
@@ -409,5 +388,63 @@ export function normalizeActionRecommendation(
         // here would change a shape existing consumers and fixtures already see,
         // which is out of scope for this read-path fix.
         ...(planCheck !== undefined ? { planCheck } : {}),
+    };
+}
+
+// --- Chart overlays (spec 2026-09-28) ---
+
+/** @internal A string[] of non-empty strings; anything else → []. */
+export function normalizeIdList(v: unknown): string[] {
+    return asArray(v).filter(
+        (x): x is string => typeof x === 'string' && x !== ''
+    );
+}
+
+const OVERLAY_KINDS = new Set([
+    'pattern',
+    'trendline',
+    'divergence',
+    'fibonacci',
+    'elliott',
+]);
+
+function isFiniteNumber(v: unknown): v is number {
+    return typeof v === 'number' && Number.isFinite(v);
+}
+
+function isPoint(v: unknown): boolean {
+    const o = asObject(v);
+    return !!o && isFiniteNumber(o.time) && isFiniteNumber(o.price);
+}
+
+/** @internal Cached `chartOverlays` entry → `ChartOverlay`, or `null` when malformed. */
+export function normalizeChartOverlay(v: unknown): ChartOverlay | null {
+    const o = asObject(v);
+    if (!o || typeof o.id !== 'string' || !OVERLAY_KINDS.has(o.kind as string))
+        return null;
+    const segments = asArray(o.segments).filter(s => {
+        const seg = asObject(s);
+        return !!seg && isPoint(seg.from) && isPoint(seg.to);
+    });
+    const levels = asArray(o.levels).filter(l => {
+        const level = asObject(l);
+        return (
+            !!level &&
+            isFiniteNumber(level.price) &&
+            isFiniteNumber(level.fromTime)
+        );
+    });
+    if (segments.length === 0 && levels.length === 0) return null;
+    return {
+        id: o.id,
+        kind: o.kind as ChartOverlay['kind'],
+        skill: asString(o.skill),
+        sourceRef: asString(o.sourceRef),
+        variant: o.variant === 'alternate' ? 'alternate' : 'primary',
+        segments: segments as ChartOverlay['segments'],
+        levels: levels as ChartOverlay['levels'],
+        labels: asArray(o.labels).filter(l =>
+            isPoint(asObject(l)?.at)
+        ) as ChartOverlay['labels'],
     };
 }

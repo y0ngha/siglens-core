@@ -190,6 +190,8 @@ describe('computeMarketReference', () => {
         expect(ref.long.fibProjection).toEqual({
             high: 220,
             low: 158.9,
+            highIndex: 50,
+            lowIndex: 48,
             direction: 'up',
             retracements: expect.any(Array),
             extensions: expect.any(Array),
@@ -218,6 +220,9 @@ describe('computeMarketReference', () => {
             a: 100,
             b: 120,
             c: 112,
+            aIndex: 10,
+            bIndex: 20,
+            cIndex: 30,
             direction: 'up',
             extensions: expect.any(Array),
         });

@@ -6,6 +6,7 @@ import {
 } from '@/domain/analysis/chartPatternCandidatesSection';
 import { screenChartPatterns } from '@/domain/patterns';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
+import { buildPatternOverlayCandidates } from '@/domain/overlays/patternOverlays';
 import {
     makeAlternatingPivotBars,
     makeBars,
@@ -23,17 +24,29 @@ const candidatesFor = (
 ): PatternCandidate[] =>
     atr !== null && atr > 0 ? screenChartPatterns(bars, atr) : [];
 
+/** Mirrors `prompt.ts`'s `offeredPatternOverlayIds` derivation exactly. */
+const offeredIdsFor = (
+    candidates: readonly PatternCandidate[],
+    bars: readonly Bar[],
+    atr: number | null
+): ReadonlySet<string> =>
+    new Set(
+        buildPatternOverlayCandidates(candidates, bars, atr ?? 0).map(c => c.id)
+    );
+
 describe('formatChartPatternCandidatesSection', () => {
     it('renders "None detected" when atr is null', () => {
         const bars: Bar[] = [
             { time: 0, open: 1, high: 1, low: 1, close: 1, volume: 1 },
         ];
+        const candidates = candidatesFor(bars, null);
         const section = formatChartPatternCandidatesSection(
-            candidatesFor(bars, null),
+            candidates,
             bars,
             null,
             2,
-            '1Day'
+            '1Day',
+            offeredIdsFor(candidates, bars, null)
         );
         expect(section).toBe(
             `${CHART_PATTERN_CANDIDATES_SECTION_HEADER}\n${CHART_PATTERN_CANDIDATES_SECTION_INTRO}\n- None detected by the pre-screener`
@@ -44,13 +57,15 @@ describe('formatChartPatternCandidatesSection', () => {
         const bars: Bar[] = [
             { time: 0, open: 1, high: 1, low: 1, close: 1, volume: 1 },
         ];
+        const candidates = candidatesFor(bars, 0);
         expect(
             formatChartPatternCandidatesSection(
-                candidatesFor(bars, 0),
+                candidates,
                 bars,
                 0,
                 2,
-                '1Day'
+                '1Day',
+                offeredIdsFor(candidates, bars, 0)
             )
         ).toContain('- None detected by the pre-screener');
     });
@@ -65,12 +80,14 @@ describe('formatChartPatternCandidatesSection', () => {
             close: 100,
             volume: 1,
         }));
+        const candidates = candidatesFor(bars, 1);
         const section = formatChartPatternCandidatesSection(
-            candidatesFor(bars, 1),
+            candidates,
             bars,
             1,
             2,
-            '1Day'
+            '1Day',
+            offeredIdsFor(candidates, bars, 1)
         );
         expect(section).toBe(
             `${CHART_PATTERN_CANDIDATES_SECTION_HEADER}\n${CHART_PATTERN_CANDIDATES_SECTION_INTRO}\n- None detected by the pre-screener`
@@ -79,12 +96,14 @@ describe('formatChartPatternCandidatesSection', () => {
 
     it('renders a candidate block with computed geometry and % distances from the last close', () => {
         const bars = makeAlternatingPivotBars(10, [20, 10, 20, 12], 20);
+        const candidates = candidatesFor(bars, 1);
         const section = formatChartPatternCandidatesSection(
-            candidatesFor(bars, 1),
+            candidates,
             bars,
             1,
             2,
-            '1Day'
+            '1Day',
+            offeredIdsFor(candidates, bars, 1)
         );
 
         expect(
@@ -105,6 +124,8 @@ describe('formatChartPatternCandidatesSection', () => {
         expect(section).toContain('- Conservative target (50%): 25.50');
         expect(section).toContain('- Invalidation level: 13.00');
         expect(section).toMatch(/- Key points: .+left rim|resistance touch/);
+        // A drawable overlay was offered for this candidate -> the id line prints.
+        expect(section).toContain('- Candidate id: pattern:');
     });
 
     // Review round 2: a model copies the PRINTED breakout/extreme, so the app's
@@ -118,12 +139,14 @@ describe('formatChartPatternCandidatesSection', () => {
                 [20.07, 10.13, 20.11, 12.29, 19.97, 13.41],
                 20.03
             );
+            const candidates = candidatesFor(bars, 1);
             const section = formatChartPatternCandidatesSection(
-                candidatesFor(bars, 1),
+                candidates,
                 bars,
                 1,
                 priceDp,
-                '1Day'
+                '1Day',
+                offeredIdsFor(candidates, bars, 1)
             );
             const blocks = section
                 .split('\n### ')
@@ -161,12 +184,14 @@ describe('formatChartPatternCandidatesSection', () => {
         // negative measured target, and a raw neckline of 19.9951 printed as
         // 20.00 must not read "broken" against a last close of 20.00.
         const bars = makeAlternatingPivotBars(15, [25, 10, 19.9951, 10.02], 20);
+        const candidates = candidatesFor(bars, 1);
         const section = formatChartPatternCandidatesSection(
-            candidatesFor(bars, 1),
+            candidates,
             bars,
             1,
             2,
-            '1Day'
+            '1Day',
+            offeredIdsFor(candidates, bars, 1)
         );
         expect(section).not.toMatch(/target(?: \(50%\))?: -\d/);
         const doubleBottom = section
@@ -183,24 +208,28 @@ describe('formatChartPatternCandidatesSection', () => {
         // low closes well below the neckline (~10.95) instead of just below
         // the second peak — direction is 'down', so this counts as broken.
         const bars = makeBars([10, 15, 11, 15.2, 5]);
+        const candidates = candidatesFor(bars, 1);
         const section = formatChartPatternCandidatesSection(
-            candidatesFor(bars, 1),
+            candidates,
             bars,
             1,
             2,
-            '1Day'
+            '1Day',
+            offeredIdsFor(candidates, bars, 1)
         );
         expect(section).toContain('### double_top (broken)');
     });
 
     it('every candidate block names the pattern id as its heading', () => {
         const bars = makeAlternatingPivotBars(10, [20, 5, 20, 5], 20); // rectangle
+        const candidates = candidatesFor(bars, 1);
         const section = formatChartPatternCandidatesSection(
-            candidatesFor(bars, 1),
+            candidates,
             bars,
             1,
             2,
-            '1Day'
+            '1Day',
+            offeredIdsFor(candidates, bars, 1)
         );
         expect(section).toContain('### rectangle');
     });
@@ -217,7 +246,8 @@ describe('formatChartPatternCandidatesSection', () => {
                 bars,
                 null,
                 2,
-                '1Day'
+                '1Day',
+                offeredIdsFor(candidates, bars, null)
             );
             expect(section).toContain('### double_top — geometry unavailable');
             expect(section).not.toContain('- Breakout level');
@@ -230,7 +260,8 @@ describe('formatChartPatternCandidatesSection', () => {
                 [],
                 1,
                 2,
-                '1Day'
+                '1Day',
+                offeredIdsFor(candidates, [], 1)
             );
             expect(section).toContain('### double_top — geometry unavailable');
         });
@@ -248,9 +279,54 @@ describe('formatChartPatternCandidatesSection', () => {
             zeroCloseBars,
             1,
             2,
-            '1Day'
+            '1Day',
+            offeredIdsFor(candidates, zeroCloseBars, 1)
         );
         expect(section).toMatch(/- Breakout level: \d+\.\d{2}\n/);
         expect(section).not.toContain('from last close');
+    });
+
+    it('a candidate with geometry but no offered overlay (empty offeredOverlayIds) gets no "Candidate id" line', () => {
+        // Same fixture as the "computed geometry" test above (a real
+        // ascending_triangle hit with geometry) — only the offered-id set
+        // changes, isolating the gate from geometry availability.
+        const bars = makeAlternatingPivotBars(10, [20, 10, 20, 12], 20);
+        const candidates = candidatesFor(bars, 1);
+        const section = formatChartPatternCandidatesSection(
+            candidates,
+            bars,
+            1,
+            2,
+            '1Day',
+            new Set() // nothing was offered as a drawable overlay
+        );
+        expect(section).toContain('### ascending_triangle');
+        expect(section).toContain('- Breakout level: 20.00');
+        expect(section).not.toContain('- Candidate id:');
+    });
+
+    it('a real "no overlay built" case (flag with endIndex <= startIndex) also gets no "Candidate id" line', () => {
+        // A single-bar flag candidate: geometry may still compute, but
+        // `buildPatternOverlayCandidates` refuses to draw a flag whose
+        // channel has no width (`endIndex <= startIndex`).
+        const bars = makeAlternatingPivotBars(10, [20, 10, 20, 12], 20);
+        const candidates = candidatesFor(bars, 1);
+        const flagCandidate: PatternCandidate = {
+            id: 'bull_flag',
+            startIndex: 3,
+            endIndex: 3,
+            pivots: candidates[0]?.pivots,
+        };
+        const offered = offeredIdsFor([flagCandidate], bars, 1);
+        expect(offered.size).toBe(0);
+        const section = formatChartPatternCandidatesSection(
+            [flagCandidate],
+            bars,
+            1,
+            2,
+            '1Day',
+            offered
+        );
+        expect(section).not.toContain('- Candidate id:');
     });
 });

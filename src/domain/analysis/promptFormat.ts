@@ -7,7 +7,7 @@
  */
 
 import type { AssetClass, CurrencyCode, Timeframe } from '@/domain/types';
-import { MS_PER_DAY } from '@/domain/constants/time';
+import { MS_PER_DAY, MS_PER_SECOND } from '@/domain/constants/time';
 
 /**
  * Human-readable timeframe labels used in prompt headers.
@@ -56,6 +56,22 @@ export function formatBarDateTime(timeMs: number): string {
         .toISOString()
         .replace('T', ' ')
         .slice(0, DATETIME_DISPLAY_LENGTH);
+}
+
+/**
+ * `YYYY-MM-DD` from a bar's Unix-seconds `time` on a daily chart,
+ * `YYYY-MM-DD HH:MM UTC` on an intraday one — a date-only stamp collapses
+ * every key point of an hourly pattern onto the same calendar day (real-data
+ * defect: an hourly double bottom printed both troughs and the neckline all
+ * dated the same day, with no way to tell them apart).
+ */
+export function formatBarDate(
+    unixSeconds: number,
+    timeframe: Timeframe
+): string {
+    const date = new Date(unixSeconds * MS_PER_SECOND);
+    if (timeframe === '1Day') return date.toISOString().slice(0, 10);
+    return `${formatBarDateTime(date.getTime())} UTC`;
 }
 
 /**

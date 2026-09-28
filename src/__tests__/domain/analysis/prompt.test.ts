@@ -19,6 +19,7 @@ import {
 } from '@/domain/analysis/prompt';
 import { calculateIndicators } from '@/domain/indicators/index';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
+import doubleTopFixture from '@/__tests__/domain/patterns/fixtures/double-top.json';
 import {
     ATR_DEFAULT_PERIOD,
     CCI_DEFAULT_PERIOD,
@@ -2073,7 +2074,7 @@ describe('prompt', () => {
             expect(result).not.toContain('"direction": "ascending"');
         });
 
-        it('가이드라인에 추세선 감지 지침이 포함된다', () => {
+        it('가이드라인에 trendlineIds 지침이 포함된다 (spec 2026-09-28)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -2081,7 +2082,34 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('Trendline Detection');
+            expect(result).toContain('### trendlineIds');
+            expect(result).not.toContain('Trendline Detection');
+            expect(result).not.toContain('patternLines');
+        });
+    });
+
+    describe('overlay candidates (spec 2026-09-28)', () => {
+        it('every non-pattern overlay id is printed in dynamic; every pattern id lands as a "Candidate id" line', () => {
+            const bars = doubleTopFixture.bars as Bar[];
+            const indicators = calculateIndicators(bars);
+            const { dynamic, overlayCandidates } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                indicators,
+                []
+            );
+
+            expect(overlayCandidates.length).toBeGreaterThan(0);
+            for (const candidate of overlayCandidates) {
+                if (candidate.kind === 'pattern') {
+                    expect(dynamic).toContain(
+                        `- Candidate id: ${candidate.id}`
+                    );
+                } else {
+                    expect(dynamic).toContain(`id: ${candidate.id}`);
+                }
+            }
         });
     });
 
@@ -6065,6 +6093,8 @@ describe('Fib table lines never print a non-positive level', () => {
             {
                 high: 100,
                 low: 30,
+                highIndex: 5,
+                lowIndex: 10,
                 direction: 'down',
                 retracements: [{ ratio: 0.618, price: 73.26 }],
                 extensions: [
@@ -6086,6 +6116,9 @@ describe('Fib table lines never print a non-positive level', () => {
                 a: 100,
                 b: 50,
                 c: 70,
+                aIndex: 1,
+                bIndex: 3,
+                cIndex: 5,
                 direction: 'down',
                 extensions: [
                     { ratio: 1, price: 20 },

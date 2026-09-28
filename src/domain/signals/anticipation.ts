@@ -2,6 +2,8 @@ import type {
     Bar,
     BollingerResult,
     IndicatorResult,
+    RsiDivergenceKind,
+    RsiDivergencePair,
     Signal,
 } from '@/domain/types';
 import {
@@ -19,8 +21,6 @@ import {
     TREND_SLOPE_LOOKBACK,
 } from '@/domain/signals/constants';
 import { calculateMA } from '@/domain/indicators/ma';
-
-type DivergenceKind = 'bullish' | 'bearish';
 
 function findPivots(
     values: number[],
@@ -101,11 +101,12 @@ export function percentileRank(value: number, xs: number[]): number | null {
     return below / (n - 1);
 }
 
-function detectRegularDivergence(
-    bars: Bar[],
-    rsi: (number | null)[],
-    kind: DivergenceKind
-): number | null {
+/** @internal Both pivots of the latest regular RSI divergence of `kind`, or `null`. */
+export function findRegularDivergencePair(
+    bars: readonly Bar[],
+    rsi: readonly (number | null)[],
+    kind: RsiDivergenceKind
+): RsiDivergencePair | null {
     if (bars.length < DIVERGENCE_LOOKBACK_BARS) return null;
     const windowStart = bars.length - DIVERGENCE_LOOKBACK_BARS;
     const lastIdx = bars.length - 1;
@@ -147,7 +148,15 @@ function detectRegularDivergence(
         if (price2 <= price1) return null;
         if (rsi2 >= rsi1) return null;
     }
-    return p2;
+    return { first: p1, second: p2 };
+}
+
+function detectRegularDivergence(
+    bars: Bar[],
+    rsi: (number | null)[],
+    kind: RsiDivergenceKind
+): number | null {
+    return findRegularDivergencePair(bars, rsi, kind)?.second ?? null;
 }
 
 /** @internal Detects regular bullish RSI divergence (anticipation signal). */

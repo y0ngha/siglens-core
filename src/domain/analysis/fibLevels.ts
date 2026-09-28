@@ -34,7 +34,8 @@ const resolveLegDirection = (
  * at the low (a pullback from the high); on a down-leg the anchors are mirrored
  * so the levels track a bounce from the low.
  */
-const buildRetracements = (
+/** @internal Exported for reuse by `domain/overlays/fibonacciCandidates.ts` — level prices must match this table exactly. */
+export const buildRetracements = (
     high: number,
     low: number,
     direction: SwingLegDirection
@@ -50,7 +51,8 @@ const buildRetracements = (
  * Build extension levels projected past the measured move: in the swing's own
  * direction (above the high for an up-leg, below the low for a down-leg).
  */
-const buildExtensions = (
+/** @internal Exported for reuse by `domain/overlays/fibonacciCandidates.ts` — level prices must match this table exactly. */
+export const buildExtensions = (
     high: number,
     low: number,
     direction: SwingLegDirection
@@ -123,7 +125,16 @@ export const computeAbcExtension = (
                 : c.price - ratio * range,
     }));
 
-    return { a: a.price, b: b.price, c: c.price, direction, extensions };
+    return {
+        a: a.price,
+        b: b.price,
+        c: c.price,
+        aIndex: a.index,
+        bIndex: b.index,
+        cIndex: c.index,
+        direction,
+        extensions,
+    };
 };
 
 /**
@@ -156,6 +167,8 @@ export const computeFibonacciProjection = (
     return {
         high,
         low,
+        highIndex: swingHigh.index,
+        lowIndex: swingLow.index,
         direction,
         retracements: buildRetracements(high, low, direction),
         extensions: buildExtensions(high, low, direction),

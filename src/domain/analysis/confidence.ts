@@ -29,6 +29,7 @@ import {
     normalizeRiskLevel,
     normalizeStrategyResult,
     normalizeTrend,
+    normalizeChartOverlay,
     normalizeTrendline,
 } from '@/domain/analysis/normalize';
 import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
@@ -352,6 +353,9 @@ export function normalizeCachedAnalysisResponse(
         keyLevels: normalizeKeyLevels(raw.keyLevels),
         priceTargets: normalizePriceTargets(raw.priceTargets),
         trendlines: compact(asArray(raw.trendlines).map(normalizeTrendline)),
+        chartOverlays: compact(
+            asArray(raw.chartOverlays).map(normalizeChartOverlay)
+        ),
         actionRecommendation: normalizeActionRecommendation(
             raw.actionRecommendation
         ),

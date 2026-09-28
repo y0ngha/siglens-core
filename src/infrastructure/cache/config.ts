@@ -726,9 +726,21 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * the prompt's `marketEvents`. Step 1 gains one line, so every 1Day request's
  * bytes change.
  *
+ * **`p19`** — chart overlay candidate ids (spec 2026-09-28-chart-overlays).
+ * `## Chart Pattern Candidates (computed)` gains a `Candidate id:` line per
+ * geometry-bearing candidate, and a new `## Chart Overlay Candidates
+ * (computed)` section lists trendline/divergence/fibonacci/elliott
+ * candidates by id. `patternSummaries[].candidateId`,
+ * `strategyResults[].candidateIds`, and `trendlineIds` replace the old
+ * `patternLines` skeleton and the free-form `trendlines` array — the model
+ * now selects logic-drawn overlays by id instead of authoring coordinates.
+ * `runAnalysis` joins the referenced ids against the offered candidates
+ * (`resolveChartOverlays`) after the model call. Bytes change on every
+ * request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p18' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p19' as const;
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
