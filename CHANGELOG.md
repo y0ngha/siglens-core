@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.0.0](https://github.com/y0ngha/siglens-core/compare/v1.18.0...v2.0.0) (2026-09-28)
+
+### Bug Fixes
+
+* **overlays:** PR [#233](https://github.com/y0ngha/siglens-core/issues/233) 리뷰 반영 — import 순서, 빌더 실패 노출, trendline 가드, 테스트 보강 ([f2a63a0](https://github.com/y0ngha/siglens-core/commit/f2a63a0b2b7db4a972aa4fe9f6824533b2244dde))
+
 # [1.18.0](https://github.com/y0ngha/siglens-core/compare/v1.17.2...v1.18.0) (2026-09-28)
 
 ### Bug Fixes
