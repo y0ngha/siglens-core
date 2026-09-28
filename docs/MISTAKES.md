@@ -483,6 +483,14 @@ and have been removed from this file.
    → **Sibling audit (MANDATORY after any version-bump fix):** grep every `export function build*Key` in `src/infrastructure/cache/config.ts` and confirm each LLM-output key interpolates a `*_PROMPT_TEMPLATE_VERSION` or a fingerprint that embeds one. Deterministic non-LLM keys (sector signals, identifier-only concatenation) are exempt. Do not rely on single-file review; exhaustively verify all siblings in the same config module.
    → Recurring (PR #194 R1–R2): ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION missed in R1, then three more builders (OVERALL, OPTIONS, peek key) missed in R2.
    → Recurring (PR #194 R3): MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION missing from buildMacroBriefingCacheKey despite prompt output change. Sibling audit in R3 completed: all 14 `build*Key` functions now verified; macro-briefing was the sole omission.
+
+7. Numeric tolerances and calculated outputs must stay synchronized with app-layer assumptions
+   → Infrastructure functions defining defensive parameters (epsilon, tolerance) cannot scale by magnitude if callers assume fixed values
+   → Precomputed values in prompts must match app-layer recomputed values; share calculation logic and round inputs to displayed precision first
+   ❌ epsilon defense in groundedNumbers scaled by value magnitude (varies ±3500 at 3.5e12) while app assumes fixed tolerance
+   ❌ Prompt precomputes pattern targets from raw data; app re-computes from model text with different rounding, causing mismatches
+   ✅ Use fixed tolerance independent of magnitude; verify app-layer callers remain compatible when infrastructure parameters change
+   ✅ Pre-round all inputs to displayed precision and use shared calculation function in both prompt and app layers
 ```
 
 ---
@@ -730,6 +738,15 @@ and have been removed from this file.
    ✅ // Score delta from two tie sources: buysell_imbalance (primary) and volume_z (secondary, 16/369 samples)
    → Recurring (fix/fear-greed-percentile-ties R1–R2): JSDoc claimed incorrect convergence behavior; test comment misattributed entire delta to one source.
       Pattern: When attributing changes to a source or describing mathematical behavior, recompute all factors to avoid silent bias or false claims.
+
+8. Documentation (rules, examples, JSDoc) must match actual implementation behavior exactly
+   → When documentation includes examples, rule statements, or JSDoc descriptions, each must correspond to enforced implementation behavior
+   → Contradictions (examples showing X while rule forbids X) force users to guess which is correct; JSDoc mismatches break IDE tooling and create false contracts
+   ❌ Prompt rule forbids computed move targets, but keyPrices examples show entries with targets
+   ❌ PUBLIC_API.md claims PATTERN_TRIGGER_CATALOG is compile-enforced; actual behavior is runtime discovery
+   ❌ Signal.detectedAt JSDoc says 'timestamp' while all detectors return bar index
+   ✅ Synchronize examples with enforced rules; remove contradictory instructions and update all references in same commit
+   ✅ JSDoc @returns/@param/@throws/@internal must reflect actual implementation code, verified against the function during review
 ```
 
 ---

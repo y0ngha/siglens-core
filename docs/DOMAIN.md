@@ -856,7 +856,7 @@ type CandlePattern =
 
 ```typescript
 type MultiCandlePattern =
-    // 상승 반전 (15종)
+    // 상승 반전 (16종)
     | 'bullish_engulfing'        // 상승 장악형
     | 'bullish_harami'           // 상승 잉태형
     | 'bullish_harami_cross'     // 상승 십자 잉태형
@@ -872,7 +872,8 @@ type MultiCandlePattern =
     | 'ladder_bottom'            // 사다리바닥
     | 'tweezers_bottom'          // 족집게 바닥
     | 'downside_gap_two_rabbits' // 하락갭 투래빗
-    // 하락 반전 (15종)
+    | 'above_the_stomach'        // 어보브 더 스토막 (장대 음봉 중간값 이상에서 시작하는 양봉)
+    // 하락 반전 (16종)
     | 'bearish_engulfing'        // 하락 장악형
     | 'bearish_harami'           // 하락 잉태형
     | 'bearish_harami_cross'     // 하락 십자 잉태형
@@ -888,11 +889,17 @@ type MultiCandlePattern =
     | 'advance_block'            // 전진 저지형
     | 'tweezers_top'             // 족집게 천장
     | 'upside_gap_two_crows'     // 상승갭 까마귀 2마리
-    // 지속 패턴 (4종)
+    | 'below_the_stomach'        // 빌로우 더 스토막 (장대 양봉 중간값 이하에서 시작하는 음봉)
+    // 지속 패턴 (6종)
     | 'upside_gap_tasuki'        // 상승갭 타스키
     | 'downside_gap_tasuki'      // 하락갭 타스키
     | 'on_neck'                  // 온넥
-    | 'in_neck';                 // 인넥
+    | 'in_neck'                  // 인넥
+    | 'rising_three_methods'     // 상승 삼법형 (5봉)
+    | 'falling_three_methods'    // 하락 삼법형 (5봉)
+    // 3선 타격 (2종, 4봉) — 이름은 전통 명칭, 추세는 측정 방향
+    | 'bullish_three_line_strike' // 상승 삼선 타격형 → trend: bearish (Bulkowski: 하락 반전 65%)
+    | 'bearish_three_line_strike'; // 하락 삼선 타격형 → trend: bullish (Bulkowski: 상승 반전 84%)
 ```
 
 ### 감지 함수
@@ -901,7 +908,8 @@ type MultiCandlePattern =
 // 단봉: 현재 봉 1개로 판별
 detectCandlePattern(bar: Bar): CandlePattern
 
-// 다봉: 최근 2~3봉으로 판별 (감지 안 되면 null)
+// 다봉: 최근 2~5봉으로 판별 (감지 안 되면 null)
+// 5봉 → 4봉 → 3봉 → 2봉 순으로 첫 매치를 반환한다. stomach는 기존 2봉 패턴 뒤의 폴백이다.
 detectMultiCandlePattern(bars: Bar[]): MultiCandlePattern | null
 ```
 
@@ -1613,7 +1621,7 @@ display:
 ### Modules
 
 - `trend.ts` — `classifyTrend(bars, indicators): TrendState` using EMA20 slope over 20 bars (±3% threshold)
-- `confirmed.ts` — 8 detectors: RSI oversold/overbought, Golden/Death cross, MACD bullish/bearish cross, Bollinger lower bounce / upper breakout
+- `confirmed.ts` — 32 detectors: bullish/bearish pairs over RSI, MA cross, MACD, Bollinger (band touch, %B), Supertrend, Parabolic SAR, Ichimoku, CCI, DMI, CMF, MFI, Keltner, squeeze momentum, plus the price-structure pairs `new_52w_high`/`new_52w_low` (close past every high/low in `[last − 365d, last)`, only when the window's first bar is ≥ 358 days old) and `gap_up`/`gap_down` (last bar's range clears the previous bar's by ≥ 0.25 × ATR(14), or by any amount when ATR is unavailable). The four price-structure types are excluded from the `evaluateConfluence` tally (not measured as votes).
 - `anticipation.ts` — 8 detectors: RSI regular divergence (bullish/bearish), MACD histogram convergence (bullish/bearish), Bollinger squeeze (bullish/bearish), Support/Resistance proximity (bullish/bearish)
 - `index.ts` — `detectSignals(bars, indicators)` aggregator
 
@@ -1625,6 +1633,7 @@ display:
 - `SQUEEZE_LOOKBACK_BARS = 120`, `SQUEEZE_PERCENTILE = 0.1`, `SQUEEZE_PCT_B_THRESHOLD = 0.5`
 - `TREND_SLOPE_LOOKBACK = 20`, `TREND_SLOPE_THRESHOLD = 0.03`
 - `SR_PROXIMITY_PCT = 0.02`, `SR_APPROACH_LOOKBACK = 5`
+- `FIFTY_TWO_WEEK_LOOKBACK_DAYS = 365`, `FIFTY_TWO_WEEK_MIN_COVERAGE_DAYS = 358`, `GAP_MIN_ATR_MULT = 0.25`
 
 ### Trend Gate (Strict Mode)
 

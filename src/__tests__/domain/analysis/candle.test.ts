@@ -3,7 +3,7 @@ import {
     detectCandlePattern,
     detectMultiCandlePattern,
 } from '@/domain/analysis/candle';
-import type { Bar } from '@/domain/types';
+import type { Bar, MultiCandlePattern } from '@/domain/types';
 
 const makeBar = (
     open: number,
@@ -342,6 +342,81 @@ describe('detectMultiCandlePattern', () => {
             });
         });
 
+        describe('above_the_stomach / below_the_stomach', () => {
+            it('음봉 후 중간값 이상에서 시작·마감하는 양봉이면 above_the_stomach를 반환한다', () => {
+                // prev: long bearish 110→100, midpoint=105
+                // curr: bullish, open(106) ≥ 105, body [106,112] 밖이라 harami 아님
+                const prev = makeBar(110, 111, 99, 100);
+                const curr = makeBar(106, 113, 105, 112);
+                expect(detectMultiCandlePattern([prev, curr])).toBe(
+                    'above_the_stomach'
+                );
+            });
+
+            it('시가가 정확히 중간값이면(경계 포함) above_the_stomach를 반환한다', () => {
+                const prev = makeBar(110, 111, 99, 100);
+                const curr = makeBar(105, 113, 104, 112);
+                expect(detectMultiCandlePattern([prev, curr])).toBe(
+                    'above_the_stomach'
+                );
+            });
+
+            it('직전 음봉이 장대봉이 아니면 above_the_stomach가 아니다', () => {
+                // prev: body 1 / range 6 — 짧은 음봉, midpoint 100.5
+                const prev = makeBar(101, 103, 97, 100);
+                const curr = makeBar(101, 104, 100.5, 103.5);
+                expect(detectMultiCandlePattern([prev, curr])).toBeNull();
+            });
+
+            it('시가가 중간값 바로 아래면 above_the_stomach가 아니다', () => {
+                // open 104.9 < midpoint 105 — 다른 2봉 패턴에도 해당 없음
+                const prev = makeBar(110, 111, 99, 100);
+                const curr = makeBar(104.9, 113, 104, 112);
+                expect(detectMultiCandlePattern([prev, curr])).toBeNull();
+            });
+
+            it('양봉 후 중간값 이하에서 시작·마감하는 음봉이면 below_the_stomach를 반환한다', () => {
+                // prev: long bullish 100→110, midpoint=105
+                // curr: bearish, open(104) ≤ 105, bodyLow 98 < 100 이라 harami 아님
+                const prev = makeBar(100, 111, 99, 110);
+                const curr = makeBar(104, 105, 97, 98);
+                expect(detectMultiCandlePattern([prev, curr])).toBe(
+                    'below_the_stomach'
+                );
+            });
+
+            it('시가가 정확히 중간값이면(경계 포함) below_the_stomach를 반환한다', () => {
+                const prev = makeBar(100, 111, 99, 110);
+                const curr = makeBar(105, 106, 97, 98);
+                expect(detectMultiCandlePattern([prev, curr])).toBe(
+                    'below_the_stomach'
+                );
+            });
+
+            it('직전 봉의 몸통이 0(시가 = 종가)이면 below_the_stomach가 아니다', () => {
+                // isBullishBar는 close ≥ open이라 몸통 0인 봉도 양봉으로 본다 —
+                // 장대봉 조건이 이 도지를 걸러낸다.
+                const prev = makeBar(100, 101, 99, 100);
+                const curr = makeBar(99.99, 100.1, 99.7, 99.8);
+                expect(detectMultiCandlePattern([prev, curr])).toBeNull();
+            });
+
+            it('시가가 중간값 바로 위면 below_the_stomach가 아니다', () => {
+                const prev = makeBar(100, 111, 99, 110);
+                const curr = makeBar(105.1, 106, 97, 98);
+                expect(detectMultiCandlePattern([prev, curr])).toBeNull();
+            });
+
+            it('기존 2봉 패턴이 함께 성립하면 기존 라벨이 이긴다 (stomach는 폴백)', () => {
+                // stomach 조건도 맞지만(open 106 ≥ 105) 몸통이 prev 몸통 안 → harami
+                const prev = makeBar(110, 111, 99, 100);
+                const curr = makeBar(106, 110, 105, 109);
+                expect(detectMultiCandlePattern([prev, curr])).toBe(
+                    'bullish_harami'
+                );
+            });
+        });
+
         describe('null 반환', () => {
             it('어떤 2봉 패턴에도 해당하지 않으면 null을 반환한다', () => {
                 // both small bullish bars with no relation
@@ -617,5 +692,443 @@ describe('detectMultiCandlePattern', () => {
                 expect(detectMultiCandlePattern([a, b, c])).toBeNull();
             });
         });
+    });
+
+    describe('4봉 패턴 (three-line strike)', () => {
+        // b1–b3: 양봉, 종가 105 → 110 → 115 연속 상승
+        const up1 = makeBar(100, 106, 99, 105);
+        const up2 = makeBar(104, 111, 103, 110);
+        const up3 = makeBar(109, 116, 108, 115);
+
+        it('세 양봉 뒤 b3 종가 이상에서 시작해 b1 시가 아래로 마감하는 음봉이면 bullish_three_line_strike를 반환한다', () => {
+            // b4: open 116 ≥ b3.close 115, close 98 < b1.open 100
+            const strike = makeBar(116, 117, 97, 98);
+            expect(detectMultiCandlePattern([up1, up2, up3, strike])).toBe(
+                'bullish_three_line_strike'
+            );
+        });
+
+        it('b4 시가가 b3 종가와 같으면(경계 포함) bullish_three_line_strike를 반환한다', () => {
+            const strike = makeBar(115, 117, 97, 98);
+            expect(detectMultiCandlePattern([up1, up2, up3, strike])).toBe(
+                'bullish_three_line_strike'
+            );
+        });
+
+        it('b4 종가가 b1 시가와 같으면(< 아님) strike가 아니고 2봉 패턴으로 떨어진다', () => {
+            // close 100 == b1.open — strike 불성립, 마지막 2봉은 하락 장악형
+            const strike = makeBar(116, 117, 99, 100);
+            expect(detectMultiCandlePattern([up1, up2, up3, strike])).toBe(
+                'bearish_engulfing'
+            );
+        });
+
+        it('b1–b3 종가가 연속 상승하지 않으면 bullish_three_line_strike가 아니다', () => {
+            // b2 종가(105)가 b1 종가(105)와 같다
+            const flat2 = makeBar(104, 106, 103, 105);
+            const strike = makeBar(116, 117, 97, 98);
+            expect(
+                detectMultiCandlePattern([up1, flat2, up3, strike])
+            ).not.toBe('bullish_three_line_strike');
+        });
+
+        it('세 음봉 뒤 b3 종가 이하에서 시작해 b1 시가 위로 마감하는 양봉이면 bearish_three_line_strike를 반환한다', () => {
+            // b1–b3 종가 110 → 105 → 100 연속 하락, b4: open 99 ≤ 100, close 117 > b1.open 115
+            const down1 = makeBar(115, 116, 109, 110);
+            const down2 = makeBar(111, 112, 104, 105);
+            const down3 = makeBar(106, 107, 99, 100);
+            const strike = makeBar(99, 118, 98, 117);
+            expect(
+                detectMultiCandlePattern([down1, down2, down3, strike])
+            ).toBe('bearish_three_line_strike');
+        });
+
+        it('b4 시가가 b3 종가와 같으면(경계 포함) bearish_three_line_strike를 반환한다', () => {
+            const down1 = makeBar(115, 116, 109, 110);
+            const down2 = makeBar(111, 112, 104, 105);
+            const down3 = makeBar(106, 107, 99, 100);
+            const strike = makeBar(100, 118, 98, 117);
+            expect(
+                detectMultiCandlePattern([down1, down2, down3, strike])
+            ).toBe('bearish_three_line_strike');
+        });
+
+        it('b4 시가가 b3 종가보다 높으면 bearish_three_line_strike가 아니다', () => {
+            const down1 = makeBar(115, 116, 109, 110);
+            const down2 = makeBar(111, 112, 104, 105);
+            const down3 = makeBar(106, 107, 99, 100);
+            const strike = makeBar(100.5, 118, 98, 117);
+            expect(
+                detectMultiCandlePattern([down1, down2, down3, strike])
+            ).not.toBe('bearish_three_line_strike');
+        });
+
+        it('4봉 패턴이 2봉 패턴보다 우선한다 — 마지막 2봉만 보면 하락 장악형', () => {
+            const strike = makeBar(116, 117, 97, 98);
+            expect(detectMultiCandlePattern([up3, strike])).toBe(
+                'bearish_engulfing'
+            );
+            expect(detectMultiCandlePattern([up1, up2, up3, strike])).toBe(
+                'bullish_three_line_strike'
+            );
+        });
+    });
+
+    describe('5봉 패턴 (three methods)', () => {
+        // b1: 장대 양봉 100→110 (body 10 / range 12), 범위 [99, 111]
+        const longUp = makeBar(100, 111, 99, 110);
+        // b2–b4: 장대 아닌 작은 음봉, 모두 b1 범위 안
+        const rest1 = makeBar(109, 110, 106, 107);
+        const rest2 = makeBar(107, 108, 104, 105);
+        const rest3 = makeBar(105, 106, 102, 103);
+        // b5: 장대 양봉, close 115 > b1.close 110 (open 102.5 ≤ b4.close → 마지막 2봉은 상승 장악형)
+        const breakUp = makeBar(102.5, 116, 102, 115);
+
+        it('장대 양봉 + b1 범위 안의 작은 봉 3개 + 더 높이 마감하는 장대 양봉이면 rising_three_methods를 반환한다', () => {
+            expect(
+                detectMultiCandlePattern([longUp, rest1, rest2, rest3, breakUp])
+            ).toBe('rising_three_methods');
+        });
+
+        it('중간 봉의 고가·저가가 b1 고가·저가와 같으면(경계 포함) 여전히 rising_three_methods다', () => {
+            const touchesHigh = makeBar(109, 111, 106, 107);
+            const touchesLow = makeBar(102, 103, 99, 100.5);
+            expect(
+                detectMultiCandlePattern([
+                    longUp,
+                    touchesHigh,
+                    rest2,
+                    touchesLow,
+                    breakUp,
+                ])
+            ).toBe('rising_three_methods');
+        });
+
+        it('중간 봉이 b1 고가를 넘으면 rising_three_methods가 아니고 4봉 패턴으로 떨어진다', () => {
+            // b2–b4는 종가가 연속 하락하는 음봉 3개, b5는 b4 종가 아래서 열어
+            // b2 시가(109) 위로 마감 → bearish_three_line_strike
+            const breaksHigh = makeBar(109, 111.5, 106, 107);
+            expect(
+                detectMultiCandlePattern([
+                    longUp,
+                    breaksHigh,
+                    rest2,
+                    rest3,
+                    breakUp,
+                ])
+            ).toBe('bearish_three_line_strike');
+        });
+
+        it('중간 봉이 장대봉이면 rising_three_methods가 아니다', () => {
+            // body 4 / range 5 = 0.8 ≥ LONG_DAY_BODY_RATIO
+            const longRest = makeBar(108, 108.5, 103.5, 104);
+            expect(
+                detectMultiCandlePattern([
+                    longUp,
+                    rest1,
+                    longRest,
+                    rest3,
+                    breakUp,
+                ])
+            ).not.toBe('rising_three_methods');
+        });
+
+        it('b5 종가가 b1 종가를 넘지 못하면 rising_three_methods가 아니다', () => {
+            // close 110 == b1.close
+            const weakBreak = makeBar(99.5, 111, 99, 110);
+            expect(
+                detectMultiCandlePattern([
+                    longUp,
+                    rest1,
+                    rest2,
+                    rest3,
+                    weakBreak,
+                ])
+            ).not.toBe('rising_three_methods');
+        });
+
+        it('장대 음봉 + b1 범위 안의 작은 봉 3개 + 더 낮게 마감하는 장대 음봉이면 falling_three_methods를 반환한다', () => {
+            // b1: 110→100, 범위 [99, 111]; b5: 107.5→95 (body 12.5 / range 14)
+            const longDown = makeBar(110, 111, 99, 100);
+            const up1 = makeBar(101, 104, 100, 103);
+            const up2 = makeBar(103, 106, 102, 105);
+            const up3 = makeBar(105, 108, 104, 107);
+            const breakDown = makeBar(107.5, 108, 94, 95);
+            expect(
+                detectMultiCandlePattern([longDown, up1, up2, up3, breakDown])
+            ).toBe('falling_three_methods');
+        });
+
+        it('b5 종가가 b1 종가와 같으면(< 아님) falling_three_methods가 아니다', () => {
+            const longDown = makeBar(110, 111, 99, 100);
+            const up1 = makeBar(101, 104, 100, 103);
+            const up2 = makeBar(103, 106, 102, 105);
+            const up3 = makeBar(105, 108, 104, 107);
+            // long bearish (body 9 / range 10), close 100 == b1.close
+            const weakBreak = makeBar(109, 109.5, 99.5, 100);
+            expect(
+                detectMultiCandlePattern([longDown, up1, up2, up3, weakBreak])
+            ).not.toBe('falling_three_methods');
+        });
+
+        it('중간 봉이 b1 저가 아래로 내려가면 falling_three_methods가 아니다', () => {
+            const longDown = makeBar(110, 111, 99, 100);
+            const breaksLow = makeBar(101, 104, 98.5, 103);
+            const up2 = makeBar(103, 106, 102, 105);
+            const up3 = makeBar(105, 108, 104, 107);
+            const breakDown = makeBar(107.5, 108, 94, 95);
+            expect(
+                detectMultiCandlePattern([
+                    longDown,
+                    breaksLow,
+                    up2,
+                    up3,
+                    breakDown,
+                ])
+            ).not.toBe('falling_three_methods');
+        });
+
+        it('5봉 패턴이 4·2봉 패턴보다 우선한다 — 마지막 4봉은 bearish_three_line_strike, 마지막 2봉은 상승 장악형', () => {
+            expect(
+                detectMultiCandlePattern([rest1, rest2, rest3, breakUp])
+            ).toBe('bearish_three_line_strike');
+            expect(detectMultiCandlePattern([rest3, breakUp])).toBe(
+                'bullish_engulfing'
+            );
+        });
+    });
+
+    describe('긴 창(5봉)에서도 기존 2·3봉 결과는 불변', () => {
+        // 가격대가 동떨어진 평탄 봉 — 4·5봉 패턴의 b1 조건(장대/동색 연속 상승)을
+        // 어느 것도 만족시키지 못해, 앞에 두 개를 붙여도 기존 탐지 결과가 그대로여야 한다.
+        const PAD = makeBar(1000, 1001, 999, 1000);
+        const LEGACY_CASES: Array<[MultiCandlePattern, Bar[]]> = [
+            [
+                'bullish_engulfing',
+                [makeBar(105, 106, 99, 100), makeBar(99, 108, 98, 107)],
+            ],
+            [
+                'bearish_engulfing',
+                [makeBar(100, 106, 99, 105), makeBar(106, 107, 97, 98)],
+            ],
+            [
+                'bullish_harami',
+                [makeBar(110, 111, 99, 100), makeBar(103, 106, 102, 105)],
+            ],
+            [
+                'bullish_harami_cross',
+                [makeBar(110, 111, 99, 100), makeBar(103, 107, 99, 103.2)],
+            ],
+            [
+                'bearish_harami',
+                [makeBar(100, 111, 99, 110), makeBar(109, 110, 104, 105)],
+            ],
+            [
+                'bearish_harami_cross',
+                [makeBar(100, 111, 99, 110), makeBar(105, 108, 102, 105.3)],
+            ],
+            [
+                'piercing_line',
+                [makeBar(110, 111, 99, 100), makeBar(98, 108, 97, 107)],
+            ],
+            [
+                'dark_cloud_cover',
+                [makeBar(100, 111, 99, 110), makeBar(112, 113, 102, 103)],
+            ],
+            [
+                'bullish_counterattack_line',
+                [makeBar(110, 111, 99, 100), makeBar(90, 101, 89, 100.1)],
+            ],
+            [
+                'bearish_counterattack_line',
+                [makeBar(100, 111, 99, 110), makeBar(120, 121, 109, 110.1)],
+            ],
+            [
+                'tweezers_bottom',
+                [makeBar(105, 106, 90, 100), makeBar(90, 97, 90, 95)],
+            ],
+            [
+                'tweezers_top',
+                [makeBar(100, 110, 99, 105), makeBar(108, 110, 102, 103)],
+            ],
+            [
+                'on_neck',
+                [makeBar(110, 111, 99, 100), makeBar(97, 100, 96, 99.1)],
+            ],
+            [
+                'in_neck',
+                [makeBar(110, 111, 99, 100), makeBar(97, 103, 96, 100.5)],
+            ],
+            [
+                'three_white_soldiers',
+                [
+                    makeBar(100, 109, 99, 108),
+                    makeBar(103, 114, 102, 113),
+                    makeBar(108, 120, 107, 119),
+                ],
+            ],
+            [
+                'three_black_crows',
+                [
+                    makeBar(110, 111, 99, 100),
+                    makeBar(105, 106, 92, 93),
+                    makeBar(98, 99, 86, 87),
+                ],
+            ],
+            [
+                'morning_star',
+                [
+                    makeBar(110, 111, 99, 100),
+                    makeBar(97, 99, 96, 98),
+                    makeBar(99, 108, 98, 107),
+                ],
+            ],
+            [
+                'morning_doji_star',
+                [
+                    makeBar(110, 111, 99, 100),
+                    makeBar(97, 99, 95, 97.2),
+                    makeBar(99, 108, 98, 107),
+                ],
+            ],
+            [
+                'evening_star',
+                [
+                    makeBar(100, 111, 99, 110),
+                    makeBar(113, 116, 112, 115),
+                    makeBar(109, 110, 102, 103),
+                ],
+            ],
+            [
+                'evening_doji_star',
+                [
+                    makeBar(100, 111, 99, 110),
+                    makeBar(113, 116, 112, 113.3),
+                    makeBar(109, 110, 102, 103),
+                ],
+            ],
+            [
+                'bullish_abandoned_baby',
+                [
+                    makeBar(110, 111, 99, 100),
+                    makeBar(95, 97, 93, 95.2),
+                    makeBar(99, 106, 98, 105),
+                ],
+            ],
+            [
+                'bearish_abandoned_baby',
+                [
+                    makeBar(100, 111, 99, 110),
+                    makeBar(114, 116, 113, 114.2),
+                    makeBar(108, 112, 105, 106),
+                ],
+            ],
+            [
+                'three_inside_up',
+                [
+                    makeBar(110, 111, 99, 100),
+                    makeBar(101, 106, 100, 105),
+                    makeBar(103, 113, 102, 112),
+                ],
+            ],
+            [
+                'three_inside_down',
+                [
+                    makeBar(100, 111, 99, 110),
+                    makeBar(109, 110, 104, 105),
+                    makeBar(107, 108, 97, 98),
+                ],
+            ],
+            [
+                'three_outside_up',
+                [
+                    makeBar(105, 106, 99, 100),
+                    makeBar(99, 108, 98, 107),
+                    makeBar(105, 111, 104, 110),
+                ],
+            ],
+            [
+                'three_outside_down',
+                [
+                    makeBar(100, 106, 99, 105),
+                    makeBar(106, 107, 97, 98),
+                    makeBar(100, 101, 94, 95),
+                ],
+            ],
+            [
+                'bullish_triple_star',
+                [
+                    makeBar(100, 105, 95, 100.5),
+                    makeBar(91, 93, 89, 91.3),
+                    makeBar(90, 92, 88, 90.3),
+                ],
+            ],
+            [
+                'bearish_triple_star',
+                [
+                    makeBar(100, 105, 95, 100.5),
+                    makeBar(108, 110, 107, 108.3),
+                    makeBar(107, 109, 105, 106.7),
+                ],
+            ],
+            [
+                'upside_gap_two_crows',
+                [
+                    makeBar(100, 109, 99, 108),
+                    makeBar(115, 116, 111, 112),
+                    makeBar(113, 114, 109, 110),
+                ],
+            ],
+            [
+                'downside_gap_two_rabbits',
+                [
+                    makeBar(110, 111, 101, 102),
+                    makeBar(96, 100, 95, 99),
+                    makeBar(97, 101, 96, 100),
+                ],
+            ],
+            [
+                'advance_block',
+                [
+                    makeBar(100, 109, 99, 108),
+                    makeBar(102, 113, 101, 108),
+                    makeBar(104, 117, 103, 108),
+                ],
+            ],
+            [
+                'upside_gap_tasuki',
+                [
+                    makeBar(100, 108, 99, 107),
+                    makeBar(110, 116, 109, 115),
+                    makeBar(113, 114, 109, 110),
+                ],
+            ],
+            [
+                'downside_gap_tasuki',
+                [
+                    makeBar(110, 111, 102, 103),
+                    makeBar(100, 101, 94, 95),
+                    makeBar(97, 101, 96, 100),
+                ],
+            ],
+            [
+                'ladder_bottom',
+                [
+                    makeBar(110, 111, 99, 100),
+                    makeBar(108, 109, 94, 95),
+                    makeBar(110, 113, 109, 112),
+                ],
+            ],
+        ];
+
+        it.each(LEGACY_CASES)(
+            '%s: 앞에 평탄 봉 2개를 붙여도 같은 라벨을 반환한다',
+            (expected, fixture) => {
+                expect(detectMultiCandlePattern(fixture)).toBe(expected);
+                expect(detectMultiCandlePattern([PAD, PAD, ...fixture])).toBe(
+                    expected
+                );
+            }
+        );
     });
 });

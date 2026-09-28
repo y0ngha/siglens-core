@@ -11,6 +11,8 @@ import {
     detectDeathCross,
     detectDmiBearishCross,
     detectDmiBullishCross,
+    detectGapDown,
+    detectGapUp,
     detectGoldenCross,
     detectIchimokuCloudBreakdown,
     detectIchimokuCloudBreakout,
@@ -20,6 +22,8 @@ import {
     detectMacdBullishCross,
     detectMfiOverboughtReversal,
     detectMfiOversoldBounce,
+    detectNew52WeekHigh,
+    detectNew52WeekLow,
     detectParabolicSarBearishFlip,
     detectParabolicSarFlip,
     detectRsiOverbought,
@@ -73,6 +77,10 @@ const DETECTORS: readonly Detector[] = [
     detectKeltnerLowerBreakout,
     detectSqueezeMomentumBullish,
     detectSqueezeMomentumBearish,
+    detectNew52WeekHigh,
+    detectNew52WeekLow,
+    detectGapUp,
+    detectGapDown,
     detectRsiBullishDivergence,
     detectRsiBearishDivergence,
     detectMacdHistogramBullishConvergence,
@@ -87,12 +95,14 @@ const DETECTORS: readonly Detector[] = [
  * Run every bundled signal detector against bars + indicators and collect
  * the non-null results.
  *
- * Combines 28 confirmed-signal detectors — bullish/bearish mirror pairs for
+ * Combines 32 confirmed-signal detectors — bullish/bearish mirror pairs for
  * RSI overbought / oversold, golden / death cross, MACD cross, Bollinger band
  * touches, Bollinger %B mean-reversion crosses, Supertrend / Parabolic SAR
  * flips, Ichimoku breakout / breakdown,
- * CCI / DMI / CMF crosses, MFI bounce / reversal, Keltner breakouts, and
- * squeeze momentum — with 8 anticipation-signal detectors (RSI / MACD
+ * CCI / DMI / CMF crosses, MFI bounce / reversal, Keltner breakouts,
+ * squeeze momentum, 52-week high / low (a close past the prior year's
+ * extreme, only once a year of bars is present) and gap up / down — with 8
+ * anticipation-signal detectors (RSI / MACD
  * histogram divergences, Bollinger squeeze, support / resistance proximity,
  * etc.).
  *
