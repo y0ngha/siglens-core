@@ -73,6 +73,7 @@ describe('browser public API exports', () => {
         expect(clientApi.FEAR_GREED_LABEL_CUTOFFS.NEUTRAL_MAX).toBe(55);
         expect(clientApi.POC_WINDOW_DEFAULT).toBe(60);
         expect(clientApi.scoreToLabel(10)).toBe('EXTREME_FEAR');
+        expect(typeof clientApi.classifyMaStack).toBe('function');
         expect(skillType).toBe('indicator_guide');
     });
 

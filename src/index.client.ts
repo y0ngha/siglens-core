@@ -235,6 +235,7 @@ export {
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
 export { computeMarketReference } from './domain/analysis/marketReference';
+export { classifyMaStack } from './domain/analysis/trendStructure';
 export {
     extractReconciledActionLines,
     validateActionPrices,
@@ -551,6 +552,7 @@ export type {
     ReferenceLevelKind,
     PriceVsLevel,
     EmaStackState,
+    MaStackDirection,
     SwingStructureState,
     MarketRegime,
     QuadrantKey,

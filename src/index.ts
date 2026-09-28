@@ -254,6 +254,7 @@ export {
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
 export { computeMarketReference } from './domain/analysis/marketReference';
+export { classifyMaStack } from './domain/analysis/trendStructure';
 // Position bucket — pure P&L-band bucketizer + its domain type. Consumers
 // (siglens server action) compute the bucket, then pass the finished enum to
 // submitAnalysis; the cache-key/prompt wiring stays internal.
@@ -860,6 +861,7 @@ export type {
     ReferenceLevelKind,
     PriceVsLevel,
     EmaStackState,
+    MaStackDirection,
     SwingStructureState,
     MarketRegime,
     MACDResult,

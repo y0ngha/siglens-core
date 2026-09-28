@@ -9,6 +9,7 @@ import {
     formatNullableNumber,
     formatSignedNumber,
 } from '@/domain/analysis/promptFormat';
+import { classifyStackOrder } from '@/domain/analysis/trendStructure';
 import type {
     BollingerResult,
     DMIResult,
@@ -81,8 +82,6 @@ function maEmaLine(
     return `- Price vs ${label}: ${parts.join(' / ')}`;
 }
 
-type StackVerdict = 'bullish' | 'bearish' | 'mixed';
-
 /**
  * @internal `bullish (MA5>MA20>MA60>MA120)` / `bearish (…<…)` / `mixed`, or
  * `'N/A'` when fewer than 2 of `periods` have a value. Only periods with a
@@ -96,15 +95,8 @@ function stackLine(
     const points = periods
         .map(p => ({ p, v: lastValueOf(series[p]) }))
         .filter((x): x is { p: number; v: number } => x.v !== null);
-    if (points.length < 2) return `- ${label} stack: N/A`;
-
-    const decreasing = points.every((x, i) => i === 0 || x.v < points[i - 1].v);
-    const increasing = points.every((x, i) => i === 0 || x.v > points[i - 1].v);
-    const verdict: StackVerdict = decreasing
-        ? 'bullish'
-        : increasing
-          ? 'bearish'
-          : 'mixed';
+    const verdict = classifyStackOrder(points.map(x => x.v));
+    if (verdict === null) return `- ${label} stack: N/A`;
     if (verdict === 'mixed') return `- ${label} stack: mixed`;
     const labels = points.map(x => `${label}${x.p}`);
     const joiner = verdict === 'bullish' ? '>' : '<';
