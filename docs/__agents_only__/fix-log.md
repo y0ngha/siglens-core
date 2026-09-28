@@ -169,3 +169,14 @@
 - Violation: inclusive (≥/≤) spec boundaries not pinned by tests; off-by-one comparator mutations passed the suite
   - Rule: MISTAKES Tests §5.5 — boundary-equality cases required when the spec defines inclusive bounds
   - Context: Added equality-boundary tests for stomach midpoint, three-line strike b4.open==b3.close, falling three methods b5.close==b1.close; rounding_top rim span-bound test.
+
+## [feat/news-macro-calendar Rounds 1–2 | feat/news-macro-calendar | 2026-09-28]
+- Violation: FMP naive `YYYY-MM-DD HH:mm:ss` (UTC) parsed with `new Date()` → local time; day-offset suffix changed with host timezone
+  - Rule: MISTAKES Domain — domain output must be host-independent; reuse the existing `parseCalendarDate` (appends Z) for FMP timestamps
+  - Context: Moved parseCalendarDate to promptFormat.ts (shared), added timezone-independent unit tests (CI runs in UTC, so a rendered-row test alone could not catch a revert).
+- Violation: backward-compat promise (cache key / sampling seed unchanged when option omitted) asserted only by comparing two outputs of the new code
+  - Rule: MISTAKES Tests — a "byte-identical to before" claim needs a literal pre-change value (or golden) in the test
+  - Context: Added literal no-macro cache key assertion and content-matched seed-parts spy.
+- Violation: cache fingerprint excluded rendered fields (estimate/previous) with a false justification; public JSDoc/PUBLIC_API drifted
+  - Rule: MISTAKES Config&State — every field that changes prompt bytes belongs in the cache key
+  - Context: Fingerprint now covers all rendered fields; JSDoc and PUBLIC_API synced.

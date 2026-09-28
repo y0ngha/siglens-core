@@ -4,6 +4,7 @@ import {
     formatPlainNumber,
     formatSignedNumber,
     formatSignedPercent,
+    parseCalendarDate,
 } from '@/domain/analysis/promptFormat';
 import { MS_PER_DAY, MS_PER_HOUR } from '@/domain/constants/time';
 import type { AssembledPrompt } from '@/domain/types';
@@ -62,29 +63,6 @@ function formatIndicatorDelta(
 }
 
 const HOURS_PER_DAY = 24;
-
-/**
- * Parses a calendar timestamp as UTC. FMP's economic calendar returns naive
- * `YYYY-MM-DD HH:mm:ss` timestamps in UTC with no zone suffix; `new
- * Date(isoDate)` parses a space-separated, zone-less string as **local**
- * time per the JS Date spec, which silently shifted every event by the
- * runtime's UTC offset. Appending `Z` (after normalizing the separator)
- * forces the intended UTC interpretation. Date-only (`YYYY-MM-DD`) is
- * already UTC midnight per the Date spec.
- *
- * `labelUtc` is true when the printed string is a naive time, so the prompt
- * line can name its zone.
- */
-function parseCalendarDate(
-    isoDate: string
-): { date: Date; labelUtc: boolean } | null {
-    const hasTime = isoDate.includes('T') || isoDate.includes(' ');
-    const normalized = isoDate.replace(' ', 'T');
-    const hasZone = /Z$|[+-]\d\d:?\d\d$/.test(normalized);
-    const date = new Date(hasTime && !hasZone ? `${normalized}Z` : normalized);
-    if (Number.isNaN(date.getTime())) return null;
-    return { date, labelUtc: hasTime && !hasZone };
-}
 
 /** `N` hours as text, never `0h` — sub-hour gaps read `<1h`. */
 function hoursText(hours: number): string {

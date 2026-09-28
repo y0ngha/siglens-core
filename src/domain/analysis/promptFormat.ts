@@ -59,17 +59,21 @@ export function formatBarDateTime(timeMs: number): string {
 }
 
 /**
- * @internal Whole calendar days from `now`'s UTC date to `targetIso`'s UTC
- * date — today is `0`, tomorrow `1`, yesterday `-1` — regardless of either
- * timestamp's time-of-day (spec 2026-09-18). A raw `Math.round(ms
- * diff / MS_PER_DAY)` drifted: at `now = …T20:00Z`, a target dated "today"
- * (parsed as UTC midnight) is 20 hours in the PAST, rounding to `-1` — "1 day
- * ago" for an event still happening today. `null` when `targetIso` cannot be
- * parsed.
+ * @internal Whole calendar days between two `Date`s' UTC dates — today is
+ * `0`, tomorrow `1`, yesterday `-1` — regardless of either `Date`'s
+ * time-of-day (spec 2026-09-18). A raw `Math.round(ms diff / MS_PER_DAY)`
+ * drifted: at `now = …T20:00Z`, a target dated "today" (parsed as UTC
+ * midnight) is 20 hours in the PAST, rounding to `-1` — "1 day ago" for an
+ * event still happening today.
+ *
+ * Pure `Date`-to-`Date` version of {@link calendarDayDiff}'s day math, for a
+ * caller that already holds a parsed `Date` — in particular one normalized
+ * to UTC via {@link parseCalendarDate} for a naive `YYYY-MM-DD HH:mm:ss`
+ * timestamp, where `new Date(targetIso)` would silently reparse as local
+ * time (spec 2026-09-28 — the news prompt's macro-calendar section hit this
+ * exact bug before routing through `parseCalendarDate` first).
  */
-export function calendarDayDiff(targetIso: string, now: Date): number | null {
-    const target = new Date(targetIso);
-    if (Number.isNaN(target.getTime())) return null;
+export function calendarDayDiffFromDate(target: Date, now: Date): number {
     const targetDateOnly = Date.UTC(
         target.getUTCFullYear(),
         target.getUTCMonth(),
@@ -81,6 +85,52 @@ export function calendarDayDiff(targetIso: string, now: Date): number | null {
         now.getUTCDate()
     );
     return Math.round((targetDateOnly - nowDateOnly) / MS_PER_DAY);
+}
+
+/**
+ * @internal Whole calendar days from `now`'s UTC date to `targetIso`'s UTC
+ * date (spec 2026-09-18). `null` when `targetIso` cannot be parsed.
+ *
+ * Parses `targetIso` with a bare `new Date(...)`, which is only safe for a
+ * date-only (`YYYY-MM-DD`) or already-zoned string — both are UTC per the
+ * `Date` spec. A naive `YYYY-MM-DD HH:mm:ss` timestamp (FMP's economic
+ * calendar) parses as **local** time here; callers with that shape must
+ * parse via {@link parseCalendarDate} first and call
+ * {@link calendarDayDiffFromDate} on the normalized `Date` instead.
+ */
+export function calendarDayDiff(targetIso: string, now: Date): number | null {
+    const target = new Date(targetIso);
+    if (Number.isNaN(target.getTime())) return null;
+    return calendarDayDiffFromDate(target, now);
+}
+
+/**
+ * @internal
+ * Parses a calendar timestamp as UTC. FMP's economic calendar returns naive
+ * `YYYY-MM-DD HH:mm:ss` timestamps in UTC with no zone suffix; `new
+ * Date(isoDate)` parses a space-separated, zone-less string as **local**
+ * time per the JS Date spec, which silently shifts every event by the
+ * runtime's UTC offset. Appending `Z` (after normalizing the separator)
+ * forces the intended UTC interpretation. Date-only (`YYYY-MM-DD`) is
+ * already UTC midnight per the Date spec.
+ *
+ * Shared by {@link buildMacroBriefingPrompt} (`economy/macroBriefingPrompt.ts`)
+ * and the news prompt's macro-calendar section (`analysis/newsPrompt.ts`) —
+ * both render FMP calendar rows and must not silently drift by the
+ * runtime's UTC offset (spec 2026-09-28).
+ *
+ * `labelUtc` is true when the printed string is a naive time, so the caller
+ * can name its zone in the rendered text.
+ */
+export function parseCalendarDate(
+    isoDate: string
+): { date: Date; labelUtc: boolean } | null {
+    const hasTime = isoDate.includes('T') || isoDate.includes(' ');
+    const normalized = isoDate.replace(' ', 'T');
+    const hasZone = /Z$|[+-]\d\d:?\d\d$/.test(normalized);
+    const date = new Date(hasTime && !hasZone ? `${normalized}Z` : normalized);
+    if (Number.isNaN(date.getTime())) return null;
+    return { date, labelUtc: hasTime && !hasZone };
 }
 
 /**

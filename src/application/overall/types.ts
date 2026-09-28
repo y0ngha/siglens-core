@@ -27,6 +27,7 @@ import type {
     AssetClass,
     CurrencyCode,
     EarningsCalendarItem,
+    EconomicCalendarEvent,
     EnrichedNewsItem,
     FinancialsScorecard,
     FundamentalAnalysisResponse,
@@ -211,6 +212,17 @@ export interface OverallDependencyInputs {
     /** Upcoming or recent earnings calendar entries for the symbol. */
     upcomingCalendar: readonly EarningsCalendarItem[];
     /**
+     * Scheduled macro-economic releases (FOMC, CPI, etc.), forwarded
+     * unchanged to the news axis (`runNewsAnalysis`'s `macroCalendar`
+     * option — spec 2026-09-28 §5). Kept top-level (mirroring
+     * `upcomingCalendar`) rather than folded into the `news` per-axis
+     * options object, so a standalone `runNewsAnalysis` call and this
+     * overall call built from the same top-level inputs produce the same
+     * news input and therefore the same cache key. Defaults to `[]`,
+     * matching `runNewsAnalysis`'s own default.
+     */
+    macroCalendar?: readonly EconomicCalendarEvent[];
+    /**
      * Options forwarded verbatim to `submitAnalysis` (the technical axis).
      *
      * The resolver does not interpret these options — the Phase-2 siglens
@@ -387,6 +399,17 @@ export interface OverallDependencyInputs {
      *   resolved `DependencyStateCached` carries `fundamental: null` /
      *   `options: null` so the prompt builder treats them as intentionally
      *   absent rather than missing data.
+     *
+     * Also forwarded verbatim to the news axis's `runNewsAnalysis` call
+     * (review round 1 finding 9, spec 2026-09-28) — a standalone
+     * `runNewsAnalysis` call and this overall call must build the SAME news
+     * prompt from the same `assetClass`, since `buildNewsCacheKey` does not
+     * fold `assetClass` into the cache key: an overall call that omitted it
+     * would write an equity-framed prompt under the exact key a correctly
+     * framed crypto `/news` call reads (and vice versa). NOT currently
+     * forwarded to the technical/fundamental/options axes — none of their
+     * per-axis `Pick`s carry `assetClass`, so extending this to them is a
+     * separate, wider change if their prompts ever need the same guarantee.
      *
      * Optional for backward compatibility — omit to keep equity behavior.
      */
