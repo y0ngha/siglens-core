@@ -1,5 +1,16 @@
 # Changelog
 
+# [1.18.0](https://github.com/y0ngha/siglens-core/compare/v1.17.2...v1.18.0) (2026-09-28)
+
+### Bug Fixes
+
+* **news:** 매크로 지문 JSON 직렬화 + 렌더 12행과 동일 선택 (PR [#232](https://github.com/y0ngha/siglens-core/issues/232) 리뷰 반영) ([5d9079f](https://github.com/y0ngha/siglens-core/commit/5d9079ffa9c1fd0c7acf9aa5e55028e03bc8f88e))
+
+### Features
+
+* **detectors:** 캔들 6종·차트 패턴 5종·신호 4종 추가 + PROMPT_TEMPLATE_VERSION p19 ([5ec29d5](https://github.com/y0ngha/siglens-core/commit/5ec29d564f583b8cb546f9bc4aecd1014f22994a))
+* **news:** 뉴스·종합 분석 프롬프트에 매크로 캘린더 주입 + 종합 뉴스 축 assetClass 전달 ([03ffd10](https://github.com/y0ngha/siglens-core/commit/03ffd107430a8b1f6beb4447a14dd93e080b8912))
+
 ## [1.17.2](https://github.com/y0ngha/siglens-core/compare/v1.17.1...v1.17.2) (2026-09-26)
 
 ### Bug Fixes
