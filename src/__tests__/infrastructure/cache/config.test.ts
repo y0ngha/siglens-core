@@ -13,6 +13,7 @@ import {
     BARS_OFFHOURS_TTL_CEILING_SECONDS,
     BARS_OPEN_TTL_SECONDS,
     buildAnalysisCacheKey,
+    buildAnalysisPeekCacheKey,
     buildBriefingCacheKey,
     buildCongressTrendCacheKey,
     buildFinancialsCacheKey,
@@ -42,6 +43,7 @@ import {
     NEWS_PROMPT_TEMPLATE_VERSION,
     OVERALL_CACHE_TTL_SECONDS,
     OVERALL_PROMPT_TEMPLATE_VERSION,
+    priorAnalysisWindowStartMs,
     PROMPT_TEMPLATE_VERSION,
     SECTOR_SIGNALS_15MIN_TTL_MINUTES,
     SECTOR_SIGNALS_1HOUR_TTL_MINUTES,
@@ -250,6 +252,78 @@ describe('new analysis cache keys', () => {
         ).toBe(
             `${CACHE_KEY_SCHEMA_VERSION}:analysis:overall:peek:AAPL:5Min:gemini-3.1-pro-preview:${OVERALL_PROMPT_TEMPLATE_VERSION}`
         );
+    });
+
+    it('buildAnalysisPeekCacheKey: peek segment + tier, no skill/history/events fingerprint', () => {
+        expect(
+            buildAnalysisPeekCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-3.6-flash',
+                'free'
+            )
+        ).toBe(
+            `analysis:peek:AAPL:1Day:gemini-3.6-flash:${PROMPT_TEMPLATE_VERSION}:free`
+        );
+    });
+
+    it('buildAnalysisPeekCacheKey: reasoning → positionBucket → locale 순서로 suffix가 붙는다', () => {
+        const base = buildAnalysisPeekCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-3.6-flash',
+            'free'
+        );
+        expect(
+            buildAnalysisPeekCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-3.6-flash',
+                'free',
+                true,
+                'profit',
+                'en'
+            )
+        ).toBe(`${base}:reason=on:pos=profit:lang=en`);
+    });
+
+    it('buildAnalysisPeekCacheKey: locale 생략과 ko는 완전히 같은 키다', () => {
+        const omitted = buildAnalysisPeekCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-3.6-flash',
+            'free'
+        );
+        const ko = buildAnalysisPeekCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-3.6-flash',
+            'free',
+            undefined,
+            undefined,
+            'ko'
+        );
+        expect(ko).toBe(omitted);
+    });
+
+    it('buildAnalysisPeekCacheKey: en은 :lang=en suffix를 붙인다', () => {
+        const base = buildAnalysisPeekCacheKey(
+            'AAPL',
+            '1Day',
+            'gemini-3.6-flash',
+            'free'
+        );
+        expect(
+            buildAnalysisPeekCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-3.6-flash',
+                'free',
+                undefined,
+                undefined,
+                'en'
+            )
+        ).toBe(`${base}:lang=en`);
     });
 
     it('CACHE_KEY_SCHEMA_VERSION is a non-empty string used as a global invalidation lever', () => {
@@ -918,8 +992,13 @@ describe('locale이 캐시 키에 반영될 때', () => {
 
 describe('narrowPriorAnalysesForCacheKey (prior-analysis-context, Task 5a)', () => {
     const WINDOW_SECONDS = 300; // 5 minutes, arbitrary but representative of ANALYSIS_CACHE_TTL['5Min']
+    // A bucket edge for a 300s window (00:10:00 is a multiple of 5 minutes),
+    // so the anchored bucket start below equals NOW_MS itself.
     const NOW_MS = Date.parse('2026-01-01T00:10:00.000Z');
-    const windowStartMs = NOW_MS - WINDOW_SECONDS * 1000;
+    const windowStartMs = priorAnalysisWindowStartMs(
+        WINDOW_SECONDS,
+        new Date(NOW_MS)
+    );
 
     it('cutoff에 정확히 걸친 항목은 제외되고, 바로 바깥(더 과거) 항목은 포함된다', () => {
         const now = new Date(NOW_MS);
@@ -1010,28 +1089,96 @@ describe('narrowPriorAnalysesForCacheKey (prior-analysis-context, Task 5a)', () 
         expect(r2.fingerprint).toBe(r1.fingerprint);
     });
 
-    it('항목이 현재 윈도우를 벗어나면(ages out) 생존자 집합이 바뀌어 fingerprint도 바뀐다', () => {
-        const entryMs = NOW_MS;
-        const entry = priorAnalysisAt(new Date(entryMs));
+    // Anchored bucket, not a rolling `now - window`: a row inside the current
+    // bucket stays excluded for the ENTIRE bucket, even past the point where a
+    // rolling boundary would have aged it in — it only becomes a survivor once
+    // the bucket edge itself moves past it.
+    it('버킷 경계 전까지는(버킷 중간에서도) 생존자 집합이 그대로다가, 다음 버킷 경계에서만 바뀐다', () => {
+        const entry = priorAnalysisAt(new Date(windowStartMs + 50 * 1000));
 
-        // Still inside the window at this `now` — excluded, no fingerprint.
-        const now1 = new Date(entryMs + (WINDOW_SECONDS * 1000) / 2);
+        // At the bucket start — entry is inside the bucket, excluded.
         const r1 = narrowPriorAnalysesForCacheKey(
             [entry],
             WINDOW_SECONDS,
-            now1
+            new Date(NOW_MS)
         );
         expect(r1.fingerprint).toBeUndefined();
 
-        // The window has rolled past `entry.generatedAt` — now included.
-        const now2 = new Date(entryMs + WINDOW_SECONDS * 1000 + 1000);
+        // Half the window later — still the SAME bucket. Under the old rolling
+        // design this is exactly where the row would have aged in; the
+        // anchored bucket has not moved, so the fingerprint is unchanged.
+        const midBucket = new Date(NOW_MS + (WINDOW_SECONDS * 1000) / 2);
         const r2 = narrowPriorAnalysesForCacheKey(
             [entry],
             WINDOW_SECONDS,
-            now2
+            midBucket
         );
-        expect(r2.fingerprint).toBeDefined();
-        expect(r2.fingerprint).not.toBe(r1.fingerprint);
+        expect(r2.fingerprint).toBe(r1.fingerprint);
+
+        // The next bucket edge — the window boundary itself moves past
+        // `entry.generatedAt`, so it now qualifies as a survivor.
+        const nextEdge = new Date(NOW_MS + WINDOW_SECONDS * 1000);
+        const r3 = narrowPriorAnalysesForCacheKey(
+            [entry],
+            WINDOW_SECONDS,
+            nextEdge
+        );
+        expect(r3.fingerprint).toBeDefined();
+        expect(r3.fingerprint).not.toBe(r1.fingerprint);
+    });
+});
+
+describe('priorAnalysisWindowStartMs (anchored cache bucket)', () => {
+    it('1Day 버킷은 now 기준 가장 최근의 UTC 20:00(KST 05:00)에서 시작한다', () => {
+        const startMs = priorAnalysisWindowStartMs(
+            SECONDS_PER_DAY,
+            new Date('2026-09-29T21:00:00.000Z')
+        );
+        expect(new Date(startMs).toISOString()).toBe(
+            '2026-09-29T20:00:00.000Z'
+        );
+    });
+
+    it('1Day 버킷: 다음날 UTC 20:00 직전까지는 같은 버킷 시작을 유지한다', () => {
+        const startMs = priorAnalysisWindowStartMs(
+            SECONDS_PER_DAY,
+            new Date('2026-09-30T19:59:59.999Z')
+        );
+        expect(new Date(startMs).toISOString()).toBe(
+            '2026-09-29T20:00:00.000Z'
+        );
+    });
+
+    it('15Min 버킷은 :00/:15/:30/:45에 정렬된다', () => {
+        const cases: [string, string][] = [
+            ['2026-09-29T13:07:00.000Z', '2026-09-29T13:00:00.000Z'],
+            ['2026-09-29T13:16:00.000Z', '2026-09-29T13:15:00.000Z'],
+            ['2026-09-29T13:31:00.000Z', '2026-09-29T13:30:00.000Z'],
+            ['2026-09-29T13:59:00.000Z', '2026-09-29T13:45:00.000Z'],
+        ];
+        for (const [now, expected] of cases) {
+            const startMs = priorAnalysisWindowStartMs(
+                15 * SECONDS_PER_MINUTE,
+                new Date(now)
+            );
+            expect(new Date(startMs).toISOString()).toBe(expected);
+        }
+    });
+
+    it('now가 정확히 버킷 경계면 자기 자신이 버킷 시작이다', () => {
+        const boundary = '2026-09-29T13:15:00.000Z';
+        const startMs = priorAnalysisWindowStartMs(
+            15 * SECONDS_PER_MINUTE,
+            new Date(boundary)
+        );
+        expect(new Date(startMs).toISOString()).toBe(boundary);
+
+        const dayBoundary = '2026-09-29T20:00:00.000Z';
+        const dayStartMs = priorAnalysisWindowStartMs(
+            SECONDS_PER_DAY,
+            new Date(dayBoundary)
+        );
+        expect(new Date(dayStartMs).toISOString()).toBe(dayBoundary);
     });
 });
 
@@ -1158,6 +1305,97 @@ describe('analysisHistoryQuery', () => {
         expect(analysisHistoryQuery('5Min').sinceMs).not.toBe(
             ANALYSIS_CACHE_TTL['5Min'] * cap * 1000
         );
+    });
+
+    describe('generatedBeforeMs (anchored current cache bucket)', () => {
+        it('technical 축 기본값: 1Day는 UTC 20:00, 15Min은 15분 정렬 버킷 시작이다', () => {
+            expect(
+                analysisHistoryQuery(
+                    '1Day',
+                    'technical',
+                    new Date('2026-09-29T21:00:00.000Z')
+                ).generatedBeforeMs
+            ).toBe(Date.parse('2026-09-29T20:00:00.000Z'));
+            expect(
+                analysisHistoryQuery(
+                    '15Min',
+                    'technical',
+                    new Date('2026-09-29T13:07:00.000Z')
+                ).generatedBeforeMs
+            ).toBe(Date.parse('2026-09-29T13:00:00.000Z'));
+        });
+
+        it('overall 축은 고정된 OVERALL_CACHE_TTL_SECONDS(1일) 윈도우의 버킷 시작을 쓴다', () => {
+            expect(
+                analysisHistoryQuery(
+                    '15Min',
+                    'overall',
+                    new Date('2026-09-29T21:00:00.000Z')
+                ).generatedBeforeMs
+            ).toBe(Date.parse('2026-09-29T20:00:00.000Z'));
+        });
+
+        // Regression (PLTR 1Day, 2026-09-29): with `ORDER BY generated_at DESC
+        // LIMIT limit` applied before the window filter, each fresh generation
+        // evicted the oldest in-key row and changed the `:hist=` fingerprint,
+        // so every request missed. Excluding the bucket in the query keeps the
+        // fingerprint stable across new in-bucket generations.
+        it('keeps the history fingerprint stable when a new in-bucket row is inserted', () => {
+            const now = new Date('2026-09-29T16:00:00Z');
+            const { limit, generatedBeforeMs } = analysisHistoryQuery(
+                '1Day',
+                'technical',
+                now
+            );
+            const bucketAgeMs = now.getTime() - generatedBeforeMs;
+            const at = (msAgo: number) => ({
+                generatedAt: new Date(now.getTime() - msAgo),
+            });
+            // 24 rows older than the bucket start + `limit - 3` rows inside the
+            // current bucket, so the old query's LIMIT still lets 3
+            // out-of-bucket rows into the key — the production shape where the
+            // churn started.
+            const old = Array.from({ length: 24 }, (_, i) =>
+                at(bucketAgeMs + (i + 1) * HOUR_MS)
+            );
+            const inBucket = Array.from({ length: limit - 3 }, (_, i) =>
+                at((i + 1) * 60 * 1000)
+            );
+            const newest = at(1000);
+            const query = (
+                rows: { generatedAt: Date }[],
+                excludeBucket: boolean
+            ) =>
+                rows
+                    .filter(
+                        r =>
+                            !excludeBucket ||
+                            r.generatedAt.getTime() < generatedBeforeMs
+                    )
+                    .toSorted(
+                        (a, b) =>
+                            b.generatedAt.getTime() - a.generatedAt.getTime()
+                    )
+                    .slice(0, limit)
+                    .map(r => ({ ...r }) as never);
+            const fp = (
+                rows: { generatedAt: Date }[],
+                excludeBucket: boolean
+            ) =>
+                narrowPriorAnalysesForCacheKey(
+                    query(rows, excludeBucket),
+                    ANALYSIS_CACHE_TTL['1Day'],
+                    now
+                ).fingerprint;
+
+            const before = [...old, ...inBucket];
+            const after = [...before, newest];
+            // Old query shape: the new row displaces an older one → key churns.
+            expect(fp(after, false)).not.toBe(fp(before, false));
+            // Bucket excluded in the query: the key survives the new row.
+            expect(fp(after, true)).toBe(fp(before, true));
+            expect(fp(after, true)).toBeDefined();
+        });
     });
 });
 

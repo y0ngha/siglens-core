@@ -57,4 +57,15 @@ export interface AnalysisHistoryQuery {
     limit: number;
     /** How far back in milliseconds the `WHERE` clause should reach from now. */
     sinceMs: number;
+    /**
+     * Exclusive upper bound (epoch ms) for `generated_at`: the start of the
+     * consuming axis' current cache bucket. Core drops newer rows from the key
+     * anyway; leaving them in the `LIMIT` lets every fresh generation evict an
+     * older, in-key row and change the `:hist=` fingerprint (see
+     * {@link analysisHistoryQuery}).
+     */
+    generatedBeforeMs: number;
 }
+
+/** Which analysis axis consumes the history — each has its own cache window. */
+export type AnalysisHistoryAxis = 'technical' | 'overall';

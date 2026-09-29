@@ -155,3 +155,13 @@
   - Rule: MISTAKES.md TypeScript 4.5 — Tier 2 public functions must have @param and @returns JSDoc tags
   - Context: New Tier 2 function added to src/domain/analysis/trendStructure.ts without @returns documentation. Fixed by adding @returns tag.
 
+## [Branch fix/history-window-cache-churn | 2026-09-30] — Round 1 review findings
+
+- Violation 1 (required): Orphaned JSDoc after inserting new function between JSDoc block and declaration
+  - Rule: JSDoc blocks must immediately precede target declarations; inserting code between JSDoc and declaration orphans the JSDoc to misapply
+  - Context: New function inserted between existing JSDoc and its target declaration. JSDoc still documented old rolling-window formula, now applying to wrong function. Fixed by relocating JSDoc or function to restore proper association.
+
+- Violation 3 (recommended): Pointer key computed on every generation, trade-off not documented
+  - Rule: Infrastructure design trade-offs must be documented with comments explaining the choice and upgrade path
+  - Context: Optimization to skip pointer key recomputation on cache-hit paths was undocumented. Fixed by adding comment explaining memory/CPU trade-off and when full recomputation would be necessary.
+

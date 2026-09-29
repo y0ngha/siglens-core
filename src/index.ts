@@ -572,7 +572,10 @@ export type {
 
 export type { CacheProvider } from './domain/ports/cache';
 // Return type of `analysisHistoryQuery` (Tier 3, exported above).
-export type { AnalysisHistoryQuery } from './infrastructure/cache/types';
+export type {
+    AnalysisHistoryAxis,
+    AnalysisHistoryQuery,
+} from './infrastructure/cache/types';
 export type { ChatTokenStore } from './domain/ports/chatTokenStore';
 export type { UserTier } from './domain/ports/userTierRepository';
 export type {

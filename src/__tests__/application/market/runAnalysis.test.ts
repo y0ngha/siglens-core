@@ -60,9 +60,12 @@ import type { UsageRepository } from '@/domain/ports/usageRepository';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import {
+    buildAnalysisPeekCacheKey,
     computeEffectiveTtl,
+    DEFAULT_ANALYSIS_MODEL_ID,
     PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
+import { DEFAULT_TIER } from '@/domain/tier';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
@@ -528,6 +531,30 @@ describe('runAnalysis', () => {
             expect(mockComputeEffectiveTtl).toHaveBeenCalled();
             expect(mockCacheSet).toHaveBeenCalledWith(
                 expect.any(String),
+                expect.objectContaining({ summary: mockRawResult.summary }),
+                3600
+            );
+        });
+
+        it('a fresh generation also writes the peek pointer key (same value, same TTL)', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            const pointerKey = buildAnalysisPeekCacheKey(
+                mockSymbol,
+                mockTimeframe,
+                DEFAULT_ANALYSIS_MODEL_ID,
+                DEFAULT_TIER
+            );
+            expect(mockCacheSet).toHaveBeenCalledTimes(2);
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                pointerKey,
                 expect.objectContaining({ summary: mockRawResult.summary }),
                 3600
             );
@@ -1504,7 +1531,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             expect(result.result.riskLevel).toBe('low');
             expect(result.result.analyzedAt).toEqual(expect.any(String));
             expect('unfilteredResult' in result).toBe(false);
-            expect(mockCacheSet).toHaveBeenCalledTimes(1);
+            // Exact key + peek pointer key — one fire-and-forget write each.
+            expect(mockCacheSet).toHaveBeenCalledTimes(2);
         });
     });
 });

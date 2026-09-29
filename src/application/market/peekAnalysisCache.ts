@@ -3,6 +3,7 @@ import {
     normalizeCachedAnalysisResponse,
 } from '@/domain/analysis/confidence';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type {
     AnalysisResponse,
@@ -14,15 +15,10 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import {
-    buildAnalysisCacheKey,
+    buildAnalysisPeekCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
-} from '@/infrastructure/skills/sampling';
 
 /**
  * `true` when a normalized analysis carries no analytical content — i.e. an
@@ -105,6 +101,9 @@ function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *   the anonymous/SSR no-bucket path, which keeps the cache key byte-identical
  *   to the legacy (pre-position-bucket) key — the default every existing
  *   caller reads today.
+ * @param locale - Output language of the page/caller. Omitted = `'ko'` (the
+ *   default, byte-identical key). Non-ko pages must pass it, or they read the
+ *   Korean entry.
  * @returns The tier-filtered cached response on a valid hit, or `null` on a
  *   miss / corrupt entry / disallowed caller-tier timeframe.
  *
@@ -124,7 +123,8 @@ export async function peekAnalysisCache(
     reasoning?: boolean,
     tier: Tier = DEFAULT_TIER,
     tierConfig: TierConfig = TIER_CONFIG,
-    positionBucket?: PositionBucket
+    positionBucket?: PositionBucket,
+    locale?: AnalysisLocale
 ): Promise<FilteredAnalysisResult | null> {
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
 
@@ -132,23 +132,16 @@ export async function peekAnalysisCache(
     if (cache === null) return null;
 
     const effectiveModelId = modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
-    const { skills } = await loadSkillsCached();
-    const skillSampling = createSkillSamplingPlan(skills, tier, [
-        'technical',
+    // Reads the peek pointer, not the exact key — see buildAnalysisPeekCacheKey
+    // for why the exact key is unreachable from a read-only caller.
+    const cacheKey = buildAnalysisPeekCacheKey(
         symbol,
         timeframe,
         effectiveModelId,
-        reasoningSeedPart(reasoning),
         tier,
-    ]);
-
-    const cacheKey = buildAnalysisCacheKey(
-        symbol,
-        timeframe,
-        effectiveModelId,
-        `${tier}:${skillSampling.fingerprint}`,
         reasoning,
-        positionBucket
+        positionBucket,
+        locale
     );
 
     const cached = await cache

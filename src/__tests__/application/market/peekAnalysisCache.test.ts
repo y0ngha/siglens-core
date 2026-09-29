@@ -4,23 +4,16 @@ import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 
 vi.mock('@/infrastructure/cache/redis');
-vi.mock('@/infrastructure/skills/loader');
 
 import { peekAnalysisCache } from '@/application/market/peekAnalysisCache';
 import {
-    buildAnalysisCacheKey,
+    buildAnalysisPeekCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
-import { hashSkillCatalog } from '@/infrastructure/hash/analysisInput';
-import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { EMPTY_ANALYSIS_FALLBACK_SUMMARY } from '@/domain/analysis/confidence';
 
 const mockCreateCacheProvider = createCacheProvider as Mock;
-const mockLoadSkillsCached = loadSkillsCached as Mock;
-
-/** Empty-catalog fingerprint folded into the peek key. */
-const EMPTY_CATALOG_FP = hashSkillCatalog([]);
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -60,10 +53,6 @@ describe('peekAnalysisCache 함수는', () => {
         vi.clearAllMocks();
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
         mockCacheGet.mockResolvedValue(null);
-        mockLoadSkillsCached.mockResolvedValue({
-            skills: [],
-            skillsDegraded: false,
-        });
     });
 
     it('캐시 HIT이면 free-safe 분석 결과를 반환한다', async () => {
@@ -78,7 +67,7 @@ describe('peekAnalysisCache 함수는', () => {
         expect(result?.lockedInfoDepth).toContain('partial_detail');
     });
 
-    it('writer와 동일한 캐시 키로 읽는다', async () => {
+    it('writer가 쓰는 peek pointer 키(buildAnalysisPeekCacheKey)로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedResult);
 
         await peekAnalysisCache(
@@ -89,11 +78,11 @@ describe('peekAnalysisCache 함수는', () => {
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(
+            buildAnalysisPeekCacheKey(
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                `free:${EMPTY_CATALOG_FP}`
+                DEFAULT_TIER
             )
         );
     });
@@ -110,11 +99,11 @@ describe('peekAnalysisCache 함수는', () => {
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(
+            buildAnalysisPeekCacheKey(
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                `free:${EMPTY_CATALOG_FP}`,
+                DEFAULT_TIER,
                 true
             )
         );
@@ -131,11 +120,11 @@ describe('peekAnalysisCache 함수는', () => {
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(
+            buildAnalysisPeekCacheKey(
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                `free:${EMPTY_CATALOG_FP}`
+                DEFAULT_TIER
             )
         );
     });
@@ -155,11 +144,11 @@ describe('peekAnalysisCache 함수는', () => {
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(
+            buildAnalysisPeekCacheKey(
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                `free:${EMPTY_CATALOG_FP}`,
+                DEFAULT_TIER,
                 undefined,
                 'profit'
             )
@@ -177,16 +166,16 @@ describe('peekAnalysisCache 함수는', () => {
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(
+            buildAnalysisPeekCacheKey(
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                `free:${EMPTY_CATALOG_FP}`
+                DEFAULT_TIER
             )
         );
     });
 
-    it('reasoning과 positionBucket이 함께 있으면 writer(submitAnalysis)와 동일한 순서로 합성된 키로 읽는다', async () => {
+    it('reasoning과 positionBucket이 함께 있으면 writer(runAnalysis)와 동일한 순서로 합성된 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedResult);
 
         await peekAnalysisCache(
@@ -201,13 +190,64 @@ describe('peekAnalysisCache 함수는', () => {
         );
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(
+            buildAnalysisPeekCacheKey(
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                `free:${EMPTY_CATALOG_FP}`,
+                DEFAULT_TIER,
                 true,
                 'deep-loss'
+            )
+        );
+    });
+
+    it('locale=en이면 :lang=en pointer 키로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedResult);
+
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            'gemini-3.6-flash',
+            undefined,
+            DEFAULT_TIER,
+            TIER_CONFIG,
+            undefined,
+            'en'
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildAnalysisPeekCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-3.6-flash',
+                DEFAULT_TIER,
+                undefined,
+                undefined,
+                'en'
+            )
+        );
+    });
+
+    it('locale 미지정 시 ko pointer 키(레거시와 byte-identical)로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedResult);
+
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            'gemini-3.6-flash'
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildAnalysisPeekCacheKey(
+                SYMBOL,
+                TIMEFRAME,
+                'gemini-3.6-flash',
+                DEFAULT_TIER,
+                undefined,
+                undefined,
+                'ko'
             )
         );
     });
@@ -218,16 +258,16 @@ describe('peekAnalysisCache 함수는', () => {
         await peekAnalysisCache(SYMBOL, TIMEFRAME);
 
         expect(mockCacheGet).toHaveBeenCalledWith(
-            buildAnalysisCacheKey(
+            buildAnalysisPeekCacheKey(
                 SYMBOL,
                 TIMEFRAME,
                 DEFAULT_ANALYSIS_MODEL_ID,
-                `free:${EMPTY_CATALOG_FP}`
+                DEFAULT_TIER
             )
         );
     });
 
-    it('same sampled catalog still isolates cache keys by tier', async () => {
+    it('tier가 다르면 pointer 키도 서로 다르다', async () => {
         await peekAnalysisCache(SYMBOL, TIMEFRAME);
         await peekAnalysisCache(
             SYMBOL,
@@ -238,18 +278,28 @@ describe('peekAnalysisCache 함수는', () => {
             'member'
         );
 
-        const [freeKey] = mockCacheGet.mock.calls[0] as [string];
-        const [memberKey] = mockCacheGet.mock.calls[1] as [string];
+        const [freeKey] = mockCacheGet.mock.calls.find(
+            call =>
+                call[0] ===
+                buildAnalysisPeekCacheKey(
+                    SYMBOL,
+                    TIMEFRAME,
+                    DEFAULT_ANALYSIS_MODEL_ID,
+                    'free'
+                )
+        ) as [string];
+        const [memberKey] = mockCacheGet.mock.calls.find(
+            call =>
+                call[0] ===
+                buildAnalysisPeekCacheKey(
+                    SYMBOL,
+                    TIMEFRAME,
+                    DEFAULT_ANALYSIS_MODEL_ID,
+                    'member'
+                )
+        ) as [string];
 
         expect(freeKey).not.toBe(memberKey);
-        expect(memberKey).toBe(
-            buildAnalysisCacheKey(
-                SYMBOL,
-                TIMEFRAME,
-                DEFAULT_ANALYSIS_MODEL_ID,
-                `member:${EMPTY_CATALOG_FP}`
-            )
-        );
     });
 
     it('returns null without reading cache when the tier disallows the timeframe', async () => {
@@ -265,7 +315,6 @@ describe('peekAnalysisCache 함수는', () => {
 
         expect(result).toBeNull();
         expect(mockCacheGet).not.toHaveBeenCalled();
-        expect(mockLoadSkillsCached).not.toHaveBeenCalled();
     });
 
     it('캐시 MISS이면 null을 반환한다', async () => {

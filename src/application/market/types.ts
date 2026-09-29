@@ -133,7 +133,10 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * Prior-analysis-context history for this symbol + timeframe, supplied
      * by the consumer (siglens / siglens-trader) from its own database —
      * core has no storage of its own for past analyses. Size the query with
-     * {@link analysisHistoryQuery} before fetching.
+     * {@link analysisHistoryQuery} before fetching, **including** its
+     * `generatedBeforeMs` bound (`generated_at < generatedBeforeMs`) —
+     * without it, fresh generations push older rows out of the `LIMIT` and the
+     * cache key changes on every request.
      *
      * Core narrows this list TWICE before any of it reaches the LLM: once
      * for the cache key (drops entries generated inside the CURRENT cache
