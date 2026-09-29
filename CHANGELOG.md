@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.1](https://github.com/y0ngha/siglens-core/compare/v2.2.0...v2.2.1) (2026-09-29)
+
+### Bug Fixes
+
+* **overall:** technical 축에 positionBucket 전달 허용 — 회원 보유 종목 technical 키(:pos=) 재사용 ([#238](https://github.com/y0ngha/siglens-core/issues/238)) ([881b4b7](https://github.com/y0ngha/siglens-core/commit/881b4b798ad872a3037851517a9cdc5e2e4c02f3))
+
 # [2.2.0](https://github.com/y0ngha/siglens-core/compare/v2.1.1...v2.2.0) (2026-09-29)
 
 ### Bug Fixes
