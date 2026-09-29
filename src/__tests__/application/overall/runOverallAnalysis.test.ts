@@ -950,6 +950,23 @@ describe('runOverallAnalysis', () => {
             expect(call).toBeDefined();
             expect(call?.[5]).toMatchObject({ priorAnalyses, marketEvents });
         });
+
+        // 보유 종목이 있는 회원의 technical 탭은 `:pos=` 키로 캐시된다. overall의
+        // technical 축이 버킷을 못 받으면 그 키를 영원히 못 맞혀 매번 다시
+        // 생성했다(2026-09-29 감사). `technical.positionBucket`이 그대로 전달돼야 한다.
+        it('technical.positionBucket을 technical 축 호출에 그대로 넘긴다', async () => {
+            await runOverallAnalysis({
+                ...baseOptions(),
+                symbol: 'BUCKET',
+                technical: { positionBucket: 'profit' },
+            });
+
+            const call = mockRunAnalysisForOverall.mock.calls.find(
+                c => c[0] === 'BUCKET'
+            );
+            expect(call).toBeDefined();
+            expect(call?.[5]).toMatchObject({ positionBucket: 'profit' });
+        });
     });
 
     describe('사전 게이트 (축 호출 전)', () => {
