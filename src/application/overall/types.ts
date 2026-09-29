@@ -101,10 +101,12 @@ export interface OverallDependencyInputs {
      * `technical.priorAnalyses` (see below), and a consumer that wants the
      * technical axis to share a cache entry with its own standalone
      * `runAnalysis` call must supply the same value in both places.
-     * Size the query with `analysisHistoryQuery(timeframe)`
-     * before fetching. Both axes take the same lookback: `OVERALL_CACHE_TTL_SECONDS`
-     * governs the *recency* exclusion, which core applies itself in stage 1,
-     * not how far back the consumer must read.
+     * Size the query with `analysisHistoryQuery(timeframe, 'overall')`
+     * before fetching, including its `generatedBeforeMs` bound (the start of the
+     * `OVERALL_CACHE_TTL_SECONDS` window). Both axes take the same lookback;
+     * only the excluded recency window differs — leaving the window in the
+     * `LIMIT` lets fresh generations evict older rows and change the key on
+     * every request.
      *
      * Narrowed twice before reaching the LLM, same two-stage design as the
      * technical axis: once for the cache key (folded into `inputHash` via a

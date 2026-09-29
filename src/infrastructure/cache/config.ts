@@ -24,7 +24,9 @@ import {
     TIMEFRAME_LOOKBACK_DAYS,
 } from '@/domain/constants/market';
 import {
+    KST_OFFSET_HOURS,
     MS_PER_DAY,
+    MS_PER_HOUR,
     MS_PER_SECOND,
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
@@ -36,6 +38,7 @@ import {
 } from '@/domain/utils';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
 import type {
+    AnalysisHistoryAxis,
     AnalysisHistoryQuery,
     NarrowedMarketEvents,
     NarrowedPriorAnalyses,
@@ -245,6 +248,38 @@ function eventsKeySuffix(fingerprint?: string): string {
 
 /**
  * @internal
+ * Start of the cache bucket `now` falls in — the boundary before which prior
+ * analyses count toward the history key.
+ *
+ * **Anchored, not rolling.** A rolling boundary (`now - window`) moves every
+ * millisecond, so any row generated in the previous window ages past it
+ * partway through the current cache entry's life, changes the `:hist=`
+ * survivor set, and orphans the entry — one extra generation per aging row,
+ * per variant, every day. Buckets are aligned to the daily cache expiry
+ * ({@link CACHE_EXPIRY_HOUR_KST}); every {@link ANALYSIS_CACHE_TTL} value and
+ * {@link OVERALL_CACHE_TTL_SECONDS} divide a day evenly, so bucket edges also
+ * coincide with that expiry. Within one bucket no row can newly qualify, so
+ * the key is stable; it changes at most once, at the bucket edge.
+ *
+ * @param windowSeconds - The consuming axis' cache window.
+ * @param now - Reference time (reuse the same instance for key and prompt).
+ * @returns Epoch milliseconds of the bucket start.
+ */
+export function priorAnalysisWindowStartMs(
+    windowSeconds: number,
+    now: Date
+): number {
+    const windowMs = windowSeconds * MS_PER_SECOND;
+    const offsetMs =
+        (((CACHE_EXPIRY_HOUR_KST - KST_OFFSET_HOURS + 24) % 24) * MS_PER_HOUR) %
+        windowMs;
+    return (
+        Math.floor((now.getTime() - offsetMs) / windowMs) * windowMs + offsetMs
+    );
+}
+
+/**
+ * @internal
  *
  * Stage 1 of the two-stage prior-analysis narrowing that backs the
  * prior-analysis-context feature (see `PriorAnalysis` in
@@ -286,9 +321,12 @@ function eventsKeySuffix(fingerprint?: string): string {
  * identical key, all the way until the window rolls over.
  *
  * Concretely, in order:
- * 1. Drop every entry with `generatedAt.getTime() >= now.getTime() -
- *    currentWindowSeconds * 1000` (inside the current window — including the
- *    boundary instant itself, which counts as "inside").
+ * 1. Drop every entry with `generatedAt.getTime() >= windowStartMs`, where
+ *    `windowStartMs` is the anchored bucket start from
+ *    {@link priorAnalysisWindowStartMs} (inside the current bucket — including
+ *    the boundary instant itself, which counts as "inside"). Anchored rather
+ *    than rolling (`now - window`) so no row ages across the boundary while a
+ *    cache entry is alive.
  * 2. Sort survivors newest-first and cap at
  *    {@link PRIOR_ANALYSIS_WINDOW_BARS} (21) — the same slack multiplier
  *    `selectPriorAnalyses` applies to its bar-count window, so under
@@ -346,7 +384,7 @@ export function narrowPriorAnalysesForCacheKey(
     currentWindowSeconds: number,
     now: Date
 ): NarrowedPriorAnalyses {
-    const windowStartMs = now.getTime() - currentWindowSeconds * MS_PER_SECOND;
+    const windowStartMs = priorAnalysisWindowStartMs(currentWindowSeconds, now);
     const cap = PRIOR_ANALYSIS_WINDOW_BARS;
 
     const candidates = priorAnalyses
@@ -751,6 +789,32 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p20' as const;
+
+/**
+ * @internal Redis key for the technical-analysis **peek pointer** — the latest
+ * generation for a symbol/timeframe/model/tier, written next to the exact key
+ * on every fresh generation (same TTL) and read by {@link peekAnalysisCache}.
+ *
+ * The exact key folds inputs a read-only caller cannot reconstruct without the
+ * writer's DB reads — the prior-analysis (`:hist=`) and market-event (`:evt=`)
+ * fingerprints — so peeking it essentially always missed (measured on
+ * production 2026-09-29: every popular symbol's SSR seed was the fallback).
+ * The pointer drops those and the skill fingerprint, keeping only what a
+ * reader knows. Same design as {@link buildOverallPeekCacheKey}.
+ *
+ * Format: `analysis:peek:<SYM>:<TF>:<model>:<promptVersion>:<tier>[:reason=on][:pos=…][:lang=…]`.
+ */
+export function buildAnalysisPeekCacheKey(
+    symbol: string,
+    timeframe: Timeframe,
+    modelId: string,
+    tier: string,
+    reasoning?: boolean,
+    positionBucket?: PositionBucket,
+    locale?: AnalysisLocale
+): string {
+    return `analysis:peek:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}:${tier}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}`;
+}
 
 /**
  * @internal Build the Redis key for a cached symbol (technical) analysis.
@@ -1739,12 +1803,34 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  * section is legitimately always empty. That degrades to today's behaviour
  * rather than misbehaving.
  *
+ * **The query must also exclude the current cache bucket
+ * (`generatedBeforeMs`).** Stage 1 drops every row newer than the window from
+ * the key, but the consumer's `ORDER BY generated_at DESC LIMIT limit` runs
+ * first. Once in-window rows fill the limit, each fresh generation pushes the
+ * oldest out-of-window row out of the result set, the survivor set changes,
+ * and the `:hist=` fingerprint changes — so the very next request misses and
+ * generates again, forever. Measured on production (PLTR 1Day, 2026-09-29):
+ * every generation after the 21 slots filled produced a new fingerprint.
+ * Excluding the bucket in SQL (`generated_at < generatedBeforeMs`) makes the
+ * result set depend only on rows older than the bucket start, which new
+ * generations cannot displace. The boundary is the same anchored bucket start
+ * stage 1 uses ({@link priorAnalysisWindowStartMs}), so SQL and key agree.
+ *
  * @param timeframe - Bar resolution the consumer will query history for.
- * @returns `limit` — the maximum rows worth fetching — and `sinceMs`, how far
- *   back in milliseconds the `WHERE` clause should reach from now.
+ * @param axis - Which cache consumes the history. The technical key's window
+ *   is {@link ANALYSIS_CACHE_TTL}`[timeframe]`; the overall key's is
+ *   {@link OVERALL_CACHE_TTL_SECONDS} (a fixed day) — pass the axis whose
+ *   `narrowPriorAnalysesForCacheKey` window the rows will feed.
+ * @param now - Reference time; defaults to the current time.
+ * @returns `limit` — the maximum rows worth fetching — `sinceMs`, how far
+ *   back in milliseconds the `WHERE` clause should reach from now, and
+ *   `generatedBeforeMs`, the epoch-ms upper bound (exclusive) for
+ *   `generated_at`.
  */
 export function analysisHistoryQuery(
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    axis: AnalysisHistoryAxis = 'technical',
+    now: Date = new Date()
 ): AnalysisHistoryQuery {
     const limit = PRIOR_ANALYSIS_WINDOW_BARS;
     const calendarDaysPerBar =
@@ -1752,7 +1838,15 @@ export function analysisHistoryQuery(
     const days =
         calendarDaysPerBar * limit * HISTORY_WEEKEND_SAFETY_FACTOR +
         MAX_MARKET_CLOSURE_DAYS;
-    return { limit, sinceMs: Math.ceil(days * MS_PER_DAY) };
+    const windowSeconds =
+        axis === 'overall'
+            ? OVERALL_CACHE_TTL_SECONDS
+            : ANALYSIS_CACHE_TTL[timeframe];
+    return {
+        limit,
+        sinceMs: Math.ceil(days * MS_PER_DAY),
+        generatedBeforeMs: priorAnalysisWindowStartMs(windowSeconds, now),
+    };
 }
 
 /**

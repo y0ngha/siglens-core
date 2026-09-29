@@ -76,9 +76,9 @@ ${withDigest('Bollinger body')}`;
 /**
  * C1 — determinism guard for the SHARED skill-catalog fingerprint.
  *
- * Every cache-key site funnels through the SAME single loader:
- * `submitAnalysis` (write path) and `peekAnalysisCache` (read path) both call
- * `loadSkillsCached()` to load the raw catalog, then tier-sample it through
+ * Every cache-key site funnels through the SAME single loader: the write path
+ * (`runAnalysis`) calls `loadSkillsCached()` to load the raw catalog, then
+ * tier-samples it through
  * `createSkillSamplingPlan()` (which internally hashes the SAMPLED set via
  * `hashSkillCatalog`). `pollAnalysis` is the intentional exception documented
  * on `loadSkillsCached`: it fingerprints its own provider-loaded skills
@@ -144,7 +144,8 @@ describe('C1: shared skill-catalog fingerprint determinism (order/dedupe/project
             .mockResolvedValueOnce(EVENT_GATED)
             .mockResolvedValueOnce(STATE_GATED);
 
-        // The cached-loader shape submitAnalysis/peekAnalysisCache use:
+        // The cached-loader shape the write path uses (the peek no longer
+        // samples skills — it reads the peek pointer key):
         // `loadSkillsCached()` (which wraps the SAME loader) fed to the same hash.
         const { skills: readSkills } = await loadSkillsCached();
         const readFingerprint = hashSkillCatalog(readSkills);

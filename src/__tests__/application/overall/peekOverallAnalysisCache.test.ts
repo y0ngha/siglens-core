@@ -108,6 +108,35 @@ describe('peekOverallAnalysisCache 함수는', () => {
         );
     });
 
+    it('locale=en이면 :lang=en peek 키로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedOverall);
+
+        await peekOverallAnalysisCache(
+            SYMBOL,
+            COMPANY,
+            TIMEFRAME,
+            MODEL,
+            undefined,
+            'free',
+            undefined,
+            'en'
+        );
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildOverallPeekCacheKey(SYMBOL, TIMEFRAME, MODEL, undefined, 'en')
+        );
+    });
+
+    it('locale 미지정 시 ko peek 키(레거시와 byte-identical)로 읽는다', async () => {
+        mockCacheGet.mockResolvedValueOnce(cachedOverall);
+
+        await peekOverallAnalysisCache(SYMBOL, COMPANY, TIMEFRAME, MODEL);
+
+        expect(mockCacheGet).toHaveBeenCalledWith(
+            buildOverallPeekCacheKey(SYMBOL, TIMEFRAME, MODEL, undefined, 'ko')
+        );
+    });
+
     it('free 티어(기본값) + intraday 타임프레임이면 캐시를 읽지 않고 null을 반환한다', async () => {
         const result = await peekOverallAnalysisCache(
             SYMBOL,

@@ -52,6 +52,7 @@ import type {
 import {
     ANALYSIS_CACHE_TTL,
     buildAnalysisCacheKey,
+    buildAnalysisPeekCacheKey,
     computeEffectiveTtl,
     DEFAULT_ANALYSIS_MODEL_ID,
     narrowMarketEventsForCacheKey,
@@ -424,6 +425,30 @@ async function runAnalysisImpl(
             .set(cacheKey, { ...result, skillsDegraded }, ttl)
             .catch(error =>
                 console.error('[RunAnalysis] Cache write failed:', error)
+            );
+        // Peek pointer — the key a read-only caller (SSR seed, chat tool) can
+        // rebuild without this request's history/events reads. Same TTL, so
+        // it never outlives the exact entry it mirrors. Written on fresh
+        // generations only, not on cache hits: an exact entry that predates
+        // the pointer self-heals within one TTL (and the anchored history
+        // window already changes every key once on deploy, so there are no
+        // pre-pointer entries worth backfilling).
+        cache
+            .set(
+                buildAnalysisPeekCacheKey(
+                    symbol,
+                    timeframe,
+                    effectiveModelId,
+                    tier,
+                    options.reasoning,
+                    options.positionBucket,
+                    options.locale
+                ),
+                { ...result, skillsDegraded },
+                ttl
+            )
+            .catch(error =>
+                console.error('[RunAnalysis] Peek cache write failed:', error)
             );
     }
 

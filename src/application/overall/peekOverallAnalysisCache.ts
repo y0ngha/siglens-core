@@ -1,4 +1,5 @@
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
+import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type {
     ModelId,
@@ -100,7 +101,8 @@ export async function peekOverallAnalysisCache(
     modelId?: ModelId,
     reasoning?: boolean,
     tier: Tier = DEFAULT_TIER,
-    tierConfig: TierConfig = TIER_CONFIG
+    tierConfig: TierConfig = TIER_CONFIG,
+    locale?: AnalysisLocale
 ): Promise<OverallAnalysisResponse | null> {
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
     if (modelId === undefined) return null;
@@ -108,11 +110,15 @@ export async function peekOverallAnalysisCache(
     const cache = createCacheProvider();
     if (cache === null) return null;
 
+    // `locale` must match the writer's (`runOverallAnalysis` folds
+    // `options.locale`). Omitting it reads the Korean pointer — non-ko pages
+    // then served Korean prose (or missed their own language's entry).
     const cacheKey = buildOverallPeekCacheKey(
         symbol,
         timeframe,
         modelId,
-        reasoning
+        reasoning,
+        locale
     );
 
     const cached = await cache
