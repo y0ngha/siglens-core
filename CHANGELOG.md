@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.1.1](https://github.com/y0ngha/siglens-core/compare/v2.1.0...v2.1.1) (2026-09-29)
+
+### Bug Fixes
+
+* **overlays:** candidateId 없이 detected된 패턴도 유일한 스크리너 후보로 작도 ([54febac](https://github.com/y0ngha/siglens-core/commit/54febac6fd1daf5ae88f7990fdcfdf2456033442))
+
 # [2.1.0](https://github.com/y0ngha/siglens-core/compare/v2.0.1...v2.1.0) (2026-09-28)
 
 ### Features
