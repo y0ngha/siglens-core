@@ -253,6 +253,12 @@ export interface OverallDependencyInputs {
      * never had) and paid for a duplicate ~5k-token technical generation per
      * symbol per nightly pre-warm. Supply the same values in both places, or
      * in neither.
+     *
+     * NOTE on `positionBucket`: same rule — it folds into the technical key as
+     * `:pos=`. Until 2026-09-29 this Pick did not accept it at all, so a member
+     * with a holding (whose technical tab is cached under `:pos=`) regenerated
+     * the technical axis on every overall request. Pass the bucket the
+     * consumer's standalone technical call uses, or omit it in both.
      */
     technical: Pick<
         SubmitAnalysisOptions,
@@ -265,6 +271,7 @@ export interface OverallDependencyInputs {
         | 'reasoning'
         | 'priorAnalyses'
         | 'marketEvents'
+        | 'positionBucket'
     > & {
         /** Forwarded to `submitAnalysis(... , force, ...)`. Defaults to `false`. */
         force?: boolean;
