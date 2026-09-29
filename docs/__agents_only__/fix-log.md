@@ -108,12 +108,6 @@
   Rule: Test conventions — new helper module requires dedicated .test.ts file
   Context: New helper module added without corresponding test file. Fixed by adding dedicated test file following module sibling convention.
 
-## [Branch fix/prompt-descriptive-framing | 2026-09-18] — Shared test table incomplete enumeration R1→R2
-
-- Violation: src/__tests__/domain/analysis/systemPrompt.test.ts — Shared PROMPTS array covered only 6 of 8 system prompts built on analysisSystemBase (FINANCIALS and CONGRESS missing)
-  Rule: Tests — shared test table must enumerate all cases of the thing it claims to cover
-  Context: R1 recommendation finding. Parameterized test using it.each(PROMPTS) relied on a partial array that didn't include all analysisSystemBase-derived prompts. Fixed in R2 by adding FINANCIALS and CONGRESS with their persona first lines pinned as literals, ensuring all 8 prompts are exercised by the shared test table.
-
 ## [Branch feat/precomputed-prompt-data | 2026-09-19] — Precomputed prompt data R1→R6
 
 - Violation 8 (R5 REQUIRED): Geometry defined from wrong pivot kind — cup/rounding-bottom rim calculated from low pivots instead of bounding high pivot
@@ -155,34 +149,9 @@
 
 ### Round 3: approved
 
-## [PR #230 | feat/test-only-minor-refactor | 2026-09-26] — Test file assertion precision
-
-- Violation: Test title vs assertion mismatch — test promised format validation but didn't check
-  Rule: Tests — test description must match assertion behavior; vacuous assertions provide no verification
-  Context: analysisInput.test.ts test title indicated "16-char hex fingerprint" validation but assertion only checked definition (expect(...).toBeDefined()). Fixed by adding toMatch(/^[0-9a-f]{16}$/) to verify format.
-
-
-## [feat/pattern-signal-expansion Round 1 | feat/pattern-signal-expansion | 2026-09-28]
-- Violation: new 2-bar candle label (above/below_the_stomach) added as a "fallback" without measuring its effect one level up (entries/prompt selection) — it matched 12.7% of real daily bars and changed the prompt's latest-candle selection in ~48% of windows
-  - Rule: (new) A new detector must be measured on real bars at the consumer level (what the prompt/selection actually shows), not only at the function it was added to; "fallback" at one layer is not "unchanged" at the next
-  - Context: Tightened with isLongBody(prev) like sibling 2-bar patterns (2.0% hits, 10.5% windows), documented impact in spec + PUBLIC_API, added an entries-level test.
-- Violation: inclusive (≥/≤) spec boundaries not pinned by tests; off-by-one comparator mutations passed the suite
-  - Rule: MISTAKES Tests §5.5 — boundary-equality cases required when the spec defines inclusive bounds
-  - Context: Added equality-boundary tests for stomach midpoint, three-line strike b4.open==b3.close, falling three methods b5.close==b1.close; rounding_top rim span-bound test.
-
-## [feat/news-macro-calendar Rounds 1–2 | feat/news-macro-calendar | 2026-09-28]
-- Violation: FMP naive `YYYY-MM-DD HH:mm:ss` (UTC) parsed with `new Date()` → local time; day-offset suffix changed with host timezone
-  - Rule: MISTAKES Domain — domain output must be host-independent; reuse the existing `parseCalendarDate` (appends Z) for FMP timestamps
-  - Context: Moved parseCalendarDate to promptFormat.ts (shared), added timezone-independent unit tests (CI runs in UTC, so a rendered-row test alone could not catch a revert).
-- Violation: backward-compat promise (cache key / sampling seed unchanged when option omitted) asserted only by comparing two outputs of the new code
-  - Rule: MISTAKES Tests — a "byte-identical to before" claim needs a literal pre-change value (or golden) in the test
-  - Context: Added literal no-macro cache key assertion and content-matched seed-parts spy.
-- Violation: cache fingerprint excluded rendered fields (estimate/previous) with a false justification; public JSDoc/PUBLIC_API drifted
-  - Rule: MISTAKES Config&State — every field that changes prompt bytes belongs in the cache key
-  - Context: Fingerprint now covers all rendered fields; JSDoc and PUBLIC_API synced.
-
 ## [PR #234 | feat/classify-ma-stack | 2026-09-28] — Tier 2 public export JSDoc missing @returns
 
 - Violation: classifyMaStack public export lacked required @returns JSDoc tag
   - Rule: MISTAKES.md TypeScript 4.5 — Tier 2 public functions must have @param and @returns JSDoc tags
   - Context: New Tier 2 function added to src/domain/analysis/trendStructure.ts without @returns documentation. Fixed by adding @returns tag.
+

@@ -28,6 +28,16 @@ const HS_FAMILY = new Set(['head_and_shoulders', 'inverse_head_and_shoulders']);
 const HS_LABELS = ['LS', 'H', 'RS'] as const;
 const HS_LABEL_PIVOT_INDICES = [0, 2, 4] as const;
 
+/**
+ * @internal
+ * Skill file stem (`skills/patterns/<stem>.md`) for a `ChartPatternId` — every
+ * id uses '_' where the file name uses '-'. The one place this convention lives:
+ * pattern candidates carry it as `skill`, and `resolveChartOverlays` matches on it.
+ */
+export function patternSkillStem(patternId: string): string {
+    return patternId.replace(/_/g, '-');
+}
+
 /** @internal Deterministic overlay id for one screener hit. */
 export function patternOverlayId(
     candidate: PatternCandidate,
@@ -177,12 +187,11 @@ function toOverlay(
     const inRange = (c.pivots ?? []).filter(
         p => p.index >= c.startIndex && p.index <= c.endIndex
     );
-    // `skill` is the skill file stem (`skills/patterns/<skill>.md`) — every
-    // `ChartPatternId` uses '_' where the file name uses '-'.
+    // `skill` is the skill file stem (`skills/patterns/<skill>.md`).
     const base = {
         id: patternOverlayId(c, bars),
         kind: 'pattern' as const,
-        skill: c.id.replace(/_/g, '-'),
+        skill: patternSkillStem(c.id),
         promptLine: '',
     };
 
