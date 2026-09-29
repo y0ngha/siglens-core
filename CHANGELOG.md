@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.2.0](https://github.com/y0ngha/siglens-core/compare/v2.1.1...v2.2.0) (2026-09-29)
+
+### Bug Fixes
+
+* **cache:** 분석 캐시 키 churn 제거 — 이력 조회 창 제외·버킷 고정, technical peek 포인터 키, peek locale ([#237](https://github.com/y0ngha/siglens-core/issues/237)) ([8ff19db](https://github.com/y0ngha/siglens-core/commit/8ff19db851d9df6ccfdfe019ac00d120a23c3f03))
+
 ## [2.1.1](https://github.com/y0ngha/siglens-core/compare/v2.1.0...v2.1.1) (2026-09-29)
 
 ### Bug Fixes
