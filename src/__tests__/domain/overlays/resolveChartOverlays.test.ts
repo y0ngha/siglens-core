@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { AnalysisResponse, OverlayCandidate } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    OverlayCandidate,
+    PatternSummary,
+    Skill,
+} from '@/domain/types';
 import { resolveChartOverlays } from '@/domain/overlays/resolveChartOverlays';
 
 const cand = (
@@ -204,5 +209,79 @@ describe('resolveChartOverlays', () => {
         );
         expect(r.chartOverlays).toEqual([]);
         expect(r.unknownIds).toEqual(['pattern:double_bottom:1']);
+    });
+
+    describe('when a detected pattern has no candidateId', () => {
+        const wedge = (id: string): OverlayCandidate => ({
+            ...cand(id, 'pattern'),
+            skill: 'ascending-wedge',
+        });
+        const SKILLS = [
+            { name: '상승쐐기', pattern: 'ascending_wedge' },
+        ] as Skill[];
+        const summary = (over: Partial<PatternSummary>): PatternSummary => ({
+            id: 'ascending_wedge_0',
+            patternName: 'ascending_wedge',
+            skillName: '상승쐐기',
+            detected: true,
+            trend: 'bearish',
+            summary: '',
+            confidenceWeight: 1,
+            ...over,
+        });
+
+        it('falls back to the only screener candidate of the same skill', () => {
+            const r = resolveChartOverlays(
+                [wedge('pattern:ascending_wedge:9'), ...CANDIDATES],
+                analysis({ patternSummaries: [summary({})] }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays.map(o => [o.id, o.sourceRef])).toEqual([
+                ['pattern:ascending_wedge:9', 'ascending_wedge_0'],
+            ]);
+            expect(r.unknownIds).toEqual([]);
+        });
+
+        it('draws nothing when two candidates of that skill make the choice ambiguous', () => {
+            const r = resolveChartOverlays(
+                [
+                    wedge('pattern:ascending_wedge:9'),
+                    wedge('pattern:ascending_wedge:12'),
+                ],
+                analysis({ patternSummaries: [summary({})] }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays).toEqual([]);
+        });
+
+        it('draws nothing for a detected:false pattern or an unknown skill', () => {
+            const r = resolveChartOverlays(
+                [wedge('pattern:ascending_wedge:9')],
+                analysis({
+                    patternSummaries: [
+                        summary({ detected: false }),
+                        summary({
+                            id: 'diamond_0',
+                            patternName: 'diamond',
+                            skillName: 'Diamond',
+                        }),
+                    ],
+                }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays).toEqual([]);
+        });
+
+        it('keeps the fallback off when no skills are passed', () => {
+            const r = resolveChartOverlays(
+                [wedge('pattern:ascending_wedge:9')],
+                analysis({ patternSummaries: [summary({})] }),
+                []
+            );
+            expect(r.chartOverlays).toEqual([]);
+        });
     });
 });

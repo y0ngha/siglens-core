@@ -372,7 +372,8 @@ async function runAnalysisImpl(
     const resolvedOverlays = resolveChartOverlays(
         overlayCandidates,
         reconciled,
-        normalizeIdList(asObject(rawResult)?.trendlineIds)
+        normalizeIdList(asObject(rawResult)?.trendlineIds),
+        skills
     );
     if (overlayBuildFailures.length > 0) {
         console.warn('[ChartOverlays] candidate builder failed', {
