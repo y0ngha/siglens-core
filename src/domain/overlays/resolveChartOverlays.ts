@@ -9,6 +9,7 @@ import type {
     Skill,
     Trendline,
 } from '@/domain/types';
+import { patternSkillStem } from '@/domain/overlays/patternOverlays';
 
 const TRENDLINE_SOURCE_REF = 'trendlines';
 const MAX_TRENDLINES = 3;
@@ -48,8 +49,8 @@ function fallbackPatternCandidateId(
         patternBySkillName.get(p.patternName);
     if (pattern === undefined) return undefined;
     // Candidate `skill` is the skill file stem ('ascending-wedge'), the skill's
-    // `pattern` the ChartPatternId ('ascending_wedge') — see patternOverlays.ts.
-    const stem = pattern.replace(/_/g, '-');
+    // `pattern` the ChartPatternId ('ascending_wedge').
+    const stem = patternSkillStem(pattern);
     const matches = candidates.filter(
         c => c.kind === 'pattern' && c.skill === stem
     );

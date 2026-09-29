@@ -216,7 +216,9 @@ describe('resolveChartOverlays', () => {
             ...cand(id, 'pattern'),
             skill: 'ascending-wedge',
         });
+        // The pattern-less skill must be skipped by the name → pattern map.
         const SKILLS = [
+            { name: 'RSI', pattern: undefined },
             { name: '상승쐐기', pattern: 'ascending_wedge' },
         ] as Skill[];
         const summary = (over: Partial<PatternSummary>): PatternSummary => ({
@@ -241,6 +243,34 @@ describe('resolveChartOverlays', () => {
                 ['pattern:ascending_wedge:9', 'ascending_wedge_0'],
             ]);
             expect(r.unknownIds).toEqual([]);
+        });
+
+        it('falls back through patternName when skillName matches no skill', () => {
+            const r = resolveChartOverlays(
+                [wedge('pattern:ascending_wedge:9')],
+                analysis({
+                    patternSummaries: [summary({ skillName: 'Rising Wedge' })],
+                }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays.map(o => o.id)).toEqual([
+                'pattern:ascending_wedge:9',
+            ]);
+        });
+
+        it('ignores a skill without a pattern', () => {
+            const r = resolveChartOverlays(
+                [wedge('pattern:ascending_wedge:9')],
+                analysis({
+                    patternSummaries: [
+                        summary({ skillName: 'RSI', patternName: 'RSI' }),
+                    ],
+                }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays).toEqual([]);
         });
 
         it('draws nothing when two candidates of that skill make the choice ambiguous', () => {
