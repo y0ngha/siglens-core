@@ -571,6 +571,7 @@ export type {
     // Chart overlays (spec 2026-09-28) — logic-drawn coordinates the model selects by id.
     ChartOverlay,
     OverlayKind,
+    StrategyOverlayKind,
     OverlayPane,
     OverlayPoint,
     OverlaySegment,

@@ -845,3 +845,48 @@ ${withDigest('Full authoring body.', 'Compressed digest.')}`;
         expect(skills[0].content).toBe('Compressed digest.');
     });
 });
+
+// ─────────────────────────────────────────
+// overlay_kind parsing — strategy skills declare the one overlay kind they draw
+// ─────────────────────────────────────────
+
+describe('FileSkillsLoader — overlay_kind parsing', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const strategyFm = (overlayKindLine: string) => `---
+name: Strategy Skill
+description: Test overlay kind
+type: strategy
+category: neutral
+indicators: []
+confidence_weight: 0.4
+${overlayKindLine}
+---
+${withDigest('Body content')}`;
+
+    it.each(['divergence', 'fibonacci', 'elliott'])(
+        'overlay_kind: %s → overlayKind',
+        async kind => {
+            mockReaddir.mockResolvedValue([makeDirent('strategy.md')]);
+            mockReadFile.mockResolvedValue(strategyFm(`overlay_kind: ${kind}`));
+
+            const skills = await new FileSkillsLoader().loadSkills();
+
+            expect(skills[0].overlayKind).toBe(kind);
+        }
+    );
+
+    it.each(['overlay_kind: pattern', 'overlay_kind: bogus', ''])(
+        '%j → overlayKind is undefined',
+        async line => {
+            mockReaddir.mockResolvedValue([makeDirent('strategy.md')]);
+            mockReadFile.mockResolvedValue(strategyFm(line));
+
+            const skills = await new FileSkillsLoader().loadSkills();
+
+            expect(skills[0].overlayKind).toBeUndefined();
+        }
+    );
+});

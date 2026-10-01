@@ -1439,6 +1439,7 @@ interface Skill {
     indicators: string[];
     confidenceWeight: number;   // 표시 가중치 (0.0–1.0); 포함 여부를 결정하지 않음
     usageRoles?: SkillUsageRole[]; // type='indicator_guide'일 때 필수 — 역할 컨텍스트 (signal/confirmation/regime/measurement/risk)
+    overlayKind?: StrategyOverlayKind; // type='strategy' 전용 — 카드가 그릴 수 있는 오버레이 종류('divergence' | 'fibonacci' | 'elliott'). 없으면 그리지 않음
     content: string;            // frontmatter 제거 후 순수 Markdown 본문
     display?: SkillDisplay;     // 차트 표시 설정 (선택)
 }

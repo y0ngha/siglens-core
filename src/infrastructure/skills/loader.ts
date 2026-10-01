@@ -13,9 +13,11 @@ import type {
     SkillType,
     SkillUsageRole,
     SignalKind,
+    StrategyOverlayKind,
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
 import { USAGE_ROLE_ORDER } from '@/domain/analysis/confidenceLevel';
+import { STRATEGY_OVERLAY_KINDS } from '@/domain/overlays/constants';
 import type { LoadSkillsCachedResult } from './types';
 
 const SKILLS_DIR = join(process.cwd(), 'skills');
@@ -188,6 +190,9 @@ const SKILL_GATING_TIERS: readonly SkillGating['tier'][] = [
     'gated',
 ];
 const SIGNAL_KINDS: readonly SignalKind[] = ['event', 'state'];
+/** `overlay_kind` frontmatter → {@link Skill.overlayKind}; anything else is dropped (the strategy then draws nothing). */
+const parseOverlayKind = (raw: unknown): StrategyOverlayKind | undefined =>
+    STRATEGY_OVERLAY_KINDS.find(kind => kind === raw);
 /**
  * Exhaustive runtime mirror of the {@link SkillStateFeature} union, encoded as
  * a `Record<SkillStateFeature, true>` so the compiler rejects both a missing
@@ -449,6 +454,7 @@ const toSkill = (data: Record<string, unknown>, body: string): Skill => ({
         typeof data.token_cost === 'number' ? data.token_cost : undefined,
     smcFullGuide: isYamlTrue(data.smc_full_guide),
     usageRoles: parseUsageRoles(data.usage_roles),
+    overlayKind: parseOverlayKind(data.overlay_kind),
 });
 
 /**

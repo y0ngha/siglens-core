@@ -964,6 +964,7 @@ export type {
     TrendlinePoint,
     TrendState,
     OverlayKind,
+    StrategyOverlayKind,
     OverlayPane,
     OverlayPoint,
     OverlaySegment,

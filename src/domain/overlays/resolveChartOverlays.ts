@@ -10,6 +10,7 @@ import type {
     Trendline,
 } from '@/domain/types';
 import { patternSkillStem } from '@/domain/overlays/patternOverlays';
+import { STRATEGY_OVERLAY_KINDS } from '@/domain/overlays/constants';
 
 const TRENDLINE_SOURCE_REF = 'trendlines';
 const MAX_TRENDLINES = 3;
@@ -18,17 +19,38 @@ const MAX_ELLIOTT_PER_STRATEGY = 2;
 /** Which candidate kinds each result slot may reference — a known id resolved from the wrong slot is as invalid as an unknown one. */
 const PATTERN_SLOT_KINDS: readonly OverlayKind[] = ['pattern'];
 const TRENDLINE_SLOT_KINDS: readonly OverlayKind[] = ['trendline'];
-const STRATEGY_SLOT_KINDS: readonly OverlayKind[] = [
-    'divergence',
-    'fibonacci',
-    'elliott',
-];
+const STRATEGY_SLOT_KINDS: readonly OverlayKind[] = STRATEGY_OVERLAY_KINDS;
+
+/**
+ * Which kinds one strategy card may reference. A strategy skill draws only
+ * its declared `overlayKind` — the chart menu names a strategy drawing after
+ * its card, so an Elliott card citing a Fibonacci candidate showed "Elliott
+ * wave" over a Fibonacci ladder. A known strategy (`type: 'strategy'` skill)
+ * without `overlayKind` draws nothing, and so does a name matching no
+ * strategy skill — the model echoing "Elliott Wave" would otherwise reopen
+ * the same mislabel. Only with no strategy skills at all (none passed) is
+ * every strategy kind kept: there is nothing to check against.
+ */
+function strategySlotKinds(
+    strategyName: string,
+    strategyByName: ReadonlyMap<string, Skill>
+): readonly OverlayKind[] {
+    if (strategyByName.size === 0) return STRATEGY_SLOT_KINDS;
+    const kind = strategyByName.get(strategyName)?.overlayKind;
+    return kind ? [kind] : [];
+}
 
 interface Ref {
     id: string;
     sourceRef: string;
     variant: OverlayVariant;
     allowedKinds: readonly OverlayKind[];
+    /**
+     * The candidate `skill` the card requires — set for a pattern card whose
+     * skill is known, so a "cup and handle" card cannot carry a double-top
+     * candidate (the menu would label the double top "cup and handle").
+     */
+    requiredSkill?: string;
 }
 
 /**
@@ -44,17 +66,28 @@ function fallbackPatternCandidateId(
     candidates: readonly OverlayCandidate[],
     patternBySkillName: ReadonlyMap<string, string>
 ): string | undefined {
-    const pattern =
-        patternBySkillName.get(p.skillName) ??
-        patternBySkillName.get(p.patternName);
-    if (pattern === undefined) return undefined;
-    // Candidate `skill` is the skill file stem ('ascending-wedge'), the skill's
-    // `pattern` the ChartPatternId ('ascending_wedge').
-    const stem = patternSkillStem(pattern);
+    const stem = patternCandidateSkill(p, patternBySkillName);
+    if (stem === undefined) return undefined;
     const matches = candidates.filter(
         c => c.kind === 'pattern' && c.skill === stem
     );
     return matches.length === 1 ? matches[0]?.id : undefined;
+}
+
+/**
+ * The candidate `skill` a pattern card stands for, or `undefined` when the
+ * card's skill is unknown. Candidate `skill` is the skill file stem
+ * ('ascending-wedge'), the skill's `pattern` the ChartPatternId
+ * ('ascending_wedge').
+ */
+function patternCandidateSkill(
+    p: PatternSummary,
+    patternBySkillName: ReadonlyMap<string, string>
+): string | undefined {
+    const pattern =
+        patternBySkillName.get(p.skillName) ??
+        patternBySkillName.get(p.patternName);
+    return pattern === undefined ? undefined : patternSkillStem(pattern);
 }
 
 function buildPatternBySkillName(
@@ -77,7 +110,8 @@ function collectRefs(
     trendlineIds: readonly string[],
     byId: ReadonlyMap<string, OverlayCandidate>,
     candidates: readonly OverlayCandidate[],
-    patternBySkillName: ReadonlyMap<string, string>
+    patternBySkillName: ReadonlyMap<string, string>,
+    strategyByName: ReadonlyMap<string, Skill>
 ): Ref[] {
     const patternRefs = analysis.patternSummaries.flatMap(p => {
         if (!p.detected) return [];
@@ -91,11 +125,16 @@ function collectRefs(
                       sourceRef: p.id,
                       variant: 'primary' as const,
                       allowedKinds: PATTERN_SLOT_KINDS,
+                      requiredSkill: patternCandidateSkill(
+                          p,
+                          patternBySkillName
+                      ),
                   },
               ]
             : [];
     });
     const strategyRefs = analysis.strategyResults.flatMap(s => {
+        const allowedKinds = strategySlotKinds(s.strategyName, strategyByName);
         let elliottSeen = 0;
         return (s.candidateIds ?? []).flatMap(id => {
             if (byId.get(id)?.kind !== 'elliott')
@@ -104,7 +143,7 @@ function collectRefs(
                         id,
                         sourceRef: s.id,
                         variant: 'primary' as const,
-                        allowedKinds: STRATEGY_SLOT_KINDS,
+                        allowedKinds,
                     },
                 ];
             elliottSeen++;
@@ -117,7 +156,7 @@ function collectRefs(
                         elliottSeen === 1
                             ? ('primary' as const)
                             : ('alternate' as const),
-                    allowedKinds: STRATEGY_SLOT_KINDS,
+                    allowedKinds,
                 },
             ];
         });
@@ -153,7 +192,9 @@ function toTrendline(o: ChartOverlay): Trendline[] {
  * (spec 2026-09-28 §2.5). Pure; an id the prompt never offered is returned in
  * `unknownIds` for logging and otherwise ignored. `skills` enables the
  * missing-`candidateId` fallback for detected patterns (see
- * {@link fallbackPatternCandidateId}); omit it to disable the fallback.
+ * {@link fallbackPatternCandidateId}), the pattern-card identity check (see
+ * {@link patternCandidateSkill}) and the per-strategy kind check (see
+ * {@link strategySlotKinds}); omit it to disable all three.
  */
 export function resolveChartOverlays(
     candidates: readonly OverlayCandidate[],
@@ -163,6 +204,9 @@ export function resolveChartOverlays(
 ): ResolvedChartOverlays {
     const byId = new Map(candidates.map(c => [c.id, c]));
     const patternBySkillName = buildPatternBySkillName(skills);
+    const strategyByName = new Map(
+        skills.filter(s => s.type === 'strategy').map(s => [s.name, s])
+    );
     const seen = new Set<string>();
     const unknownIds: string[] = [];
     const chartOverlays: ChartOverlay[] = [];
@@ -171,13 +215,19 @@ export function resolveChartOverlays(
         trendlineIds,
         byId,
         candidates,
-        patternBySkillName
+        patternBySkillName,
+        strategyByName
     )) {
         const candidate = byId.get(ref.id);
         // A known id resolved from the wrong slot (e.g. an elliott candidate
         // id used as a patternSummary.candidateId) is treated like an
         // unknown id — the model referenced something that does not belong there.
-        if (!candidate || !ref.allowedKinds.includes(candidate.kind)) {
+        if (
+            !candidate ||
+            !ref.allowedKinds.includes(candidate.kind) ||
+            (ref.requiredSkill !== undefined &&
+                candidate.skill !== ref.requiredSkill)
+        ) {
             unknownIds.push(ref.id);
             continue;
         }
