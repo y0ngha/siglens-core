@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.2](https://github.com/y0ngha/siglens-core/compare/v2.2.1...v2.2.2) (2026-10-01)
+
+### Bug Fixes
+
+* **overlays:** fibonacci extension labels + canonical pattern skillName ([#239](https://github.com/y0ngha/siglens-core/issues/239)) ([f3d3b7d](https://github.com/y0ngha/siglens-core/commit/f3d3b7d6461f4195641579549ed29399d13ca2b8))
+
 ## [2.2.1](https://github.com/y0ngha/siglens-core/compare/v2.2.0...v2.2.1) (2026-09-29)
 
 ### Bug Fixes
