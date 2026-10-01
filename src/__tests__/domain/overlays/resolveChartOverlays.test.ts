@@ -211,6 +211,133 @@ describe('resolveChartOverlays', () => {
         expect(r.unknownIds).toEqual(['pattern:double_bottom:1']);
     });
 
+    describe('per-strategy overlay kind', () => {
+        const SKILLS = [
+            { name: '엘리어트 파동', type: 'strategy', overlayKind: 'elliott' },
+            {
+                name: '피보나치 전략',
+                type: 'strategy',
+                overlayKind: 'fibonacci',
+            },
+            {
+                name: '다이버전스 전략',
+                type: 'strategy',
+                overlayKind: 'divergence',
+            },
+            { name: '브레이크아웃 전략', type: 'strategy' },
+            { name: '상승쐐기', type: 'pattern', pattern: 'ascending_wedge' },
+        ] as Skill[];
+        const MIXED = [
+            ...CANDIDATES,
+            cand('div:rsi:1', 'divergence'),
+            cand('ew:up:3:4', 'elliott'),
+        ];
+        const strategy = (strategyName: string, candidateIds: string[]) =>
+            analysis({
+                strategyResults: [
+                    {
+                        id: `${strategyName}_0`,
+                        strategyName,
+                        trend: 'neutral',
+                        summary: '',
+                        confidenceWeight: 1,
+                        candidateIds,
+                    },
+                ],
+            });
+        const ALL = ['fib:short:5', 'div:rsi:1', 'ew:up:1:6'];
+
+        it.each([
+            ['엘리어트 파동', 'ew:up:1:6'],
+            ['피보나치 전략', 'fib:short:5'],
+            ['다이버전스 전략', 'div:rsi:1'],
+        ])('%s draws only its declared kind', (name, kept) => {
+            const r = resolveChartOverlays(
+                MIXED,
+                strategy(name, ALL),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays.map(o => o.id)).toEqual([kept]);
+            expect(r.unknownIds).toEqual(ALL.filter(id => id !== kept));
+        });
+
+        it('keeps the Elliott primary/alternate split and its cap of two', () => {
+            const r = resolveChartOverlays(
+                MIXED,
+                strategy('엘리어트 파동', [
+                    'fib:short:5',
+                    'ew:up:1:6',
+                    'ew:up:2:5',
+                    'ew:up:3:4',
+                ]),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays.map(o => [o.id, o.variant])).toEqual([
+                ['ew:up:1:6', 'primary'],
+                ['ew:up:2:5', 'alternate'],
+            ]);
+            expect(r.unknownIds).toEqual(['fib:short:5']);
+        });
+
+        it.each([
+            ['a known strategy without overlayKind', '브레이크아웃 전략'],
+            ['a name matching no skill', 'Elliott Wave'],
+            ['a non-strategy skill name', '상승쐐기'],
+        ])('draws nothing for %s', (_, name) => {
+            const r = resolveChartOverlays(
+                MIXED,
+                strategy(name, ['fib:short:5']),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays).toEqual([]);
+            expect(r.unknownIds).toEqual(['fib:short:5']);
+        });
+
+        it('keeps every strategy kind when no strategy skills are passed', () => {
+            const r = resolveChartOverlays(
+                MIXED,
+                strategy('엘리어트 파동', ALL),
+                []
+            );
+            expect(r.chartOverlays.map(o => o.id)).toEqual(ALL);
+            expect(r.unknownIds).toEqual([]);
+        });
+
+        it('a card rejected for the wrong kind does not use up the id for the right card', () => {
+            const r = resolveChartOverlays(
+                MIXED,
+                analysis({
+                    strategyResults: [
+                        {
+                            id: '브레이크아웃 전략_0',
+                            strategyName: '브레이크아웃 전략',
+                            trend: 'neutral',
+                            summary: '',
+                            confidenceWeight: 1,
+                            candidateIds: ['fib:short:5'],
+                        },
+                        {
+                            id: '피보나치 전략_0',
+                            strategyName: '피보나치 전략',
+                            trend: 'neutral',
+                            summary: '',
+                            confidenceWeight: 1,
+                            candidateIds: ['fib:short:5'],
+                        },
+                    ],
+                }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays.map(o => [o.id, o.sourceRef])).toEqual([
+                ['fib:short:5', '피보나치 전략_0'],
+            ]);
+        });
+    });
+
     describe('when a detected pattern has no candidateId', () => {
         const wedge = (id: string): OverlayCandidate => ({
             ...cand(id, 'pattern'),
@@ -303,6 +430,57 @@ describe('resolveChartOverlays', () => {
                 SKILLS
             );
             expect(r.chartOverlays).toEqual([]);
+        });
+
+        it('drops an explicit candidateId of a different pattern than the card', () => {
+            const r = resolveChartOverlays(
+                [wedge('pattern:ascending_wedge:9'), ...CANDIDATES],
+                analysis({
+                    patternSummaries: [
+                        summary({ candidateId: 'pattern:double_bottom:1' }),
+                    ],
+                }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays).toEqual([]);
+            expect(r.unknownIds).toEqual(['pattern:double_bottom:1']);
+        });
+
+        it('keeps an explicit candidateId of the same pattern as the card', () => {
+            const r = resolveChartOverlays(
+                [wedge('pattern:ascending_wedge:9'), ...CANDIDATES],
+                analysis({
+                    patternSummaries: [
+                        summary({ candidateId: 'pattern:ascending_wedge:9' }),
+                    ],
+                }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays.map(o => o.id)).toEqual([
+                'pattern:ascending_wedge:9',
+            ]);
+        });
+
+        it('skips the identity check for a card whose skill is unknown', () => {
+            const r = resolveChartOverlays(
+                CANDIDATES,
+                analysis({
+                    patternSummaries: [
+                        summary({
+                            skillName: '모름',
+                            patternName: '모름',
+                            candidateId: 'pattern:double_bottom:1',
+                        }),
+                    ],
+                }),
+                [],
+                SKILLS
+            );
+            expect(r.chartOverlays.map(o => o.id)).toEqual([
+                'pattern:double_bottom:1',
+            ]);
         });
 
         it('keeps the fallback off when no skills are passed', () => {

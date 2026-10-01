@@ -799,6 +799,15 @@ export interface Skill {
      * invalid/missing values to `undefined` (fail-safe).
      */
     usageRoles?: SkillUsageRole[];
+    /**
+     * The one overlay kind this strategy's card may draw (`overlay_kind`
+     * frontmatter, `type: strategy` only). The chart menu names a strategy
+     * drawing after its card, so an Elliott card citing a Fibonacci candidate
+     * showed "Elliott wave" over a Fibonacci ladder; `resolveChartOverlays`
+     * now drops a strategy's candidate ids of any other kind. A strategy skill
+     * without it draws nothing.
+     */
+    overlayKind?: StrategyOverlayKind;
 }
 
 /**
@@ -4120,6 +4129,12 @@ export interface NormalizedUsage {
 
 export type OverlayKind =
     'pattern' | 'trendline' | 'divergence' | 'fibonacci' | 'elliott';
+
+/** The overlay kinds a strategy card may draw — declared per strategy skill via `overlay_kind` frontmatter ({@link Skill.overlayKind}). */
+export type StrategyOverlayKind = Extract<
+    OverlayKind,
+    'divergence' | 'fibonacci' | 'elliott'
+>;
 
 /** Which chart pane a segment belongs to — only a divergence's oscillator line is off the price pane. */
 export type OverlayPane = 'price' | 'rsi';

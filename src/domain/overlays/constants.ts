@@ -1,3 +1,25 @@
+import type { StrategyOverlayKind } from '@/domain/types';
+
+// ─── Strategy slots ─────────────────────────────────────────────────────────
+// Record<StrategyOverlayKind, true> makes the compiler reject a missing or an
+// unknown kind, so adding a strategy kind to the union cannot silently leave
+// the loader dropping it.
+const STRATEGY_OVERLAY_KIND_FLAGS: Record<StrategyOverlayKind, true> = {
+    divergence: true,
+    fibonacci: true,
+    elliott: true,
+};
+/**
+ * @internal The overlay kinds a strategy card may draw — the loader's
+ * `overlay_kind` whitelist and the resolver's slot for a strategy whose skill
+ * is unknown.
+ */
+// (a) Keys of STRATEGY_OVERLAY_KIND_FLAGS are exactly StrategyOverlayKind (the
+// Record's exhaustive key type above). (b) Object.keys' generic-erased
+// string[] return type is what forces this cast.
+export const STRATEGY_OVERLAY_KINDS: readonly StrategyOverlayKind[] =
+    Object.keys(STRATEGY_OVERLAY_KIND_FLAGS) as StrategyOverlayKind[];
+
 // ─── Trendlines ─────────────────────────────────────────────────────────────
 /** @internal A same-kind pivot within this many ATR of the line counts as a touch. */
 export const TRENDLINE_TOUCH_ATR_MULT = 0.25;

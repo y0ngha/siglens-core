@@ -165,3 +165,27 @@
   - Rule: Infrastructure design trade-offs must be documented with comments explaining the choice and upgrade path
   - Context: Optimization to skip pointer key recomputation on cache-hit paths was undocumented. Fixed by adding comment explaining memory/CPU trade-off and when full recomputation would be necessary.
 
+## [Branch fix/strategy-overlay-kind | 2026-10-01] — Strategy overlay kind type export and testing
+
+- Violation 1 (R1 REQUIRED, fixed): StrategyOverlayKind export added to public API but PUBLIC_API.md type inventory not updated
+  Rule: MISTAKES.md Public API & Module Exports #7 — new public exports must be documented in changelog
+  Context: New StrategyOverlayKind type export added during Round 1. PUBLIC_API.md updated with dated changelog row documenting the addition.
+
+- Violation 2 (R1 RECOMMENDED, fixed): StrategyOverlayKind literal ('divergence' | 'fibonacci' | 'elliott') duplicated across loader, resolver, and type definitions
+  Rule: Code duplication — magic strings should have single source of truth
+  Context: Three separate lists of kind variants consolidated into a single Record<StrategyOverlayKind, true>-backed constant in domain/overlays/constants.ts.
+
+- Violation 3 (R1 RECOMMENDED, fixed): strategyNameToKind lookup matched any skill type instead of restricting to type==='strategy'
+  Rule: Type-matching precision — restrict name lookups to intended skill type
+  Context: Fixed lookup to check type==='strategy' before matching against strategy names, preventing false matches on other skill types.
+
+- Violation 4 (R1 RECOMMENDED, fixed): Missing test coverage for skills-omitted branch, divergence/fibonacci kinds, and elliott primary/alternate variants with overlayKind
+  Rule: Test coverage — new overlayKind parameter branches need assertions
+  Context: Added test cases covering skills-omitted branch, divergence/fibonacci kinds, and elliott primary/alternate with overlayKind parameter.
+
+- Violation 5 (R1 RECOMMENDED, fixed): Changelog lacked note that cached analyses retain old overlayKind pairing until TTL expiration
+  Rule: Changelog documentation — runtime behavior must include cache semantics note
+  Context: Added changelog note documenting that cached analyses keep old overlayKind pairing until TTL expiration, and consumer must deploy frontmatter changes simultaneously.
+
+Round 2: approved
+
