@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.5.0](https://github.com/y0ngha/siglens-core/compare/v2.4.0...v2.5.0) (2026-10-01)
+
+### Bug Fixes
+
+* **overlays:** re-home cross-kind strategy ids instead of dropping them ([#243](https://github.com/y0ngha/siglens-core/issues/243)) ([3e2d668](https://github.com/y0ngha/siglens-core/commit/3e2d668d3fa7fd8e41ed87f8e99d5723b318bf44))
+
 # [2.4.0](https://github.com/y0ngha/siglens-core/compare/v2.3.1...v2.4.0) (2026-10-01)
 
 ### Features
