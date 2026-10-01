@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.3.0](https://github.com/y0ngha/siglens-core/compare/v2.2.2...v2.3.0) (2026-10-01)
+
+### Bug Fixes
+
+* **overlays:** strategy and pattern cards draw only their own overlays ([#240](https://github.com/y0ngha/siglens-core/issues/240)) ([2229042](https://github.com/y0ngha/siglens-core/commit/22290422f031a0521071c89dd3bef8cbf07bee1c))
+
 ## [2.2.2](https://github.com/y0ngha/siglens-core/compare/v2.2.1...v2.2.2) (2026-10-01)
 
 ### Bug Fixes
