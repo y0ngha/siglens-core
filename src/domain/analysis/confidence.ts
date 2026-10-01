@@ -164,6 +164,10 @@ export function enrichAnalysisWithConfidence(
             const skill = findSkill(lookup, p.skillName);
             return {
                 ...p,
+                // The model sometimes echoes the pattern id ('ascending_wedge')
+                // as skillName; canonicalise to the skill's display name so the
+                // UI can localise it like any other pattern card.
+                skillName: skill?.name ?? p.skillName,
                 id: patternSummaryIds[index],
                 confidenceWeight:
                     skill?.confidenceWeight ??

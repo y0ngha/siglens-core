@@ -396,6 +396,26 @@ describe('confidence', () => {
                     chartDisplay
                 );
             });
+
+            it('영어 pattern 값 skillName은 skill 표시명으로 정규화된다', () => {
+                const analysis = makeAnalysisResponse({
+                    patternSummaries: [
+                        makePatternSummary({ skillName: 'head_and_shoulders' }),
+                        makePatternSummary({ skillName: '없는스킬' }),
+                    ],
+                });
+                const skills = [
+                    makeSkill({
+                        name: '헤드앤숄더',
+                        pattern: 'head_and_shoulders',
+                    }),
+                ];
+                const result = enrichAnalysisWithConfidence(analysis, skills);
+                expect(result.patternSummaries.map(p => p.skillName)).toEqual([
+                    '헤드앤숄더',
+                    '없는스킬',
+                ]);
+            });
         });
 
         describe('no confidence floor — unmatched patterns are kept', () => {

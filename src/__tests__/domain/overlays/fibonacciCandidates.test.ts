@@ -94,6 +94,24 @@ describe('buildFibonacciCandidates', () => {
         expect(c.levels.map(l => l.label)).toContain('61.8%');
     });
 
+    it('extensions carry the ext prefix; the 100% duplicate of the end anchor is dropped', () => {
+        const ref = {
+            short: horizon(fib(20, 10)),
+            medium: horizon(null),
+            long: horizon(null),
+        } as MarketReference;
+        const [c] = buildFibonacciCandidates(ref, bars, FMT);
+        expect(c.levels.map(l => l.label)).toEqual([
+            '23.6%',
+            '38.2%',
+            '50%',
+            '61.8%',
+            '78.6%',
+            'ext 127.2%',
+            'ext 161.8%',
+        ]);
+    });
+
     it('never exceeds the candidate limit', () => {
         const ref = {
             short: horizon(fib(1, 2)),
