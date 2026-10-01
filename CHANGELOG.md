@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.4.0](https://github.com/y0ngha/siglens-core/compare/v2.3.1...v2.4.0) (2026-10-01)
+
+### Features
+
+* **overlays:** export STRATEGY_OVERLAY_KINDS; record cross-kind drop decision and shelved prompt A/B ([#242](https://github.com/y0ngha/siglens-core/issues/242)) ([837d3f9](https://github.com/y0ngha/siglens-core/commit/837d3f9d485dddf1fd4883be7851e078a3c5909a))
+
 ## [2.3.1](https://github.com/y0ngha/siglens-core/compare/v2.3.0...v2.3.1) (2026-10-01)
 
 ### Bug Fixes
