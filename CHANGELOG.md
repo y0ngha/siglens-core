@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.3.1](https://github.com/y0ngha/siglens-core/compare/v2.3.0...v2.3.1) (2026-10-01)
+
+### Bug Fixes
+
+* **overlays:** match pattern targets to drawn lines, canonicalise skill names, fix id/limit edge cases ([#241](https://github.com/y0ngha/siglens-core/issues/241)) ([8aa5f01](https://github.com/y0ngha/siglens-core/commit/8aa5f016dccbcc4b6eabd50d33f7e79d1d0b8226))
+
 # [2.3.0](https://github.com/y0ngha/siglens-core/compare/v2.2.2...v2.3.0) (2026-10-01)
 
 ### Bug Fixes
