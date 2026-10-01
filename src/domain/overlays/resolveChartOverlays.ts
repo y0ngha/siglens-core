@@ -45,15 +45,14 @@ const STRATEGY_SLOT_KINDS: readonly OverlayKind[] = STRATEGY_OVERLAY_KINDS;
  * its declared `overlayKind` — the chart menu names a strategy drawing after
  * its card, so an Elliott card citing a Fibonacci candidate showed "Elliott
  * wave" over a Fibonacci ladder. A known strategy (`type: 'strategy'` skill)
- * without `overlayKind` draws nothing, and so does a name matching no
- * strategy skill exactly — `enrichAnalysisWithConfidence` has already
- * renamed a recognisable one ("Elliott Wave", "피보나치 되돌림") to its
- * skill's name, so what is left names no strategy and would otherwise reopen
- * the same mislabel. Only with no strategy skills at all (none passed) is
- * every strategy kind kept: there is nothing to check against.
- *
- * A cross-kind id is not drawn under the card that cited it; see
- * {@link homeStrategyRefs} for where it goes instead.
+ * without `overlayKind` draws nothing under its own card, and neither does a
+ * name matching no strategy skill exactly (`enrichAnalysisWithConfidence`
+ * has already renamed a recognisable one — "Elliott Wave", "피보나치 되돌림" —
+ * to its skill's name). Their strategy-kind citations are not lost: they are
+ * cross-kind for that card, so {@link homeStrategyRefs} draws them under the
+ * card of their kind or under `STRATEGY_KIND_SOURCE_REF`. Only with no
+ * strategy skills at all (none passed) is every strategy kind kept under the
+ * citing card: there is nothing to check against.
  */
 function strategySlotKinds(
     strategyName: string,
@@ -65,17 +64,20 @@ function strategySlotKinds(
 }
 
 /**
- * The strategy card of the analysis that draws `kind`: the first card whose
- * skill declares it (`overlayKind`). `undefined` when none of the analysis'
- * cards does.
+ * Each kind's home card in the analysis: the first card whose skill declares
+ * it (`overlayKind`). A kind no card declares is absent.
  */
-function homeCardFor(
-    kind: StrategyOverlayKind,
+function homeCardIds(
     strategyResults: readonly StrategyResult[],
     strategyByName: ReadonlyMap<string, Skill>
-): StrategyResult | undefined {
-    return strategyResults.find(
-        s => strategyByName.get(s.strategyName)?.overlayKind === kind
+): ReadonlyMap<StrategyOverlayKind, string> {
+    return new Map(
+        STRATEGY_OVERLAY_KINDS.flatMap(kind => {
+            const home = strategyResults.find(
+                s => strategyByName.get(s.strategyName)?.overlayKind === kind
+            );
+            return home ? [[kind, home.id] as const] : [];
+        })
     );
 }
 
@@ -107,9 +109,10 @@ function homeStrategyRefs(
     strategyResults: readonly StrategyResult[],
     byId: ReadonlyMap<string, OverlayCandidate>,
     strategyByName: ReadonlyMap<string, Skill>
-): (Ref & { citedBy: string })[] {
-    if (strategyByName.size === 0) return [];
-    return strategyResults.flatMap(s => {
+): { refs: Ref[]; movedKeys: ReadonlySet<string> } {
+    if (strategyByName.size === 0) return { refs: [], movedKeys: new Set() };
+    const homes = homeCardIds(strategyResults, strategyByName);
+    const moved = strategyResults.flatMap(s => {
         const own = strategyByName.get(s.strategyName)?.overlayKind;
         return (s.candidateIds ?? []).flatMap(id => {
             const kind = byId.get(id)?.kind;
@@ -119,18 +122,23 @@ function homeStrategyRefs(
                 !isStrategyOverlayKind(kind)
             )
                 return [];
-            const home = homeCardFor(kind, strategyResults, strategyByName);
-            return [
-                {
-                    id,
-                    sourceRef: home?.id ?? STRATEGY_KIND_SOURCE_REF[kind],
-                    allowedKinds: [kind],
-                    citedBy: s.id,
-                },
-            ];
+            const ref: Ref = {
+                id,
+                sourceRef: homes.get(kind) ?? STRATEGY_KIND_SOURCE_REF[kind],
+                allowedKinds: [kind],
+            };
+            return [{ ref, key: movedKey(s.id, id) }];
         });
     });
+    return {
+        refs: moved.map(m => m.ref),
+        movedKeys: new Set(moved.map(m => m.key)),
+    };
 }
+
+/** Identifies one card's citation of one id (`homeStrategyRefs` ↔ `collectRefs`). */
+const movedKey = (cardId: string, id: string): string =>
+    JSON.stringify([cardId, id]);
 
 type PatternSkill = Skill & { pattern: string };
 
@@ -238,7 +246,7 @@ function collectRefs(
     // A moved id is not also kept as the citing card's own (rejected) ref —
     // it is not unknown, so it must not land in `unknownIds`.
     const isMoved = (cardId: string, id: string) =>
-        moved.some(m => m.citedBy === cardId && m.id === id);
+        moved.movedKeys.has(movedKey(cardId, id));
     const strategyRefs = analysis.strategyResults.flatMap(s => {
         const allowedKinds = strategySlotKinds(s.strategyName, strategyByName);
         return (s.candidateIds ?? [])
@@ -250,7 +258,7 @@ function collectRefs(
         sourceRef: TRENDLINE_SOURCE_REF,
         allowedKinds: TRENDLINE_SLOT_KINDS,
     }));
-    return [...patternRefs, ...strategyRefs, ...moved, ...trendRefs];
+    return [...patternRefs, ...strategyRefs, ...moved.refs, ...trendRefs];
 }
 
 /**

@@ -30,9 +30,9 @@ export const STRATEGY_OVERLAY_KINDS: readonly StrategyOverlayKind[] =
  * "Elliott wave" showing a Fibonacci ladder) or not at all. Consumers label
  * these with the kind's name. No card id can collide: card ids end in `_<n>`.
  */
-export const STRATEGY_KIND_SOURCE_REF: Readonly<
-    Record<StrategyOverlayKind, string>
-> = {
+export const STRATEGY_KIND_SOURCE_REF: Readonly<{
+    [K in StrategyOverlayKind]: `kind:${K}`;
+}> = {
     divergence: 'kind:divergence',
     fibonacci: 'kind:fibonacci',
     elliott: 'kind:elliott',
