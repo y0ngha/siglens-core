@@ -53,24 +53,11 @@ function legCandidate(
     // prefix the `Fib table:` line already uses.
     const levels = FIB_OVERLAY_RATIOS.flatMap(ratio => {
         const retracement = retracementByRatio.get(ratio);
-        if (retracement !== undefined)
-            return [
-                {
-                    price: retracement,
-                    fromTime: to.time,
-                    label: formatFibRatio(ratio),
-                },
-            ];
-        const extension = extensionByRatio.get(ratio);
-        return extension === undefined
-            ? []
-            : [
-                  {
-                      price: extension,
-                      fromTime: to.time,
-                      label: `ext ${formatFibRatio(ratio)}`,
-                  },
-              ];
+        const price = retracement ?? extensionByRatio.get(ratio);
+        if (price === undefined) return [];
+        const percent = formatFibRatio(ratio);
+        const label = retracement === undefined ? `ext ${percent}` : percent;
+        return [{ price, fromTime: to.time, label }];
     });
     return {
         id: `fib:${key}:${to.time}`,
