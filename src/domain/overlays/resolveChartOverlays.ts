@@ -10,10 +10,15 @@ import type {
     ResolvedChartOverlays,
     Skill,
     SkillCategory,
+    StrategyOverlayKind,
+    StrategyResult,
     Trendline,
 } from '@/domain/types';
 import { patternSkillStem } from '@/domain/overlays/patternOverlays';
-import { STRATEGY_OVERLAY_KINDS } from '@/domain/overlays/constants';
+import {
+    STRATEGY_KIND_SOURCE_REF,
+    STRATEGY_OVERLAY_KINDS,
+} from '@/domain/overlays/constants';
 
 const TRENDLINE_SOURCE_REF = 'trendlines';
 const MAX_TRENDLINES = 3;
@@ -40,31 +45,14 @@ const STRATEGY_SLOT_KINDS: readonly OverlayKind[] = STRATEGY_OVERLAY_KINDS;
  * its declared `overlayKind` — the chart menu names a strategy drawing after
  * its card, so an Elliott card citing a Fibonacci candidate showed "Elliott
  * wave" over a Fibonacci ladder. A known strategy (`type: 'strategy'` skill)
- * without `overlayKind` draws nothing, and so does a name matching no
- * strategy skill exactly — `enrichAnalysisWithConfidence` has already
- * renamed a recognisable one ("Elliott Wave", "피보나치 되돌림") to its
- * skill's name, so what is left names no strategy and would otherwise reopen
- * the same mislabel. Only with no strategy skills at all (none passed) is
- * every strategy kind kept: there is nothing to check against.
- *
- * Design decision (2026-10-01): a cross-kind id is dropped, not kept under a
- * kind-named item ("Fibonacci (Elliott wave basis)"). A drawing labelled
- * with the wrong card reads as a broken chart; a missing one goes unnoticed,
- * and its prices still appear in the card text and key levels. Relabelling
- * would also leave the card's panel toggle highlighting a different kind.
- * Measured on 90 live analyses this drops a drawing in 5 of them (~5.6%:
- * 4 Fibonacci ladders cited only by the Elliott card, 1 Elliott count on the
- * MACD card); a Fibonacci
- * id the Fibonacci card also cites is kept under that card.
- *
- * A prompt fix was tried and shelved (2026-10-01, real-LLM A/B, 8 symbols ×
- * 2 runs, deepseek-v4.1-flash): rewording the strategyResults `candidateIds`
- * note to "cite only your own kind; leave a Fibonacci/divergence id to that
- * strategy" cut cross-kind citations 13 → 2–4, but those were mostly
- * duplicates the Fibonacci card already cited, so drawn Fibonacci ladders
- * did not rise (21 vs 20/17/19) — and stricter wordings made the Fibonacci
- * card cite `[]` for its own legs in 2–3 runs. The current prompt plus this
- * drop draws the most. Revisit only with a larger sample.
+ * without `overlayKind` draws nothing under its own card, and neither does a
+ * name matching no strategy skill exactly (`enrichAnalysisWithConfidence`
+ * has already renamed a recognisable one — "Elliott Wave", "피보나치 되돌림" —
+ * to its skill's name). Their strategy-kind citations are not lost: they are
+ * cross-kind for that card, so {@link homeStrategyRefs} draws them under the
+ * card of their kind or under `STRATEGY_KIND_SOURCE_REF`. Only with no
+ * strategy skills at all (none passed) is every strategy kind kept under the
+ * citing card: there is nothing to check against.
  */
 function strategySlotKinds(
     strategyName: string,
@@ -74,6 +62,83 @@ function strategySlotKinds(
     const kind = strategyByName.get(strategyName)?.overlayKind;
     return kind ? [kind] : [];
 }
+
+/**
+ * Each kind's home card in the analysis: the first card whose skill declares
+ * it (`overlayKind`). A kind no card declares is absent.
+ */
+function homeCardIds(
+    strategyResults: readonly StrategyResult[],
+    strategyByName: ReadonlyMap<string, Skill>
+): ReadonlyMap<StrategyOverlayKind, string> {
+    return new Map(
+        STRATEGY_OVERLAY_KINDS.flatMap(kind => {
+            const home = strategyResults.find(
+                s => strategyByName.get(s.strategyName)?.overlayKind === kind
+            );
+            return home ? [[kind, home.id] as const] : [];
+        })
+    );
+}
+
+const isStrategyOverlayKind = (
+    kind: OverlayKind
+): kind is StrategyOverlayKind => STRATEGY_SLOT_KINDS.includes(kind);
+
+/**
+ * Cross-kind strategy ids, re-homed instead of drawn under the citing card.
+ *
+ * The model often cites a Fibonacci leg from the Elliott card (or a
+ * multi-timeframe card). Drawn under the citing card it is mislabelled —
+ * the chart menu names a drawing after its card, so "Elliott wave" showed a
+ * Fibonacci ladder; dropped, real drawings vanished (replaying 552
+ * production analyses on 2026-10-01: 65 of the 264 analyses showing a
+ * Fibonacci ladder lost it, and 56 of 74 analyses with an Elliott-cited leg
+ * had no Fibonacci card at all). So the id goes to the analysis' own card of
+ * that kind when there is one, else to {@link STRATEGY_KIND_SOURCE_REF} —
+ * either way the label matches what is drawn.
+ *
+ * These refs come after every card's own citations, so a card's own ids
+ * keep first claim (and an Elliott card's own count stays its primary).
+ * A prompt-side fix (ask the model to cite each id on its own kind) was
+ * A/B-tested with the real model and shelved: cross-kind citations fell
+ * 13 → 2–4 but drawn ladders did not rise, and stricter wordings made the
+ * Fibonacci card cite `[]` for its own legs.
+ */
+function homeStrategyRefs(
+    strategyResults: readonly StrategyResult[],
+    byId: ReadonlyMap<string, OverlayCandidate>,
+    strategyByName: ReadonlyMap<string, Skill>
+): { refs: Ref[]; movedKeys: ReadonlySet<string> } {
+    if (strategyByName.size === 0) return { refs: [], movedKeys: new Set() };
+    const homes = homeCardIds(strategyResults, strategyByName);
+    const moved = strategyResults.flatMap(s => {
+        const own = strategyByName.get(s.strategyName)?.overlayKind;
+        return (s.candidateIds ?? []).flatMap(id => {
+            const kind = byId.get(id)?.kind;
+            if (
+                kind === undefined ||
+                kind === own ||
+                !isStrategyOverlayKind(kind)
+            )
+                return [];
+            const ref: Ref = {
+                id,
+                sourceRef: homes.get(kind) ?? STRATEGY_KIND_SOURCE_REF[kind],
+                allowedKinds: [kind],
+            };
+            return [{ ref, key: movedKey(s.id, id) }];
+        });
+    });
+    return {
+        refs: moved.map(m => m.ref),
+        movedKeys: new Set(moved.map(m => m.key)),
+    };
+}
+
+/** Identifies one card's citation of one id (`homeStrategyRefs` ↔ `collectRefs`). */
+const movedKey = (cardId: string, id: string): string =>
+    JSON.stringify([cardId, id]);
 
 type PatternSkill = Skill & { pattern: string };
 
@@ -150,6 +215,7 @@ function collectRefs(
     analysis: AnalysisResponse,
     trendlineIds: readonly string[],
     candidates: readonly OverlayCandidate[],
+    byId: ReadonlyMap<string, OverlayCandidate>,
     patternBySkillName: ReadonlyMap<string, PatternSkill>,
     strategyByName: ReadonlyMap<string, Skill>
 ): Ref[] {
@@ -172,20 +238,27 @@ function collectRefs(
               ]
             : [];
     });
+    const moved = homeStrategyRefs(
+        analysis.strategyResults,
+        byId,
+        strategyByName
+    );
+    // A moved id is not also kept as the citing card's own (rejected) ref —
+    // it is not unknown, so it must not land in `unknownIds`.
+    const isMoved = (cardId: string, id: string) =>
+        moved.movedKeys.has(movedKey(cardId, id));
     const strategyRefs = analysis.strategyResults.flatMap(s => {
         const allowedKinds = strategySlotKinds(s.strategyName, strategyByName);
-        return (s.candidateIds ?? []).map(id => ({
-            id,
-            sourceRef: s.id,
-            allowedKinds,
-        }));
+        return (s.candidateIds ?? [])
+            .filter(id => !isMoved(s.id, id))
+            .map(id => ({ id, sourceRef: s.id, allowedKinds }));
     });
     const trendRefs = trendlineIds.map(id => ({
         id,
         sourceRef: TRENDLINE_SOURCE_REF,
         allowedKinds: TRENDLINE_SLOT_KINDS,
     }));
-    return [...patternRefs, ...strategyRefs, ...trendRefs];
+    return [...patternRefs, ...strategyRefs, ...moved.refs, ...trendRefs];
 }
 
 /**
@@ -234,6 +307,7 @@ export function resolveChartOverlays(
         analysis,
         trendlineIds,
         candidates,
+        byId,
         patternBySkillName,
         strategyByName
     )) {

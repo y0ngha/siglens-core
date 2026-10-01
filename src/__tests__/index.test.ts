@@ -77,6 +77,11 @@ describe('public API exports', () => {
     it('exports the MA-stack classifier from package entrypoint', () => {
         // siglens' get_bars_indicators derived.maStack reads this instead of a local copy.
         expect(typeof coreApi.classifyMaStack).toBe('function');
+        expect(coreApi.STRATEGY_KIND_SOURCE_REF).toEqual({
+            divergence: 'kind:divergence',
+            fibonacci: 'kind:fibonacci',
+            elliott: 'kind:elliott',
+        });
         expect(coreApi.STRATEGY_OVERLAY_KINDS).toEqual([
             'divergence',
             'fibonacci',

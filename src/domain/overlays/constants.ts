@@ -21,6 +21,23 @@ const STRATEGY_OVERLAY_KIND_FLAGS: Record<StrategyOverlayKind, true> = {
 export const STRATEGY_OVERLAY_KINDS: readonly StrategyOverlayKind[] =
     Object.keys(STRATEGY_OVERLAY_KIND_FLAGS) as StrategyOverlayKind[];
 
+/**
+ * `ChartOverlay.sourceRef` of a strategy-kind drawing that no card of the
+ * analysis owns: a Fibonacci leg, divergence or Elliott count the model cited
+ * only from a card of another kind (or with no card of its kind in the
+ * analysis). It is drawn under its kind — the way every trendline shares the
+ * `'trendlines'` sourceRef — instead of under the citing card (a mislabel:
+ * "Elliott wave" showing a Fibonacci ladder) or not at all. Consumers label
+ * these with the kind's name. No card id can collide: card ids end in `_<n>`.
+ */
+export const STRATEGY_KIND_SOURCE_REF: Readonly<{
+    [K in StrategyOverlayKind]: `kind:${K}`;
+}> = {
+    divergence: 'kind:divergence',
+    fibonacci: 'kind:fibonacci',
+    elliott: 'kind:elliott',
+};
+
 // ─── Trendlines ─────────────────────────────────────────────────────────────
 /** @internal A same-kind pivot within this many ATR of the line counts as a touch. */
 export const TRENDLINE_TOUCH_ATR_MULT = 0.25;

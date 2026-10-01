@@ -143,12 +143,6 @@
 
 ### Round 3: approved
 
-## [PR #234 | feat/classify-ma-stack | 2026-09-28] — Tier 2 public export JSDoc missing @returns
-
-- Violation: classifyMaStack public export lacked required @returns JSDoc tag
-  - Rule: MISTAKES.md TypeScript 4.5 — Tier 2 public functions must have @param and @returns JSDoc tags
-  - Context: New Tier 2 function added to src/domain/analysis/trendStructure.ts without @returns documentation. Fixed by adding @returns tag.
-
 ## [Branch fix/history-window-cache-churn | 2026-09-30] — Round 1 review findings
 
 - Violation 1 (required): Orphaned JSDoc after inserting new function between JSDoc block and declaration
@@ -181,10 +175,6 @@ Round 2: approved
 
 ## [PR #241 claude-review | fix/overlay-resolution-followups | 2026-10-01]
 
-- Violation 1 (APPROVED, fixed): computeCandidateGeometry function computed twice per candidate — once during prompt section iteration, once again during printedPatternGeometriesByOverlayId rendering
-  Rule: MISTAKES.md Coding Paradigm #2 — repeated computation
-  Context: Refactored to compute candidateGeometries once outside the loop and share the Map across both use-sites, eliminating redundant O(n) traversals.
-
 - Violation 2 (APPROVED, fixed): findSkill used for…of loop with early return instead of declarative find()
   Rule: CONVENTIONS.md — loop-avoidance pattern (map/filter/find preferred over for…of)
   Context: Converted for…of with early return to .find((skill) => skill.name === patternName), aligning with codebase declarative style.
@@ -192,4 +182,12 @@ Round 2: approved
 - Violation 3 (APPROVED, fixed): TechnicalAssembledPrompt.patternGeometries is a Map that may not be JSON-serializable; JSDoc did not document in-process-only scope
   Rule: MISTAKES.md Type Documentation #4 — Tier 4 public type fields require JSDoc; runtime serialization constraints must be documented
   Context: Added JSDoc note clarifying patternGeometries is a transient in-memory Map used only during prompt generation and not included in serialized analysis results.
+
+## [Branch fix/reassign-cross-kind-strategy-ids | 2026-10-02] — ChartOverlay sourceRef and Skill overlayKind JSDoc
+
+- Violation 3 (R1 RECOMMENDED, fixed): missing tests for orphan Elliott primary/alternate and for one card citing the same cross-kind id twice
+  Rule: MISTAKES.md Tests §5.5 — new conditional branches require dedicated test cases
+  Context: Re-homing logic introduced edge cases (orphan Elliott patterns, duplicate cross-kind citations). Added test cases covering both scenarios to verify new branching logic.
+
+Round 2: approved
 
