@@ -3,10 +3,13 @@ import type {
     ChartOverlay,
     OverlayCandidate,
     OverlayKind,
-    OverlayVariant,
+    PatternBreakoutDirection,
+    PatternResult,
     PatternSummary,
+    PatternTargetGeometry,
     ResolvedChartOverlays,
     Skill,
+    SkillCategory,
     Trendline,
 } from '@/domain/types';
 import { patternSkillStem } from '@/domain/overlays/patternOverlays';
@@ -15,6 +18,17 @@ import { STRATEGY_OVERLAY_KINDS } from '@/domain/overlays/constants';
 const TRENDLINE_SOURCE_REF = 'trendlines';
 const MAX_TRENDLINES = 3;
 const MAX_ELLIOTT_PER_STRATEGY = 2;
+
+/**
+ * How many RESOLVED overlays of a kind one `sourceRef` may draw — counted
+ * after validation and dedupe, so an unknown, duplicate or wrong-kind id
+ * never pushes a real one out (trendlines share the one `'trendlines'`
+ * sourceRef, so theirs is the global cap).
+ */
+const MAX_PER_SOURCE: Partial<Record<OverlayKind, number>> = {
+    elliott: MAX_ELLIOTT_PER_STRATEGY,
+    trendline: MAX_TRENDLINES,
+};
 
 /** Which candidate kinds each result slot may reference — a known id resolved from the wrong slot is as invalid as an unknown one. */
 const PATTERN_SLOT_KINDS: readonly OverlayKind[] = ['pattern'];
@@ -27,7 +41,9 @@ const STRATEGY_SLOT_KINDS: readonly OverlayKind[] = STRATEGY_OVERLAY_KINDS;
  * its card, so an Elliott card citing a Fibonacci candidate showed "Elliott
  * wave" over a Fibonacci ladder. A known strategy (`type: 'strategy'` skill)
  * without `overlayKind` draws nothing, and so does a name matching no
- * strategy skill — the model echoing "Elliott Wave" would otherwise reopen
+ * strategy skill exactly — `enrichAnalysisWithConfidence` has already
+ * renamed a recognisable one ("Elliott Wave", "피보나치 되돌림") to its
+ * skill's name, so what is left names no strategy and would otherwise reopen
  * the same mislabel. Only with no strategy skills at all (none passed) is
  * every strategy kind kept: there is nothing to check against.
  */
@@ -40,10 +56,11 @@ function strategySlotKinds(
     return kind ? [kind] : [];
 }
 
+type PatternSkill = Skill & { pattern: string };
+
 interface Ref {
     id: string;
     sourceRef: string;
-    variant: OverlayVariant;
     allowedKinds: readonly OverlayKind[];
     /**
      * The candidate `skill` the card requires — set for a pattern card whose
@@ -64,7 +81,7 @@ interface Ref {
 function fallbackPatternCandidateId(
     p: PatternSummary,
     candidates: readonly OverlayCandidate[],
-    patternBySkillName: ReadonlyMap<string, string>
+    patternBySkillName: ReadonlyMap<string, PatternSkill>
 ): string | undefined {
     const stem = patternCandidateSkill(p, patternBySkillName);
     if (stem === undefined) return undefined;
@@ -82,35 +99,39 @@ function fallbackPatternCandidateId(
  */
 function patternCandidateSkill(
     p: PatternSummary,
-    patternBySkillName: ReadonlyMap<string, string>
+    patternBySkillName: ReadonlyMap<string, PatternSkill>
 ): string | undefined {
-    const pattern =
-        patternBySkillName.get(p.skillName) ??
-        patternBySkillName.get(p.patternName);
-    return pattern === undefined ? undefined : patternSkillStem(pattern);
+    const skill = patternSkillOf(p, patternBySkillName);
+    return skill === undefined ? undefined : patternSkillStem(skill.pattern);
 }
 
+/** The pattern skill a card stands for — looked up by `skillName`, then `patternName`. */
+function patternSkillOf(
+    p: PatternSummary,
+    patternBySkillName: ReadonlyMap<string, PatternSkill>
+): PatternSkill | undefined {
+    return (
+        patternBySkillName.get(p.skillName) ??
+        patternBySkillName.get(p.patternName)
+    );
+}
+
+/** Pattern skills keyed by both display name and `pattern` id. */
 function buildPatternBySkillName(
     skills: readonly Skill[]
-): Map<string, string> {
+): Map<string, PatternSkill> {
     return new Map(
-        skills.flatMap(s =>
-            s.pattern
-                ? [
-                      [s.name, s.pattern] as const,
-                      [s.pattern, s.pattern] as const,
-                  ]
-                : []
-        )
+        skills
+            .filter((s): s is PatternSkill => Boolean(s.pattern))
+            .flatMap(s => [[s.name, s] as const, [s.pattern, s] as const])
     );
 }
 
 function collectRefs(
     analysis: AnalysisResponse,
     trendlineIds: readonly string[],
-    byId: ReadonlyMap<string, OverlayCandidate>,
     candidates: readonly OverlayCandidate[],
-    patternBySkillName: ReadonlyMap<string, string>,
+    patternBySkillName: ReadonlyMap<string, PatternSkill>,
     strategyByName: ReadonlyMap<string, Skill>
 ): Ref[] {
     const patternRefs = analysis.patternSummaries.flatMap(p => {
@@ -123,7 +144,6 @@ function collectRefs(
                   {
                       id,
                       sourceRef: p.id,
-                      variant: 'primary' as const,
                       allowedKinds: PATTERN_SLOT_KINDS,
                       requiredSkill: patternCandidateSkill(
                           p,
@@ -135,36 +155,15 @@ function collectRefs(
     });
     const strategyRefs = analysis.strategyResults.flatMap(s => {
         const allowedKinds = strategySlotKinds(s.strategyName, strategyByName);
-        let elliottSeen = 0;
-        return (s.candidateIds ?? []).flatMap(id => {
-            if (byId.get(id)?.kind !== 'elliott')
-                return [
-                    {
-                        id,
-                        sourceRef: s.id,
-                        variant: 'primary' as const,
-                        allowedKinds,
-                    },
-                ];
-            elliottSeen++;
-            if (elliottSeen > MAX_ELLIOTT_PER_STRATEGY) return [];
-            return [
-                {
-                    id,
-                    sourceRef: s.id,
-                    variant:
-                        elliottSeen === 1
-                            ? ('primary' as const)
-                            : ('alternate' as const),
-                    allowedKinds,
-                },
-            ];
-        });
+        return (s.candidateIds ?? []).map(id => ({
+            id,
+            sourceRef: s.id,
+            allowedKinds,
+        }));
     });
-    const trendRefs = trendlineIds.slice(0, MAX_TRENDLINES).map(id => ({
+    const trendRefs = trendlineIds.map(id => ({
         id,
         sourceRef: TRENDLINE_SOURCE_REF,
-        variant: 'primary' as const,
         allowedKinds: TRENDLINE_SLOT_KINDS,
     }));
     return [...patternRefs, ...strategyRefs, ...trendRefs];
@@ -208,12 +207,13 @@ export function resolveChartOverlays(
         skills.filter(s => s.type === 'strategy').map(s => [s.name, s])
     );
     const seen = new Set<string>();
+    // Resolved overlays per `sourceRef` + kind, for {@link MAX_PER_SOURCE}.
+    const drawnPerSource = new Map<string, number>();
     const unknownIds: string[] = [];
     const chartOverlays: ChartOverlay[] = [];
     for (const ref of collectRefs(
         analysis,
         trendlineIds,
-        byId,
         candidates,
         patternBySkillName,
         strategyByName
@@ -232,12 +232,24 @@ export function resolveChartOverlays(
             continue;
         }
         if (seen.has(ref.id)) continue;
+        const capKey = `${ref.sourceRef}:${candidate.kind}`;
+        const drawn = drawnPerSource.get(capKey) ?? 0;
+        // Over the cap: dropped silently and, like a rejected ref, without
+        // consuming the id.
+        if (drawn >= (MAX_PER_SOURCE[candidate.kind] ?? Infinity)) continue;
         seen.add(ref.id);
+        drawnPerSource.set(capKey, drawn + 1);
         const { promptLine: _promptLine, ...drawable } = candidate;
         chartOverlays.push({
             ...drawable,
             sourceRef: ref.sourceRef,
-            variant: ref.variant,
+            // An elliott card's first RESOLVED count is its primary; the
+            // next one (index 1 in `candidateIds` once rejects are skipped)
+            // is the faded alternate.
+            variant:
+                candidate.kind === 'elliott' && drawn > 0
+                    ? 'alternate'
+                    : 'primary',
         });
     }
     return {
@@ -246,5 +258,77 @@ export function resolveChartOverlays(
             .filter(o => o.kind === 'trendline')
             .flatMap(toTrendline),
         unknownIds,
+    };
+}
+
+/** Breakout direction a directional pattern skill's category implies; neutral categories imply none. */
+const CATEGORY_DIRECTION: Partial<
+    Record<SkillCategory, PatternBreakoutDirection>
+> = {
+    reversal_bullish: 'up',
+    continuation_bullish: 'up',
+    reversal_bearish: 'down',
+    continuation_bearish: 'down',
+};
+
+/**
+ * @internal
+ * Makes each detected pattern card's `geometry` — the input `ai-levels.ts`
+ * derives its measured/conservative target `keyPrices` from — agree with what
+ * the chart draws for it:
+ *
+ * - A card that resolved to a pattern overlay (`chartOverlays` from
+ *   {@link resolveChartOverlays}, so the same slot, identity and dedupe
+ *   checks apply) gets that candidate's printed geometry from
+ *   `patternGeometries` in place of whatever the model copied — breakout,
+ *   extreme, direction and invalidation alike, so a miscopied number or an
+ *   invented direction can no longer put the card's target on the other side
+ *   of the drawn breakout line.
+ * - A card with no resolved overlay keeps the model's geometry, unless its
+ *   direction contradicts the card skill's directional category
+ *   (`*_bullish` ⇒ `'up'`, `*_bearish` ⇒ `'down'`) — e.g. a double top with
+ *   an `'up'` breakout. That geometry is dropped, so no target is derived
+ *   from it.
+ *
+ * Run it before `postProcessAnalysisWithReconcile`, which derives the targets.
+ *
+ * @param analysis - The enriched analysis (pattern ids already assigned).
+ * @param chartOverlays - {@link resolveChartOverlays}' overlays for `analysis`.
+ * @param patternGeometries - Printed geometry per offered pattern overlay id
+ *   (`TechnicalAssembledPrompt.patternGeometries`).
+ * @param skills - Skills for the category check; omit to skip it.
+ * @returns `analysis` with aligned `patternSummaries[].geometry`.
+ */
+export function alignPatternGeometry(
+    analysis: AnalysisResponse,
+    chartOverlays: readonly ChartOverlay[],
+    patternGeometries: ReadonlyMap<string, PatternTargetGeometry>,
+    skills: readonly Skill[] = []
+): AnalysisResponse {
+    const overlayIdBySource = new Map(
+        chartOverlays
+            .filter(o => o.kind === 'pattern')
+            .map(o => [o.sourceRef, o.id])
+    );
+    const patternBySkillName = buildPatternBySkillName(skills);
+    const align = (p: PatternResult): PatternResult => {
+        if (!p.detected) return p;
+        const overlayId = overlayIdBySource.get(p.id);
+        const drawn =
+            overlayId === undefined
+                ? undefined
+                : patternGeometries.get(overlayId);
+        if (drawn) return { ...p, geometry: drawn };
+        const category = patternSkillOf(p, patternBySkillName)?.category;
+        const implied =
+            category === undefined ? undefined : CATEGORY_DIRECTION[category];
+        if (!p.geometry || implied === undefined) return p;
+        if (p.geometry.direction === implied) return p;
+        const { geometry: _contradicting, ...rest } = p;
+        return rest;
+    };
+    return {
+        ...analysis,
+        patternSummaries: analysis.patternSummaries.map(align),
     };
 }

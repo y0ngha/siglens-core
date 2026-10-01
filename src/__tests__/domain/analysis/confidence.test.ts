@@ -239,6 +239,42 @@ describe('confidence', () => {
                 expect(result.strategyResults[0].id).toBe('RSI 다이버전스_0');
                 expect(result.strategyResults[1].id).toBe('RSI 다이버전스_1');
             });
+
+            it('패턴 카드와 같은 이름의 전략은 다음 번호를 받아 id(=오버레이 sourceRef)가 겹치지 않는다', () => {
+                const analysis = makeAnalysisResponse({
+                    patternSummaries: [
+                        makePatternSummary({ patternName: '엘리어트 파동' }),
+                    ],
+                    strategyResults: [
+                        makeStrategyResult({ strategyName: '엘리어트 파동' }),
+                        makeStrategyResult({ strategyName: 'RSI 다이버전스' }),
+                    ],
+                });
+                const result = enrichAnalysisWithConfidence(analysis, []);
+                expect(result.patternSummaries[0].id).toBe('엘리어트 파동_0');
+                expect(result.strategyResults.map(r => r.id)).toEqual([
+                    '엘리어트 파동_1',
+                    'RSI 다이버전스_0',
+                ]);
+            });
+
+            it('캔들 패턴 id는 카드 id와 별도로 센다', () => {
+                const analysis = makeAnalysisResponse({
+                    patternSummaries: [
+                        makePatternSummary({ patternName: 'hammer' }),
+                    ],
+                    candlePatterns: [
+                        {
+                            patternName: 'hammer',
+                            detected: true,
+                            trend: 'bullish',
+                            summary: '',
+                        },
+                    ],
+                });
+                const result = enrichAnalysisWithConfidence(analysis, []);
+                expect(result.candlePatterns[0].id).toBe('hammer_0');
+            });
         });
 
         describe('strategyResults confidenceWeight 채우기', () => {
@@ -417,6 +453,173 @@ describe('confidence', () => {
                     '헤드앤숄더',
                     '없는스킬',
                 ]);
+            });
+        });
+
+        describe('모델이 쓴 스킬 이름 정규화 (운영 관측 문자열)', () => {
+            const STRATEGY_SKILLS = [
+                makeSkill({
+                    name: '엘리어트 파동',
+                    type: 'strategy',
+                    overlayKind: 'elliott',
+                    confidenceWeight: 0.7,
+                }),
+                makeSkill({
+                    name: '피보나치 전략',
+                    type: 'strategy',
+                    overlayKind: 'fibonacci',
+                }),
+                makeSkill({
+                    name: '다이버전스 전략',
+                    type: 'strategy',
+                    overlayKind: 'divergence',
+                }),
+                makeSkill({ name: 'MACD 대순환 분석', type: 'strategy' }),
+            ];
+            const PATTERN_SKILLS = [
+                makeSkill({ name: '상승쐐기', pattern: 'ascending_wedge' }),
+                makeSkill({ name: '원형바닥', pattern: 'rounding_bottom' }),
+                makeSkill({ name: '이중천장', pattern: 'double_top' }),
+            ];
+            const strategyNames = (names: string[], skills = STRATEGY_SKILLS) =>
+                enrichAnalysisWithConfidence(
+                    makeAnalysisResponse({
+                        strategyResults: names.map(strategyName =>
+                            makeStrategyResult({ strategyName })
+                        ),
+                    }),
+                    skills
+                ).strategyResults.map(r => r.strategyName);
+
+            it.each([
+                ['fibonacci-retracement', '피보나치 전략'],
+                ['피보나치 되돌림', '피보나치 전략'],
+                ['fib-retracement', '피보나치 전략'],
+                ['Elliott Wave', '엘리어트 파동'],
+                ['엘리엇 파동 분석', '엘리어트 파동'],
+                ['RSI Divergence', '다이버전스 전략'],
+                ['엘리어트파동', '엘리어트 파동'],
+                ['macd 대순환-분석', 'MACD 대순환 분석'],
+            ])('전략 이름 %s 는 %s 로 바뀐다', (written, canonical) => {
+                expect(strategyNames([written])).toEqual([canonical]);
+            });
+
+            it('정규화된 전략은 그 스킬의 confidenceWeight와 정규화된 id를 받는다', () => {
+                const [r] = enrichAnalysisWithConfidence(
+                    makeAnalysisResponse({
+                        strategyResults: [
+                            makeStrategyResult({
+                                strategyName: 'Elliott Wave',
+                            }),
+                        ],
+                    }),
+                    STRATEGY_SKILLS
+                ).strategyResults;
+                expect(r?.id).toBe('엘리어트 파동_0');
+                expect(r?.confidenceWeight).toBe(0.7);
+            });
+
+            it.each([
+                ['종류 단어가 없는 이름', 'MACD 크로스'],
+                ['두 종류를 함께 쓴 이름', 'Elliott Fibonacci confluence'],
+                ['단어 안에 묻힌 fib', 'fibrous trend'],
+                ['전략으로 보고된 패턴', '상승 채널'],
+                ['전략으로 보고된 패턴 id', 'cup_and_handle'],
+                [
+                    '다른 전략 스킬 이름을 통째로 담은 이름',
+                    'MACD 대순환 분석 (다이버전스 확인)',
+                ],
+            ])('%s(%s)은 그대로 둔다', (_, written) => {
+                expect(strategyNames([written])).toEqual([written]);
+            });
+
+            it('한 종류를 두 전략 스킬이 선언하면 그 종류 이름으로는 정하지 않는다', () => {
+                const skills = [
+                    ...STRATEGY_SKILLS,
+                    makeSkill({
+                        name: '피보나치 확장',
+                        type: 'strategy',
+                        overlayKind: 'fibonacci',
+                    }),
+                ];
+                expect(
+                    strategyNames(['fibonacci-retracement'], skills)
+                ).toEqual(['fibonacci-retracement']);
+            });
+
+            it('전략 스킬이 아닌 이름(패턴 스킬)으로 맞춰 바꾸지 않는다', () => {
+                expect(
+                    strategyNames(
+                        ['descending_wedge'],
+                        [
+                            ...STRATEGY_SKILLS,
+                            makeSkill({
+                                name: '하락쐐기',
+                                pattern: 'descending_wedge',
+                            }),
+                        ]
+                    )
+                ).toEqual(['descending_wedge']);
+            });
+
+            it('전략으로 보고된 패턴(이중천장)은 같은 이름의 패턴 카드와 id가 겹치지 않는다', () => {
+                const result = enrichAnalysisWithConfidence(
+                    makeAnalysisResponse({
+                        patternSummaries: [
+                            makePatternSummary({
+                                patternName: '이중천장',
+                                skillName: '이중천장',
+                            }),
+                        ],
+                        strategyResults: [
+                            makeStrategyResult({ strategyName: '이중천장' }),
+                        ],
+                    }),
+                    [...STRATEGY_SKILLS, ...PATTERN_SKILLS]
+                );
+                expect(result.strategyResults[0]?.strategyName).toBe(
+                    '이중천장'
+                );
+                expect(result.patternSummaries[0]?.id).toBe('이중천장_0');
+                expect(result.strategyResults[0]?.id).toBe('이중천장_1');
+            });
+
+            it.each([
+                ['ascending wedge', 'ascending wedge', '상승쐐기'],
+                ['상승 쐐기', '상승 쐐기', '상승쐐기'],
+                ['rounding bottom', 'rounding bottom', '원형바닥'],
+                ['Pattern Index Reference', 'Ascending-Wedge', '상승쐐기'],
+            ])(
+                '패턴 skillName %s (patternName %s) 는 %s 로 바뀐다',
+                (skillName, patternName, canonical) => {
+                    const [p] = enrichAnalysisWithConfidence(
+                        makeAnalysisResponse({
+                            patternSummaries: [
+                                makePatternSummary({ skillName, patternName }),
+                            ],
+                        }),
+                        PATTERN_SKILLS
+                    ).patternSummaries;
+                    expect(p?.skillName).toBe(canonical);
+                }
+            );
+
+            it('정규화를 넘는 추측은 하지 않는다: 괄호 설명이 붙은 patternName은 매칭되지 않는다', () => {
+                const [p] = enrichAnalysisWithConfidence(
+                    makeAnalysisResponse({
+                        patternSummaries: [
+                            makePatternSummary({
+                                skillName: 'Pattern Index Reference',
+                                patternName: '이중 천장 (Double Top)',
+                            }),
+                        ],
+                    }),
+                    PATTERN_SKILLS
+                ).patternSummaries;
+                expect(p?.skillName).toBe('Pattern Index Reference');
+                expect(p?.confidenceWeight).toBe(
+                    UNMATCHED_SKILL_CONFIDENCE_WEIGHT
+                );
             });
         });
 

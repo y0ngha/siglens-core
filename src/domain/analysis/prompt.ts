@@ -106,7 +106,9 @@ import {
 } from '@/domain/analysis/chartOverlayCandidatesSection';
 import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
+    candidateGeometries,
     formatChartPatternCandidatesSection,
+    printedPatternGeometriesByOverlayId,
 } from '@/domain/analysis/chartPatternCandidatesSection';
 import { buildOverlayCandidates } from '@/domain/overlays/buildOverlayCandidates';
 import {
@@ -2197,7 +2199,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   market profile (see {@link CurrencyCode} — core never derives it from the
  *   symbol). Drives the listing framing sentence and price precision (`KRW` →
  *   whole won). Defaults to `'USD'`.
- * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures }` — see {@link TechnicalAssembledPrompt}.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2379,6 +2381,11 @@ export function buildAnalysisPrompt(
     // minus the combined skill-content block (now split: `core` digests live
     // in `stable`, replaced here by a one-line pointer when non-empty;
     // `selected` digests stay in `dynamic` at the same position).
+    const patternCandidateGeometries = candidateGeometries(
+        patternCandidates,
+        bars,
+        atrForPatternGeometry
+    );
     const dynamicSections = [
         `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
@@ -2429,7 +2436,8 @@ export function buildAnalysisPrompt(
             atrForPatternGeometry,
             priceDp,
             timeframe,
-            offeredPatternOverlayIds
+            offeredPatternOverlayIds,
+            patternCandidateGeometries
         ),
         ...(overlayCandidatesSection !== '' ? [overlayCandidatesSection] : []),
         formatMarketReferenceSection(
@@ -2475,5 +2483,13 @@ export function buildAnalysisPrompt(
         dynamic: dynamicSections.join('\n\n'),
         overlayCandidates,
         overlayBuildFailures,
+        patternGeometries: printedPatternGeometriesByOverlayId(
+            patternCandidates,
+            bars,
+            atrForPatternGeometry,
+            priceDp,
+            offeredPatternOverlayIds,
+            patternCandidateGeometries
+        ),
     };
 }

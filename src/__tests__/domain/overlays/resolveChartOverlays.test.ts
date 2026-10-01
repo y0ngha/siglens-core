@@ -3,9 +3,14 @@ import type {
     AnalysisResponse,
     OverlayCandidate,
     PatternSummary,
+    PatternTargetGeometry,
     Skill,
 } from '@/domain/types';
-import { resolveChartOverlays } from '@/domain/overlays/resolveChartOverlays';
+import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
+import {
+    alignPatternGeometry,
+    resolveChartOverlays,
+} from '@/domain/overlays/resolveChartOverlays';
 
 const cand = (
     id: string,
@@ -159,6 +164,60 @@ describe('resolveChartOverlays', () => {
         ]);
     });
 
+    it('caps trendlines after validation: invented, wrong-kind and duplicate ids do not push real ones out', () => {
+        const r = resolveChartOverlays(
+            [
+                ...CANDIDATES,
+                cand('tl:support:3:5', 'trendline', 'support'),
+                cand('tl:support:4:6', 'trendline', 'support'),
+            ],
+            analysis({}),
+            [
+                'tl:made:up',
+                'fib:short:5',
+                'tl:support:1:3',
+                'tl:support:1:3',
+                'tl:resistance:2:4',
+                'tl:support:3:5',
+                'tl:support:4:6',
+            ]
+        );
+        expect(r.chartOverlays.map(o => o.id)).toEqual([
+            'tl:support:1:3',
+            'tl:resistance:2:4',
+            'tl:support:3:5',
+        ]);
+        expect(r.unknownIds).toEqual(['tl:made:up', 'fib:short:5']);
+    });
+
+    it('assigns the elliott primary/alternate split over resolved ids only: a count already claimed by an earlier card does not take the primary slot', () => {
+        const ew = (id: string, candidateIds: string[]) => ({
+            id,
+            strategyName: 'e',
+            trend: 'neutral' as const,
+            summary: '',
+            confidenceWeight: 1,
+            candidateIds,
+        });
+        const r = resolveChartOverlays(
+            [...CANDIDATES, cand('ew:down:3:4', 'elliott')],
+            analysis({
+                strategyResults: [
+                    ew('e_0', ['ew:up:1:6']),
+                    ew('e_1', ['ew:up:1:6', 'ew:up:2:5', 'ew:down:3:4']),
+                ],
+            }),
+            []
+        );
+        expect(
+            r.chartOverlays.map(o => [o.id, o.sourceRef, o.variant])
+        ).toEqual([
+            ['ew:up:1:6', 'e_0', 'primary'],
+            ['ew:up:2:5', 'e_1', 'primary'],
+            ['ew:down:3:4', 'e_1', 'alternate'],
+        ]);
+    });
+
     it('a known id in the wrong slot is treated like an unknown id: patternSummaries.candidateId must resolve to a pattern candidate', () => {
         const r = resolveChartOverlays(
             CANDIDATES,
@@ -294,6 +353,35 @@ describe('resolveChartOverlays', () => {
             );
             expect(r.chartOverlays).toEqual([]);
             expect(r.unknownIds).toEqual(['fib:short:5']);
+        });
+
+        it('draws for a model-written strategy name once enrichment canonicalises it, and still drops intended mismatches', () => {
+            const strategyResults = [
+                ['Elliott Wave', ['ew:up:1:6']],
+                ['피보나치 되돌림', ['fib:short:5']],
+                ['MACD 대순환 분석', ['ew:up:2:5']],
+                ['엘리어트 파동', ['fib:short:5']],
+            ].map(([strategyName, candidateIds]) => ({
+                strategyName,
+                trend: 'neutral',
+                summary: '',
+                candidateIds,
+            }));
+            const skills = [
+                ...SKILLS,
+                { name: 'MACD 대순환 분석', type: 'strategy' },
+            ].map(s => ({ ...s, confidenceWeight: 1 })) as Skill[];
+            const r = resolveChartOverlays(
+                MIXED,
+                enrichAnalysisWithConfidence({ strategyResults }, skills),
+                [],
+                skills
+            );
+            expect(r.chartOverlays.map(o => [o.id, o.sourceRef])).toEqual([
+                ['ew:up:1:6', '엘리어트 파동_0'],
+                ['fib:short:5', '피보나치 전략_0'],
+            ]);
+            expect(r.unknownIds).toEqual(['ew:up:2:5', 'fib:short:5']);
         });
 
         it('keeps every strategy kind when no strategy skills are passed', () => {
@@ -490,6 +578,177 @@ describe('resolveChartOverlays', () => {
                 []
             );
             expect(r.chartOverlays).toEqual([]);
+        });
+    });
+
+    describe('alignPatternGeometry', () => {
+        const SKILLS = [
+            {
+                name: '이중천장',
+                pattern: 'double_top',
+                category: 'reversal_bearish',
+            },
+            {
+                name: '이중바닥',
+                pattern: 'double_bottom',
+                category: 'reversal_bullish',
+            },
+            {
+                name: '대칭삼각형',
+                pattern: 'symmetrical_triangle',
+                category: 'neutral',
+            },
+        ] as Skill[];
+        const PRINTED: PatternTargetGeometry = {
+            breakoutLevel: 105,
+            extremeLevel: 100,
+            direction: 'up',
+            invalidationLevel: 99.5,
+        };
+        const GEOMETRIES = new Map([['pattern:double_bottom:1', PRINTED]]);
+        const card = (over: Partial<PatternSummary>): PatternSummary => ({
+            id: 'double_bottom_0',
+            patternName: 'double_bottom',
+            skillName: '이중바닥',
+            detected: true,
+            trend: 'bullish',
+            summary: '',
+            confidenceWeight: 1,
+            ...over,
+        });
+        const align = (
+            patternSummaries: PatternSummary[],
+            geometries: ReadonlyMap<string, PatternTargetGeometry> = GEOMETRIES
+        ) => {
+            const a = analysis({ patternSummaries });
+            const { chartOverlays } = resolveChartOverlays(
+                [
+                    {
+                        ...cand('pattern:double_bottom:1', 'pattern'),
+                        skill: 'double-bottom',
+                    },
+                ],
+                a,
+                [],
+                SKILLS
+            );
+            return alignPatternGeometry(a, chartOverlays, geometries, SKILLS)
+                .patternSummaries;
+        };
+
+        it('replaces the model geometry of a resolved card with the printed geometry of the candidate it draws', () => {
+            const [p] = align([
+                card({
+                    candidateId: 'pattern:double_bottom:1',
+                    geometry: {
+                        breakoutLevel: 95,
+                        extremeLevel: 100,
+                        direction: 'down',
+                    },
+                }),
+            ]);
+            expect(p?.geometry).toEqual(PRINTED);
+        });
+
+        it('keeps the model geometry of a resolved card whose candidate has no printed geometry', () => {
+            const model: PatternTargetGeometry = {
+                breakoutLevel: 105,
+                extremeLevel: 98,
+                direction: 'up',
+            };
+            const [p] = align(
+                [
+                    card({
+                        candidateId: 'pattern:double_bottom:1',
+                        geometry: model,
+                    }),
+                ],
+                new Map()
+            );
+            expect(p?.geometry).toEqual(model);
+        });
+
+        it('gives a resolved card without geometry the printed geometry', () => {
+            const [p] = align([
+                card({ candidateId: 'pattern:double_bottom:1' }),
+            ]);
+            expect(p?.geometry).toEqual(PRINTED);
+        });
+
+        it('only the card that drew the candidate gets its geometry, not a later card citing the same id', () => {
+            const model: PatternTargetGeometry = {
+                breakoutLevel: 110,
+                extremeLevel: 101,
+                direction: 'up',
+            };
+            const [, second] = align([
+                card({ candidateId: 'pattern:double_bottom:1' }),
+                card({
+                    id: 'double_bottom_1',
+                    candidateId: 'pattern:double_bottom:1',
+                    geometry: model,
+                }),
+            ]);
+            expect(second?.geometry).toEqual(model);
+        });
+
+        it('leaves an unresolved card without geometry as it is', () => {
+            const [p] = align([
+                card({
+                    id: 'double_top_0',
+                    patternName: 'double_top',
+                    skillName: '이중천장',
+                }),
+            ]);
+            expect(p).not.toHaveProperty('geometry');
+        });
+
+        it('drops the geometry of an unresolved card when its direction contradicts the skill category', () => {
+            const [p] = align([
+                card({
+                    id: 'double_top_0',
+                    patternName: 'double_top',
+                    skillName: '이중천장',
+                    geometry: {
+                        breakoutLevel: 90,
+                        extremeLevel: 80,
+                        direction: 'up',
+                    },
+                }),
+            ]);
+            expect(p).not.toHaveProperty('geometry');
+        });
+
+        it.each([
+            [
+                'a direction matching the category',
+                '이중천장',
+                'double_top',
+                'down',
+            ],
+            ['a neutral category', '대칭삼각형', 'symmetrical_triangle', 'up'],
+            ['an unknown skill', '모름', '모름', 'up'],
+        ] as const)(
+            'keeps the geometry of an unresolved card for %s',
+            (_, skillName, patternName, direction) => {
+                const geometry: PatternTargetGeometry = {
+                    breakoutLevel: 90,
+                    extremeLevel: direction === 'up' ? 80 : 100,
+                    direction,
+                };
+                const [p] = align([
+                    card({ id: 'x_0', skillName, patternName, geometry }),
+                ]);
+                expect(p?.geometry).toEqual(geometry);
+            }
+        );
+
+        it('leaves a detected:false card untouched', () => {
+            const unresolved = card({
+                detected: false,
+                candidateId: 'pattern:double_bottom:1',
+            });
+            expect(align([unresolved])).toEqual([unresolved]);
         });
     });
 });

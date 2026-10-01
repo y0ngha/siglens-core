@@ -20,6 +20,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         dynamic: 'mock-dynamic',
         overlayCandidates: [],
         overlayBuildFailures: [],
+        patternGeometries: new Map(),
     })),
 }));
 vi.mock('@/domain/indicators/fearGreed', () => ({
@@ -1270,6 +1271,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [],
                 overlayBuildFailures: [],
+                patternGeometries: new Map(),
             });
 
             await runAnalysis(
@@ -1312,6 +1314,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
+                patternGeometries: new Map(),
             });
             const reconciledWithCandidate: AnalysisResponse = {
                 ...mockRawResult,
@@ -1366,12 +1369,71 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             ]);
         });
 
+        it('resolve된 패턴 카드는 목표가 계산(postProcess) 전에 그려지는 후보의 출력 geometry로 바뀐다', async () => {
+            const printed = {
+                breakoutLevel: 105,
+                extremeLevel: 100,
+                direction: 'up' as const,
+                invalidationLevel: 99.5,
+            };
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [overlayCandidate],
+                overlayBuildFailures: [],
+                patternGeometries: new Map([[overlayCandidate.id, printed]]),
+            });
+            const enrichedWithMiscopy: AnalysisResponse = {
+                ...mockRawResult,
+                patternSummaries: [
+                    {
+                        id: 'pattern_0',
+                        patternName: 'double_bottom',
+                        skillName: 'Double Bottom',
+                        detected: true,
+                        trend: 'bullish',
+                        summary: '패턴 요약',
+                        confidenceWeight: 0.8,
+                        candidateId: overlayCandidate.id,
+                        // Model miscopied the breakout and invented the direction.
+                        geometry: {
+                            breakoutLevel: 95,
+                            extremeLevel: 100,
+                            direction: 'down',
+                        },
+                    },
+                ],
+            };
+            mockEnrichAnalysisWithConfidence.mockReturnValueOnce(
+                enrichedWithMiscopy
+            );
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify(enrichedWithMiscopy)
+            );
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            const postProcessed = mockPostProcessAnalysisWithReconcile.mock
+                .lastCall![0] as AnalysisResponse;
+            expect(postProcessed.patternSummaries[0]?.geometry).toEqual(
+                printed
+            );
+        });
+
         it('offered 후보에 없는 id는 chartOverlays에서 빠지고 unknown id 경고를 남긴다', async () => {
             mockBuildAnalysisPrompt.mockReturnValueOnce({
                 stable: 'mock-stable',
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
+                patternGeometries: new Map(),
             });
             const reconciledWithUnknownId: AnalysisResponse = {
                 ...mockRawResult,
@@ -1436,6 +1498,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [],
                 overlayBuildFailures: ['elliott'],
+                patternGeometries: new Map(),
             });
             const warnSpy = vi
                 .spyOn(console, 'warn')
