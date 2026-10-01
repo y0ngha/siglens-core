@@ -255,6 +255,7 @@ export {
 } from './domain/analysis/keyLevels';
 export { computeMarketReference } from './domain/analysis/marketReference';
 export { classifyMaStack } from './domain/analysis/trendStructure';
+export { STRATEGY_OVERLAY_KINDS } from './domain/overlays/constants';
 // Position bucket — pure P&L-band bucketizer + its domain type. Consumers
 // (siglens server action) compute the bucket, then pass the finished enum to
 // submitAnalysis; the cache-key/prompt wiring stays internal.

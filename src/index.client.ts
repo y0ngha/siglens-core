@@ -236,6 +236,7 @@ export {
 } from './domain/analysis/keyLevels';
 export { computeMarketReference } from './domain/analysis/marketReference';
 export { classifyMaStack } from './domain/analysis/trendStructure';
+export { STRATEGY_OVERLAY_KINDS } from './domain/overlays/constants';
 export {
     extractReconciledActionLines,
     validateActionPrices,

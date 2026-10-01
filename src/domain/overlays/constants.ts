@@ -10,9 +10,10 @@ const STRATEGY_OVERLAY_KIND_FLAGS: Record<StrategyOverlayKind, true> = {
     elliott: true,
 };
 /**
- * @internal The overlay kinds a strategy card may draw — the loader's
- * `overlay_kind` whitelist and the resolver's slot for a strategy whose skill
- * is unknown.
+ * The overlay kinds a strategy card may draw — the `overlay_kind` frontmatter
+ * whitelist (core's loader, and consumers that parse skills themselves) and
+ * the resolver's slot when no strategy skills are passed. Public so a
+ * consumer's own skill loader/validator uses this list instead of a copy.
  */
 // (a) Keys of STRATEGY_OVERLAY_KIND_FLAGS are exactly StrategyOverlayKind (the
 // Record's exhaustive key type above). (b) Object.keys' generic-erased

@@ -46,6 +46,25 @@ const STRATEGY_SLOT_KINDS: readonly OverlayKind[] = STRATEGY_OVERLAY_KINDS;
  * skill's name, so what is left names no strategy and would otherwise reopen
  * the same mislabel. Only with no strategy skills at all (none passed) is
  * every strategy kind kept: there is nothing to check against.
+ *
+ * Design decision (2026-10-01): a cross-kind id is dropped, not kept under a
+ * kind-named item ("Fibonacci (Elliott wave basis)"). A drawing labelled
+ * with the wrong card reads as a broken chart; a missing one goes unnoticed,
+ * and its prices still appear in the card text and key levels. Relabelling
+ * would also leave the card's panel toggle highlighting a different kind.
+ * Measured on 90 live analyses this drops a drawing in 5 of them (~5.6%:
+ * 4 Fibonacci ladders cited only by the Elliott card, 1 Elliott count on the
+ * MACD card); a Fibonacci
+ * id the Fibonacci card also cites is kept under that card.
+ *
+ * A prompt fix was tried and shelved (2026-10-01, real-LLM A/B, 8 symbols ×
+ * 2 runs, deepseek-v4.1-flash): rewording the strategyResults `candidateIds`
+ * note to "cite only your own kind; leave a Fibonacci/divergence id to that
+ * strategy" cut cross-kind citations 13 → 2–4, but those were mostly
+ * duplicates the Fibonacci card already cited, so drawn Fibonacci ladders
+ * did not rise (21 vs 20/17/19) — and stricter wordings made the Fibonacci
+ * card cite `[]` for its own legs in 2–3 runs. The current prompt plus this
+ * drop draws the most. Revisit only with a larger sample.
  */
 function strategySlotKinds(
     strategyName: string,
