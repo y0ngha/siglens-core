@@ -13,6 +13,7 @@ import type {
     Bar,
     PatternCandidate,
     PatternGeometry,
+    PatternTargetGeometry,
     Timeframe,
 } from '@/domain/types';
 
@@ -61,6 +62,46 @@ function isBroken(
         : lastClose < breakoutLevel;
 }
 
+/**
+ * @internal
+ * The geometry a candidate block PRINTS, as a {@link PatternTargetGeometry} —
+ * the ONE place the printed numbers are derived, shared by the prompt section
+ * and by the post-call override that replaces a resolved pattern card's
+ * model-copied geometry with it (so the app's targets match the drawn line).
+ *
+ * Breakout/extreme are rounded to the printed precision FIRST: the model
+ * copies what it reads, so every printed number (and the app's
+ * recomputation) starts from the rounded values, not from the raw (often
+ * non-terminating OLS / averaged) geometry. The extreme is breakout ∓ height
+ * (height = |extreme − breakout|), so copying breakout/extreme/direction
+ * makes `computePatternTargets` reproduce the listed targets. The
+ * invalidation level is included at printed precision only when the block
+ * prints a number for it (finite and > 0 — `N/A` otherwise).
+ *
+ * @param geometry - The candidate's computed geometry (`computeCandidateGeometry`).
+ * @param priceDp - Decimal places the section prints prices with.
+ * @returns The printed breakout/extreme/direction(/invalidation).
+ */
+export function printedPatternGeometry(
+    geometry: PatternGeometry,
+    priceDp: number
+): PatternTargetGeometry {
+    const round = (n: number): number => Number(n.toFixed(priceDp));
+    const invalidation = geometry.invalidationLevel;
+    return {
+        breakoutLevel: round(geometry.breakoutLevel),
+        extremeLevel: round(
+            geometry.direction === 'up'
+                ? geometry.breakoutLevel - geometry.height
+                : geometry.breakoutLevel + geometry.height
+        ),
+        direction: geometry.direction,
+        ...(Number.isFinite(invalidation) && invalidation > 0
+            ? { invalidationLevel: round(invalidation) }
+            : {}),
+    };
+}
+
 function formatCandidate(
     candidate: PatternCandidate,
     geometry: PatternGeometry | null,
@@ -100,17 +141,9 @@ function formatCandidate(
     // `geometry.measuredTarget`/`conservativeTarget` here (each family's own
     // raw, unrounded formula in `patternGeometry.ts`) could byte-mismatch
     // what the app later appends from the exact same two numbers.
-    //
-    // Round breakout/extreme to the printed precision FIRST and derive every
-    // printed number from those rounded values: the model copies what it
-    // reads, so the app's recomputation starts from the printed numbers, not
-    // from the raw (often non-terminating OLS / averaged) geometry.
-    const breakoutLevel = Number(geometry.breakoutLevel.toFixed(priceDp));
-    const extremeLevel = Number(
-        (geometry.direction === 'up'
-            ? geometry.breakoutLevel - geometry.height
-            : geometry.breakoutLevel + geometry.height
-        ).toFixed(priceDp)
+    const { breakoutLevel, extremeLevel } = printedPatternGeometry(
+        geometry,
+        priceDp
     );
     const targets = computePatternTargets(
         breakoutLevel,
@@ -159,6 +192,39 @@ function formatCandidate(
             priceDp
         ),
     ].join('\n');
+}
+
+/**
+ * @internal
+ * {@link printedPatternGeometry} for every candidate whose `- Candidate id:`
+ * line the section prints, keyed by that overlay id — the geometry a pattern
+ * card resolved to that overlay must carry so its app-computed targets match
+ * the breakout line the chart draws. Same inputs and same offered-id filter
+ * as {@link formatChartPatternCandidatesSection}.
+ *
+ * @returns Overlay id → printed geometry.
+ */
+export function printedPatternGeometriesByOverlayId(
+    candidates: readonly PatternCandidate[],
+    bars: readonly Bar[],
+    atr: number | null,
+    priceDp: number,
+    offeredOverlayIds: ReadonlySet<string>
+): Map<string, PatternTargetGeometry> {
+    return new Map(
+        candidates.flatMap(candidate => {
+            const geometry = computeCandidateGeometry(
+                candidate,
+                bars,
+                atr ?? 0
+            );
+            if (geometry === null) return [];
+            const overlayId = patternOverlayId(candidate, bars);
+            return offeredOverlayIds.has(overlayId)
+                ? [[overlayId, printedPatternGeometry(geometry, priceDp)]]
+                : [];
+        })
+    );
 }
 
 /**

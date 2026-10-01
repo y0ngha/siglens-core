@@ -1527,7 +1527,10 @@ export interface PatternSummary {
      * to `keyPrices`; the model must never compute a target itself. Copied
      * verbatim from `## Chart Pattern Candidates (computed)` when the
      * pattern is listed there; for a pattern the pre-screener missed, the
-     * model reads the chart itself and fills this in.
+     * model reads the chart itself and fills this in. For a card whose
+     * `candidateId` resolves to a drawn pattern overlay, `runAnalysis`
+     * replaces it with that candidate's printed geometry, and drops a
+     * model geometry whose direction contradicts the skill's category.
      */
     geometry?: PatternTargetGeometry;
 }
@@ -1908,11 +1911,13 @@ export interface AssembledPrompt {
     dynamic: string;
 }
 
-/** {@link buildAnalysisPrompt}'s result: the prompt halves plus the overlay candidates it printed, so the caller resolves the model's ids against the exact same list. */
+/** {@link buildAnalysisPrompt}'s result: the prompt halves plus the overlay candidates (and printed pattern geometry) it offered, so the caller resolves the model's ids against the exact same list. */
 export interface TechnicalAssembledPrompt extends AssembledPrompt {
     overlayCandidates: readonly OverlayCandidate[];
     /** Overlay builders that threw during this prompt build (their kinds offered nothing). */
     overlayBuildFailures: readonly OverlayKind[];
+    /** Printed `## Chart Pattern Candidates` geometry per offered pattern overlay id — what a card resolved to that overlay carries as its `geometry`. */
+    patternGeometries: ReadonlyMap<string, PatternTargetGeometry>;
 }
 
 /**

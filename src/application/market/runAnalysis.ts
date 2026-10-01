@@ -35,7 +35,7 @@ import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
-import { resolveChartOverlays } from '@/domain/overlays';
+import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
@@ -296,22 +296,27 @@ async function runAnalysisImpl(
         });
 
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
-    const { stable, dynamic, overlayCandidates, overlayBuildFailures } =
-        buildAnalysisPrompt(
-            symbol,
-            companyName,
-            bars,
-            indicators,
-            skillSampling.skills,
-            timeframe,
-            fearGreed ?? undefined,
-            options.assetClass ?? 'equity',
-            options.positionBucket,
-            locale,
-            priorAnalysisCandidates,
-            marketEventCandidates,
-            options.currency
-        );
+    const {
+        stable,
+        dynamic,
+        overlayCandidates,
+        overlayBuildFailures,
+        patternGeometries,
+    } = buildAnalysisPrompt(
+        symbol,
+        companyName,
+        bars,
+        indicators,
+        skillSampling.skills,
+        timeframe,
+        fearGreed ?? undefined,
+        options.assetClass ?? 'equity',
+        options.positionBucket,
+        locale,
+        priorAnalysisCandidates,
+        marketEventCandidates,
+        options.currency
+    );
 
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
@@ -362,19 +367,30 @@ async function runAnalysisImpl(
     // Inline post-processing (formerly in pollAnalysis). No job queue involved.
     const rawResult = JSON.parse(raw) as unknown;
     const enriched = enrichAnalysisWithConfidence(rawResult, skills);
-    const reconciled = postProcessAnalysisWithReconcile(
+    // Resolved against `enriched`, before post-processing: the pattern
+    // targets `postProcessAnalysisWithReconcile` appends are derived from
+    // `geometry`, which `alignPatternGeometry` first replaces with the
+    // geometry of the overlay the card actually draws. Post-processing only
+    // touches `keyPrices`/`actionRecommendation` — none of the ids, names,
+    // `detected` or candidate ids resolution reads — so resolving earlier
+    // yields the same overlays.
+    const resolvedOverlays = resolveChartOverlays(
+        overlayCandidates,
         enriched,
+        normalizeIdList(asObject(rawResult)?.trendlineIds),
+        skills
+    );
+    const reconciled = postProcessAnalysisWithReconcile(
+        alignPatternGeometry(
+            enriched,
+            resolvedOverlays.chartOverlays,
+            patternGeometries,
+            skills
+        ),
         lastClose,
         atr,
         options.currency,
         locale
-    );
-
-    const resolvedOverlays = resolveChartOverlays(
-        overlayCandidates,
-        reconciled,
-        normalizeIdList(asObject(rawResult)?.trendlineIds),
-        skills
     );
     if (overlayBuildFailures.length > 0) {
         console.warn('[ChartOverlays] candidate builder failed', {

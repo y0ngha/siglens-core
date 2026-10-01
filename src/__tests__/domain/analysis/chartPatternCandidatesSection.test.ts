@@ -3,6 +3,8 @@ import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     CHART_PATTERN_CANDIDATES_SECTION_INTRO,
     formatChartPatternCandidatesSection,
+    printedPatternGeometriesByOverlayId,
+    printedPatternGeometry,
 } from '@/domain/analysis/chartPatternCandidatesSection';
 import { screenChartPatterns } from '@/domain/patterns';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
@@ -11,7 +13,7 @@ import {
     makeAlternatingPivotBars,
     makeBars,
 } from '@/__tests__/domain/patterns/helpers';
-import type { Bar, PatternCandidate } from '@/domain/types';
+import type { Bar, PatternCandidate, PatternGeometry } from '@/domain/types';
 
 /**
  * `formatChartPatternCandidatesSection` no longer screens internally (spec
@@ -328,5 +330,96 @@ describe('formatChartPatternCandidatesSection', () => {
             offered
         );
         expect(section).not.toContain('- Candidate id:');
+    });
+});
+
+describe('printedPatternGeometriesByOverlayId', () => {
+    it.each([2, 0])(
+        'maps each printed Candidate id to exactly the breakout/extreme/direction/invalidation its block prints (priceDp %i)',
+        priceDp => {
+            const bars = makeAlternatingPivotBars(
+                10,
+                [20.07, 10.13, 20.11, 12.29, 19.97, 13.41],
+                20.03
+            );
+            const candidates = candidatesFor(bars, 1);
+            const offered = offeredIdsFor(candidates, bars, 1);
+            const section = formatChartPatternCandidatesSection(
+                candidates,
+                bars,
+                1,
+                priceDp,
+                '1Day',
+                offered
+            );
+            const geometries = printedPatternGeometriesByOverlayId(
+                candidates,
+                bars,
+                1,
+                priceDp,
+                offered
+            );
+            const blocks = section
+                .split('\n### ')
+                .filter(b => b.includes('- Candidate id: '));
+            expect(blocks.length).toBeGreaterThan(0);
+            expect(geometries.size).toBe(blocks.length);
+            for (const block of blocks) {
+                const field = (label: string): string =>
+                    new RegExp(`- ${label}: (\\S+)`).exec(block)![1]!;
+                expect(geometries.get(field('Candidate id'))).toEqual({
+                    breakoutLevel: Number(field('Breakout level')),
+                    extremeLevel: Number(field('Extreme level')),
+                    direction: field('Direction'),
+                    invalidationLevel: Number(field('Invalidation level')),
+                });
+            }
+        }
+    );
+
+    it('leaves out a candidate whose overlay was not offered', () => {
+        const bars = makeAlternatingPivotBars(10, [20, 10, 20, 12], 20);
+        const candidates = candidatesFor(bars, 1);
+        expect(
+            printedPatternGeometriesByOverlayId(
+                candidates,
+                bars,
+                1,
+                2,
+                new Set()
+            ).size
+        ).toBe(0);
+    });
+});
+
+describe('printedPatternGeometry', () => {
+    const geometry: PatternGeometry = {
+        keyPoints: [],
+        breakoutLevel: 50.004,
+        height: 10.123,
+        measuredTarget: 0,
+        conservativeTarget: 0,
+        invalidationLevel: 0,
+        direction: 'down',
+    };
+
+    it('rounds breakout and breakout ± height to the printed precision', () => {
+        expect(printedPatternGeometry(geometry, 2)).toEqual({
+            breakoutLevel: 50,
+            extremeLevel: 60.13,
+            direction: 'down',
+        });
+    });
+
+    it('omits an invalidation level the block prints as N/A', () => {
+        expect(printedPatternGeometry(geometry, 2)).not.toHaveProperty(
+            'invalidationLevel'
+        );
+        expect(
+            printedPatternGeometry(
+                { ...geometry, invalidationLevel: 61.456 },
+                2
+            ).invalidationLevel
+        ).toBe(61.46);
     });
 });

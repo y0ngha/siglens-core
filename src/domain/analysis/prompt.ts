@@ -107,6 +107,7 @@ import {
 import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     formatChartPatternCandidatesSection,
+    printedPatternGeometriesByOverlayId,
 } from '@/domain/analysis/chartPatternCandidatesSection';
 import { buildOverlayCandidates } from '@/domain/overlays/buildOverlayCandidates';
 import {
@@ -2197,7 +2198,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   market profile (see {@link CurrencyCode} — core never derives it from the
  *   symbol). Drives the listing framing sentence and price precision (`KRW` →
  *   whole won). Defaults to `'USD'`.
- * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures }` — see {@link TechnicalAssembledPrompt}.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2475,5 +2476,12 @@ export function buildAnalysisPrompt(
         dynamic: dynamicSections.join('\n\n'),
         overlayCandidates,
         overlayBuildFailures,
+        patternGeometries: printedPatternGeometriesByOverlayId(
+            patternCandidates,
+            bars,
+            atrForPatternGeometry,
+            priceDp,
+            offeredPatternOverlayIds
+        ),
     };
 }
