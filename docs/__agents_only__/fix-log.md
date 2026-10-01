@@ -81,12 +81,6 @@
 
 ## [Branch fix/prompt-precision-currency R1 | 2026-09-11] — Round 1 main: overloads
 
-## [Branch fix/prompt-precision-currency | 2026-09-11] — Lesson: Real-data validation required for prompt changes
-
-- Lesson (non-blocker, verification finding): Prompt-number changes must be validated by rendering real data and comparing distributions, not only by unit tests
-  Rule: Testing best practice — prompt logic verification scope
-  Context: Audit recommendation to floor structural risk:reward leg at one mean bar range passed all 90+ unit tests but, when rendered over real market data (90 charts), flipped 34 verdicts from >= 1.0 to < 1.0 and made verdict sentences false. Recommendation was removed post-R1. Unit test coverage is insufficient for prompt calculations involving conditional defaults or output transformations. Rendering real data distributions before deployment is mandatory.
-
 ## [Branch fix/agent-answer-hygiene | Round 1→2 | 2026-09-13]
 
 - Violation 1: Prompt citation example showed ET (Eastern Time) while a new adjacent rule mandates KST (Korean Standard Time) for Korean answers

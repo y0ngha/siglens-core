@@ -621,6 +621,15 @@ and have been removed from this file.
     ✅ await vi.waitFor(() => expect(logSpy).toHaveBeenCalledWith(...))  // Vitest-aware; respects mocked time
     ✅ await vi.waitFor(() => expect(cacheSpy).toHaveBeenCalledTimes(1))  // retry-aware; succeeds on first call
     → Recurring pattern (Round 1 findings: 3 test files): runFinancialsAnalysis.test.ts, runOptionsAnalysis.test.ts, runOverallAnalysis.test.ts all used bare setTimeout for cache-write-failure log synchronization
+
+18. Prompt logic changes validated only by unit tests may improve the targeted metric while regressing user-visible output
+    → A change to prompt instructions that is meant to change model output must be validated on real data before release — render the prompt values over real charts, and for model-behaviour changes run a real-LLM A/B on the user-visible result — not only with unit tests that check the prompt text
+    → Count side effects too (e.g. a card leaving its own field empty), and treat small differences at small n as "no improvement"
+    → Example (2026-09-11, fix/prompt-precision-currency): flooring the structural risk:reward leg at one mean bar range passed all unit tests, but rendered over 90 real charts it flipped 34 verdicts from >= 1.0 to < 1.0 and made the verdict sentences false — removed before release
+    → Example (2026-10-01, fix/strategy-candidate-citation): rewording the strategyResults `candidateIds` rule cut cross-kind citations 13 → 2–4 in a real-LLM A/B (8 symbols × 2 runs), but drawn Fibonacci ladders did not rise (21 vs 20/17/19) and stricter wordings made the Fibonacci card cite `[]` for its own legs in 2–3 runs — caught before release; the prompt change was reverted
+    ❌ Prompt rewording shipped because its unit test passes and the targeted metric looks better
+    ✅ Real-LLM A/B on the visible output (OLD vs NEW, same inputs); revert and record the result when visible output does not improve
+    → Recurring pattern (fix/prompt-precision-currency R1, fix/strategy-candidate-citation R1)
 ```
 
 ---
