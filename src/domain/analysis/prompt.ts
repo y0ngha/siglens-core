@@ -106,6 +106,7 @@ import {
 } from '@/domain/analysis/chartOverlayCandidatesSection';
 import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
+    candidateGeometries,
     formatChartPatternCandidatesSection,
     printedPatternGeometriesByOverlayId,
 } from '@/domain/analysis/chartPatternCandidatesSection';
@@ -2380,6 +2381,11 @@ export function buildAnalysisPrompt(
     // minus the combined skill-content block (now split: `core` digests live
     // in `stable`, replaced here by a one-line pointer when non-empty;
     // `selected` digests stay in `dynamic` at the same position).
+    const patternCandidateGeometries = candidateGeometries(
+        patternCandidates,
+        bars,
+        atrForPatternGeometry
+    );
     const dynamicSections = [
         `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
@@ -2430,7 +2436,8 @@ export function buildAnalysisPrompt(
             atrForPatternGeometry,
             priceDp,
             timeframe,
-            offeredPatternOverlayIds
+            offeredPatternOverlayIds,
+            patternCandidateGeometries
         ),
         ...(overlayCandidatesSection !== '' ? [overlayCandidatesSection] : []),
         formatMarketReferenceSection(
@@ -2481,7 +2488,8 @@ export function buildAnalysisPrompt(
             bars,
             atrForPatternGeometry,
             priceDp,
-            offeredPatternOverlayIds
+            offeredPatternOverlayIds,
+            patternCandidateGeometries
         ),
     };
 }

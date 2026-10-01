@@ -692,6 +692,17 @@ describe('resolveChartOverlays', () => {
             expect(second?.geometry).toEqual(model);
         });
 
+        it('leaves an unresolved card without geometry as it is', () => {
+            const [p] = align([
+                card({
+                    id: 'double_top_0',
+                    patternName: 'double_top',
+                    skillName: '이중천장',
+                }),
+            ]);
+            expect(p).not.toHaveProperty('geometry');
+        });
+
         it('drops the geometry of an unresolved card when its direction contradicts the skill category', () => {
             const [p] = align([
                 card({

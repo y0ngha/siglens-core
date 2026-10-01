@@ -107,12 +107,10 @@ function findSkill(
     lookup: SkillLookup,
     ...names: readonly string[]
 ): Skill | undefined {
-    for (const name of names) {
-        const key = skillKey(name);
-        const skill = lookup.byName.get(key) ?? lookup.byPattern.get(key);
-        if (skill) return skill;
-    }
-    return undefined;
+    return names
+        .map(skillKey)
+        .map(key => lookup.byName.get(key) ?? lookup.byPattern.get(key))
+        .find(skill => skill !== undefined);
 }
 
 /**

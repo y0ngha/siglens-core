@@ -1916,7 +1916,10 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
     overlayCandidates: readonly OverlayCandidate[];
     /** Overlay builders that threw during this prompt build (their kinds offered nothing). */
     overlayBuildFailures: readonly OverlayKind[];
-    /** Printed `## Chart Pattern Candidates` geometry per offered pattern overlay id — what a card resolved to that overlay carries as its `geometry`. */
+    /**
+     * Printed `## Chart Pattern Candidates` geometry per offered pattern overlay id — what a card resolved to that overlay carries as its `geometry`.
+     * In-process only: a `Map` serialises to `{}` with `JSON.stringify`, so do not put this on a cache entry or queue payload — convert to entries first.
+     */
     patternGeometries: ReadonlyMap<string, PatternTargetGeometry>;
 }
 

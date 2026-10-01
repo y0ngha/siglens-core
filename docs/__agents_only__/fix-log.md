@@ -179,13 +179,23 @@
   Rule: Type-matching precision — restrict name lookups to intended skill type
   Context: Fixed lookup to check type==='strategy' before matching against strategy names, preventing false matches on other skill types.
 
-- Violation 4 (R1 RECOMMENDED, fixed): Missing test coverage for skills-omitted branch, divergence/fibonacci kinds, and elliott primary/alternate variants with overlayKind
-  Rule: Test coverage — new overlayKind parameter branches need assertions
-  Context: Added test cases covering skills-omitted branch, divergence/fibonacci kinds, and elliott primary/alternate with overlayKind parameter.
-
 - Violation 5 (R1 RECOMMENDED, fixed): Changelog lacked note that cached analyses retain old overlayKind pairing until TTL expiration
   Rule: Changelog documentation — runtime behavior must include cache semantics note
   Context: Added changelog note documenting that cached analyses keep old overlayKind pairing until TTL expiration, and consumer must deploy frontmatter changes simultaneously.
 
 Round 2: approved
+
+## [PR #241 claude-review | fix/overlay-resolution-followups | 2026-10-01]
+
+- Violation 1 (APPROVED, fixed): computeCandidateGeometry function computed twice per candidate — once during prompt section iteration, once again during printedPatternGeometriesByOverlayId rendering
+  Rule: MISTAKES.md Coding Paradigm #2 — repeated computation
+  Context: Refactored to compute candidateGeometries once outside the loop and share the Map across both use-sites, eliminating redundant O(n) traversals.
+
+- Violation 2 (APPROVED, fixed): findSkill used for…of loop with early return instead of declarative find()
+  Rule: CONVENTIONS.md — loop-avoidance pattern (map/filter/find preferred over for…of)
+  Context: Converted for…of with early return to .find((skill) => skill.name === patternName), aligning with codebase declarative style.
+
+- Violation 3 (APPROVED, fixed): TechnicalAssembledPrompt.patternGeometries is a Map that may not be JSON-serializable; JSDoc did not document in-process-only scope
+  Rule: MISTAKES.md Type Documentation #4 — Tier 4 public type fields require JSDoc; runtime serialization constraints must be documented
+  Context: Added JSDoc note clarifying patternGeometries is a transient in-memory Map used only during prompt generation and not included in serialized analysis results.
 

@@ -196,6 +196,24 @@ function formatCandidate(
 
 /**
  * @internal
+ * `computeCandidateGeometry` for each candidate, in order. A prompt build
+ * computes this once and hands it to both
+ * {@link formatChartPatternCandidatesSection} and
+ * {@link printedPatternGeometriesByOverlayId}, so the geometry is not
+ * recomputed per consumer.
+ */
+export function candidateGeometries(
+    candidates: readonly PatternCandidate[],
+    bars: readonly Bar[],
+    atr: number | null
+): (PatternGeometry | null)[] {
+    return candidates.map(candidate =>
+        computeCandidateGeometry(candidate, bars, atr ?? 0)
+    );
+}
+
+/**
+ * @internal
  * {@link printedPatternGeometry} for every candidate whose `- Candidate id:`
  * line the section prints, keyed by that overlay id — the geometry a pattern
  * card resolved to that overlay must carry so its app-computed targets match
@@ -209,15 +227,16 @@ export function printedPatternGeometriesByOverlayId(
     bars: readonly Bar[],
     atr: number | null,
     priceDp: number,
-    offeredOverlayIds: ReadonlySet<string>
+    offeredOverlayIds: ReadonlySet<string>,
+    geometries: readonly (PatternGeometry | null)[] = candidateGeometries(
+        candidates,
+        bars,
+        atr
+    )
 ): Map<string, PatternTargetGeometry> {
     return new Map(
-        candidates.flatMap(candidate => {
-            const geometry = computeCandidateGeometry(
-                candidate,
-                bars,
-                atr ?? 0
-            );
+        candidates.flatMap((candidate, i) => {
+            const geometry = geometries[i] ?? null;
             if (geometry === null) return [];
             const overlayId = patternOverlayId(candidate, bars);
             return offeredOverlayIds.has(overlayId)
@@ -264,7 +283,12 @@ export function formatChartPatternCandidatesSection(
     atr: number | null,
     priceDp: number,
     timeframe: Timeframe,
-    offeredOverlayIds: ReadonlySet<string>
+    offeredOverlayIds: ReadonlySet<string>,
+    geometries: readonly (PatternGeometry | null)[] = candidateGeometries(
+        candidates,
+        bars,
+        atr
+    )
 ): string {
     if (candidates.length === 0) {
         return [
@@ -275,8 +299,8 @@ export function formatChartPatternCandidatesSection(
     }
 
     const lastClose = bars.length > 0 ? bars[bars.length - 1].close : NaN;
-    const blocks = candidates.map(candidate => {
-        const geometry = computeCandidateGeometry(candidate, bars, atr ?? 0);
+    const blocks = candidates.map((candidate, i) => {
+        const geometry = geometries[i] ?? null;
         return formatCandidate(
             candidate,
             geometry,
