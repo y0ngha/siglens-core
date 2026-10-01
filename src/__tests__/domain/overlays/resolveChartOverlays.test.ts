@@ -7,6 +7,7 @@ import type {
     Skill,
 } from '@/domain/types';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
+import { STRATEGY_KIND_SOURCE_REF } from '@/domain/overlays/constants';
 import {
     alignPatternGeometry,
     resolveChartOverlays,
@@ -310,16 +311,31 @@ describe('resolveChartOverlays', () => {
             ['엘리어트 파동', 'ew:up:1:6'],
             ['피보나치 전략', 'fib:short:5'],
             ['다이버전스 전략', 'div:rsi:1'],
-        ])('%s draws only its declared kind', (name, kept) => {
-            const r = resolveChartOverlays(
-                MIXED,
-                strategy(name, ALL),
-                [],
-                SKILLS
-            );
-            expect(r.chartOverlays.map(o => o.id)).toEqual([kept]);
-            expect(r.unknownIds).toEqual(ALL.filter(id => id !== kept));
-        });
+        ])(
+            '%s draws its declared kind under its own card and the other kinds under their kind',
+            (name, kept) => {
+                const kindOf = (id: string) =>
+                    id.startsWith('fib')
+                        ? 'fibonacci'
+                        : id.startsWith('div')
+                          ? 'divergence'
+                          : 'elliott';
+                const r = resolveChartOverlays(
+                    MIXED,
+                    strategy(name, ALL),
+                    [],
+                    SKILLS
+                );
+                expect(r.chartOverlays.map(o => [o.id, o.sourceRef])).toEqual([
+                    [kept, `${name}_0`],
+                    ...ALL.filter(id => id !== kept).map(id => [
+                        id,
+                        STRATEGY_KIND_SOURCE_REF[kindOf(id)],
+                    ]),
+                ]);
+                expect(r.unknownIds).toEqual([]);
+            }
+        );
 
         it('keeps the Elliott primary/alternate split and its cap of two', () => {
             const r = resolveChartOverlays(
@@ -333,29 +349,37 @@ describe('resolveChartOverlays', () => {
                 [],
                 SKILLS
             );
-            expect(r.chartOverlays.map(o => [o.id, o.variant])).toEqual([
-                ['ew:up:1:6', 'primary'],
-                ['ew:up:2:5', 'alternate'],
+            expect(
+                r.chartOverlays.map(o => [o.id, o.sourceRef, o.variant])
+            ).toEqual([
+                ['ew:up:1:6', '엘리어트 파동_0', 'primary'],
+                ['ew:up:2:5', '엘리어트 파동_0', 'alternate'],
+                ['fib:short:5', STRATEGY_KIND_SOURCE_REF.fibonacci, 'primary'],
             ]);
-            expect(r.unknownIds).toEqual(['fib:short:5']);
+            expect(r.unknownIds).toEqual([]);
         });
 
         it.each([
             ['a known strategy without overlayKind', '브레이크아웃 전략'],
             ['a name matching no skill', 'Elliott Wave'],
             ['a non-strategy skill name', '상승쐐기'],
-        ])('draws nothing for %s', (_, name) => {
-            const r = resolveChartOverlays(
-                MIXED,
-                strategy(name, ['fib:short:5']),
-                [],
-                SKILLS
-            );
-            expect(r.chartOverlays).toEqual([]);
-            expect(r.unknownIds).toEqual(['fib:short:5']);
-        });
+        ])(
+            'draws a Fibonacci leg cited by %s under its kind, not under that card',
+            (_, name) => {
+                const r = resolveChartOverlays(
+                    MIXED,
+                    strategy(name, ['fib:short:5']),
+                    [],
+                    SKILLS
+                );
+                expect(r.chartOverlays.map(o => [o.id, o.sourceRef])).toEqual([
+                    ['fib:short:5', STRATEGY_KIND_SOURCE_REF.fibonacci],
+                ]);
+                expect(r.unknownIds).toEqual([]);
+            }
+        );
 
-        it('draws for a model-written strategy name once enrichment canonicalises it, and still drops intended mismatches', () => {
+        it('draws for a model-written strategy name once enrichment canonicalises it, and moves cross-kind ids to the card of their kind', () => {
             const strategyResults = [
                 ['Elliott Wave', ['ew:up:1:6']],
                 ['피보나치 되돌림', ['fib:short:5']],
@@ -377,11 +401,180 @@ describe('resolveChartOverlays', () => {
                 [],
                 skills
             );
-            expect(r.chartOverlays.map(o => [o.id, o.sourceRef])).toEqual([
-                ['ew:up:1:6', '엘리어트 파동_0'],
-                ['fib:short:5', '피보나치 전략_0'],
+            // MACD's Elliott count moves to the Elliott card (its alternate:
+            // the Elliott card's own count keeps the primary); the Elliott
+            // card's Fibonacci leg is already drawn by the Fibonacci card.
+            expect(
+                r.chartOverlays.map(o => [o.id, o.sourceRef, o.variant])
+            ).toEqual([
+                ['ew:up:1:6', '엘리어트 파동_0', 'primary'],
+                ['fib:short:5', '피보나치 전략_0', 'primary'],
+                ['ew:up:2:5', '엘리어트 파동_0', 'alternate'],
             ]);
-            expect(r.unknownIds).toEqual(['ew:up:2:5', 'fib:short:5']);
+            expect(r.unknownIds).toEqual([]);
+        });
+
+        describe('cross-kind ids move to the card of their own kind', () => {
+            const cards = (...entries: [string, string[]][]) =>
+                analysis({
+                    strategyResults: entries.map(
+                        ([strategyName, candidateIds]) => ({
+                            id: `${strategyName}_0`,
+                            strategyName,
+                            trend: 'neutral',
+                            summary: '',
+                            confidenceWeight: 1,
+                            candidateIds,
+                        })
+                    ),
+                });
+            const drawn = (a: ReturnType<typeof cards>) => {
+                const r = resolveChartOverlays(MIXED, a, [], SKILLS);
+                return {
+                    overlays: r.chartOverlays.map(o => [
+                        o.id,
+                        o.sourceRef,
+                        o.variant,
+                    ]),
+                    unknownIds: r.unknownIds,
+                };
+            };
+
+            // Production (HOOD, 2026-10-01): the Fibonacci card cited [] and
+            // only the Elliott card cited the leg — dropping it lost the ladder.
+            it('draws a Fibonacci leg the Elliott card cited under an empty Fibonacci card', () => {
+                expect(
+                    drawn(
+                        cards(
+                            ['엘리어트 파동', ['fib:short:5']],
+                            ['피보나치 전략', []]
+                        )
+                    )
+                ).toEqual({
+                    overlays: [['fib:short:5', '피보나치 전략_0', 'primary']],
+                    unknownIds: [],
+                });
+            });
+
+            it('moves a divergence to the divergence card, from a card with no overlay kind', () => {
+                expect(
+                    drawn(
+                        cards(
+                            ['브레이크아웃 전략', ['div:rsi:1']],
+                            ['다이버전스 전략', []]
+                        )
+                    )
+                ).toEqual({
+                    overlays: [['div:rsi:1', '다이버전스 전략_0', 'primary']],
+                    unknownIds: [],
+                });
+            });
+
+            it("keeps the home card's own count as the Elliott primary even when another card is listed first", () => {
+                expect(
+                    drawn(
+                        cards(
+                            ['브레이크아웃 전략', ['ew:up:2:5']],
+                            ['엘리어트 파동', ['ew:up:1:6']]
+                        )
+                    ).overlays
+                ).toEqual([
+                    ['ew:up:1:6', '엘리어트 파동_0', 'primary'],
+                    ['ew:up:2:5', '엘리어트 파동_0', 'alternate'],
+                ]);
+            });
+
+            it('draws the id under its kind when the analysis has no card of that kind', () => {
+                expect(
+                    drawn(cards(['엘리어트 파동', ['fib:short:5']]))
+                ).toEqual({
+                    overlays: [
+                        [
+                            'fib:short:5',
+                            STRATEGY_KIND_SOURCE_REF.fibonacci,
+                            'primary',
+                        ],
+                    ],
+                    unknownIds: [],
+                });
+            });
+
+            it("splits orphan Elliott counts under 'kind:elliott' into primary/alternate and caps them at two", () => {
+                expect(
+                    drawn(
+                        cards(
+                            ['브레이크아웃 전략', ['ew:up:1:6', 'ew:up:2:5']],
+                            ['피보나치 전략', ['ew:up:3:4']]
+                        )
+                    )
+                ).toEqual({
+                    overlays: [
+                        [
+                            'ew:up:1:6',
+                            STRATEGY_KIND_SOURCE_REF.elliott,
+                            'primary',
+                        ],
+                        [
+                            'ew:up:2:5',
+                            STRATEGY_KIND_SOURCE_REF.elliott,
+                            'alternate',
+                        ],
+                    ],
+                    // The third count is over the cap — skipped, not unknown.
+                    unknownIds: [],
+                });
+            });
+
+            it('draws a cross-kind id a card cites twice once', () => {
+                expect(
+                    drawn(
+                        cards(['엘리어트 파동', ['fib:short:5', 'fib:short:5']])
+                    )
+                ).toEqual({
+                    overlays: [
+                        [
+                            'fib:short:5',
+                            STRATEGY_KIND_SOURCE_REF.fibonacci,
+                            'primary',
+                        ],
+                    ],
+                    unknownIds: [],
+                });
+            });
+
+            it('draws one kind item for a leg several cards cite without a card of its kind', () => {
+                expect(
+                    drawn(
+                        cards(
+                            ['엘리어트 파동', ['fib:short:5']],
+                            ['브레이크아웃 전략', ['fib:short:5']]
+                        )
+                    ).overlays
+                ).toEqual([
+                    [
+                        'fib:short:5',
+                        STRATEGY_KIND_SOURCE_REF.fibonacci,
+                        'primary',
+                    ],
+                ]);
+            });
+
+            it('does not move pattern or trendline ids cited by a strategy', () => {
+                expect(
+                    drawn(
+                        cards(
+                            [
+                                '엘리어트 파동',
+                                ['pattern:double_bottom:1', 'tl:support:1:3'],
+                            ],
+                            ['피보나치 전략', []]
+                        )
+                    )
+                ).toEqual({
+                    overlays: [],
+                    unknownIds: ['pattern:double_bottom:1', 'tl:support:1:3'],
+                });
+            });
         });
 
         it('keeps every strategy kind when no strategy skills are passed', () => {

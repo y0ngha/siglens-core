@@ -804,8 +804,10 @@ export interface Skill {
      * frontmatter, `type: strategy` only). The chart menu names a strategy
      * drawing after its card, so an Elliott card citing a Fibonacci candidate
      * showed "Elliott wave" over a Fibonacci ladder; `resolveChartOverlays`
-     * now drops a strategy's candidate ids of any other kind. A strategy skill
-     * without it draws nothing.
+     * now draws only this kind under the card, and re-homes the card's ids of
+     * another strategy kind to the analysis' card of that kind (else to
+     * `STRATEGY_KIND_SOURCE_REF[kind]`). A strategy skill without it draws
+     * nothing under its own card.
      */
     overlayKind?: StrategyOverlayKind;
 }
@@ -4198,7 +4200,12 @@ export interface OverlayCandidate {
 
 /** A candidate the model referenced, ready to render. */
 export interface ChartOverlay extends Omit<OverlayCandidate, 'promptLine'> {
-    /** Result item that referenced it: `patternSummaries[].id`, `strategyResults[].id`, or `'trendlines'`. */
+    /**
+     * Who the drawing belongs to: `patternSummaries[].id`, `strategyResults[].id`,
+     * `'trendlines'`, or a `STRATEGY_KIND_SOURCE_REF` value (`'kind:fibonacci'`,
+     * `'kind:divergence'`, `'kind:elliott'`) — a strategy-kind drawing that no
+     * card of the analysis owns. Those match no card id: label them by kind.
+     */
     sourceRef: string;
     variant: OverlayVariant;
 }

@@ -74,6 +74,11 @@ describe('browser public API exports', () => {
         expect(clientApi.POC_WINDOW_DEFAULT).toBe(60);
         expect(clientApi.scoreToLabel(10)).toBe('EXTREME_FEAR');
         expect(typeof clientApi.classifyMaStack).toBe('function');
+        expect(clientApi.STRATEGY_KIND_SOURCE_REF).toEqual({
+            divergence: 'kind:divergence',
+            fibonacci: 'kind:fibonacci',
+            elliott: 'kind:elliott',
+        });
         expect(clientApi.STRATEGY_OVERLAY_KINDS).toEqual([
             'divergence',
             'fibonacci',

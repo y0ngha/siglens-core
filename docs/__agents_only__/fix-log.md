@@ -193,3 +193,19 @@ Round 2: approved
   Rule: MISTAKES.md Type Documentation #4 — Tier 4 public type fields require JSDoc; runtime serialization constraints must be documented
   Context: Added JSDoc note clarifying patternGeometries is a transient in-memory Map used only during prompt generation and not included in serialized analysis results.
 
+## [Branch fix/reassign-cross-kind-strategy-ids | 2026-10-02] — ChartOverlay sourceRef and Skill overlayKind JSDoc
+
+- Violation 1 (R1 REQUIRED, fixed): public `ChartOverlay.sourceRef` JSDoc did not list the new `STRATEGY_KIND_SOURCE_REF` values
+  Rule: MISTAKES.md Documentation Sync §4.8 — exported type fields require complete JSDoc documenting all possible values
+  Context: New STRATEGY_KIND_SOURCE_REF values added to the sourceRef field type but JSDoc not updated. Consumers reading the exported type would not know a sourceRef can match no card. Fixed by updating JSDoc to enumerate all sourceRef value types.
+
+- Violation 2 (R1 REQUIRED, fixed): `Skill.overlayKind` JSDoc described old behavior (cross-kind ids dropped) after behavior changed to re-homing
+  Rule: MISTAKES.md Documentation Sync §1 — type documentation must be synchronized when implementation behavior changes
+  Context: Re-homing logic replaced the previous drop-ids approach. DOMAIN.md was updated but the exported type's JSDoc was not. Fixed by updating Skill.overlayKind JSDoc to document re-homing behavior instead of id-dropping.
+
+- Violation 3 (R1 RECOMMENDED, fixed): missing tests for orphan Elliott primary/alternate and for one card citing the same cross-kind id twice
+  Rule: MISTAKES.md Tests §5.5 — new conditional branches require dedicated test cases
+  Context: Re-homing logic introduced edge cases (orphan Elliott patterns, duplicate cross-kind citations). Added test cases covering both scenarios to verify new branching logic.
+
+Round 2: approved
+
