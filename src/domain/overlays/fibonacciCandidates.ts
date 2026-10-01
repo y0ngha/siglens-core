@@ -47,13 +47,17 @@ function legCandidate(
             l.price,
         ])
     );
-    const levelPrice = (ratio: number) =>
-        retracementByRatio.get(ratio) ?? extensionByRatio.get(ratio);
+    // Retracements are measured from the leg's end, extensions from its start
+    // (fibLevels.ts), so one bare-percent ladder would read out of order on the
+    // chart (23.6% then 127.2% on the same side). Extensions carry the `ext`
+    // prefix the `Fib table:` line already uses.
     const levels = FIB_OVERLAY_RATIOS.flatMap(ratio => {
-        const price = levelPrice(ratio);
-        return price === undefined
-            ? []
-            : [{ price, fromTime: to.time, label: formatFibRatio(ratio) }];
+        const retracement = retracementByRatio.get(ratio);
+        const price = retracement ?? extensionByRatio.get(ratio);
+        if (price === undefined) return [];
+        const percent = formatFibRatio(ratio);
+        const label = retracement === undefined ? `ext ${percent}` : percent;
+        return [{ price, fromTime: to.time, label }];
     });
     return {
         id: `fib:${key}:${to.time}`,

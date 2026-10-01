@@ -9,9 +9,13 @@ export const TRENDLINE_MAX_BREAK_BARS = 2;
 export const TRENDLINE_CANDIDATES_PER_SIDE = 3;
 
 // ─── Fibonacci ──────────────────────────────────────────────────────────────
-/** @internal Retracement + extension ratios drawn; 2.0/2.618 are left off — they sit far off-chart. */
+/**
+ * @internal Retracement + extension ratios drawn. 1.0 is left off — the 100%
+ * extension equals the leg's end anchor, a duplicate line. 2.0/2.618 are left
+ * off — they sit far off-chart.
+ */
 export const FIB_OVERLAY_RATIOS = [
-    0.236, 0.382, 0.5, 0.618, 0.786, 1.0, 1.272, 1.618,
+    0.236, 0.382, 0.5, 0.618, 0.786, 1.272, 1.618,
 ] as const;
 /** @internal ABC projections draw only the near extensions. */
 export const FIB_ABC_OVERLAY_RATIOS = [1.0, 1.272, 1.618] as const;
