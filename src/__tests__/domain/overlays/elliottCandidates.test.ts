@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import type { ElliottScoredCandidate, ElliottStructure } from '@/domain/types';
+import type {
+    ElliottLevel,
+    ElliottScoredCandidate,
+    ElliottStructure,
+} from '@/domain/types';
 import { buildDiagonalCandidates } from '@/domain/overlays/elliottDiagonal';
 import {
     buildElliottCandidates,
@@ -623,7 +627,11 @@ describe('isSpentCount', () => {
             close: low,
             volume: 0,
         }));
-    const level = (label: string, price: number, breach: 'up' | 'down') => ({
+    const level = (
+        label: ElliottLevel['label'],
+        price: number,
+        breach: 'up' | 'down'
+    ): ElliottLevel => ({
         label,
         price,
         breach,

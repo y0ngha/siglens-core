@@ -118,11 +118,14 @@ function triangleLevels(
     ];
 }
 
+// Prompt wording for the target fact — not the OVERLAY_LEVEL_LABELS key.
+const THRUST_TARGET_FACT = 'thrust target';
+
 /** `invalidation 357.80`, `thrust target 424.57` — the levels as prompt facts. */
 const triangleFacts = (levels: readonly ElliottLevel[], fmt: OverlayFormat) =>
     levels.map(
         l =>
-            `${l.label === OVERLAY_LEVEL_LABELS.target ? 'thrust target' : l.label} ${formatOverlayPrice(l.price, fmt)}`
+            `${l.label === OVERLAY_LEVEL_LABELS.target ? THRUST_TARGET_FACT : l.label} ${formatOverlayPrice(l.price, fmt)}`
     );
 
 /**

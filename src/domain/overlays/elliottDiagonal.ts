@@ -1,6 +1,7 @@
 import type {
     Bar,
     ElliottLevel,
+    ElliottLevelLabel,
     ElliottScoredCandidate,
     OverlayCandidate,
     OverlayFormat,
@@ -112,6 +113,9 @@ function diagonalScore(
     return (g2 + g4 + recency(seq[seq.length - 1].index, lastBarIndex)) / 3;
 }
 
+// Prompt wording for the cap fact — not the OVERLAY_LEVEL_LABELS key.
+const WAVE_5_CAP_FACT = 'wave 5 cap';
+
 const WAVE_LABELS = ['1', '2', '3', '4', '5'] as const;
 
 /**
@@ -125,7 +129,7 @@ function diagonalLevels(d: DiagonalCount): ElliottLevel[] {
     const cap = d.seq[4].price + trend * w[2];
     // The cap is passed with the trend — even when wave 5 already edged past
     // it within EW_DIAG_WAVE_TOLERANCE; wave 4's end is passed against it.
-    const capLevel = (label: string): ElliottLevel => ({
+    const capLevel = (label: ElliottLevelLabel): ElliottLevel => ({
         label,
         price: cap,
         breach: breachOf(trend),
@@ -151,7 +155,7 @@ function diagonalFacts(
     return [
         ...levels.map(
             l =>
-                `${l.label === OVERLAY_LEVEL_LABELS.wave5Cap ? 'wave 5 cap' : l.label} ${formatOverlayPrice(l.price, fmt)}`
+                `${l.label === OVERLAY_LEVEL_LABELS.wave5Cap ? WAVE_5_CAP_FACT : l.label} ${formatOverlayPrice(l.price, fmt)}`
         ),
         waveRatios(d.seq, d.atRightEdge),
     ];

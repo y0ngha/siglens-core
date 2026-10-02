@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Bar } from '@/domain/types';
+import type { Bar, PatternCandidate } from '@/domain/types';
 import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
 import { isSpentPattern } from '@/domain/patterns/spentPatterns';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
@@ -72,6 +72,19 @@ describe('isSpentPattern', () => {
         // Highs are close + 0.1: 124 → 124.1 (short), 124.4 → 124.5 (within).
         expect(isSpentPattern(db(base), tail([124]), f.atr)).toBe(false);
         expect(isSpentPattern(db(base), tail([124.4]), f.atr)).toBe(true);
+    });
+
+    it('keeps a hit without geometry, whatever the price does after it', () => {
+        // Hand-built, no pivots: computeCandidateGeometry has nothing to measure.
+        const bare: PatternCandidate = {
+            id: 'double_top',
+            startIndex: 40,
+            endIndex: 49,
+        };
+        const wild = withTail([300, 1]);
+        expect(isSpentPattern(bare, wild, f.atr)).toBe(false);
+        // The same tail does spend the pivoted pattern, so the null is what keeps it.
+        expect(isSpentPattern(dt(f.bars), wild, f.atr)).toBe(true);
     });
 
     it('the prompt leaves a fulfilled pattern out of its candidates and overlays', () => {

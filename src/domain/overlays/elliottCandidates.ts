@@ -204,8 +204,8 @@ function impulseState(count: Count, abcTag: AbcTag | null): string {
 }
 
 /**
- * Invalidation for the count's state, then the ratios of its finished waves
- * and an attached A–B–C's C targets. Wave 4 forming: wave 1's end (rule 3).
+ * The count's levels: its invalidation for its state, then an attached
+ * A–B–C's C targets. Wave 4 forming: wave 1's end (rule 3).
  * Wave 5 forming: wave 4's end. Complete — with or without an A–B–C — a new
  * extreme beyond wave 5's end, which negates "impulse complete" (wave 5 is
  * still extending); breaking wave 4's end then only confirms the
@@ -235,14 +235,19 @@ function impulseLevels(count: Count, abcTag: AbcTag | null): ElliottLevel[] {
     ];
 }
 
+/**
+ * The count's invalidation (`levels[0]`), its finished waves' ratios and an
+ * attached A–B–C's C targets, as prompt facts.
+ */
 function impulseFacts(
     count: Count,
     abcTag: AbcTag | null,
+    levels: readonly ElliottLevel[],
     fmt: OverlayFormat
 ): string[] {
     const { seq, abc } = count;
     const forming = count.atRightEdge || seq.length < EW_IMPULSE_PIVOTS;
-    const [invalidation] = impulseLevels(count, abcTag);
+    const [invalidation] = levels;
     return [
         `invalidation ${formatOverlayPrice(invalidation.price, fmt)}`,
         waveRatios(seq, forming),
@@ -256,7 +261,8 @@ function toCandidate(
     count: Count,
     bars: readonly Bar[],
     fmt: OverlayFormat,
-    abcTag: AbcTag | null
+    abcTag: AbcTag | null,
+    levels: readonly ElliottLevel[]
 ): OverlayCandidate {
     const { seq, abc } = count;
     const all = [...seq, ...abc];
@@ -278,7 +284,7 @@ function toCandidate(
             `impulse ${dir}`,
             impulseState(count, abcTag),
             namedPoints(bars, all, ['0', ...waves, ...abcNames], fmt),
-            impulseFacts(count, abcTag, fmt),
+            impulseFacts(count, abcTag, levels, fmt),
             count.score
         ),
         segments: [
@@ -289,7 +295,7 @@ function toCandidate(
             ),
             ...correction,
         ],
-        levels: structureLevels(bars, all, impulseLevels(count, abcTag), fmt),
+        levels: structureLevels(bars, all, levels, fmt),
         labels: pivotLabels(bars, all.slice(1), [...waves, ...abcNames]),
     };
 }
@@ -410,12 +416,16 @@ export function buildElliottCandidates(
     };
     const scored: ElliottScoredCandidate[] = [
         ...(on('impulse')
-            ? enumerate(merged, lastBarIndex, atr).map(c => ({
-                  structure: 'impulse' as const,
-                  score: c.score,
-                  candidate: toCandidate(c, bars, fmt, tagAbc(c)),
-                  levels: impulseLevels(c, tagAbc(c)),
-              }))
+            ? enumerate(merged, lastBarIndex, atr).map(c => {
+                  const tag = tagAbc(c);
+                  const levels = impulseLevels(c, tag);
+                  return {
+                      structure: 'impulse' as const,
+                      score: c.score,
+                      candidate: toCandidate(c, bars, fmt, tag, levels),
+                      levels,
+                  };
+              })
             : []),
         ...(on('diagonal')
             ? buildDiagonalCandidates(merged, bars, atr, fmt)

@@ -363,7 +363,7 @@ export function waveRatios(
 }
 
 /** `100%`, `161.8%`: a projection ratio as a percentage, trailing zeros dropped. */
-const ratioLabel = (r: number) =>
+const ratioLabel = (r: number): `${number}%` =>
     `${Number((r * PERCENT).toFixed(EW_RATIO_DECIMALS))}%`;
 
 /**
@@ -375,7 +375,7 @@ const ratioLabel = (r: number) =>
 export function abcTargetLevels(seq: readonly PivotPoint[]): ElliottLevel[] {
     const [a] = legSizes(seq);
     const sign = legSign(seq);
-    return EW_ABC_C_PROJECTIONS.map(r => ({
+    return EW_ABC_C_PROJECTIONS.map((r): ElliottLevel => ({
         label: `${OVERLAY_LEVEL_LABELS.target} ${ratioLabel(r)}`,
         price: seq[2].price + sign * r * a,
         // C runs with A.

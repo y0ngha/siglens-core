@@ -4210,6 +4210,14 @@ export type ElliottStructure =
 
 /**
  * @internal
+ * An ElliottLevel label: an OVERLAY_LEVEL_LABELS value (types.ts stays
+ * type-only, so they are spelled out) or a ratio-qualified target.
+ */
+export type ElliottLevelLabel =
+    'invalidation' | 'target' | 'wave5_cap' | `target ${string}%`;
+
+/**
+ * @internal
  * A price an Elliott count computes and cites as a prompt fact
  * (invalidation, target, cap), also drawn as a horizontal level. `label` is
  * an OVERLAY_LEVEL_LABELS value, a target optionally qualified by its ratio
@@ -4219,7 +4227,7 @@ export type ElliottStructure =
  * cap can sit below a wave 5 that edged past it within tolerance).
  */
 export interface ElliottLevel {
-    label: string;
+    label: ElliottLevelLabel;
     price: number;
     breach: 'up' | 'down';
 }

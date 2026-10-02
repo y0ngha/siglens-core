@@ -34,8 +34,10 @@ import {
 import { formatOverlayPrice } from '@/domain/overlays/format';
 
 /**
- * C targets, and — for a zigzag, whose B may not pass A's start — that start
- * as the invalidation level. Flats have none: their B may run past it.
+ * The levels of an A–B–C: C's 100% / 161.8% targets (reached as C runs on
+ * with A) and — for a zigzag, whose B may not pass A's start — that start as
+ * the invalidation level (passed by B moving against A). Flats have none:
+ * their B may run past it.
  */
 const abcLevels = (
     seq: readonly PivotPoint[],
@@ -54,6 +56,10 @@ const abcLevels = (
         : []),
 ];
 
+/**
+ * The same values as prompt facts: the C targets, and a zigzag's
+ * `invalidation <price>`.
+ */
 function abcFacts(
     seq: readonly PivotPoint[],
     type: AbcType,
