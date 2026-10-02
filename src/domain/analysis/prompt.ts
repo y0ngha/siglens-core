@@ -1038,7 +1038,7 @@ export const retracementDepthSuffix = (
     price: number | null
 ): string => {
     const range = fib.high - fib.low;
-    if (price == null || !Number.isFinite(price) || !(range > 0)) return '';
+    if (price === null || !Number.isFinite(price) || !(range > 0)) return '';
     const pulledBack =
         fib.direction === 'up' ? fib.high - price : price - fib.low;
     if (pulledBack < 0)

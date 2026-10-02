@@ -36,6 +36,9 @@ const baseInput: IndicatorStateInput = {
     diffDp: 2,
     lastVolume: 1500,
     priorVolumes: Array.from({ length: 20 }, () => 1000),
+    rsi: null,
+    lastBar: undefined,
+    prevBar: undefined,
 };
 
 describe('buildIndicatorStateSection', () => {

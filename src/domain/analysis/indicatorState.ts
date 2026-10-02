@@ -382,8 +382,16 @@ const MA_CYCLE_PERIODS = { short: 5, medium: 20, long: 60 } as const;
 
 type MaCycleRole = keyof typeof MA_CYCLE_PERIODS;
 
+type MaCycleOrder =
+    | 'short>medium>long'
+    | 'medium>short>long'
+    | 'medium>long>short'
+    | 'long>medium>short'
+    | 'long>short>medium'
+    | 'short>long>medium';
+
 /** MA cycle stage by top-to-bottom role order (skills/strategies/ma-cycle.md stage table). */
-const MA_CYCLE_STAGE: Readonly<Record<string, number>> = {
+const MA_CYCLE_STAGE: Readonly<Record<MaCycleOrder, number>> = {
     'short>medium>long': 1,
     'medium>short>long': 2,
     'medium>long>short': 3,
@@ -391,6 +399,10 @@ const MA_CYCLE_STAGE: Readonly<Record<string, number>> = {
     'long>short>medium': 5,
     'short>long>medium': 6,
 };
+
+function isMaCycleOrder(key: string): key is MaCycleOrder {
+    return Object.hasOwn(MA_CYCLE_STAGE, key);
+}
 
 const MA_CYCLE_LABEL = `- MA cycle (${(['short', 'medium', 'long'] as const)
     .map(role => `MA${MA_CYCLE_PERIODS[role]}`)
@@ -417,19 +429,22 @@ function maCycleLine(series: Record<number, (number | null)[]>): string {
     const sorted = valued.toSorted((a, b) => b.v - a.v);
     if (sorted[0].v === sorted[1].v || sorted[1].v === sorted[2].v)
         return `${MA_CYCLE_LABEL}: N/A (two MAs equal)`;
-    const stage = MA_CYCLE_STAGE[sorted.map(x => x.role).join('>')];
+    const order = sorted.map(x => x.role).join('>');
+    if (!isMaCycleOrder(order)) return `${MA_CYCLE_LABEL}: N/A`;
+    const stage = MA_CYCLE_STAGE[order];
     return `${MA_CYCLE_LABEL}: ${sorted.map(x => `MA${x.p}`).join('>')}; stage ${stage}`;
+}
+
+function rsiZone(rsi: number): 'overbought' | 'oversold' | 'neutral' {
+    if (rsi >= RSI_OVERBOUGHT_LEVEL) return 'overbought';
+    if (rsi <= RSI_OVERSOLD_LEVEL) return 'oversold';
+    return 'neutral';
 }
 
 /** @internal `- RSI(14): 64.83 neutral (overbought ≥ 70, oversold ≤ 30)` — so "과열" is never said of a sub-70 RSI. */
 function rsiLine(rsi: number | null | undefined): string {
     if (!isFinite(rsi)) return '- RSI zone: N/A';
-    const zone =
-        rsi >= RSI_OVERBOUGHT_LEVEL
-            ? 'overbought'
-            : rsi <= RSI_OVERSOLD_LEVEL
-              ? 'oversold'
-              : 'neutral';
+    const zone = rsiZone(rsi);
     return `- RSI zone: ${formatNullableNumber(rsi, PCT_DP)} ${zone} (overbought ≥ ${RSI_OVERBOUGHT_LEVEL}, oversold ≤ ${RSI_OVERSOLD_LEVEL})`;
 }
 
@@ -517,11 +532,11 @@ export interface IndicatorStateInput {
      * `N/A` when fewer than {@link VOLUME_AVG_WINDOW} are available.
      */
     priorVolumes: readonly (number | null | undefined)[];
-    /** Latest RSI(14). Optional so older callers/tests keep compiling; the prompt always passes it. */
-    rsi?: number | null;
-    /** Last and previous bar high/low for the gap line. Optional for the same reason. */
-    lastBar?: BarRange;
-    prevBar?: BarRange;
+    /** Latest RSI(14); `null`/`undefined` renders `N/A`. */
+    rsi: number | null | undefined;
+    /** Last and previous bar high/low for the gap line; `undefined` renders `N/A`. */
+    lastBar: BarRange | undefined;
+    prevBar: BarRange | undefined;
 }
 
 /**
