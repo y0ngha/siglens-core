@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.7.1](https://github.com/y0ngha/siglens-core/compare/v2.7.0...v2.7.1) (2026-10-02)
+
+### Bug Fixes
+
+* **analysis:** 모델이 직접 셈하다 틀리던 비교값을 프롬프트에 계산해 넣기 (p21) ([#247](https://github.com/y0ngha/siglens-core/issues/247)) ([59846d2](https://github.com/y0ngha/siglens-core/commit/59846d2f401b0884248e37343743c9a621a8a486))
+
 # [2.7.0](https://github.com/y0ngha/siglens-core/compare/v2.6.0...v2.7.0) (2026-10-02)
 
 ### Features
