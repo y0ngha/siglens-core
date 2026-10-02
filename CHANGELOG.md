@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.7.0](https://github.com/y0ngha/siglens-core/compare/v2.6.0...v2.7.0) (2026-10-02)
+
+### Features
+
+* **overlays:** 무효화·목표가 수평선 + 이미 지난 엘리어트·패턴 제외 ([#245](https://github.com/y0ngha/siglens-core/issues/245)) ([58cf6dc](https://github.com/y0ngha/siglens-core/commit/58cf6dc590082ab1ce651c4e8309f2acb7bfe3b5))
+
 # [2.6.0](https://github.com/y0ngha/siglens-core/compare/v2.5.0...v2.6.0) (2026-10-02)
 
 ### Features
