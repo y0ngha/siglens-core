@@ -63,6 +63,32 @@ function isBroken(
         : lastClose < breakoutLevel;
 }
 
+/** Key points whose spacing the pattern skills gate on (double/triple tops and bottoms, head and shoulders). */
+const SPACED_POINT =
+    /^(?:peak \d+|trough \d+|left shoulder|head|right shoulder)$/;
+
+/**
+ * @internal `- Spacing (bars): trough 1 → trough 2: 5` — bars between consecutive
+ * structural points, or `null` when fewer than two apply. The skills gate on
+ * this (double bottom troughs ≥ 10 bars apart, …) and the model miscounted it
+ * from dates — and still from per-point "N bars ago" (8 → 3 read as "14봉",
+ * 2026-10-02 A/B) — so the subtraction is done here.
+ */
+export function spacingLine(
+    keyPoints: PatternGeometry['keyPoints']
+): string | null {
+    const pts = keyPoints
+        .filter(p => SPACED_POINT.test(p.label) && Number.isInteger(p.index))
+        .toSorted((a, b) => a.index - b.index);
+    if (pts.length < 2) return null;
+    const gaps = pts
+        .slice(1)
+        .map(
+            (p, i) => `${pts[i].label} → ${p.label}: ${p.index - pts[i].index}`
+        );
+    return `- Spacing (bars): ${gaps.join(' / ')}`;
+}
+
 function formatCandidate(
     candidate: PatternCandidate,
     geometry: PatternGeometry | null,
@@ -76,6 +102,7 @@ function formatCandidate(
         return `### ${candidate.id} — geometry unavailable`;
     }
 
+    const spacing = spacingLine(geometry.keyPoints);
     const keyPointsLine =
         geometry.keyPoints.length > 0
             ? `- Key points: ${geometry.keyPoints
@@ -127,6 +154,7 @@ function formatCandidate(
     return [
         `### ${candidate.id} (${status})${candidateIdLine}`,
         keyPointsLine,
+        ...(spacing === null ? [] : [spacing]),
         formatLevelLine('Breakout level', breakoutLevel, lastClose, priceDp),
         // The measured-move anchor, printed as breakout ∓ height so a model
         // that copies breakout/extreme/direction into `geometry` makes the app

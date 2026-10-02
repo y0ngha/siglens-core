@@ -36,6 +36,9 @@ const baseInput: IndicatorStateInput = {
     diffDp: 2,
     lastVolume: 1500,
     priorVolumes: Array.from({ length: 20 }, () => 1000),
+    rsi: null,
+    lastBar: undefined,
+    prevBar: undefined,
 };
 
 describe('buildIndicatorStateSection', () => {
@@ -152,7 +155,18 @@ describe('buildIndicatorStateSection', () => {
                 ...baseInput,
                 ma: { 5: [101], 20: [104], 60: [100], 120: [103] },
             });
-            expect(section).toContain('- MA stack: mixed');
+            // the actual order, highest value first — not just a bare "mixed"
+            expect(section).toContain(
+                '- MA stack: mixed (MA20>MA120>MA5>MA60)'
+            );
+        });
+
+        it('lists only periods with a value in the mixed order', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                ma: { 5: [101], 20: [104], 60: [null], 120: [103] },
+            });
+            expect(section).toContain('- MA stack: mixed (MA20>MA120>MA5)');
         });
 
         it('is N/A when fewer than 2 periods have a value', () => {
@@ -161,6 +175,188 @@ describe('buildIndicatorStateSection', () => {
                 ma: { 5: [104], 20: [null], 60: [null], 120: [null] },
             });
             expect(section).toContain('- MA stack: N/A');
+        });
+    });
+
+    describe('EMA stack', () => {
+        it('renders the full EMA order next to the MA stack', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                emaPeriods: [9, 21, 60],
+            });
+            expect(section).toContain(
+                '- EMA stack: bullish (EMA9>EMA21>EMA60)'
+            );
+        });
+
+        it('lists the actual order when mixed (TSLA 2026-10-02: EMA60 above EMA20)', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                ema: { 9: [363.71], 20: [362.97], 21: [362.79], 60: [363.25] },
+                emaPeriods: [9, 20, 21, 60],
+            });
+            expect(section).toContain(
+                '- EMA stack: mixed (EMA9>EMA60>EMA20>EMA21)'
+            );
+        });
+    });
+
+    describe('MA cycle', () => {
+        it.each([
+            [{ 5: [3], 20: [2], 60: [1] }, 'MA5>MA20>MA60; stage 1'],
+            [{ 5: [2], 20: [3], 60: [1] }, 'MA20>MA5>MA60; stage 2'],
+            [{ 5: [1], 20: [3], 60: [2] }, 'MA20>MA60>MA5; stage 3'],
+            [{ 5: [1], 20: [2], 60: [3] }, 'MA60>MA20>MA5; stage 4'],
+            [{ 5: [2], 20: [1], 60: [3] }, 'MA60>MA5>MA20; stage 5'],
+            // IONQ 2026-10-02: MA5 44.24, MA20 40.90, MA60 39.97 is stage 1, not "MA5>MA60>MA20"
+            [{ 5: [44.24], 20: [40.9], 60: [39.97] }, 'MA5>MA20>MA60; stage 1'],
+            [{ 5: [3], 20: [1], 60: [2] }, 'MA5>MA60>MA20; stage 6'],
+        ])('maps the MA5/20/60 order to its stage (%o)', (ma, expected) => {
+            const section = buildIndicatorStateSection({ ...baseInput, ma });
+            expect(section).toContain(
+                `- MA cycle (MA5/MA20/MA60): ${expected}`
+            );
+        });
+
+        it('is N/A on a missing value or a tie', () => {
+            expect(
+                buildIndicatorStateSection({
+                    ...baseInput,
+                    ma: { 5: [1], 20: [null], 60: [2] },
+                })
+            ).toContain('- MA cycle (MA5/MA20/MA60): N/A');
+            expect(
+                buildIndicatorStateSection({
+                    ...baseInput,
+                    ma: { 5: [2], 20: [2], 60: [1] },
+                })
+            ).toContain('- MA cycle (MA5/MA20/MA60): N/A (two MAs equal)');
+        });
+    });
+
+    describe('RSI zone', () => {
+        it('labels the zone from the 70/30 thresholds (PLTR 2026-10-02: 64.83 is not overbought)', () => {
+            expect(
+                buildIndicatorStateSection({ ...baseInput, rsi: 64.83 })
+            ).toContain(
+                '- RSI zone: 64.83 neutral (overbought ≥ 70, oversold ≤ 30)'
+            );
+            expect(
+                buildIndicatorStateSection({ ...baseInput, rsi: 70 })
+            ).toContain('70.00 overbought');
+            expect(
+                buildIndicatorStateSection({ ...baseInput, rsi: 30 })
+            ).toContain('30.00 oversold');
+        });
+
+        it('is N/A without a value', () => {
+            expect(buildIndicatorStateSection(baseInput)).toContain(
+                '- RSI zone: N/A'
+            );
+        });
+    });
+
+    describe('Gap', () => {
+        // MSTR 2026-10-02: low 165.10 over the previous high 161.58 with ATR 9.00 → 3.52 = 0.39× ATR
+        it('reports a gap up at or above 0.25× ATR', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                atr: 9,
+                lastBar: { high: 170.17, low: 165.1 },
+                prevBar: { high: 161.58, low: 152.63 },
+            });
+            expect(section).toContain(
+                '- Gap (last bar vs previous bar): up — last low 165.10 above previous high 161.58 by 3.52 = 0.39× ATR, counts as a gap (≥ 0.25× ATR)'
+            );
+        });
+
+        it('reports a gap down, and says when it is below the ATR minimum', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                atr: 10,
+                lastBar: { high: 99, low: 95 },
+                prevBar: { high: 105, low: 100 },
+            });
+            expect(section).toContain(
+                'down — last high 99.00 below previous low 100.00 by 1.00 = 0.10× ATR, below the 0.25× ATR minimum — not a gap'
+            );
+        });
+
+        it('agrees with the engine at exactly 0.25× ATR (size ≥ mult × ATR, not the rounded ratio)', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                atr: 4,
+                lastBar: { high: 105, low: 101 },
+                prevBar: { high: 100, low: 95 },
+            });
+            expect(section).toContain('by 1.00 = 0.25× ATR, counts as a gap');
+        });
+
+        it('says ATR N/A when ATR is missing, and N/A for a non-finite bar', () => {
+            expect(
+                buildIndicatorStateSection({
+                    ...baseInput,
+                    atr: null,
+                    lastBar: { high: 105, low: 101 },
+                    prevBar: { high: 100, low: 95 },
+                })
+            ).toContain(
+                'up — last low 101.00 above previous high 100.00 by 1.00 (ATR N/A)'
+            );
+            expect(
+                buildIndicatorStateSection({
+                    ...baseInput,
+                    lastBar: { high: Number.NaN, low: 101 },
+                    prevBar: { high: 100, low: 95 },
+                })
+            ).toContain('- Gap (last bar vs previous bar): N/A');
+        });
+
+        it('says none when the bars overlap, N/A without bars', () => {
+            expect(
+                buildIndicatorStateSection({
+                    ...baseInput,
+                    lastBar: { high: 105, low: 99 },
+                    prevBar: { high: 101, low: 95 },
+                })
+            ).toContain(
+                '- Gap (last bar vs previous bar): none (the two bars overlap)'
+            );
+            expect(buildIndicatorStateSection(baseInput)).toContain(
+                '- Gap (last bar vs previous bar): N/A'
+            );
+        });
+    });
+
+    describe('MA spreads', () => {
+        it('renders each MA vs the next-longer one, adjacent pairs in period order', () => {
+            // MSTR 2026-10-02 shape: MA20 146.95, MA60 117.97 -> MA20 above MA60 by 24.57%,
+            // a figure the model must not confuse with price-vs-MA60 (+36.1%).
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                ma: { 5: [158], 20: [146.95], 60: [117.97], 120: [130] },
+            });
+            expect(section).toContain(
+                '- MA spreads: MA5 above MA20 by 7.52% / MA20 above MA60 by 24.57% / MA60 below MA120 by 9.25%'
+            );
+        });
+
+        it('skips a pair when either side has no value', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                ma: { 5: [104], 20: [null], 60: [101], 120: [100] },
+            });
+            expect(section).toContain(
+                '- MA spreads: MA60 above MA120 by 1.00%'
+            );
+        });
+
+        it('is N/A when no adjacent pair has both values', () => {
+            const section = buildIndicatorStateSection({
+                ...baseInput,
+                ma: { 5: [104], 20: [null], 60: [101], 120: [null] },
+            });
+            expect(section).toContain('- MA spreads: N/A');
         });
     });
 

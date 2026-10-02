@@ -829,9 +829,10 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // p16 은 컨플루언스 신뢰도 문구를 "측정된 우위 없음"으로 바꾸고, 1Day에
         // Short-Term Washout 블록을 추가하며 entryRecommendation 규칙을 고친다.
         // p17 은 washout 진입 판정을 룰 엔진이 내리게 하고, p18 은 뉴스로 인한
-        // 하락에서 그 판정을 유보한다. p20 은 차트 오버레이 후보 id를 추가한다
+        // 하락에서 그 판정을 유보한다. p20 은 차트 오버레이 후보 id를 추가한다.
+        // p21 은 모델이 직접 셈하다 틀리던 비교값(MA 간 격차·배열, 대순환 단계, 갭, 되돌림 깊이, 패턴 간격 등)을 계산해 넣는다
         // (spec 2026-09-28-chart-overlays). p19 는 탐지 목록을 넓힌다(캔들 6종·차트 패턴 5종·신호 4종).
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p20');
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p21');
     });
 });
 

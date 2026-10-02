@@ -4,6 +4,7 @@ import {
     CHART_PATTERN_CANDIDATES_SECTION_INTRO,
     formatChartPatternCandidatesSection,
     printedPatternGeometriesByOverlayId,
+    spacingLine,
 } from '@/domain/analysis/chartPatternCandidatesSection';
 import { screenChartPatterns } from '@/domain/patterns';
 import {
@@ -132,6 +133,73 @@ describe('formatChartPatternCandidatesSection', () => {
         expect(section).toMatch(/- Key points: .+left rim|resistance touch/);
         // A drawable overlay was offered for this candidate -> the id line prints.
         expect(section).toContain('- Candidate id: pattern:');
+    });
+
+    it('prints the Spacing line right after Key points for a double bottom, and none for a rectangle', () => {
+        // troughs at bar 1 and bar 3 → 2 bars apart; the rectangle has touches, not peaks/troughs
+        const bars = makeAlternatingPivotBars(20, [10, 20, 10, 20], 20);
+        const candidates = candidatesFor(bars, 1);
+        const section = formatChartPatternCandidatesSection(
+            candidates,
+            bars,
+            1,
+            2,
+            '1Day',
+            offeredIdsFor(candidates, bars, 1)
+        );
+        const block = (id: string): string[] => {
+            const start = section.indexOf(`### ${id}`);
+            expect(start).toBeGreaterThanOrEqual(0);
+            const next = section.indexOf('\n### ', start + 4);
+            return section
+                .slice(start, next === -1 ? undefined : next)
+                .split('\n');
+        };
+        const db = block('double_bottom');
+        const kp = db.findIndex(l => l.startsWith('- Key points: '));
+        expect(db[kp + 1]).toBe('- Spacing (bars): trough 1 → trough 2: 2');
+        expect(block('rectangle').some(l => l.startsWith('- Spacing'))).toBe(
+            false
+        );
+    });
+
+    describe('spacingLine', () => {
+        const pt = (label: string, index: number) => ({
+            label,
+            price: 1,
+            index,
+            time: index,
+        });
+
+        it('is the bar count between consecutive peaks/troughs in index order (OXY 2026-10-02: 5, not "7봉"/"14봉")', () => {
+            expect(
+                spacingLine([
+                    pt('trough 1', 492),
+                    pt('trough 2', 497),
+                    pt('neckline', 494),
+                ])
+            ).toBe('- Spacing (bars): trough 1 → trough 2: 5');
+        });
+
+        it('covers head and shoulders and ignores non-structural points', () => {
+            expect(
+                spacingLine([
+                    pt('left shoulder', 10),
+                    pt('left trough', 12),
+                    pt('head', 18),
+                    pt('right trough', 21),
+                    pt('right shoulder', 25),
+                    pt('neckline', 21),
+                ])
+            ).toBe(
+                '- Spacing (bars): left shoulder → head: 8 / head → right shoulder: 7'
+            );
+        });
+
+        it('is null with fewer than two structural points', () => {
+            expect(spacingLine([pt('rim', 1), pt('bottom', 9)])).toBeNull();
+            expect(spacingLine([pt('peak 1', 4)])).toBeNull();
+        });
     });
 
     // Review round 2: a model copies the PRINTED breakout/extreme, so the app's

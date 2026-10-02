@@ -785,10 +785,19 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * `runAnalysis` joins the referenced ids against the offered candidates
  * (`resolveChartOverlays`) after the model call. Bytes change on every
  * request.
+ * **`p21`** — computed facts the model used to derive and got wrong
+ * (2026-10-02 real-LLM A/B, 60 runs per side): `## Indicator State` gains
+ * `MA spreads`, `EMA stack`, `MA cycle (MA5/MA20/MA60)`, `RSI zone` and
+ * `Gap (last bar vs previous bar)` lines and a `mixed` MA stack now prints its
+ * order; Long-term Context prints dated period extremes and distances instead
+ * of ratios; Fib anchor lines end with the retracement depth; pattern
+ * candidates gain a `Spacing (bars)` line; candle-pattern lines carry the bar
+ * date; the Indicator State guidelines are rewritten and a Consistency Across
+ * Fields block is added. Bytes change on every request.
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p20' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p21' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

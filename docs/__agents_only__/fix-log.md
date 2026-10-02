@@ -141,13 +141,15 @@
 
 ### Round 1 findings (required, all fixed)
 
-### Round 3: approved
+### ### Round 2 (recommended, fixed)
+
+- Violation 1: RETRACEMENT_DEPTH_DP inserted between `retracementDepthSuffix`'s JSDoc and the function — same displaced-JSDoc defect as R1 Violation 2
+  Rule: MISTAKES 11.5
+  Context: Constant moved above the JSDoc block.
+
+Round 3: approved
 
 ## [Branch fix/history-window-cache-churn | 2026-09-30] — Round 1 review findings
-
-- Violation 1 (required): Orphaned JSDoc after inserting new function between JSDoc block and declaration
-  - Rule: JSDoc blocks must immediately precede target declarations; inserting code between JSDoc and declaration orphans the JSDoc to misapply
-  - Context: New function inserted between existing JSDoc and its target declaration. JSDoc still documented old rolling-window formula, now applying to wrong function. Fixed by relocating JSDoc or function to restore proper association.
 
 - Violation 3 (recommended): Pointer key computed on every generation, trade-off not documented
   - Rule: Infrastructure design trade-offs must be documented with comments explaining the choice and upgrade path
@@ -220,3 +222,53 @@ Round 5: approved
 - Violation 5 (open string type, fixed): ElliottLevel.label was `string`, so a typo'd label compiled
   Rule: Close a type whose values are a known finite set
   Context: @internal ElliottLevelLabel = 'invalidation' | 'target' | 'wave5_cap' | `target ${string}%` in types.ts (kept type-only); ratioLabel returns `${number}%`, abcTargetLevels annotates its map callback, test helper typed.
+
+## [Branch fix/ma-spread-facts | Round 1→3 (approved) | 2026-10-02] — MA spread facts and pattern geometry refinement
+
+### Round 1 (required, all fixed in R2/R3)
+
+- Violation 1: PROMPT_TEMPLATE_VERSION not bumped when technical prompt's bytes changed
+  Rule: Cache builders' template/prompt versions not bumped when rendered bytes change (see Infrastructure #6)
+  Context: New Indicator State lines, Long-term Context/Fib anchor/candle/pattern-candidate format changes and the rewritten guidelines changed the technical prompt's bytes; version incremented from p20 to p21 with history comment. config.test expectation updated to match new version.
+
+- Violation 2: New MA-cycle constants inserted between `IndicatorStateInput`'s JSDoc and the interface — the doc described the constants and the export lost `@internal`
+  Rule: MISTAKES 11.5 — a JSDoc block must sit directly on its declaration
+  Context: Moved the JSDoc back onto the interface and documented the constants separately.
+
+- Violation 3: prettier --check failed on the six changed files
+  Rule: CONVENTIONS — formatting enforced (`yarn format:check`)
+  Context: prettier applied; format:check passes.
+
+### Round 1 (recommended, all fixed in R2/R3)
+
+- Violation 1: Unused test import in spacing line test file
+  Rule: Code cleanup — remove unused imports
+  Context: Unused import removed.
+
+- Violation 2: Spacing line wiring not tested end-to-end through formatChartPatternCandidatesSection
+  Rule: Critical paths must be tested end-to-end through integrating functions
+  Context: Added test coverage for spacing line formatting through the full formatting pipeline.
+
+- Violation 3: Rewritten guideline block not asserted; no guard that rendered guideline line names match defined line names
+  Rule: New display logic must have matching test assertions and guards for name/label consistency
+  Context: Added assertions verifying guideline line names in rendered output match their definitions.
+
+- Violation 4: Vacuous Long-term Context tests — tests guarded with `if (row)` but no assertion on computed percentage
+  Rule: Tests must verify logic, not conditionally guard the verification away; each assertion must check the computed value
+  Context: Replaced with one test on bars with a known period high/low: asserts the exact dated `Period High/Low` lines and the exact distances (33.33% below / 100.00% above).
+
+- Violation 5: maCycleLine hardcoded label with `as` type casts and magic numbers
+  Rule: Magic literals must be extracted to named constants; type assertions should be avoided in favor of proper typing
+  Context: MA cycle label built from MA_CYCLE_PERIODS; `as` casts replaced by a type guard; RETRACEMENT_DEPTH_DP constant for the retracement decimals.
+
+- Violation 6: Gap line division logic mismatches engine calculation; ATR-N/A and non-finite ATR branches untested
+  Rule: Chart line logic must match engine calculation exactly; all branches (undefined/NaN/infinity cases) must have dedicated tests
+  Context: Gap line now compares `size >= GAP_MIN_ATR_MULT * atr` like detectGapUp/Down; tests added for the exact 0.25× ATR boundary, ATR N/A, and a non-finite bar.
+
+### Round 2 (recommended, fixed)
+
+- Violation 1: RETRACEMENT_DEPTH_DP inserted between `retracementDepthSuffix`'s JSDoc and the function — same displaced-JSDoc defect as R1 Violation 2
+  Rule: MISTAKES 11.5
+  Context: Constant moved above the JSDoc block.
+
+Round 3: approved
