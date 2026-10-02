@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.6.0](https://github.com/y0ngha/siglens-core/compare/v2.5.0...v2.6.0) (2026-10-02)
+
+### Features
+
+* **overlays:** Elliott triangles and diagonals, stricter impulse, computed invalidation/targets in candidate lines ([#244](https://github.com/y0ngha/siglens-core/issues/244)) ([00e6036](https://github.com/y0ngha/siglens-core/commit/00e6036d69b22809b082dfcecb999a8d7613fb24))
+
 # [2.5.0](https://github.com/y0ngha/siglens-core/compare/v2.4.0...v2.5.0) (2026-10-01)
 
 ### Bug Fixes
