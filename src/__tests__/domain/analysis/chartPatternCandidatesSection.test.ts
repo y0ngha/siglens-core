@@ -4,10 +4,12 @@ import {
     CHART_PATTERN_CANDIDATES_SECTION_INTRO,
     formatChartPatternCandidatesSection,
     printedPatternGeometriesByOverlayId,
-    printedPatternGeometry,
 } from '@/domain/analysis/chartPatternCandidatesSection';
 import { screenChartPatterns } from '@/domain/patterns';
-import { computePatternTargets } from '@/domain/analysis/patternTargets';
+import {
+    computePatternTargets,
+    printedPatternGeometry,
+} from '@/domain/analysis/patternTargets';
 import { buildPatternOverlayCandidates } from '@/domain/overlays/patternOverlays';
 import {
     makeAlternatingPivotBars,
@@ -33,7 +35,9 @@ const offeredIdsFor = (
     atr: number | null
 ): ReadonlySet<string> =>
     new Set(
-        buildPatternOverlayCandidates(candidates, bars, atr ?? 0).map(c => c.id)
+        buildPatternOverlayCandidates(candidates, bars, atr ?? 0, 2).map(
+            c => c.id
+        )
     );
 
 describe('formatChartPatternCandidatesSection', () => {

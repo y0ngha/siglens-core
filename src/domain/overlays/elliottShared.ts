@@ -1,7 +1,9 @@
 import type {
     Bar,
+    ElliottLevel,
     OverlayFormat,
     OverlayLabel,
+    OverlayLevel,
     OverlayPoint,
     OverlaySegment,
     PivotPoint,
@@ -20,6 +22,7 @@ import {
     EW_REGULAR_FLAT_C_MAX,
     EW_SCORE_DECIMALS,
     EW_ZIGZAG_B_MAX,
+    OVERLAY_LEVEL_LABELS,
 } from '@/domain/overlays/constants';
 import {
     formatOverlayPoint,
@@ -163,6 +166,34 @@ export const boundaryLine = (
     style: 'dashed',
     pane: 'price',
 });
+
+/**
+ * @internal
+ * `levels` drawn from the count's first pivot, across the whole structure
+ * like a pattern's breakout line — a line starting at the last leg sits a
+ * few bars from the right edge and hides behind its own axis label
+ * (2026-10-02 live render). Prices are rounded to the prompt's `priceDp`, so
+ * a line's axis label matches the number the card cites.
+ */
+export const structureLevels = (
+    bars: readonly Bar[],
+    pivots: readonly PivotPoint[],
+    levels: readonly ElliottLevel[],
+    fmt: OverlayFormat
+): OverlayLevel[] =>
+    levels
+        // Like a pattern level: a projection at or below zero is not a price
+        // to draw (the prompt line still states it).
+        .filter(l => l.price > 0)
+        .map(({ label, price }) => ({
+            label,
+            price: Number(price.toFixed(fmt.priceDp)),
+            fromTime: bars[pivots[0].index].time,
+        }));
+
+/** @internal `up` for a positive sign — the breach direction of a level. */
+export const breachOf = (sign: number): ElliottLevel['breach'] =>
+    sign > 0 ? 'up' : 'down';
 
 /** @internal `A 2026-01-05 101.20, B …` — named points for a prompt line. */
 export const namedPoints = (
@@ -331,23 +362,38 @@ export function waveRatios(
         .join(', ');
 }
 
+/** `100%`, `161.8%`: a projection ratio as a percentage, trailing zeros dropped. */
+const ratioLabel = (r: number) =>
+    `${Number((r * PERCENT).toFixed(EW_RATIO_DECIMALS))}%`;
+
 /**
  * @internal
- * C's EW_ABC_C_PROJECTIONS (100% and 161.8%) of A projected from B, for a 4-pivot A–B–C (start, A,
- * B, C): `C target 100% 118.00, 161.8% 112.44`.
+ * C's EW_ABC_C_PROJECTIONS (100% and 161.8%) of A projected from B, for a
+ * 4-pivot A–B–C (start, A, B, C), as levels labelled `target 100%`, …,
+ * reached as C runs on in A's direction.
+ */
+export function abcTargetLevels(seq: readonly PivotPoint[]): ElliottLevel[] {
+    const [a] = legSizes(seq);
+    const sign = legSign(seq);
+    return EW_ABC_C_PROJECTIONS.map(r => ({
+        label: `${OVERLAY_LEVEL_LABELS.target} ${ratioLabel(r)}`,
+        price: seq[2].price + sign * r * a,
+        // C runs with A.
+        breach: breachOf(sign),
+    }));
+}
+
+/**
+ * @internal
+ * The same projections as a prompt fact: `C target 100% 118.00, 161.8% 112.44`.
  */
 export function abcTargets(
     seq: readonly PivotPoint[],
     fmt: OverlayFormat
 ): string {
-    const [a] = legSizes(seq);
-    const sign = legSign(seq);
-    // `100%`, `161.8%`: the ratio as a percentage, trailing zeros dropped.
-    const label = (r: number) =>
-        `${Number((r * PERCENT).toFixed(EW_RATIO_DECIMALS))}%`;
+    const prices = abcTargetLevels(seq).map(l => l.price);
     return `C target ${EW_ABC_C_PROJECTIONS.map(
-        r =>
-            `${label(r)} ${formatOverlayPrice(seq[2].price + sign * r * a, fmt)}`
+        (r, i) => `${ratioLabel(r)} ${formatOverlayPrice(prices[i], fmt)}`
     ).join(', ')}`;
 }
 

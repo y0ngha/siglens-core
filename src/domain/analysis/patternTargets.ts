@@ -1,4 +1,8 @@
-import type { PatternBreakoutDirection } from '@/domain/types';
+import type {
+    PatternBreakoutDirection,
+    PatternGeometry,
+    PatternTargetGeometry,
+} from '@/domain/types';
 
 /** Upper bound on decimals kept for an app-computed pattern target. */
 const MAX_TARGET_DECIMALS = 8;
@@ -78,5 +82,45 @@ export function computePatternTargets(
             inputs,
             1
         ),
+    };
+}
+
+/**
+ * @internal
+ * The geometry a candidate block PRINTS, as a {@link PatternTargetGeometry} —
+ * the ONE place the printed numbers are derived, shared by the prompt section,
+ * the drawn pattern levels (`patternOverlays.ts`) and the post-call override that replaces a resolved pattern card's
+ * model-copied geometry with it (so the app's targets match the drawn line).
+ *
+ * Breakout/extreme are rounded to the printed precision FIRST: the model
+ * copies what it reads, so every printed number (and the app's
+ * recomputation) starts from the rounded values, not from the raw (often
+ * non-terminating OLS / averaged) geometry. The extreme is breakout ∓ height
+ * (height = |extreme − breakout|), so copying breakout/extreme/direction
+ * makes `computePatternTargets` reproduce the listed targets. The
+ * invalidation level is included at printed precision only when the block
+ * prints a number for it (finite and > 0 — `N/A` otherwise).
+ *
+ * @param geometry - The candidate's computed geometry (`computeCandidateGeometry`).
+ * @param priceDp - Decimal places the section prints prices with.
+ * @returns The printed breakout/extreme/direction(/invalidation).
+ */
+export function printedPatternGeometry(
+    geometry: PatternGeometry,
+    priceDp: number
+): PatternTargetGeometry {
+    const round = (n: number): number => Number(n.toFixed(priceDp));
+    const invalidation = geometry.invalidationLevel;
+    return {
+        breakoutLevel: round(geometry.breakoutLevel),
+        extremeLevel: round(
+            geometry.direction === 'up'
+                ? geometry.breakoutLevel - geometry.height
+                : geometry.breakoutLevel + geometry.height
+        ),
+        direction: geometry.direction,
+        ...(Number.isFinite(invalidation) && invalidation > 0
+            ? { invalidationLevel: round(invalidation) }
+            : {}),
     };
 }

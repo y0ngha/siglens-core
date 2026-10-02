@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { ElliottScoredCandidate, ElliottStructure } from '@/domain/types';
+import { buildDiagonalCandidates } from '@/domain/overlays/elliottDiagonal';
 import {
     buildElliottCandidates,
+    isSpentCount,
     selectElliottCandidates,
 } from '@/domain/overlays/elliottCandidates';
 import {
@@ -9,7 +11,11 @@ import {
     ELLIOTT_PER_STRUCTURE_LIMIT,
 } from '@/domain/overlays/constants';
 import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
-import { FMT, STEP } from '@/__tests__/domain/overlays/elliottTestHelpers';
+import {
+    FMT,
+    STEP,
+    pivotsAt,
+} from '@/__tests__/domain/overlays/elliottTestHelpers';
 
 /**
  * Flat bars at each price — with ATR 1 every move ≥ 1.5 becomes a pivot.
@@ -244,6 +250,26 @@ describe('buildElliottCandidates', () => {
         );
     });
 
+    it("draws the invalidation and the attached A–B–C's C targets from the count's first pivot", () => {
+        const levels = (prices: number[], suffix: string) =>
+            buildElliottCandidates(ladder(prices), 1, FMT)
+                .find(c => c.id.endsWith(suffix))
+                ?.levels.map(l => [
+                    l.label,
+                    Number(l.price.toFixed(2)),
+                    l.fromTime,
+                ]);
+        // From wave 0 (bar STEP), across the whole count.
+        expect(levels(TEXTBOOK, ':6')).toEqual([['invalidation', 131, STEP]]);
+        expect(
+            levels([...TEXTBOOK.slice(0, -1), 122, 127, 118, 121], ':abc')
+        ).toEqual([
+            ['invalidation', 131, STEP],
+            ['target 100%', 118, STEP],
+            ['target 161.8%', 112.44, STEP],
+        ]);
+    });
+
     it('a forming wave is left out of the ratios; the invalidation follows the state', () => {
         const line = (prices: number[], n: number) =>
             buildElliottCandidates(ladder(prices), 1, FMT).find(c =>
@@ -384,6 +410,48 @@ describe('buildElliottCandidates — diagonals', () => {
         );
     });
 
+    it("sets breach directions: wave 4's end against the trend, the cap with it", () => {
+        const levels = (prices: number[]) => {
+            const { pivots, bars } = pivotsAt(prices);
+            return buildDiagonalCandidates(pivots, bars, 1, FMT)[0]?.levels;
+        };
+        // Wave 5 forming (last pivot is the right edge).
+        expect(levels(DIAGONAL)).toEqual([
+            { label: 'invalidation', price: 132, breach: 'down' },
+            { label: 'wave5_cap', price: 154, breach: 'up' },
+        ]);
+        // Complete: the cap is the invalidation, passed upward.
+        expect(levels([...DIAGONAL, 138])).toEqual([
+            { label: 'invalidation', price: 154, breach: 'up' },
+        ]);
+    });
+
+    it('keeps a complete diagonal whose wave 5 edged past the cap through a normal pullback', () => {
+        // Waves 24/14/24/12/24.72: wave 5 runs 3% past wave 3 (within
+        // EW_DIAG_WAVE_TOLERANCE), so the cap (146) sits below wave 5's end
+        // (146.72). It is passed only upward — the pullback to 141.5 keeps the count.
+        const ids = buildElliottCandidates(
+            ladder([104, 100, 124, 110, 134, 122, 146.72, 141.5]),
+            1,
+            FMT
+        ).map(c => c.id);
+        expect(ids.some(id => id.endsWith(':diag'))).toBe(true);
+    });
+
+    it("draws the diagonal's invalidation, and its wave 5 cap while wave 5 forms", () => {
+        const levels = (prices: number[]) =>
+            buildElliottCandidates(ladder(prices), 1, FMT)
+                .find(c => c.id.endsWith(':diag'))
+                ?.levels.map(l => [l.label, l.price]);
+        expect(levels([104, ...DIAGONAL, 138])).toEqual([
+            ['invalidation', 154],
+        ]);
+        expect(levels([104, ...DIAGONAL])).toEqual([
+            ['invalidation', 132],
+            ['wave5_cap', 154],
+        ]);
+    });
+
     it('is ending after a same-way swing and leading after an opposite one', () => {
         const role = (prefix: number[]) =>
             buildElliottCandidates(
@@ -471,6 +539,170 @@ describe('buildElliottCandidates — triangles', () => {
         expect(ids()).toContain(`ew:down:${STEP}:tri`);
         expect(ids(['impulse']).some(id => id.endsWith(':tri'))).toBe(false);
     });
+
+    it('drops a complete triangle the price already moved past', () => {
+        const ids = (after: number[]) =>
+            buildElliottCandidates(
+                ladder([...TRIANGLE.slice(0, -1), ...after]),
+                1,
+                FMT
+            ).map(c => c.id);
+        const tri = `ew:down:${STEP}:tri`;
+        // Thrust target 125 (see elliottTriangle.test.ts): 124 has not reached it.
+        expect(ids([124])).toContain(tri);
+        expect(ids([126])).not.toContain(tri);
+        // Invalidation 104 (C's end): 105 holds, 103 breaks it.
+        expect(ids([111, 105])).toContain(tri);
+        expect(ids([111, 103])).not.toContain(tri);
+    });
+});
+
+describe('buildElliottCandidates — spent counts (breach directions)', () => {
+    // ATR 1 → EW_SPENT_SLACK_ATR slack 0.25. Each case places a later bar on
+    // both sides of the level, so a flipped breach direction fails one of them.
+    const ids = (prices: number[]) =>
+        buildElliottCandidates(ladder(prices), 1, FMT).map(c => c.id);
+    const prefix = TEXTBOOK.slice(0, 6); // 0..4 = 100, 110, 104, 126, 120
+
+    it('a wave-4-forming count is never spent by the bounce off its provisional low', () => {
+        // Wave 4 forming at 118 (provisional); invalidation = wave 1's end
+        // (110), passed downward only — the bounce to 119 must keep it.
+        expect(ids([...prefix.slice(0, 5), 118, 119])).toContain(
+            `ew:up:${STEP}:5`
+        );
+    });
+
+    it("a wave-5-forming count holds through a shallow pullback above wave 4's end", () => {
+        // Wave 5 forming at 122 (provisional); the pullback to 121 stays under
+        // 1.5 ATR and above wave 4's end (120) — invalidation is passed only
+        // downward, so the bars above 120.25 must not spend it. (A retreat
+        // through 120 is ≥ 1.5 ATR and confirms wave 5, making the count complete.)
+        expect(ids([...prefix, 122, 121])).toContain(`ew:up:${STEP}:6`);
+    });
+
+    it("an attached A–B–C is spent once C runs on to its 161.8% target in A's direction", () => {
+        // C = 118 sits on its 100% projection (the count reached it itself);
+        // 161.8% = 112.44, reached within the slack at 112.6.
+        const abc = [...TEXTBOOK.slice(0, -1), 122, 127, 118, 121];
+        expect(ids([...abc, 113])).toContain(`ew:up:${STEP}:6:abc`);
+        expect(ids([...abc, 112.6])).not.toContain(`ew:up:${STEP}:6:abc`);
+    });
+});
+
+describe('isSpentCount', () => {
+    // A count whose last leg falls from B (110) to C (100) at time 2.
+    const count = (levels: ElliottScoredCandidate['levels']) => ({
+        levels,
+        candidate: {
+            id: 'ew:test',
+            kind: 'elliott' as const,
+            skill: 'elliott-wave',
+            promptLine: '',
+            segments: [],
+            levels: [],
+            labels: [
+                {
+                    at: { time: 1, price: 110 },
+                    text: 'B',
+                    position: 'above' as const,
+                },
+                {
+                    at: { time: 2, price: 100 },
+                    text: 'C',
+                    position: 'below' as const,
+                },
+            ],
+        },
+    });
+    const bars = (lows: number[], highs: number[]) =>
+        lows.map((low, i) => ({
+            time: i + 1,
+            open: low,
+            high: highs[i],
+            low,
+            close: low,
+            volume: 0,
+        }));
+    const level = (label: string, price: number, breach: 'up' | 'down') => ({
+        label,
+        price,
+        breach,
+    });
+
+    it('is spent once a later bar passes the invalidation, not on a touch', () => {
+        const c = count([level('invalidation', 120, 'up')]);
+        expect(isSpentCount(c, bars([110, 100, 105], [110, 100, 120]), 0)).toBe(
+            false
+        );
+        expect(isSpentCount(c, bars([110, 100, 105], [110, 100, 121]), 0)).toBe(
+            true
+        );
+    });
+
+    it('reads the breach direction from the level, not from where it sits', () => {
+        // A cap the last pivot already edged past (a diagonal's wave 5 within
+        // tolerance): passed only upward, so a pullback below it is no breach.
+        const c = count([level('invalidation', 99, 'up')]);
+        expect(isSpentCount(c, bars([110, 100, 90], [110, 100, 99]), 0)).toBe(
+            false
+        );
+        expect(isSpentCount(c, bars([110, 100, 90], [110, 100, 99.5]), 0)).toBe(
+            true
+        );
+    });
+
+    it('is spent once a later bar reaches a target', () => {
+        const c = count([level('target 161.8%', 95, 'down')]);
+        expect(isSpentCount(c, bars([110, 100, 96], [110, 100, 99]), 0)).toBe(
+            false
+        );
+        expect(isSpentCount(c, bars([110, 100, 95], [110, 100, 99]), 0)).toBe(
+            true
+        );
+    });
+
+    it("skips a target the count's own last pivot already reached", () => {
+        // C (100) is already past its 100% projection (105) downward.
+        const c = count([level('target 100%', 105, 'down')]);
+        expect(isSpentCount(c, bars([110, 100, 101], [110, 100, 106]), 0)).toBe(
+            false
+        );
+    });
+
+    it('gives EW_SPENT_SLACK_ATR of slack: a wick just past an invalidation holds, near a target counts', () => {
+        // ATR 4 → 1 point of slack.
+        const inv = count([level('invalidation', 120, 'up')]);
+        expect(
+            isSpentCount(inv, bars([110, 100, 105], [110, 100, 121]), 4)
+        ).toBe(false);
+        expect(
+            isSpentCount(inv, bars([110, 100, 105], [110, 100, 121.5]), 4)
+        ).toBe(true);
+        const tgt = count([level('target 161.8%', 95, 'down')]);
+        expect(isSpentCount(tgt, bars([110, 100, 96], [110, 100, 99]), 4)).toBe(
+            true
+        );
+        expect(
+            isSpentCount(tgt, bars([110, 100, 96.5], [110, 100, 99]), 4)
+        ).toBe(false);
+    });
+
+    it('ignores caps and counts with no bar after the last pivot', () => {
+        expect(
+            isSpentCount(
+                count([level('wave5_cap', 90, 'down')]),
+                bars([110, 100, 80], [110, 100, 101]),
+                0
+            )
+        ).toBe(false);
+        expect(
+            isSpentCount(
+                count([level('invalidation', 120, 'up')]),
+                bars([110, 100], [110, 100]),
+                0
+            )
+        ).toBe(false);
+    });
 });
 
 const scored = (
@@ -480,6 +712,7 @@ const scored = (
 ): ElliottScoredCandidate => ({
     structure,
     score,
+    levels: [],
     candidate: {
         id,
         kind: 'elliott',

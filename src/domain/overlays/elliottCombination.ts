@@ -172,6 +172,8 @@ export function buildCombinationCandidates(
                 {
                     structure: 'combination' as const,
                     score,
+                    // Disabled structure; no computed level to check.
+                    levels: [],
                     candidate: {
                         id: `ew:${dir}:${bars[seq[0].index].time}:${suffix}`,
                         kind: 'elliott' as const,

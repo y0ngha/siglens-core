@@ -38,6 +38,24 @@ export const STRATEGY_KIND_SOURCE_REF: Readonly<{
     elliott: 'kind:elliott',
 };
 
+// ─── Level labels ───────────────────────────────────────────────────────────
+/**
+ * `OverlayLevel.label` values core emits, so consumers localize them without
+ * copying strings. A ratio-qualified target reads `target 161.8%` (an A–B–C's
+ * C projections); a Fibonacci ladder's labels are its ratios and are not
+ * listed here.
+ */
+export const OVERLAY_LEVEL_LABELS = {
+    /** A pattern's neckline / boundary the breakout crosses. */
+    breakout: 'breakout',
+    /** Past this price the pattern or count is wrong. */
+    invalidation: 'invalidation',
+    /** The measured move / thrust target the structure projects. */
+    target: 'target',
+    /** A contracting diagonal's wave 5 must end inside this price. */
+    wave5Cap: 'wave5_cap',
+} as const;
+
 // ─── Trendlines ─────────────────────────────────────────────────────────────
 /** @internal A same-kind pivot within this many ATR of the line counts as a touch. */
 export const TRENDLINE_TOUCH_ATR_MULT = 0.25;
@@ -257,6 +275,15 @@ export const EW_DIAG_TREND_MIN_ATR = 1;
  * checked for running too far past the line.
  */
 export const EW_DIAG_LINE_TOLERANCE = 0.2;
+/**
+ * @internal
+ * Slack of the spent-count check (`isSpentCount`), in ATR: an invalidation
+ * is passed only by more than this, and a target counts as reached within
+ * it. Price reacts in a zone, not at the exact computed price, and the count's
+ * own pivots are bar extremes picked at 1.5 ATR sensitivity — a wick a few
+ * ticks past a level is noise. Same scale as TRENDLINE_TOUCH_ATR_MULT.
+ */
+export const EW_SPENT_SLACK_ATR = 0.25;
 
 // ─── Elliott combinations ───────────────────────────────────────────────────
 /** @internal Pivots per simple correction in a combination (start, a, b, c). */

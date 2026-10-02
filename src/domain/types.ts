@@ -4208,12 +4208,30 @@ export interface OverlayCandidate {
 export type ElliottStructure =
     'impulse' | 'diagonal' | 'triangle' | 'combination' | 'abc';
 
+/**
+ * @internal
+ * A price an Elliott count computes and cites as a prompt fact
+ * (invalidation, target, cap), also drawn as a horizontal level. `label` is
+ * an OVERLAY_LEVEL_LABELS value, a target optionally qualified by its ratio
+ * (`target 161.8%`). `breach` is the way price moves to pass an invalidation
+ * or reach a target — known when the count is built, so it never has to be
+ * guessed from where the level sits against the last pivot (a diagonal's
+ * cap can sit below a wave 5 that edged past it within tolerance).
+ */
+export interface ElliottLevel {
+    label: string;
+    price: number;
+    breach: 'up' | 'down';
+}
+
 /** @internal An elliott candidate with its structure and score, before the per-structure selection. */
 export interface ElliottScoredCandidate {
     structure: ElliottStructure;
     /** 0–1; ranks candidates within and across structures. */
     score: number;
     candidate: OverlayCandidate;
+    /** The candidate's levels with their breach directions (`isSpentCount`). */
+    levels: readonly ElliottLevel[];
 }
 
 /** A candidate the model referenced, ready to render. */

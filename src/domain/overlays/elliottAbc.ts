@@ -1,5 +1,6 @@
 import type {
     Bar,
+    ElliottLevel,
     ElliottScoredCandidate,
     OverlayFormat,
     PivotPoint,
@@ -10,15 +11,20 @@ import {
     EW_ABC_STANDALONE_PIVOTS,
     EW_STANDALONE_ABC_SCORE_FACTOR,
     EW_UNJUDGED_SCORE,
+    OVERLAY_LEVEL_LABELS,
 } from '@/domain/overlays/constants';
 import {
     type AbcType,
+    abcTargetLevels,
     abcTargets,
+    breachOf,
     classifyAbc,
     elliottPromptLine,
     firstLegDir,
     isLastPivotInList,
+    structureLevels,
     legSegments,
+    legSign,
     legSizes,
     namedPoints,
     pivotLabels,
@@ -31,6 +37,23 @@ import { formatOverlayPrice } from '@/domain/overlays/format';
  * C targets, and — for a zigzag, whose B may not pass A's start — that start
  * as the invalidation level. Flats have none: their B may run past it.
  */
+const abcLevels = (
+    seq: readonly PivotPoint[],
+    type: AbcType
+): ElliottLevel[] => [
+    ...abcTargetLevels(seq),
+    ...(type === 'zigzag'
+        ? [
+              {
+                  label: OVERLAY_LEVEL_LABELS.invalidation,
+                  price: seq[0].price,
+                  // B passing A's start, against A.
+                  breach: breachOf(-legSign(seq)),
+              },
+          ]
+        : []),
+];
+
 function abcFacts(
     seq: readonly PivotPoint[],
     type: AbcType,
@@ -86,10 +109,12 @@ export function buildAbcCandidates(
                 recency(seq[3].index, lastBarIndex)) /
                 3);
         const dir = firstLegDir(seq);
+        const levels = abcLevels(seq, type);
         return [
             {
                 structure: 'abc',
                 score,
+                levels,
                 candidate: {
                     id: `ew:${dir}:${bars[seq[0].index].time}:abc`,
                     kind: 'elliott',
@@ -106,7 +131,7 @@ export function buildAbcCandidates(
                         'wave_B',
                         'wave_C',
                     ]),
-                    levels: [],
+                    levels: structureLevels(bars, seq, levels, fmt),
                     labels: pivotLabels(bars, seq.slice(1), ['A', 'B', 'C']),
                 },
             },

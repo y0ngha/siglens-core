@@ -4,6 +4,10 @@ import type { Bar } from '@/domain/types';
 import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
 import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
 import {
+    computePatternTargets,
+    printedPatternGeometry,
+} from '@/domain/analysis/patternTargets';
+import {
     buildPatternOverlayCandidates,
     patternOverlayId,
 } from '@/domain/overlays/patternOverlays';
@@ -21,12 +25,15 @@ const build = (f: Fixture) =>
     buildPatternOverlayCandidates(
         screenChartPatterns(f.bars, f.atr),
         f.bars,
-        f.atr
+        f.atr,
+        DP
     );
+/** Prompt price precision the fixtures are printed at. */
+const DP = 2;
 const barTimes = (f: Fixture) => new Set(f.bars.map(b => b.time));
 
 describe('buildPatternOverlayCandidates', () => {
-    it('head & shoulders: 5-pivot polyline + a sloped neckline segment, no level, LS/H/RS labels', () => {
+    it('head & shoulders: 5-pivot polyline + a sloped neckline segment, no breakout level, LS/H/RS labels', () => {
         const f = hsTextbook as Fixture;
         const hs = build(f).find(c =>
             c.id.startsWith('pattern:head_and_shoulders:')
@@ -41,8 +48,9 @@ describe('buildPatternOverlayCandidates', () => {
         expect(neckline.pane).toBe('price');
         // Extended to the chart's right edge.
         expect(neckline.to.time).toBe(f.bars[f.bars.length - 1].time);
-        // No horizontal breakout level for H&S — the neckline segment replaces it.
-        expect(hs.levels).toEqual([]);
+        // No horizontal breakout level for H&S — the neckline segment replaces
+        // it; only the invalidation and target levels are horizontal.
+        expect(hs.levels.map(l => l.label)).toEqual(['invalidation', 'target']);
         expect(hs.labels.map(l => l.text)).toEqual(['LS', 'H', 'RS']);
     });
 
@@ -96,10 +104,52 @@ describe('buildPatternOverlayCandidates', () => {
         }
     });
 
+    it('every family draws its printed invalidation and measured target, from before the last bar', () => {
+        let checked = 0;
+        for (const f of [
+            hsTextbook,
+            doubleTop,
+            ascendingTriangle,
+            bullFlag,
+            cupAndHandle,
+        ] as Fixture[]) {
+            const screened = screenChartPatterns(f.bars, f.atr);
+            const lastTime = f.bars[f.bars.length - 1].time;
+            for (const s of screened) {
+                const g = computeCandidateGeometry(s, f.bars, f.atr);
+                const c = buildPatternOverlayCandidates(
+                    [s],
+                    f.bars,
+                    f.atr,
+                    DP
+                )[0];
+                if (!g || !c) continue;
+                checked++;
+                const byLabel = new Map(c.levels.map(l => [l.label, l]));
+                // The exact numbers the prompt block prints.
+                const p = printedPatternGeometry(g, DP);
+                expect(byLabel.get('invalidation')?.price).toBe(
+                    p.invalidationLevel
+                );
+                expect(byLabel.get('target')?.price).toBe(
+                    computePatternTargets(
+                        p.breakoutLevel,
+                        p.extremeLevel,
+                        p.direction
+                    ).measuredTarget
+                );
+                for (const l of c.levels)
+                    expect(l.fromTime).toBeLessThan(lastTime);
+            }
+        }
+        // One per fixture family at least — never a pass with zero checks.
+        expect(checked).toBeGreaterThanOrEqual(5);
+    });
+
     it('id is deterministic and matches patternOverlayId', () => {
         const f = doubleTop as Fixture;
         const screened = screenChartPatterns(f.bars, f.atr);
-        const out = buildPatternOverlayCandidates(screened, f.bars, f.atr);
+        const out = buildPatternOverlayCandidates(screened, f.bars, f.atr, DP);
         expect(out.map(c => c.id)).toEqual(
             screened
                 .filter(s =>
@@ -115,7 +165,8 @@ describe('buildPatternOverlayCandidates', () => {
             buildPatternOverlayCandidates(
                 [{ id: 'double_top', startIndex: 1, endIndex: 5 }],
                 f.bars,
-                f.atr
+                f.atr,
+                DP
             )
         ).toEqual([]);
     });
@@ -149,7 +200,8 @@ describe('buildPatternOverlayCandidates', () => {
             const [c] = buildPatternOverlayCandidates(
                 [{ id, startIndex: 1, endIndex: 8, pivots }],
                 bars,
-                1
+                1,
+                DP
             );
             expect(c?.segments.map(s => s.role).toSorted()).toEqual([
                 'boundary_lower',
@@ -174,7 +226,7 @@ describe('buildPatternOverlayCandidates', () => {
             computeCandidateGeometry(narrowed, f.bars, f.atr)
         ).not.toBeNull();
         expect(
-            buildPatternOverlayCandidates([narrowed], f.bars, f.atr)
+            buildPatternOverlayCandidates([narrowed], f.bars, f.atr, DP)
         ).toEqual([]);
     });
 });

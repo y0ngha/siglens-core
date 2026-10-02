@@ -185,3 +185,12 @@ export const ROUNDING_MIN_DEPTH_ATR_MULT = 2;
  * nothing.
  */
 export const SINGULAR_MATRIX_DET_EPSILON = 1e-9;
+
+/**
+ * @internal
+ * Slack of the spent-pattern check (`isSpentPattern`), in ATR: a close past
+ * the invalidation level by more than this fails the pattern, and a bar
+ * within it of the measured target has fulfilled it. Price reacts in a zone,
+ * not at the exact computed level — the same scale as the Elliott spent check.
+ */
+export const PATTERN_SPENT_SLACK_ATR = 0.25;

@@ -33,7 +33,13 @@ export function buildOverlayCandidates(
     const builders: ReadonlyArray<[OverlayKind, () => OverlayCandidate[]]> = [
         [
             'pattern',
-            () => buildPatternOverlayCandidates(patternCandidates, bars, atr),
+            () =>
+                buildPatternOverlayCandidates(
+                    patternCandidates,
+                    bars,
+                    atr,
+                    fmt.priceDp
+                ),
         ],
         ['trendline', () => buildTrendlineCandidates(bars, atr, fmt)],
         ['divergence', () => buildDivergenceCandidates(bars, rsi, fmt)],

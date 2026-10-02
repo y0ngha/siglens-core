@@ -64,6 +64,7 @@ import { selectSkills } from '@/domain/analysis/selectSkills';
 import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
 import { screenChartPatterns } from '@/domain/patterns';
+import { isSpentPattern } from '@/domain/patterns/spentPatterns';
 import type {
     AnalysisResponse,
     TechnicalAssembledPrompt,
@@ -1985,7 +1986,9 @@ const collectDetectedCandleNames = (
  * in `submitAnalysis.ts`. Unlike that application-layer call, this domain
  * function cannot `console.error` (domain is zero-I/O per `domain/CLAUDE.md`)
  * — the application-layer observe-only log already surfaces screener
- * failures, so no telemetry is duplicated here.
+ * failures, so no telemetry is duplicated here. Hits the price has already
+ * failed or fulfilled (`isSpentPattern`) are dropped here, so the prompt,
+ * skill selection and the drawn overlays all leave them out.
  */
 const screenPatternCandidatesSafely = (
     bars: readonly Bar[],
@@ -1993,7 +1996,9 @@ const screenPatternCandidatesSafely = (
 ): PatternCandidate[] => {
     if (atr === null || atr <= 0) return [];
     try {
-        return screenChartPatterns(bars, atr);
+        return screenChartPatterns(bars, atr).filter(
+            c => !isSpentPattern(c, bars, atr)
+        );
     } catch {
         return [];
     }
