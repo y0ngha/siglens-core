@@ -8,14 +8,6 @@ Each module in this layer is a **use-case** — a named, end-to-end operation th
 a library consumer can call without knowing which infrastructure modules or domain
 functions are involved.
 
-Current use-cases:
-
-| Sub-directory | Use-cases |
-|---|---|
-| `market/` | `submitAnalysis`, `pollAnalysis`, `cancelAnalysisJob`, `submitBriefing`, `pollBriefing` |
-| `ticker/` | Ticker-related orchestration |
-| `dashboard/` | Dashboard-related orchestration |
-
 ## Dependency Rules
 
 ```

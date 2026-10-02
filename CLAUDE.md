@@ -139,18 +139,26 @@ domain         ← No external imports. Pure TypeScript functions only.
                  No I/O, no Date.now(), no fetch, no console.
                  Calculation logic is implemented directly (no technicalindicators, etc.)
 
-infrastructure ← May import from domain only.
+infrastructure ← May import from domain only. Never from application.
                  Owns all I/O — external API calls (Neon, Upstash Redis, etc.),
                  filesystem access (Skills loader), and process.env reads.
-                 Every external dependency is wrapped behind an interface in `types.ts`.
+                 Adapters implement the port interfaces declared in `domain/ports/`;
+                 a module's `types.ts` holds adapter-internal types only.
+
+application    ← May import from domain and infrastructure.
+                 Never imported by either of them.
+                 Use-case orchestration — composes domain functions and
+                 infrastructure adapters into end-to-end flows.
 ```
 
-Public exports of the library are assembled from `domain/` and `infrastructure/` via
-`src/index.ts`. Consumers of the package (separate UI projects, CLIs, workers) are
-responsible for their own presentation and runtime concerns — `siglens-core` never
-reaches into them.
+Public exports of the library are assembled from `domain/`, `infrastructure/` and
+`application/` via `src/index.ts`. Consumers of the package (separate UI projects, CLIs,
+workers) are responsible for their own presentation and runtime concerns — `siglens-core`
+never reaches into them.
 
-Violations trigger ESLint errors. PRs cannot be merged.
+Import-direction violations trigger ESLint errors. PRs cannot be merged.
+The purity rules for `domain/` (no I/O, no external libraries) are not lint-enforced —
+they are caught in review.
 
 ---
 
@@ -183,29 +191,7 @@ Invoke the listed skills **before** writing code in each category. Do not skip.
 ## Commands
 
 Always use `yarn` for package installation. `npm` and `pnpm` are prohibited.
-
-```bash
-# Type check (no emit)
-yarn typecheck
-
-# Build (emits dist/)
-yarn build
-
-# Lint
-yarn lint
-yarn lint:fix
-
-# Test (Vitest)
-yarn test                   # run once
-yarn test --watch           # watch mode
-yarn test --coverage        # with coverage
-
-# Format
-yarn format
-```
-
-There is no dev server and no style linter — `siglens-core` emits `dist/` via `tsc`
-and is consumed by other projects through npm.
+Scripts are listed in `package.json`.
 
 ---
 

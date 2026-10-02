@@ -20,29 +20,9 @@ is a pure interface — no behavior, no implementation, no SDK references. Adapt
 `infrastructure/<module>/` import the port and implement it (`implements` for classes,
 explicit return-type annotation for factory functions).
 
-**Target file layout (ports are migrated module-by-module — only files listed
-under "Currently migrated" actually exist today):**
-
-```
-domain/ports/
-  aiProvider.ts        → CallAiProvider, CallAiProviderOptions, ... ✅ migrated
-  cache.ts             → CacheProvider           ✅ migrated
-  chatTokenStore.ts    → ChatTokenStore           ✅ migrated
-  fundamentalDataProvider.ts → FundamentalDataProvider ✅ migrated
-  jobStateStore.ts     → JobStateStore (@internal), JobStateSetOpts ✅ migrated
-  marketDataProvider.ts → MarketDataProvider, GetBarsOptions   ✅ migrated
-  newsProvider.ts      → NewsProvider, NewsTimeRange ✅ migrated
-  optionsDataProvider.ts → OptionsDataProvider     ✅ migrated
-  skillsProvider.ts    → SkillsProvider                         ✅ migrated
-  usageLogRepository.ts → UsageLogRepository, CreateUsageLogInput ✅ migrated
-  usageRepository.ts   → UsageRepository, RecordUsageInput ✅ migrated
-  userTierRepository.ts → UserTierRepository      ✅ migrated
-  ...
-```
-
-Until a module is migrated, its port interface still lives in
-`infrastructure/<module>/types.ts`. Do not import from a `domain/ports/<x>` path
-that is not yet listed under "✅ migrated".
+Ports are migrated module-by-module. Until a module is migrated, its port interface
+still lives in `infrastructure/<module>/types.ts`. Do not import from a
+`domain/ports/<x>` path that does not exist yet.
 
 **Authoring rules:**
 - One conceptual contract per file. Co-locate option / argument types used by that

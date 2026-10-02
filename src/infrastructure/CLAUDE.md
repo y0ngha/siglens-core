@@ -7,22 +7,7 @@ External world boundary layer. Every outbound I/O call lives here — and nowher
 Wrap external systems behind typed interfaces so the rest of the codebase never
 touches raw HTTP, environment variables, or third-party SDKs directly.
 
-Each sub-directory corresponds to exactly **one** external system:
-
-| Sub-directory | External system |
-|---|---|
-| `ai/` | LLM response JSON salvage helper (`extractJsonWithRepair`); the `CallAiProvider` port lives in `domain/ports/aiProvider.ts` |
-| `cache/` | Upstash Redis — TTL-based cache + cache-key builders |
-| `chat/` | Chat token store (Upstash Redis-backed daily token bucket) |
-| `db/` | Persistence interfaces (Neon / PostgreSQL — usage logs, user tier) |
-| `fmp/` | Financial Modeling Prep market data API config + types |
-| `fundamental/` | Fundamental data provider interface (raw FMP shapes → domain) |
-| `hash/` | Deterministic input hashing helpers used in cache keys |
-| `jobs/` | Redis-based job queue (enqueue / dequeue / status / meta) |
-| `market/` | Worker config reader, fetch-timeout constant, re-analysis cooldown |
-| `skills/` | Filesystem Skills loader (`skills/*.md` → `Skill[]`) |
-| `upstash/` | Upstash Redis client factory + config |
-| `usage/` | Daily-salt IP hashing helper for cross-DB usage tracking |
+Each sub-directory corresponds to exactly **one** external system.
 
 ## Dependency Rules
 
