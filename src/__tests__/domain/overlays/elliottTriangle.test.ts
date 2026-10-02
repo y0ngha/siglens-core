@@ -47,6 +47,51 @@ describe('buildTriangleCandidates', () => {
         );
     });
 
+    it("draws the invalidation and thrust target from the triangle's first pivot", () => {
+        // From wave 0 (bar 0), across the whole triangle.
+        expect(triangleFrom0(TRIANGLE)?.levels).toEqual([
+            { label: 'invalidation', price: 104, fromTime: 0 },
+            { label: 'target', price: 125, fromTime: 0 },
+        ]);
+        // D forming: only the invalidation.
+        expect(triangleFrom0([120, 100, 116, 104, 113])?.levels).toEqual([
+            { label: 'invalidation', price: 116, fromTime: 0 },
+        ]);
+    });
+
+    it("sets each level's breach direction, and a barrier E past C as the invalidation price", () => {
+        const scored = (prices: number[]) => {
+            const { pivots, bars } = pivotsAt(prices);
+            return buildTriangleCandidates(pivots, bars, 1, FMT).find(
+                c => c.candidate.id === 'ew:down:0:tri'
+            );
+        };
+        // A down: C and E are lows — the invalidation is passed downward, the
+        // thrust target reached upward.
+        expect(scored(TRIANGLE)?.levels).toEqual([
+            { label: 'invalidation', price: 104, breach: 'down' },
+            { label: 'target', price: 125, breach: 'up' },
+        ]);
+        // E (100.1) edged past C (100.2) within tolerance: the lower of the two.
+        expect(
+            scored([120, 100, 116, 100.2, 112, 100.1, 104])?.levels[0]
+        ).toEqual({ label: 'invalidation', price: 100.1, breach: 'down' });
+        // Mirrored (A up): E (119.9) edged above C (119.8) — the higher of
+        // the two, passed upward.
+        const { pivots, bars } = pivotsAt([
+            100, 120, 104, 119.8, 108, 119.9, 116,
+        ]);
+        expect(
+            buildTriangleCandidates(pivots, bars, 1, FMT).find(
+                c => c.candidate.id === 'ew:up:0:tri'
+            )?.levels[0]
+        ).toEqual({ label: 'invalidation', price: 119.9, breach: 'up' });
+        // D forming: B (a high) is passed upward.
+        expect(scored([120, 100, 116, 104, 113])?.levels).toEqual([
+            { label: 'invalidation', price: 116, breach: 'up' },
+        ]);
+    });
+
     it('a barrier E edging past C (within EW_TRI_LEG_TOLERANCE) moves the invalidation to E', () => {
         // Flat lower side: C ends 100.2, E 100.1.
         expect(

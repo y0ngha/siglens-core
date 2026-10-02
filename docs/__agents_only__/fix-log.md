@@ -155,10 +155,6 @@
 
 ## [Branch fix/strategy-overlay-kind | 2026-10-01] — Strategy overlay kind type export and testing
 
-- Violation 1 (R1 REQUIRED, fixed): StrategyOverlayKind export added to public API but PUBLIC_API.md type inventory not updated
-  Rule: MISTAKES.md Public API & Module Exports #7 — new public exports must be documented in changelog
-  Context: New StrategyOverlayKind type export added during Round 1. PUBLIC_API.md updated with dated changelog row documenting the addition.
-
 - Violation 2 (R1 RECOMMENDED, fixed): StrategyOverlayKind literal ('divergence' | 'fibonacci' | 'elliott') duplicated across loader, resolver, and type definitions
   Rule: Code duplication — magic strings should have single source of truth
   Context: Three separate lists of kind variants consolidated into a single Record<StrategyOverlayKind, true>-backed constant in domain/overlays/constants.ts.
@@ -182,3 +178,45 @@ Round 2: approved
 - Violation 3 (APPROVED, fixed): TechnicalAssembledPrompt.patternGeometries is a Map that may not be JSON-serializable; JSDoc did not document in-process-only scope
   Rule: MISTAKES.md Type Documentation #4 — Tier 4 public type fields require JSDoc; runtime serialization constraints must be documented
   Context: Added JSDoc note clarifying patternGeometries is a transient in-memory Map used only during prompt generation and not included in serialized analysis results.
+
+## [review-agent | feat/overlay-invalidation-target-levels | 2026-10-02]
+
+- Violation 1 (R1 REQUIRED, fixed): isSpentCount inferred an Elliott level's breach side from its price vs the last pivot; a complete diagonal whose wave 5 edged past the cap (within EW_DIAG_WAVE_TOLERANCE) put the cap below the last high, so a normal pullback "spent" a valid count
+  Rule: Encode semantics known at build time instead of re-deriving them from geometry later
+  Context: Added @internal ElliottLevel { label, price, breach } and ElliottScoredCandidate.levels; every builder sets breach when it computes the level.
+
+- Violation 3 (R2 REQUIRED, fixed): breach directions of running impulse invalidation and attached A–B–C targets unpinned — flipping them left all tests green
+  Rule: A value set per builder needs a test per builder that fails when the sign flips
+  Context: End-to-end buildElliottCandidates cases on both sides of each level plus direct ElliottScoredCandidate.levels assertions; mutation-checked.
+
+- Violation 4 (found in live render, fixed): OVERLAY_LEVEL_LABELS exported from src/index.ts but not from the browser entrypoint src/index.client.ts — the siglens chart crashed in the browser
+  Rule: A public value consumed by client code must be exported from BOTH entrypoints and asserted in index.client.test.ts
+  Context: Added to index.client.ts with a test assertion.
+
+- Violation 5 (R1/R4 RECOMMENDED, fixed): tests that could pass vacuously — pattern family test with `continue` and no count assertion; isSpentPattern covered only direction 'down'; prompt wiring test whose tail made the screener drop the pattern on its own
+  Rule: Assert the loop checked something; cover both branches of a sign; mutation-check wiring tests
+  Context: checked >= 5 assertion, mirrored double-bottom case, wiring pinned by the fulfilled-target case (mutation-checked).
+
+Round 5: approved
+
+## [PR #245 claude-review | feat/overlay-invalidation-target-levels | 2026-10-02]
+
+- Violation 1 (JSDoc on the wrong function, fixed): abcFacts' original JSDoc (C targets + zigzag invalidation) sat above the new abcLevels, leaving abcFacts undocumented; impulseLevels' JSDoc also described the facts
+  Rule: Splitting a function in two means splitting its JSDoc — each function's comment must describe that function
+  Context: Gave abcLevels and abcFacts their own JSDoc, rewrote impulseLevels' and added one to impulseFacts; diagonal and triangle Levels/Facts audited, already accurate.
+
+- Violation 2 (untested guard branches, fixed): isSpentPattern's `g === null` and `!(g.measuredTarget > 0)` branches were each hit by no test of their own
+  Rule: Every early-return branch needs a test that fails when that branch is inverted
+  Context: Pivot-less hand-built candidate in spentPatterns.test.ts; mocked-geometry cases (direction up, target -5) in spentPatterns.noTarget.test.ts. Both mutation-checked.
+
+- Violation 3 (recomputed per count, fixed): buildElliottCandidates called tagAbc(c) twice and impulseLevels three times per count
+  Rule: Compute a derived value once per item and pass it through
+  Context: tag and levels computed once in the map callback; impulseFacts and toCandidate take `levels` as a parameter. Prompt text unchanged.
+
+- Violation 4 (magic strings, fixed): the prompt wordings 'wave 5 cap' and 'thrust target' were inline literals next to OVERLAY_LEVEL_LABELS keys they differ from
+  Rule: Name a wording constant that is deliberately distinct from a similar key
+  Context: WAVE_5_CAP_FACT (elliottDiagonal.ts) and THRUST_TARGET_FACT (elliottTriangle.ts), each with a comment that it is prompt wording.
+
+- Violation 5 (open string type, fixed): ElliottLevel.label was `string`, so a typo'd label compiled
+  Rule: Close a type whose values are a known finite set
+  Context: @internal ElliottLevelLabel = 'invalidation' | 'target' | 'wave5_cap' | `target ${string}%` in types.ts (kept type-only); ratioLabel returns `${number}%`, abcTargetLevels annotates its map callback, test helper typed.

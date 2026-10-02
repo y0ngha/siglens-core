@@ -1,5 +1,7 @@
 import type {
     Bar,
+    ElliottLevel,
+    ElliottLevelLabel,
     ElliottScoredCandidate,
     OverlayCandidate,
     OverlayFormat,
@@ -13,11 +15,14 @@ import {
     EW_DIAG_WAVE_TOLERANCE,
     EW_IMPULSE_PIVOTS,
     EW_TIME_BALANCE_MIN,
+    OVERLAY_LEVEL_LABELS,
 } from '@/domain/overlays/constants';
 import {
     boundaryLine,
+    breachOf,
     elliottPromptLine,
     isLastPivotInList,
+    structureLevels,
     legSegments,
     legSizes,
     namedPoints,
@@ -108,6 +113,9 @@ function diagonalScore(
     return (g2 + g4 + recency(seq[seq.length - 1].index, lastBarIndex)) / 3;
 }
 
+// Prompt wording for the cap fact — not the OVERLAY_LEVEL_LABELS key.
+const WAVE_5_CAP_FACT = 'wave 5 cap';
+
 const WAVE_LABELS = ['1', '2', '3', '4', '5'] as const;
 
 /**
@@ -115,19 +123,40 @@ const WAVE_LABELS = ['1', '2', '3', '4', '5'] as const;
  * wave 4's end + wave 3's length. Wave 5 forming: invalidated past wave 4's
  * end, with that cap; complete: broken once price runs past the cap.
  */
-function diagonalFacts(d: DiagonalCount, fmt: OverlayFormat): string[] {
+function diagonalLevels(d: DiagonalCount): ElliottLevel[] {
     const w = legSizes(d.seq);
-    const cap = formatOverlayPrice(
-        d.seq[4].price + (d.up ? 1 : -1) * w[2],
-        fmt
-    );
+    const trend = d.up ? 1 : -1;
+    const cap = d.seq[4].price + trend * w[2];
+    // The cap is passed with the trend — even when wave 5 already edged past
+    // it within EW_DIAG_WAVE_TOLERANCE; wave 4's end is passed against it.
+    const capLevel = (label: ElliottLevelLabel): ElliottLevel => ({
+        label,
+        price: cap,
+        breach: breachOf(trend),
+    });
+    return d.atRightEdge
+        ? [
+              {
+                  label: OVERLAY_LEVEL_LABELS.invalidation,
+                  price: d.seq[4].price,
+                  breach: breachOf(-trend),
+              },
+              capLevel(OVERLAY_LEVEL_LABELS.wave5Cap),
+          ]
+        : [capLevel(OVERLAY_LEVEL_LABELS.invalidation)];
+}
+
+/** `invalidation 98.20`, `wave 5 cap 120.40`, then the wave ratios. */
+function diagonalFacts(
+    d: DiagonalCount,
+    levels: readonly ElliottLevel[],
+    fmt: OverlayFormat
+): string[] {
     return [
-        ...(d.atRightEdge
-            ? [
-                  `invalidation ${formatOverlayPrice(d.seq[4].price, fmt)}`,
-                  `wave 5 cap ${cap}`,
-              ]
-            : [`invalidation ${cap}`]),
+        ...levels.map(
+            l =>
+                `${l.label === OVERLAY_LEVEL_LABELS.wave5Cap ? WAVE_5_CAP_FACT : l.label} ${formatOverlayPrice(l.price, fmt)}`
+        ),
         waveRatios(d.seq, d.atRightEdge),
     ];
 }
@@ -140,6 +169,7 @@ function toDiagonalCandidate(
     const dir = d.up ? 'up' : 'down';
     const last = d.seq[d.seq.length - 1].index;
     const state = d.atRightEdge ? 'wave 5 in progress' : 'complete';
+    const levels = diagonalLevels(d);
     return {
         id: `ew:${dir}:${bars[d.seq[0].index].time}:diag`,
         kind: 'elliott',
@@ -148,7 +178,7 @@ function toDiagonalCandidate(
             `diagonal ${dir} (${d.role}, contracting)`,
             state,
             namedPoints(bars, d.seq, ['0', ...WAVE_LABELS], fmt),
-            diagonalFacts(d, fmt),
+            diagonalFacts(d, levels, fmt),
             d.score
         ),
         segments: [
@@ -160,7 +190,7 @@ function toDiagonalCandidate(
             boundaryLine(bars, d.seq[1], d.seq[3], last, 'boundary_13'),
             boundaryLine(bars, d.seq[2], d.seq[4], last, 'boundary_24'),
         ],
-        levels: [],
+        levels: structureLevels(bars, d.seq, levels, fmt),
         labels: pivotLabels(bars, d.seq.slice(1), WAVE_LABELS),
     };
 }
@@ -200,6 +230,7 @@ export function buildDiagonalCandidates(
             {
                 structure: 'diagonal' as const,
                 score: d.score,
+                levels: diagonalLevels(d),
                 candidate: toDiagonalCandidate(d, bars, fmt),
             },
         ];

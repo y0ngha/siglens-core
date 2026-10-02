@@ -256,6 +256,7 @@ export {
 export { computeMarketReference } from './domain/analysis/marketReference';
 export { classifyMaStack } from './domain/analysis/trendStructure';
 export {
+    OVERLAY_LEVEL_LABELS,
     STRATEGY_KIND_SOURCE_REF,
     STRATEGY_OVERLAY_KINDS,
 } from './domain/overlays/constants';

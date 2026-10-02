@@ -2,6 +2,7 @@ import type {
     Bar,
     OverlayCandidate,
     OverlayLabel,
+    OverlayLevel,
     OverlaySegment,
     PatternCandidate,
     PatternGeometry,
@@ -11,6 +12,11 @@ import {
     computeCandidateGeometry,
     evaluateTrendlineAt,
 } from '@/domain/patterns/patternGeometry';
+import { OVERLAY_LEVEL_LABELS } from '@/domain/overlays/constants';
+import {
+    computePatternTargets,
+    printedPatternGeometry,
+} from '@/domain/analysis/patternTargets';
 
 const TRENDLINE_FAMILY = new Set([
     'ascending_triangle',
@@ -95,21 +101,32 @@ function necklineSegment(
     );
 }
 
+/**
+ * Legs between consecutive pivots. A leg between two pivots on the same bar
+ * (a wide bar whose high and low both pivot) has no length and cannot be
+ * drawn — it is left out instead of costing the whole pattern its drawing
+ * (`runsForward` drops a candidate with any non-forward segment; 165 of
+ * 1,592 real-data double/triple/H&S hits lost their drawing that way).
+ */
 function polyline(
     bars: readonly Bar[],
     pivots: readonly PivotPoint[]
 ): OverlaySegment[] {
     return pivots
         .slice(1)
-        .map((p, i) =>
-            seg(
-                bars,
-                pivots[i].index,
-                pivots[i].price,
-                p.index,
-                p.price,
-                'pattern'
-            )
+        .flatMap((p, i) =>
+            p.index > pivots[i].index
+                ? [
+                      seg(
+                          bars,
+                          pivots[i].index,
+                          pivots[i].price,
+                          p.index,
+                          p.price,
+                          'pattern'
+                      ),
+                  ]
+                : []
         );
 }
 
@@ -179,10 +196,58 @@ function hsLabels(
     }));
 }
 
+/**
+ * The pattern's breakout, invalidation and measured-move target at the exact
+ * numbers its prompt block prints (`printedPatternGeometry`), so a line's
+ * axis label matches the analysis card. Every level is drawn from the
+ * pattern's first pivot (its start without pivots), across the whole pattern:
+ * a line starting at the last leg sits a few bars from the right edge and
+ * hides behind its own axis label (2026-10-02 live render). Like the prompt
+ * block, a level at or below zero (a down pattern taller than its breakout)
+ * is not a price and is left out.
+ */
+function patternLevels(
+    c: PatternCandidate,
+    g: PatternGeometry,
+    bars: readonly Bar[],
+    inRange: readonly PivotPoint[],
+    priceDp: number,
+    withBreakout: boolean
+): OverlayLevel[] {
+    const p = printedPatternGeometry(g, priceDp);
+    const { measuredTarget } = computePatternTargets(
+        p.breakoutLevel,
+        p.extremeLevel,
+        p.direction
+    );
+    const fromTime =
+        bars[inRange.length > 0 ? inRange[0].index : c.startIndex].time;
+    const outcome = [
+        {
+            price: p.invalidationLevel ?? 0,
+            label: OVERLAY_LEVEL_LABELS.invalidation,
+        },
+        { price: measuredTarget, label: OVERLAY_LEVEL_LABELS.target },
+    ]
+        .filter(l => Number.isFinite(l.price) && l.price > 0)
+        .map(l => ({ ...l, fromTime }));
+    return withBreakout && inRange.length > 0
+        ? [
+              {
+                  price: p.breakoutLevel,
+                  fromTime,
+                  label: OVERLAY_LEVEL_LABELS.breakout,
+              },
+              ...outcome,
+          ]
+        : outcome;
+}
+
 function toOverlay(
     c: PatternCandidate,
     g: PatternGeometry,
-    bars: readonly Bar[]
+    bars: readonly Bar[],
+    priceDp: number
 ): OverlayCandidate | null {
     const inRange = (c.pivots ?? []).filter(
         p => p.index >= c.startIndex && p.index <= c.endIndex
@@ -200,7 +265,7 @@ function toOverlay(
         return {
             ...base,
             segments: flagSegments(bars, c, g),
-            levels: [],
+            levels: patternLevels(c, g, bars, inRange, priceDp, false),
             labels: [],
         };
     }
@@ -208,7 +273,7 @@ function toOverlay(
         return {
             ...base,
             segments: trendlineSegments(bars, inRange),
-            levels: [],
+            levels: patternLevels(c, g, bars, inRange, priceDp, false),
             labels: [],
         };
     }
@@ -222,15 +287,7 @@ function toOverlay(
         segments: isHs
             ? [...polyline(bars, inRange), necklineSegment(bars, inRange)]
             : polyline(bars, inRange),
-        levels: isHs
-            ? []
-            : [
-                  {
-                      price: g.breakoutLevel,
-                      fromTime: bars[inRange[0].index].time,
-                      label: 'breakout',
-                  },
-              ],
+        levels: patternLevels(c, g, bars, inRange, priceDp, !isHs),
         labels: isHs ? hsLabels(bars, inRange) : [],
     };
 }
@@ -244,11 +301,12 @@ function toOverlay(
 export function buildPatternOverlayCandidates(
     candidates: readonly PatternCandidate[],
     bars: readonly Bar[],
-    atr: number
+    atr: number,
+    priceDp: number
 ): OverlayCandidate[] {
     return candidates.flatMap(c => {
         const g = computeCandidateGeometry(c, bars, atr);
-        const overlay = g ? toOverlay(c, g, bars) : null;
+        const overlay = g ? toOverlay(c, g, bars, priceDp) : null;
         return overlay ? [overlay] : [];
     });
 }

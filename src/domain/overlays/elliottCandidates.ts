@@ -1,5 +1,6 @@
 import type {
     Bar,
+    ElliottLevel,
     ElliottScoredCandidate,
     ElliottStructure,
     OverlayCandidate,
@@ -30,18 +31,23 @@ import {
     EW_WAVE4_RETRACE_MAX,
     EW_WAVE4_RETRACE_MIN,
     EW_WAVE5_OF_ZERO_TO_THREE,
+    EW_SPENT_SLACK_ATR,
     EW_WAVE5_TOLERANCE,
+    OVERLAY_LEVEL_LABELS,
 } from '@/domain/overlays/constants';
 import { formatOverlayPrice } from '@/domain/overlays/format';
 import { buildAbcCandidates } from '@/domain/overlays/elliottAbc';
 import { buildCombinationCandidates } from '@/domain/overlays/elliottCombination';
 import { buildDiagonalCandidates } from '@/domain/overlays/elliottDiagonal';
 import {
+    abcTargetLevels,
     abcTargets,
     alternates,
+    breachOf,
     classifyAbc,
     elliottPromptLine,
     isLastPivotInList,
+    structureLevels,
     legSegments,
     legSizes,
     mergeShortLegs,
@@ -198,29 +204,52 @@ function impulseState(count: Count, abcTag: AbcTag | null): string {
 }
 
 /**
- * Invalidation for the count's state, then the ratios of its finished waves
- * and an attached A–B–C's C targets. Wave 4 forming: wave 1's end (rule 3).
+ * The count's levels: its invalidation for its state, then an attached
+ * A–B–C's C targets. Wave 4 forming: wave 1's end (rule 3).
  * Wave 5 forming: wave 4's end. Complete — with or without an A–B–C — a new
  * extreme beyond wave 5's end, which negates "impulse complete" (wave 5 is
  * still extending); breaking wave 4's end then only confirms the
  * correction. An attached A–B–C's B never passes wave 5's end (`abcAfter`),
  * so this is also every attached A–B–C's invalidation (a zigzag's A start).
  */
-function impulseFacts(
-    count: Count,
-    abcTag: AbcTag | null,
-    fmt: OverlayFormat
-): string[] {
+function impulseLevels(count: Count, abcTag: AbcTag | null): ElliottLevel[] {
     const { seq, abc } = count;
-    const forming = count.atRightEdge || seq.length < EW_IMPULSE_PIVOTS;
     const level =
         seq.length < EW_IMPULSE_PIVOTS
             ? seq[1]
             : count.atRightEdge
               ? seq[4]
               : seq[5];
+    const trend = count.up ? 1 : -1;
     return [
-        `invalidation ${formatOverlayPrice(level.price, fmt)}`,
+        {
+            label: OVERLAY_LEVEL_LABELS.invalidation,
+            price: level.price,
+            // Complete: a new extreme past wave 5, with the trend. Running:
+            // wave 1's / wave 4's end, against it.
+            breach: breachOf(level === seq[5] ? trend : -trend),
+        },
+        ...(abc.length > 0 && abcTag !== null && abcTag.type !== null
+            ? abcTargetLevels([seq[seq.length - 1], ...abc])
+            : []),
+    ];
+}
+
+/**
+ * The count's invalidation (`levels[0]`), its finished waves' ratios and an
+ * attached A–B–C's C targets, as prompt facts.
+ */
+function impulseFacts(
+    count: Count,
+    abcTag: AbcTag | null,
+    levels: readonly ElliottLevel[],
+    fmt: OverlayFormat
+): string[] {
+    const { seq, abc } = count;
+    const forming = count.atRightEdge || seq.length < EW_IMPULSE_PIVOTS;
+    const [invalidation] = levels;
+    return [
+        `invalidation ${formatOverlayPrice(invalidation.price, fmt)}`,
         waveRatios(seq, forming),
         ...(abc.length > 0 && abcTag !== null && abcTag.type !== null
             ? [abcTargets([seq[seq.length - 1], ...abc], fmt)]
@@ -232,7 +261,8 @@ function toCandidate(
     count: Count,
     bars: readonly Bar[],
     fmt: OverlayFormat,
-    abcTag: AbcTag | null
+    abcTag: AbcTag | null,
+    levels: readonly ElliottLevel[]
 ): OverlayCandidate {
     const { seq, abc } = count;
     const all = [...seq, ...abc];
@@ -254,7 +284,7 @@ function toCandidate(
             `impulse ${dir}`,
             impulseState(count, abcTag),
             namedPoints(bars, all, ['0', ...waves, ...abcNames], fmt),
-            impulseFacts(count, abcTag, fmt),
+            impulseFacts(count, abcTag, levels, fmt),
             count.score
         ),
         segments: [
@@ -265,9 +295,50 @@ function toCandidate(
             ),
             ...correction,
         ],
-        levels: [],
+        levels: structureLevels(bars, all, levels, fmt),
         labels: pivotLabels(bars, all.slice(1), [...waves, ...abcNames]),
     };
+}
+
+/**
+ * @internal
+ * A count the price has already moved past: after its last pivot, a bar
+ * went past its invalidation or reached one of its targets — each in the
+ * level's own `breach` direction, with EW_SPENT_SLACK_ATR of slack. It describes the past — e.g. a
+ * triangle (AVGO, 2026-07) whose thrust hit its target and then fell through
+ * its invalidation — so it is not offered. A target the last pivot already
+ * stands at or past (an A–B–C's C beyond its 100% projection) was reached by
+ * the count itself and is skipped. A running count's last pivot is the
+ * right-edge extreme no later bar has passed, so only a retreat through its
+ * invalidation (wave 5 falling through wave 4's end) can spend it.
+ */
+export function isSpentCount(
+    scored: Pick<ElliottScoredCandidate, 'candidate' | 'levels'>,
+    bars: readonly Bar[],
+    atr: number
+): boolean {
+    const last = scored.candidate.labels.at(-1);
+    if (last === undefined) return false;
+    const after = bars.filter(b => b.time > last.at.time);
+    const slack = EW_SPENT_SLACK_ATR * atr;
+    return scored.levels.some(l => {
+        const up = l.breach === 'up';
+        if (l.label === OVERLAY_LEVEL_LABELS.invalidation)
+            return after.some(b =>
+                up ? b.high > l.price + slack : b.low < l.price - slack
+            );
+        if (!l.label.startsWith(OVERLAY_LEVEL_LABELS.target)) return false;
+        // Within the slack counts as reached — for the count's own last
+        // pivot (skip: the count reached it itself) and for later bars.
+        const reach = up ? l.price - slack : l.price + slack;
+        const reachedByCount = up
+            ? last.at.price >= reach
+            : last.at.price <= reach;
+        return (
+            !reachedByCount &&
+            after.some(b => (up ? b.high >= reach : b.low <= reach))
+        );
+    });
 }
 
 /**
@@ -310,7 +381,10 @@ export function selectElliottCandidates(
  * complete impulse), diagonals (rule 3 broken in a wedge), triangles,
  * combinations and standalone A–B–Cs — each only when listed in `enabled`.
  * Pivot sensitivity is the screener's (1.5 ATR); counts are hypotheses, and
- * the model picks among them rather than drawing its own.
+ * the model picks among them rather than drawing its own. Counts the price
+ * has already moved past (`isSpentCount`) are dropped before selection, so
+ * a live count takes their slot. Each candidate's invalidation, targets and
+ * caps also ride as `levels` (horizontal lines from its first pivot).
  *
  * @param enabled - Structures to offer; defaults to the gated
  * ELLIOTT_ENABLED_STRUCTURES (the synthetic gate passes the full list to
@@ -342,11 +416,16 @@ export function buildElliottCandidates(
     };
     const scored: ElliottScoredCandidate[] = [
         ...(on('impulse')
-            ? enumerate(merged, lastBarIndex, atr).map(c => ({
-                  structure: 'impulse' as const,
-                  score: c.score,
-                  candidate: toCandidate(c, bars, fmt, tagAbc(c)),
-              }))
+            ? enumerate(merged, lastBarIndex, atr).map(c => {
+                  const tag = tagAbc(c);
+                  const levels = impulseLevels(c, tag);
+                  return {
+                      structure: 'impulse' as const,
+                      score: c.score,
+                      candidate: toCandidate(c, bars, fmt, tag, levels),
+                      levels,
+                  };
+              })
             : []),
         ...(on('diagonal')
             ? buildDiagonalCandidates(merged, bars, atr, fmt)
@@ -359,5 +438,7 @@ export function buildElliottCandidates(
             : []),
         ...(on('abc') ? buildAbcCandidates(merged, bars, fmt) : []),
     ];
-    return selectElliottCandidates(scored);
+    return selectElliottCandidates(
+        scored.filter(c => !isSpentCount(c, bars, atr))
+    );
 }

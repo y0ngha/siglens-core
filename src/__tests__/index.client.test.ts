@@ -79,6 +79,13 @@ describe('browser public API exports', () => {
             fibonacci: 'kind:fibonacci',
             elliott: 'kind:elliott',
         });
+        // The chart localizes level labels in the browser bundle (siglens).
+        expect(clientApi.OVERLAY_LEVEL_LABELS).toEqual({
+            breakout: 'breakout',
+            invalidation: 'invalidation',
+            target: 'target',
+            wave5Cap: 'wave5_cap',
+        });
         expect(clientApi.STRATEGY_OVERLAY_KINDS).toEqual([
             'divergence',
             'fibonacci',

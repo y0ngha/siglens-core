@@ -1,5 +1,6 @@
 import type {
     Bar,
+    ElliottLevel,
     ElliottScoredCandidate,
     OverlayFormat,
     PivotPoint,
@@ -14,12 +15,15 @@ import {
     EW_TRIANGLE_MIN_PIVOTS,
     EW_TRIANGLE_PIVOTS,
     EW_UNJUDGED_SCORE,
+    OVERLAY_LEVEL_LABELS,
 } from '@/domain/overlays/constants';
 import {
     boundaryLine,
+    breachOf,
     elliottPromptLine,
     firstLegDir,
     isLastPivotInList,
+    structureLevels,
     legSegments,
     legSizes,
     legSign,
@@ -85,28 +89,44 @@ function contractingEndsOk(
  * adds the post-triangle thrust: its widest width (A's end to the B–D line
  * at A's end) projected from E, against A.
  */
-function triangleFacts(
+function triangleLevels(
     seq: readonly PivotPoint[],
-    atEdge: boolean,
-    fmt: OverlayFormat
-): string[] {
+    atEdge: boolean
+): ElliottLevel[] {
     const n = seq.length;
     const twoBack = seq[n - 3];
     const last = seq[n - 1];
     // Same kind as `twoBack`: "beyond" is higher for highs, lower for lows.
-    const level =
-        twoBack.kind === 'high'
-            ? Math.max(twoBack.price, last.price)
-            : Math.min(twoBack.price, last.price);
-    const facts = [`invalidation ${formatOverlayPrice(level, fmt)}`];
-    if (seq.length < EW_TRIANGLE_PIVOTS || atEdge) return facts;
+    const invalidation: ElliottLevel = {
+        label: OVERLAY_LEVEL_LABELS.invalidation,
+        price:
+            twoBack.kind === 'high'
+                ? Math.max(twoBack.price, last.price)
+                : Math.min(twoBack.price, last.price),
+        breach: twoBack.kind === 'high' ? 'up' : 'down',
+    };
+    if (seq.length < EW_TRIANGLE_PIVOTS || atEdge) return [invalidation];
     const width = Math.abs(lineAt(seq[2], seq[4], seq[1].index) - seq[1].price);
     const against = -legSign(seq);
     return [
-        ...facts,
-        `thrust target ${formatOverlayPrice(seq[5].price + against * width, fmt)}`,
+        invalidation,
+        {
+            label: OVERLAY_LEVEL_LABELS.target,
+            price: seq[5].price + against * width,
+            breach: breachOf(against),
+        },
     ];
 }
+
+// Prompt wording for the target fact — not the OVERLAY_LEVEL_LABELS key.
+const THRUST_TARGET_FACT = 'thrust target';
+
+/** `invalidation 357.80`, `thrust target 424.57` — the levels as prompt facts. */
+const triangleFacts = (levels: readonly ElliottLevel[], fmt: OverlayFormat) =>
+    levels.map(
+        l =>
+            `${l.label === OVERLAY_LEVEL_LABELS.target ? THRUST_TARGET_FACT : l.label} ${formatOverlayPrice(l.price, fmt)}`
+    );
 
 /**
  * @internal
@@ -164,10 +184,12 @@ export function buildTriangleCandidates(
         const labels = TRIANGLE_LABELS.slice(0, n - 1);
         const dir = firstLegDir(seq);
         const last = seq[n - 1].index;
+        const levels = triangleLevels(seq, atEdge);
         return [
             {
                 structure: 'triangle',
                 score,
+                levels,
                 candidate: {
                     id: `ew:${dir}:${bars[seq[0].index].time}:tri`,
                     kind: 'elliott',
@@ -176,7 +198,7 @@ export function buildTriangleCandidates(
                         `triangle (contracting), A ${dir}`,
                         state,
                         namedPoints(bars, seq, ['0', ...labels], fmt),
-                        triangleFacts(seq, atEdge, fmt),
+                        triangleFacts(levels, fmt),
                         score
                     ),
                     segments: [
@@ -188,7 +210,7 @@ export function buildTriangleCandidates(
                         boundaryLine(bars, seq[1], seq[3], last, 'boundary_ac'),
                         boundaryLine(bars, seq[2], seq[4], last, 'boundary_bd'),
                     ],
-                    levels: [],
+                    levels: structureLevels(bars, seq, levels, fmt),
                     labels: pivotLabels(bars, seq.slice(1), labels),
                 },
             },
