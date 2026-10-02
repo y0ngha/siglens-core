@@ -182,12 +182,3 @@ Round 2: approved
 - Violation 3 (APPROVED, fixed): TechnicalAssembledPrompt.patternGeometries is a Map that may not be JSON-serializable; JSDoc did not document in-process-only scope
   Rule: MISTAKES.md Type Documentation #4 — Tier 4 public type fields require JSDoc; runtime serialization constraints must be documented
   Context: Added JSDoc note clarifying patternGeometries is a transient in-memory Map used only during prompt generation and not included in serialized analysis results.
-
-## [Branch fix/reassign-cross-kind-strategy-ids | 2026-10-02] — ChartOverlay sourceRef and Skill overlayKind JSDoc
-
-- Violation 3 (R1 RECOMMENDED, fixed): missing tests for orphan Elliott primary/alternate and for one card citing the same cross-kind id twice
-  Rule: MISTAKES.md Tests §5.5 — new conditional branches require dedicated test cases
-  Context: Re-homing logic introduced edge cases (orphan Elliott patterns, duplicate cross-kind citations). Added test cases covering both scenarios to verify new branching logic.
-
-Round 2: approved
-

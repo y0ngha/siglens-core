@@ -22,6 +22,7 @@ import {
     isLastPivotInList,
     legSegments,
     legSizes,
+    legSign,
     lineAt,
     namedPoints,
     pivotLabels,
@@ -52,7 +53,8 @@ const contracting = (w: readonly number[], forming: boolean) =>
 /**
  * A contracting triangle's ends: wave A starts beyond the B–D line, and E
  * ends near the A–C line — at most EW_TRI_E_OVERSHOOT ATR past it and, once
- * complete, at least EW_TRI_E_MIN_REACH of the way to it from D. `sign` is
+ * complete, at least EW_TRI_E_MIN_REACH of the way to it from D (a D that
+ * already sits on the line rejects). `sign` is
  * the first leg's direction.
  */
 function contractingEndsOk(
@@ -67,12 +69,12 @@ function contractingEndsOk(
     if (!startOutside || seq.length < EW_TRIANGLE_PIVOTS) return startOutside;
     const acAtE = lineAt(seq[1], seq[3], seq[5].index);
     const overshoot = sign * (seq[5].price - acAtE);
-    const reach =
-        Math.abs(seq[5].price - seq[4].price) / Math.abs(acAtE - seq[4].price);
-    return (
-        overshoot <= EW_TRI_E_OVERSHOOT * atr &&
-        (eForming || reach >= EW_TRI_E_MIN_REACH)
-    );
+    // D's end on the A–C line leaves no distance to cover: degenerate, not a reach.
+    const toLine = Math.abs(acAtE - seq[4].price);
+    const reached =
+        toLine > 0 &&
+        Math.abs(seq[5].price - seq[4].price) / toLine >= EW_TRI_E_MIN_REACH;
+    return overshoot <= EW_TRI_E_OVERSHOOT * atr && (eForming || reached);
 }
 
 /**
@@ -99,7 +101,7 @@ function triangleFacts(
     const facts = [`invalidation ${formatOverlayPrice(level, fmt)}`];
     if (seq.length < EW_TRIANGLE_PIVOTS || atEdge) return facts;
     const width = Math.abs(lineAt(seq[2], seq[4], seq[1].index) - seq[1].price);
-    const against = seq[1].price > seq[0].price ? -1 : 1;
+    const against = -legSign(seq);
     return [
         ...facts,
         `thrust target ${formatOverlayPrice(seq[5].price + against * width, fmt)}`,
@@ -133,7 +135,7 @@ export function buildTriangleCandidates(
         const w = legSizes(seq);
         const atEdge = isLastPivotInList(seq, pivots);
         const balance = timeBalance(seq, atEdge);
-        const sign = seq[1].price > seq[0].price ? 1 : -1;
+        const sign = legSign(seq);
         if (
             !contracting(w, atEdge) ||
             balance < EW_TIME_BALANCE_MIN ||

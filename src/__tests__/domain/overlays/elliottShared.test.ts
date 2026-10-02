@@ -3,6 +3,7 @@ import type { PivotPoint } from '@/domain/types';
 import {
     classifyAbc,
     mergeShortLegs,
+    priorTrend,
     pivotRuns,
     timeBalance,
 } from '@/domain/overlays/elliottShared';
@@ -86,6 +87,12 @@ describe('classifyAbc', () => {
         expect(classifyAbc(abc(b, c), forming)).toBe(type);
     });
 
+    it('null for a zero-size A (no ratio to read)', () => {
+        expect(
+            classifyAbc(pivotsAt([100, 100, 105, 95]).pivots, false)
+        ).toBeNull();
+    });
+
     it.each([
         ['B between the zigzag and flat bands', 8.5, 12],
         ['B far past A’s start', 14, 16],
@@ -95,5 +102,18 @@ describe('classifyAbc', () => {
         ['an expanded/running flat with C at A’s end', 12, 12.5],
     ])('null for %s', (_, b, c) => {
         expect(classifyAbc(abc(b, c), false)).toBeNull();
+    });
+});
+
+describe('priorTrend', () => {
+    // A high at 130 after flat bars at 100: 30 away.
+    const { pivots, bars } = pivotsAt([130, 120], [8, 12]);
+
+    it('measures the move into the start in units of `size`', () => {
+        expect(priorTrend(bars, pivots, 8, 10)).toBeCloseTo(3.005);
+    });
+
+    it('0 for a zero-size unit instead of Infinity', () => {
+        expect(priorTrend(bars, pivots, 8, 0)).toBe(0);
     });
 });

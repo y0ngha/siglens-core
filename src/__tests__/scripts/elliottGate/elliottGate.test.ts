@@ -5,13 +5,13 @@ import {
     GATE,
     measureGate,
     structureOf,
-} from '@/__tests__/domain/overlays/elliottSynthetic/metrics';
+} from '../../../../scripts/elliottGate/metrics';
 
 const FMT = { timeframe: '1Day' as const, priceDp: 2 };
 
 /**
  * The release gate (spec 2026-10-02 §검증) at the full sample size of
- * `scripts/elliottGate.ts` — 300 synthetic samples per structure per noise
+ * `scripts/elliottGate/run.ts` — 300 synthetic samples per structure per noise
  * level, 1,000 random walks, same seed — so CI checks the very numbers the
  * gate decision was made on. Every shipped structure, impulse included,
  * must clear it. Smaller runs were too coarse: at 400 walks the

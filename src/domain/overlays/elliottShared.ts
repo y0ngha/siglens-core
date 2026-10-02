@@ -9,13 +9,16 @@ import type {
 import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
 import {
     EW_ABC_B_MAX,
+    EW_ABC_C_PROJECTIONS,
     EW_FLAT_B_BEYOND_START,
     EW_FLAT_B_MIN,
     EW_FLAT_C_TOLERANCE,
     EW_IMPULSE_PIVOTS,
     EW_MIN_IMPULSE_SPAN_BARS,
     EW_MIN_WAVE_BARS,
+    EW_RATIO_DECIMALS,
     EW_REGULAR_FLAT_C_MAX,
+    EW_SCORE_DECIMALS,
     EW_ZIGZAG_B_MAX,
 } from '@/domain/overlays/constants';
 import {
@@ -61,8 +64,8 @@ export const recency = (lastPivotIndex: number, lastBarIndex: number): number =>
 export const legSizes = (seq: readonly PivotPoint[]): number[] =>
     seq.slice(1).map((p, i) => Math.abs(p.price - seq[i].price));
 
-/** The count is long enough (EW_MIN_IMPULSE_SPAN_BARS) to be more than sub-degree noise. */
-const spansEnough = (seq: readonly PivotPoint[]): boolean =>
+/** @internal The count is long enough (EW_MIN_IMPULSE_SPAN_BARS) to be more than sub-degree noise. */
+export const spansEnough = (seq: readonly PivotPoint[]): boolean =>
     seq[seq.length - 1].index - seq[0].index >= EW_MIN_IMPULSE_SPAN_BARS;
 
 /**
@@ -76,6 +79,8 @@ const spansEnough = (seq: readonly PivotPoint[]): boolean =>
  * each swing keeps its true extreme.
  */
 export function mergeShortLegs(pivots: readonly PivotPoint[]): PivotPoint[] {
+    // A loop over a local array: a reduce copying the list per pivot would be
+    // O(n²) for no gain in clarity (MISTAKES Coding Paradigm 15.5).
     const out: PivotPoint[] = [];
     for (const p of pivots) {
         const last = out[out.length - 1];
@@ -99,19 +104,17 @@ export function pivotRuns(
     n: number,
     partialAtEdge = false
 ): PivotPoint[][] {
-    const runs: PivotPoint[][] = [];
-    const first = partialAtEdge ? pivots.length - n : 0;
-    for (let s = Math.max(0, first); s + n <= pivots.length; s++) {
-        const seq = pivots.slice(s, s + n);
-        if (alternates(seq) && spansEnough(seq)) runs.push(seq);
-    }
-    return runs;
+    const first = Math.max(0, partialAtEdge ? pivots.length - n : 0);
+    return Array.from(
+        { length: Math.max(0, pivots.length - n - first + 1) },
+        (_, k) => pivots.slice(first + k, first + k + n)
+    ).filter(seq => alternates(seq) && spansEnough(seq));
 }
 
 // ─── Drawing ────────────────────────────────────────────────────────────────
 
-/** A pivot as a chart point (bar time, not index). */
-const pointOf = (bars: readonly Bar[], p: PivotPoint): OverlayPoint => ({
+/** @internal A pivot as a chart point (bar time, not index). */
+export const pointOf = (bars: readonly Bar[], p: PivotPoint): OverlayPoint => ({
     time: bars[p.index].time,
     price: p.price,
 });
@@ -174,9 +177,13 @@ export const namedPoints = (
         )
         .join(', ');
 
+/** @internal `1` when the first leg rises, `-1` when it falls — signs prices so "with the first leg" is positive. */
+export const legSign = (seq: readonly PivotPoint[]): 1 | -1 =>
+    seq[1].price > seq[0].price ? 1 : -1;
+
 /** @internal `up` when the first leg rises. */
 export const firstLegDir = (seq: readonly PivotPoint[]): 'up' | 'down' =>
-    seq[1].price > seq[0].price ? 'up' : 'down';
+    legSign(seq) === 1 ? 'up' : 'down';
 
 // ─── A–B–C type ─────────────────────────────────────────────────────────────
 
@@ -194,7 +201,7 @@ export type AbcType =
  * and where C ends against A's end (spec 2026-10-02 §4). `null` when the
  * shape is neither a zigzag nor a flat (B between 78.6% and 90% of A, or
  * past 138.2%; a zigzag whose C stays inside A; a flat whose C lands inside
- * the dead band). While C is still forming (`cInProgress`) the conditions
+ * the dead band; a zero-size A). While C is still forming (`cInProgress`) the conditions
  * C may yet meet are waived; a forming C already past A's end after a B
  * beyond A's start is an expanded flat (C only extends), one short of it is
  * `expanded or running flat`.
@@ -204,6 +211,8 @@ export function classifyAbc(
     cInProgress: boolean
 ): AbcType | null {
     const [a, b, c] = legSizes(seq);
+    // A zero-size A leaves no ratio to read (NaN would fall through every band).
+    if (!(a > 0)) return null;
     const bRetrace = b / a;
     // How far C ends past A's end, in units of A (negative: short of it).
     const cPastA = (c - b) / a;
@@ -262,7 +271,8 @@ export function passesRules(
  * @internal
  * The trend a structure starting at `seq[0]` corrects, in units of `size`:
  * over the `span` bars before it, how far price came from — or `0` when
- * `seq[0]` is not the extreme of those bars (no trend ends there). Reads the
+ * `seq[0]` is not the extreme of those bars (no trend ends there) or `size`
+ * is not positive. Reads the
  * bars, not the pivots, so a trend older than the pivot lookback counts.
  */
 export function priorTrend(
@@ -275,6 +285,7 @@ export function priorTrend(
     const before = bars.slice(Math.max(0, start.index - span), start.index);
     const isHigh = start.kind === 'high';
     if (
+        !(size > 0) ||
         before.length === 0 ||
         !before.every(b =>
             isHigh ? b.high <= start.price : b.low >= start.price
@@ -291,9 +302,11 @@ export function priorTrend(
 // Everything the logic can compute rides in the prompt line, so the model
 // cites invalidation levels, ratios and targets instead of computing them.
 
-/** `61.8%` — `part` as a share of `whole`, one decimal. */
-const pct = (part: number, whole: number): string =>
-    `${((part / whole) * 100).toFixed(1)}%`;
+const PERCENT = 100;
+
+/** @internal `61.8%` — `part` as a share of `whole`, EW_RATIO_DECIMALS decimals. */
+export const pct = (part: number, whole: number): string =>
+    `${((part / whole) * PERCENT).toFixed(EW_RATIO_DECIMALS)}%`;
 
 /**
  * @internal
@@ -320,7 +333,7 @@ export function waveRatios(
 
 /**
  * @internal
- * C's 100% and 161.8% of A projected from B, for a 4-pivot A–B–C (start, A,
+ * C's EW_ABC_C_PROJECTIONS (100% and 161.8%) of A projected from B, for a 4-pivot A–B–C (start, A,
  * B, C): `C target 100% 118.00, 161.8% 112.44`.
  */
 export function abcTargets(
@@ -328,10 +341,14 @@ export function abcTargets(
     fmt: OverlayFormat
 ): string {
     const [a] = legSizes(seq);
-    const sign = seq[1].price > seq[0].price ? 1 : -1;
-    const target = (r: number) =>
-        formatOverlayPrice(seq[2].price + sign * r * a, fmt);
-    return `C target 100% ${target(1)}, 161.8% ${target(1.618)}`;
+    const sign = legSign(seq);
+    // `100%`, `161.8%`: the ratio as a percentage, trailing zeros dropped.
+    const label = (r: number) =>
+        `${Number((r * PERCENT).toFixed(EW_RATIO_DECIMALS))}%`;
+    return `C target ${EW_ABC_C_PROJECTIONS.map(
+        r =>
+            `${label(r)} ${formatOverlayPrice(seq[2].price + sign * r * a, fmt)}`
+    ).join(', ')}`;
 }
 
 /**
@@ -351,6 +368,6 @@ export function elliottPromptLine(
         state,
         points,
         ...facts.filter(f => f !== ''),
-        `score ${score.toFixed(2)}`,
+        `score ${score.toFixed(EW_SCORE_DECIMALS)}`,
     ].join('; ');
 }

@@ -22,7 +22,9 @@ import {
     isLastPivotInList,
     legSegments,
     legSizes,
+    legSign,
     namedPoints,
+    pct,
     pivotLabels,
     pivotRuns,
     priorTrend,
@@ -31,9 +33,24 @@ import {
 } from '@/domain/overlays/elliottShared';
 import { formatOverlayPrice } from '@/domain/overlays/format';
 
-/** Boundary labels of a combination with `simples` simple corrections. */
-const comboLabels = (simples: number) =>
-    simples === 2 ? ['W', 'X', 'Y'] : ['W', 'X', 'Y', 'X', 'Z'];
+/**
+ * The combinations counted, by number of simple corrections: boundary labels,
+ * drawn roles (the second X is `wave_X2`) and id suffix.
+ */
+const COMBINATIONS = [
+    {
+        simples: 2,
+        labels: ['W', 'X', 'Y'],
+        roles: ['wave_W', 'wave_X', 'wave_Y'],
+        suffix: 'combo',
+    },
+    {
+        simples: 3,
+        labels: ['W', 'X', 'Y', 'X', 'Z'],
+        roles: ['wave_W', 'wave_X', 'wave_Y', 'wave_X2', 'wave_Z'],
+        suffix: 'combo3',
+    },
+] as const;
 
 /**
  * Size of each boundary leg, X as a share of the simple before it:
@@ -49,7 +66,7 @@ function comboSizes(
         .map((size, i) => {
             const text = `${labels[i]} ${formatOverlayPrice(size, fmt)}`;
             return labels[i] === 'X'
-                ? `${text} (${((size / w[i - 1]) * 100).toFixed(1)}% of ${labels[i - 1]})`
+                ? `${text} (${pct(size, w[i - 1])} of ${labels[i - 1]})`
                 : text;
         })
         .join(', ');
@@ -74,19 +91,18 @@ export function buildCombinationCandidates(
     fmt: OverlayFormat
 ): ElliottScoredCandidate[] {
     const lastBarIndex = bars.length - 1;
-    return [2, 3].flatMap(simples =>
+    return COMBINATIONS.flatMap(({ simples, labels, roles, suffix }) =>
         pivotRuns(pivots, simples * EW_COMBO_SIMPLE_PIVOTS).flatMap(seq => {
             const inProgress = isLastPivotInList(seq, pivots);
-            const sign = seq[1].price > seq[0].price ? 1 : -1;
+            const sign = legSign(seq);
             const parts = Array.from({ length: simples }, (_, j) =>
                 seq.slice(
                     j * EW_COMBO_SIMPLE_PIVOTS,
                     (j + 1) * EW_COMBO_SIMPLE_PIVOTS
                 )
             );
-            const net = parts.map(
-                p => sign * (p[p.length - 1].price - p[0].price)
-            );
+            const end = (p: readonly PivotPoint[]) => p[p.length - 1];
+            const net = parts.map(p => sign * (end(p).price - p[0].price));
             const types = parts.map((p, j) =>
                 classifyAbc(p, inProgress && j === simples - 1)
             );
@@ -94,14 +110,15 @@ export function buildCombinationCandidates(
             const xRetrace = parts
                 .slice(1)
                 .map(
-                    (p, j) => (sign * (parts[j][3].price - p[0].price)) / net[j]
+                    (p, j) =>
+                        (sign * (end(parts[j]).price - p[0].price)) / net[j]
                 );
             const ratio = net.slice(1).map(v => v / net[0]);
             const legs = legSizes(seq);
             const trend = priorTrend(
                 bars,
                 seq,
-                seq[3].index - seq[0].index,
+                end(parts[0]).index - seq[0].index,
                 legs[0]
             );
             const ok =
@@ -119,7 +136,7 @@ export function buildCombinationCandidates(
                             r >= EW_COMBO_Y_TO_W_MIN)
                 );
             if (!ok) return [];
-            const boundaries = parts.flatMap(p => [p[0], p[3]]);
+            const boundaries = parts.flatMap(p => [p[0], end(p)]);
             const symmetry =
                 ratio.reduce(
                     (s, r) =>
@@ -149,7 +166,6 @@ export function buildCombinationCandidates(
                     Math.min(1, trend / EW_PRIOR_TREND_FULL) +
                     recency(seq[seq.length - 1].index, lastBarIndex)) /
                 4;
-            const labels = comboLabels(simples);
             const dir = firstLegDir(seq);
             const last = labels[labels.length - 1];
             return [
@@ -157,7 +173,7 @@ export function buildCombinationCandidates(
                     structure: 'combination' as const,
                     score,
                     candidate: {
-                        id: `ew:${dir}:${bars[seq[0].index].time}:${simples === 2 ? 'combo' : 'combo3'}`,
+                        id: `ew:${dir}:${bars[seq[0].index].time}:${suffix}`,
                         kind: 'elliott' as const,
                         skill: 'elliott-wave',
                         promptLine: elliottPromptLine(
@@ -172,13 +188,7 @@ export function buildCombinationCandidates(
                             [comboSizes(boundaries, labels, fmt)],
                             score
                         ),
-                        segments: legSegments(
-                            bars,
-                            boundaries,
-                            labels.map((l, i) =>
-                                i === 3 ? 'wave_X2' : `wave_${l}`
-                            )
-                        ),
+                        segments: legSegments(bars, boundaries, roles),
                         levels: [],
                         labels: pivotLabels(bars, boundaries.slice(1), labels),
                     },

@@ -4,8 +4,6 @@ import type {
     ElliottStructure,
     OverlayCandidate,
     OverlayFormat,
-    OverlayLabel,
-    OverlaySegment,
     PivotPoint,
 } from '@/domain/types';
 import { extractPivots } from '@/domain/patterns/pivots';
@@ -18,7 +16,6 @@ import {
     EW_ABC_PIVOTS,
     EW_ALTERNATION_MIN_DIFF,
     EW_IMPULSE_PIVOTS,
-    EW_MIN_IMPULSE_SPAN_BARS,
     EW_MIN_PARTIAL_PIVOTS,
     EW_MIN_STRUCTURE_PIVOTS,
     EW_MIN_WAVE_ATR,
@@ -35,10 +32,7 @@ import {
     EW_WAVE5_OF_ZERO_TO_THREE,
     EW_WAVE5_TOLERANCE,
 } from '@/domain/overlays/constants';
-import {
-    formatOverlayPoint,
-    formatOverlayPrice,
-} from '@/domain/overlays/format';
+import { formatOverlayPrice } from '@/domain/overlays/format';
 import { buildAbcCandidates } from '@/domain/overlays/elliottAbc';
 import { buildCombinationCandidates } from '@/domain/overlays/elliottCombination';
 import { buildDiagonalCandidates } from '@/domain/overlays/elliottDiagonal';
@@ -48,10 +42,14 @@ import {
     classifyAbc,
     elliottPromptLine,
     isLastPivotInList,
+    legSegments,
     legSizes,
     mergeShortLegs,
+    namedPoints,
     passesRules,
+    pivotLabels,
     recency,
+    spansEnough,
     waveRatios,
     within,
 } from '@/domain/overlays/elliottShared';
@@ -152,8 +150,7 @@ function enumerate(
             const seq = pivots.slice(s, s + n);
             if (
                 !alternates(seq) ||
-                seq[seq.length - 1].index - seq[0].index <
-                    EW_MIN_IMPULSE_SPAN_BARS ||
+                !spansEnough(seq) ||
                 !passesRules(seq, up) ||
                 !impulseShapeOk(seq, isLastPivotInList(seq, pivots), atr)
             )
@@ -237,51 +234,39 @@ function toCandidate(
     fmt: OverlayFormat,
     abcTag: AbcTag | null
 ): OverlayCandidate {
-    const pt = (p: PivotPoint) => ({
-        time: bars[p.index].time,
-        price: p.price,
-    });
-    const all = [...count.seq, ...count.abc];
-    const segments: OverlaySegment[] = all.slice(1).map((p, i) => ({
-        from: pt(all[i]),
-        to: pt(p),
-        role:
-            i < count.seq.length - 1
-                ? `wave_${i + 1}`
-                : `wave_${ABC_LABELS[i - (count.seq.length - 1)]}`,
-        style: i < count.seq.length - 1 ? 'solid' : 'dashed',
-        pane: 'price',
-    }));
-    const labels: OverlayLabel[] = all.slice(1).map((p, i) => ({
-        at: pt(p),
-        text:
-            i < count.seq.length - 1
-                ? String(i + 1)
-                : ABC_LABELS[i - (count.seq.length - 1)],
-        position: p.kind === 'high' ? 'above' : 'below',
-    }));
-    const n = count.seq.length;
+    const { seq, abc } = count;
+    const all = [...seq, ...abc];
+    const waves = seq.slice(1).map((_, i) => String(i + 1));
+    const abcNames = ABC_LABELS.slice(0, abc.length);
+    // The A–B–C after the impulse is drawn dashed.
+    const correction = legSegments(
+        bars,
+        abc.length > 0 ? [seq[seq.length - 1], ...abc] : [],
+        abcNames.map(l => `wave_${l}`)
+    ).map(segment => ({ ...segment, style: 'dashed' as const }));
+    const n = seq.length;
     const dir = count.up ? 'up' : 'down';
-    const points = all
-        .map(
-            (p, i) =>
-                `${i < n ? i : ABC_LABELS[i - n]} ${formatOverlayPoint(pt(p), fmt)}`
-        )
-        .join(', ');
     return {
-        id: `ew:${dir}:${bars[count.seq[0].index].time}:${n}${count.abc.length > 0 ? ':abc' : ''}`,
+        id: `ew:${dir}:${bars[seq[0].index].time}:${n}${abc.length > 0 ? ':abc' : ''}`,
         kind: 'elliott',
         skill: 'elliott-wave',
         promptLine: elliottPromptLine(
             `impulse ${dir}`,
             impulseState(count, abcTag),
-            points,
+            namedPoints(bars, all, ['0', ...waves, ...abcNames], fmt),
             impulseFacts(count, abcTag, fmt),
             count.score
         ),
-        segments,
+        segments: [
+            ...legSegments(
+                bars,
+                seq,
+                waves.map(w => `wave_${w}`)
+            ),
+            ...correction,
+        ],
         levels: [],
-        labels,
+        labels: pivotLabels(bars, all.slice(1), [...waves, ...abcNames]),
     };
 }
 
@@ -296,24 +281,25 @@ function toCandidate(
 export function selectElliottCandidates(
     scored: readonly ElliottScoredCandidate[]
 ): OverlayCandidate[] {
-    const seen = new Set<string>();
-    const ranked = scored
-        .toSorted((a, b) => b.score - a.score)
-        .filter(c =>
-            seen.has(c.candidate.id) ? false : (seen.add(c.candidate.id), true)
-        );
-    const picked = new Set(
-        ranked.filter(
-            (c, i) => ranked.findIndex(d => d.structure === c.structure) === i
-        )
+    const sorted = scored.toSorted((a, b) => b.score - a.score);
+    // First (= best-scoring) occurrence of each id.
+    const ranked = sorted.filter(
+        (c, i) => sorted.findIndex(d => d.candidate.id === c.candidate.id) === i
     );
-    const taken = (structure: ElliottStructure) =>
-        ranked.filter(c => picked.has(c) && c.structure === structure).length;
-    for (const c of ranked) {
-        if (picked.size >= ELLIOTT_CANDIDATE_LIMIT) break;
-        if (taken(c.structure) < ELLIOTT_PER_STRUCTURE_LIMIT) picked.add(c);
-    }
-    return ranked.filter(c => picked.has(c)).map(c => c.candidate);
+    const leaders = ranked.filter(
+        (c, i) => ranked.findIndex(d => d.structure === c.structure) === i
+    );
+    const picked = ranked.reduce<readonly ElliottScoredCandidate[]>(
+        (acc, c) =>
+            acc.length >= ELLIOTT_CANDIDATE_LIMIT ||
+            acc.includes(c) ||
+            acc.filter(d => d.structure === c.structure).length >=
+                ELLIOTT_PER_STRUCTURE_LIMIT
+                ? acc
+                : [...acc, c],
+        leaders
+    );
+    return ranked.filter(c => picked.includes(c)).map(c => c.candidate);
 }
 
 /**

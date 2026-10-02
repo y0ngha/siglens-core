@@ -8,7 +8,7 @@ import {
     SAMPLE_STRUCTURE,
     type Sample,
     type SampleKind,
-} from '@/__tests__/domain/overlays/elliottSynthetic/generator';
+} from './generator';
 
 /**
  * Gate harness (spec 2026-10-02 §검증): per structure, recall, false

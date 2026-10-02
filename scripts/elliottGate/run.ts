@@ -1,17 +1,17 @@
 /**
  * Full Elliott structure gate run (spec 2026-10-02 §검증): 300 synthetic
  * samples per structure per noise level + 1,000 random walks. The vitest
- * `elliottGate.test.ts` runs a reduced, deterministic version of the same
+ * `src/__tests__/scripts/elliottGate/elliottGate.test.ts` runs the same
  * harness.
  *
- * Run with: `yarn tsx scripts/elliottGate.ts [--all] [--n 300] [--walks 1000]`
+ * Run with: `yarn tsx scripts/elliottGate/run.ts [--all] [--n 300] [--walks 1000]`
  * `--all` enables every structure (the gate's candidate set); without it
  * the shipped `ELLIOTT_ENABLED_STRUCTURES` are used.
  */
 import type { ElliottStructure } from '@/domain/types';
 import { buildElliottCandidates } from '@/domain/overlays/elliottCandidates';
 import { ELLIOTT_ENABLED_STRUCTURES } from '@/domain/overlays/constants';
-import { measureGate } from '@/__tests__/domain/overlays/elliottSynthetic/metrics';
+import { measureGate } from './metrics';
 
 const FMT = { timeframe: '1Day' as const, priceDp: 2 };
 const args = process.argv.slice(2);

@@ -76,7 +76,7 @@ export const ELLIOTT_CANDIDATE_LIMIT = 5;
 export const ELLIOTT_PER_STRUCTURE_LIMIT = 3;
 /**
  * @internal Structures offered to the model: only those passing the
- * synthetic gate (`scripts/elliottGate.ts`: recall ≥ 80% at noise 0.1 and
+ * synthetic gate (`scripts/elliottGate/run.ts`: recall ≥ 80% at noise 0.1 and
  * ≥ 60% at 0.25, random-walk false positives ≤ 5%, confusion ≤ 10%; checked
  * in CI by `elliottGate.test.ts`). `combination` and the standalone `abc`
  * are implemented but stay off — combinations are confused with overlapping
@@ -90,11 +90,13 @@ export const ELLIOTT_ENABLED_STRUCTURES: readonly ElliottStructure[] = [
 ];
 /** @internal Guideline band for wave 2's retracement of wave 1. */
 export const EW_WAVE2_RETRACE_MIN = 0.382;
+/** @internal Upper end of the scored wave-2 retracement band (see EW_WAVE2_RETRACE_MIN). */
 export const EW_WAVE2_RETRACE_MAX = 0.786;
 /** @internal Wave 3 at or beyond this multiple of wave 1 scores full marks. */
 export const EW_WAVE3_EXTENSION = 1.618;
 /** @internal Guideline band for wave 4's retracement of wave 3. */
 export const EW_WAVE4_RETRACE_MIN = 0.236;
+/** @internal Upper end of the scored wave-4 retracement band (see EW_WAVE4_RETRACE_MIN). */
 export const EW_WAVE4_RETRACE_MAX = 0.5;
 /** @internal Wave 5 within this relative distance of a target ratio counts as a match. */
 export const EW_WAVE5_TOLERANCE = 0.2;
@@ -120,8 +122,11 @@ export const EW_MIN_PARTIAL_PIVOTS = 5;
  * A forming wave 4 is only held to the upper bound.
  */
 export const EW_WAVE2_RETRACE_LIMIT_MIN = 0.236;
+/** @internal Hard upper bound of wave 2's retracement of wave 1. */
 export const EW_WAVE2_RETRACE_LIMIT_MAX = 0.886;
+/** @internal Hard lower bound of wave 4's retracement of wave 3 (not applied while wave 4 forms). */
 export const EW_WAVE4_RETRACE_LIMIT_MIN = 0.146;
+/** @internal Hard upper bound of wave 4's retracement of wave 3. */
 export const EW_WAVE4_RETRACE_LIMIT_MAX = 0.618;
 /**
  * @internal Every finished wave of an impulse or combination spans at least
@@ -172,8 +177,14 @@ export const EW_ABC_B_MAX = 1.382;
 export const EW_FLAT_C_TOLERANCE = 0.1;
 /** @internal A regular flat's C runs at most this share of A past A's end. */
 export const EW_REGULAR_FLAT_C_MAX = 0.382;
-/** @internal C/A ratios a correction's C commonly lands on. */
+/** @internal C/A ratios a correction's C commonly lands on (scored). */
 export const EW_ABC_C_TARGETS = [0.618, 1, 1.618] as const;
+/** @internal C/A ratios printed as C targets (projected from B) — the two most common of EW_ABC_C_TARGETS. */
+export const EW_ABC_C_PROJECTIONS = [1, 1.618] as const;
+/** @internal Decimals of the percentages in elliott prompt facts (`61.8%`). */
+export const EW_RATIO_DECIMALS = 1;
+/** @internal Decimals of an elliott candidate's `score` in its prompt line. */
+export const EW_SCORE_DECIMALS = 2;
 /** @internal C within this relative distance of a target ratio counts as a match. */
 export const EW_ABC_C_TOLERANCE = 0.15;
 /**
@@ -231,6 +242,7 @@ export const EW_TRI_A_START_TOLERANCE_ATR = 0.5;
 export const EW_DIAG_WAVE_TOLERANCE = 0.05;
 /** @internal Diagonal waves 2 and 4 typically retrace this band of the prior wave. */
 export const EW_DIAG_RETRACE_MIN = 0.5;
+/** @internal Upper end of the scored diagonal wave 2/4 retracement band (see EW_DIAG_RETRACE_MIN). */
 export const EW_DIAG_RETRACE_MAX = 0.886;
 /**
  * @internal The swing before the count must differ from wave 0 by at least
@@ -253,7 +265,9 @@ export const EW_COMBO_SIMPLE_PIVOTS = 4;
 export const EW_COMBO_X_MAX_RETRACE = 1;
 /** @internal Preferred X retracement band (scored, not required). */
 export const EW_COMBO_X_PREFERRED_MIN = 0.382;
+/** @internal Upper end of the preferred X retracement band (see EW_COMBO_X_PREFERRED_MIN). */
 export const EW_COMBO_X_PREFERRED_MAX = 0.786;
 /** @internal Y (and Z) net move as a multiple of W's. */
 export const EW_COMBO_Y_TO_W_MIN = 0.618;
+/** @internal Most Y (and Z) may run, as a multiple of W (see EW_COMBO_Y_TO_W_MIN). */
 export const EW_COMBO_Y_TO_W_MAX = 1.618;
