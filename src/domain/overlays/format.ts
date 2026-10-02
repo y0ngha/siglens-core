@@ -11,3 +11,8 @@ export function formatOverlayPoint(
 ): string {
     return `${formatBarDate(point.time, fmt.timeframe)} ${formatNullableNumber(point.price, fmt.priceDp)}`;
 }
+
+/** @internal A price at the candidate's precision — the number format every candidate prompt line uses. */
+export function formatOverlayPrice(price: number, fmt: OverlayFormat): string {
+    return formatNullableNumber(price, fmt.priceDp);
+}

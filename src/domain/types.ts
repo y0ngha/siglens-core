@@ -4198,6 +4198,24 @@ export interface OverlayCandidate {
     labels: OverlayLabel[];
 }
 
+/**
+ * @internal
+ * Elliott structure an `elliott` overlay candidate counts (spec 2026-10-02):
+ * `impulse` 1–5 (with an A–B–C attached when one follows), `diagonal` 1–5
+ * wedge whose wave 4 overlaps wave 1, `triangle` A–B–C–D–E, `combination`
+ * W–X–Y(–X–Z), and a standalone `abc` correction.
+ */
+export type ElliottStructure =
+    'impulse' | 'diagonal' | 'triangle' | 'combination' | 'abc';
+
+/** @internal An elliott candidate with its structure and score, before the per-structure selection. */
+export interface ElliottScoredCandidate {
+    structure: ElliottStructure;
+    /** 0–1; ranks candidates within and across structures. */
+    score: number;
+    candidate: OverlayCandidate;
+}
+
 /** A candidate the model referenced, ready to render. */
 export interface ChartOverlay extends Omit<OverlayCandidate, 'promptLine'> {
     /**
