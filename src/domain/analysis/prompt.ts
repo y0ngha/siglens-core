@@ -246,6 +246,8 @@ const detectTrend = (
 
 interface PromptCandlePatternEntry {
     barsAgo: number;
+    /** Unix seconds of the bar the pattern was detected on (its last bar for multi-candle patterns). */
+    barTime: number | null;
     patternType: CandlePatternEntry['patternType'];
     patternName: string;
     trend: Trend;
@@ -304,6 +306,23 @@ const formatMarketSection = (bars: Bar[], priceDp: number): string => {
     ].join('\n');
 };
 
+/**
+ * @internal `15.26% below the period high` / `173.22% above the period low`, or `N/A`.
+ * Written as a distance, not a ratio: the old `Current vs Low: 273.22%` (price
+ * is 273% *of* the low) was quoted as "273% 상승" when the move was +173%
+ * (NVDA, 2026-10-02 A/B).
+ */
+export const distanceFromExtreme = (
+    close: number,
+    extreme: number,
+    name: 'high' | 'low'
+): string => {
+    const pct = percentOf(Math.abs(close - extreme), extreme);
+    if (pct === 'N/A' || !Number.isFinite(close)) return 'N/A';
+    const side = close >= extreme ? 'above' : 'below';
+    return `${pct} ${side} the period ${name}`;
+};
+
 const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
     if (bars.length === 0) {
         return ['## Long-term Context', '- No data available'].join('\n');
@@ -317,15 +336,24 @@ const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
     const periodLow = lows.length > 0 ? Math.min(...lows) : Number.NaN;
     const firstClose = bars[0].close;
     const lastClose = bars[bars.length - 1].close;
+    // The bar the extreme came from, so the model never has to guess its date —
+    // it wrote "8월 저점 83.68" for a 7/31 low and "6월 고점 151.00" for a 5/27
+    // high when only the price was printed (2026-10-02 A/B).
+    const dated = (value: number, field: 'high' | 'low'): string => {
+        const bar = bars.findLast(b => b[field] === value);
+        return bar === undefined
+            ? px(value)
+            : `${px(value)} (${formatBarDateTime(bar.time * MS_PER_SECOND)})`;
+    };
 
     return [
         `## Long-term Context (${bars.length} bars total)`,
-        `- Period High: ${px(periodHigh)}`,
-        `- Period Low: ${px(periodLow)}`,
+        `- Period High: ${dated(periodHigh, 'high')}`,
+        `- Period Low: ${dated(periodLow, 'low')}`,
         `- Price Range: ${px(periodHigh)} ~ ${px(periodLow)}`,
         `- Period Return: ${percentOf(lastClose - firstClose, firstClose)}`,
-        `- Current vs High: ${percentOf(lastClose, periodHigh)}`,
-        `- Current vs Low: ${percentOf(lastClose, periodLow)}`,
+        `- Current vs High: ${distanceFromExtreme(lastClose, periodHigh, 'high')}`,
+        `- Current vs Low: ${distanceFromExtreme(lastClose, periodLow, 'low')}`,
     ].join('\n');
 };
 
@@ -347,6 +375,7 @@ const buildCandlePatternEntries = (
     return lastEntries
         .map((entry: CandlePatternEntry) => ({
             barsAgo: totalBars - 1 - entry.barIndex,
+            barTime: detectionBars[entry.barIndex]?.time ?? null,
             patternType: entry.patternType,
             patternName:
                 entry.patternType === 'multi'
@@ -363,8 +392,20 @@ const buildCandlePatternEntries = (
         );
 };
 
-const formatPatternEntry = (entry: PromptCandlePatternEntry): string =>
-    `- [${entry.barsAgo} bars ago] ${entry.patternType === 'single' ? 'Single candle pattern' : 'Multi-candle pattern'}: ${entry.patternName} [trend: ${entry.trend}]`;
+/**
+ * `- [10 bars ago · bar 2026-09-18 00:00] Multi-candle pattern: …`. The bar's
+ * date is printed in the `## Recent Bar Data` row format so the model can find
+ * that row; with only "N bars ago" it described the wrong bar (a 1-bar-ago
+ * doji narrated with the last bar's OHLC, a tweezers top placed at another
+ * high — PLTR, 2026-10-02 A/B).
+ */
+const formatPatternEntry = (entry: PromptCandlePatternEntry): string => {
+    const at =
+        entry.barTime === null
+            ? ''
+            : ` · bar ${formatBarDateTime(entry.barTime * MS_PER_SECOND)}`;
+    return `- [${entry.barsAgo} bars ago${at}] ${entry.patternType === 'single' ? 'Single candle pattern' : 'Multi-candle pattern'}: ${entry.patternName} [trend: ${entry.trend}]`;
+};
 
 const formatRecentBarsSection = (
     bars: Bar[],
@@ -981,12 +1022,39 @@ export const formatAbcTableLine = (
 ): string =>
     `Fib ABC table: ${abc.extensions.map(e => `${formatFibRatio(e.ratio)} ${formatTablePrice(e.price, priceDp)}`).join(' / ')}`;
 
+/** Decimals of the retracement depth printed after a Fib anchor line (Fib ratios themselves are 1 dp). */
+const RETRACEMENT_DEPTH_DP = 1;
+
+/**
+ * @internal `; price 44.9% retraced` after a `Fib anchor:` line — how far the current
+ * price has pulled back from the leg's end toward its start. The model
+ * otherwise works this out itself and got it backwards (TSLA, 2026-10-02 A/B:
+ * "약 55%" for a 44.9% pullback, contradicting the 38.2–50% band it named).
+ * Beyond either end of the leg it says so instead of printing a negative or
+ * >100% figure. Empty when the price or leg is unusable.
+ */
+export const retracementDepthSuffix = (
+    fib: { direction: 'up' | 'down'; high: number; low: number },
+    price: number | null
+): string => {
+    const range = fib.high - fib.low;
+    if (price == null || !Number.isFinite(price) || !(range > 0)) return '';
+    const pulledBack =
+        fib.direction === 'up' ? fib.high - price : price - fib.low;
+    if (pulledBack < 0)
+        return `; price beyond the swing ${fib.direction === 'up' ? 'high' : 'low'} (no retracement)`;
+    if (pulledBack > range)
+        return `; price beyond the swing ${fib.direction === 'up' ? 'low' : 'high'} (leg fully retraced)`;
+    return `; price ${formatNullableNumber((pulledBack / range) * PERCENTAGE_FACTOR, RETRACEMENT_DEPTH_DP)}% retraced`;
+};
+
 const formatHorizonBlock = (
     key: HorizonKey,
     horizon: HorizonReference,
     timeframe: Timeframe,
     priceDp: number,
-    assetClass: AssetClass
+    assetClass: AssetClass,
+    currentPrice: number | null
 ): string => {
     const s = horizon.structure;
     const span =
@@ -996,7 +1064,7 @@ const formatHorizonBlock = (
     const levelLine = (level: ReferenceLevel): string =>
         formatReferenceLevelLine(level, priceDp);
     const structureLine =
-        `Structure: price ${s.priceVsMA60} MA60 / ${s.priceVsMA200} MA200; EMA ${s.emaStack}; swings ${s.swingStructure}; ` +
+        `Structure: price ${s.priceVsMA60} MA60 / ${s.priceVsMA200} MA200; price/EMA9/EMA20 ${s.emaStack}; swings ${s.swingStructure}; ` +
         `ADX ${s.adx != null ? s.adx.toFixed(INDICATOR_DECIMAL_PLACES) : 'n/a'}; efficiency ${s.efficiencyRatio != null ? s.efficiencyRatio.toFixed(EFFICIENCY_DECIMAL_PLACES) : 'n/a'}; regime ${s.regime}.`;
     // The `Fib …%` / `Fib ext …%` rows above are levels only — the swing
     // they are anchored on isn't printed anywhere else, and the fibonacci
@@ -1008,9 +1076,10 @@ const formatHorizonBlock = (
         fib == null
             ? []
             : [
-                  fib.direction === 'up'
+                  (fib.direction === 'up'
                       ? `Fib anchor: swing low ${formatNullableNumber(fib.low, priceDp)} → swing high ${formatNullableNumber(fib.high, priceDp)} (up leg)`
-                      : `Fib anchor: swing high ${formatNullableNumber(fib.high, priceDp)} → swing low ${formatNullableNumber(fib.low, priceDp)} (down leg)`,
+                      : `Fib anchor: swing high ${formatNullableNumber(fib.high, priceDp)} → swing low ${formatNullableNumber(fib.low, priceDp)} (down leg)`) +
+                      retracementDepthSuffix(fib, currentPrice),
               ];
     // Same reasoning as `fibLine`, for the separate A→B→C swing triplet the
     // `Fib ABC ext …%` levels (above) are anchored on (spec 2026-09-18 §A3).
@@ -1091,7 +1160,8 @@ const formatMarketReferenceSection = (
     reference: MarketReference,
     timeframe: Timeframe,
     priceDp: number,
-    assetClass: AssetClass
+    assetClass: AssetClass,
+    currentPrice: number | null
 ): string =>
     [
         MARKET_REFERENCE_HEADER,
@@ -1103,7 +1173,8 @@ const formatMarketReferenceSection = (
                 reference[key],
                 timeframe,
                 priceDp,
-                assetClass
+                assetClass,
+                currentPrice
             )
         ),
         formatPivotTableLine(reference.pivots, priceDp),
@@ -1646,7 +1717,25 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         "- When ## Deterministic Metrics shows a Short-Term Washout reading other than none, state it next to the tally with its Measured line, and say plainly that a bearish tally is that reading's normal state rather than evidence against it.",
         '',
         '### Indicator State',
-        '- ## Indicator State is computed; do not re-derive these comparisons. Every above/below-MA/EMA distance, MA stack, MACD-vs-signal/zero, DMI/ADX regime, Stochastic zone, Ichimoku cloud position, Bollinger position, and Supertrend/Parabolic SAR/ATR distance already appears there — cite it, never recompute it.',
+        '- ## Indicator State is computed; do not re-derive these comparisons. Every line below already holds the answer — cite it, never recompute it, and never contradict it:',
+        "  - `Price vs MA` / `Price vs EMA`: the price's distance from each average — not a gap between two averages.",
+        '  - `MA spreads`: the only gaps between two MAs. Quote this figure or say nothing about an MA-to-MA gap.',
+        '  - `MA stack` / `EMA stack`: the full order. Only `bullish` is a full bullish alignment (정배열) and only `bearish` a full bearish one (역배열); `mixed` is neither and its parenthesized order is the real order. The `price/EMA9/EMA20` label on ## Market Reference `Structure:` lines covers only those three values.',
+        '  - `MA cycle (MA5/MA20/MA60)`: the order and stage for the MA cycle strategy — copy both; do not read the order off the MA values yourself.',
+        '  - `MACD cycle`: the same for the MACD cycle strategy.',
+        '  - `RSI zone`, `Stochastic` zone, `Bollinger` position: call an oscillator overbought or oversold only when its line says so.',
+        '  - `Gap (last bar vs previous bar)`: whether the last bar gapped and by how much of ATR — the gap strategy quotes this verdict instead of comparing bars itself.',
+        '- Other computed lines elsewhere in the prompt follow the same rule:',
+        '  - ## Long-term Context `Current vs High/Low`: distances from the period high and low (e.g. "15.26% below the period high"), not ratios.',
+        '  - ## Market Reference `Fib anchor` lines end with how far the price has retraced that leg — quote it; do not work out a retracement percentage.',
+        "  - ## Chart Pattern Candidates `Spacing (bars)`: bars between the pattern's peaks/troughs/shoulders — quote it for any spacing rule; do not count bars from dates.",
+        '  - ## Detected Candle Patterns: each line names the bar the pattern was detected on; describe that bar (its row is in ## Recent Bar Data), and keep the prose consistent with its `[trend: …]` label.',
+        '',
+        '### Consistency Across Fields',
+        '- Each chart pattern has its own breakout, target and invalidation. Never say several patterns share a level unless their printed levels are identical; name each pattern with its own level.',
+        '- Attach a date to a price only when that date is printed next to that price in the data (bar rows, key points, candidate lines). Otherwise name the price without a date or month.',
+        '- Give one long-term direction everywhere: the summary, the strategy cards and actionRecommendation must not call the long-term structure rising in one place and falling in another.',
+        '- When a level is broken, say the price moved past that level — not that it reached the next one (falling below the 38.2% retracement means the retracement is deeper than 38.2%, not 61.8%).',
         '',
         '### Conflicting Signals',
         '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has stronger confluence.',
@@ -2431,6 +2520,9 @@ export function buildAnalysisPrompt(
             // slices its own trailing 20-bar window (spec 2026-09-18), so
             // this no longer needs to hand-size the slice itself.
             priorVolumes: bars.slice(0, -1).map(b => b.volume),
+            rsi: lastNonNull(indicators.rsi),
+            lastBar: bars.at(-1),
+            prevBar: bars.at(-2),
         }),
         formatProIndicatorSection(indicators, config, precision),
         formatSMCSection(indicators, bars, priceDp, atrForPatternGeometry),
@@ -2449,7 +2541,8 @@ export function buildAnalysisPrompt(
             marketReference,
             timeframe,
             priceDp,
-            assetClass
+            assetClass,
+            bars.length > 0 ? bars[bars.length - 1].close : null
         ),
         // Placed after the reference levels it quotes: the risk:reward half is arithmetic
         // over the levels rendered immediately above, and reading the inputs before the

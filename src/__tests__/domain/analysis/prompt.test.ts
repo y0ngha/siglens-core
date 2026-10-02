@@ -16,7 +16,10 @@ import {
     PRO_RELIABILITY_NOTE,
     PROMPT_CONFIG_BY_TIMEFRAME,
     REGIME_CONTEXT_SECTION_HEADER,
+    retracementDepthSuffix,
+    distanceFromExtreme,
 } from '@/domain/analysis/prompt';
+import { INDICATOR_STATE_SECTION_HEADER } from '@/domain/analysis/indicatorState';
 import { calculateIndicators } from '@/domain/indicators/index';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
 import doubleTopFixture from '@/__tests__/domain/patterns/fixtures/double-top.json';
@@ -2357,7 +2360,35 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toMatch(/\[\d+ bars ago] Multi-candle pattern: .+/);
+            expect(result).toMatch(
+                /\[\d+ bars ago · bar \d{4}-\d{2}-\d{2} \d{2}:\d{2}] Multi-candle pattern: .+/
+            );
+        });
+
+        it('패턴 줄의 봉 날짜는 N bars ago 위치의 실제 봉과 같고, Recent Bar Data 행에 그대로 있다', () => {
+            const bars = makeEngulfingBars();
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                []
+            );
+            const lines = result.split('\n');
+            const entries = lines
+                .map(l =>
+                    l.match(
+                        /^- \[(\d+) bars ago · bar (\d{4}-\d{2}-\d{2} \d{2}:\d{2})]/
+                    )
+                )
+                .filter((m): m is RegExpMatchArray => m !== null);
+            expect(entries.length).toBeGreaterThan(0);
+            for (const [, ago, date] of entries) {
+                const bar = bars[bars.length - 1 - Number(ago)]!;
+                expect(lines).toContainEqual(
+                    expect.stringContaining(`[ts:${bar.time}] ${date} |`)
+                );
+            }
         });
 
         it('다봉 패턴 라인에 사전 계산된 trend가 포함된다', () => {
@@ -2384,7 +2415,9 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toMatch(/\[\d+ bars ago] Single candle pattern: .+/);
+            expect(result).toMatch(
+                /\[\d+ bars ago · bar \d{4}-\d{2}-\d{2} \d{2}:\d{2}] Single candle pattern: .+/
+            );
         });
 
         it('단봉 패턴 라인에 사전 계산된 trend가 포함된다', () => {
@@ -5512,6 +5545,100 @@ describe('prompt', () => {
             );
         });
 
+        it("ends each Fib anchor line with the snapshot price's retracement depth of that leg", () => {
+            const prompt = buildRealisticPrompt();
+            const price = Number(
+                prompt.match(
+                    /Snapshot Price \(price captured at analysis time; not a live quote\): ([\d.]+)/
+                )![1]
+            );
+            const anchors = prompt
+                .split('\n')
+                .filter(l => l.startsWith('Fib anchor:'));
+            expect(anchors.length).toBeGreaterThan(0);
+            for (const line of anchors) {
+                const m = line.match(
+                    /swing (low|high) ([\d.]+) → swing (high|low) ([\d.]+) \((up|down) leg\)(.*)$/
+                )!;
+                const [a, b] = [Number(m[2]), Number(m[4])];
+                const [high, low] = m[5] === 'up' ? [b, a] : [a, b];
+                const pulled = m[5] === 'up' ? high - price : price - low;
+                const tail = m[6];
+                if (pulled < 0) expect(tail).toContain('(no retracement)');
+                else if (pulled > high - low)
+                    expect(tail).toContain('(leg fully retraced)');
+                else
+                    expect(tail).toBe(
+                        `; price ${((pulled / (high - low)) * 100).toFixed(1)}% retraced`
+                    );
+            }
+        });
+
+        it('labels the Structure-line EMA stack with the three values it compares', () => {
+            const prompt = buildRealisticPrompt();
+            expect(prompt).toMatch(
+                /Structure: .*; price\/EMA9\/EMA20 (aligned_up|aligned_down|mixed);/
+            );
+            expect(prompt).not.toMatch(
+                /; EMA (aligned_up|aligned_down|mixed);/
+            );
+        });
+
+        it('dates the Long-term Context period high/low and states them as distances (exact values)', () => {
+            // bar 1 holds the period high (150), bar 2 the period low (50); last close 100
+            const bars = [
+                makeBar(0, 100),
+                { ...makeBar(1, 120), high: 150 },
+                { ...makeBar(2, 60), low: 50 },
+                makeBar(3, 100),
+            ];
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                []
+            );
+            const rowDate = (i: number): string =>
+                result
+                    .split('\n')
+                    .find(l => l.startsWith(`[ts:${bars[i]!.time}] `))!
+                    .split(' | ')[0]!
+                    .slice(`[ts:${bars[i]!.time}] `.length);
+            expect(result).toContain(`- Period High: 150.00 (${rowDate(1)})`);
+            expect(result).toContain(`- Period Low: 50.00 (${rowDate(2)})`);
+            // 100 vs 150 → 33.33% below; 100 vs 50 → 100.00% above (the old ratio format printed 66.67% / 200.00%)
+            expect(result).toContain(
+                '- Current vs High: 33.33% below the period high'
+            );
+            expect(result).toContain(
+                '- Current vs Low: 100.00% above the period low'
+            );
+        });
+
+        it('guidelines name every computed Indicator State line, and each named line is actually rendered', () => {
+            const prompt = buildRealisticPrompt();
+            expect(prompt).toContain('### Consistency Across Fields');
+            const names = [
+                'MA spreads',
+                'MA stack',
+                'EMA stack',
+                'MA cycle (MA5/MA20/MA60)',
+                'RSI zone',
+                'Gap (last bar vs previous bar)',
+            ];
+            const guideStart = prompt.indexOf('### Indicator State');
+            const guideEnd = prompt.indexOf('### Consistency Across Fields');
+            const guide = prompt.slice(guideStart, guideEnd);
+            const section = prompt.slice(
+                prompt.indexOf(INDICATOR_STATE_SECTION_HEADER)
+            );
+            for (const name of names) {
+                expect(guide).toContain(`\`${name}`);
+                expect(section).toContain(`- ${name}:`);
+            }
+        });
+
         it('renders a Fib ABC anchor line once a 3rd (C) swing confirms after B (spec 2026-09-18 §A3)', () => {
             const prompt = buildRealisticPrompt();
             // Realistic bars oscillate (Math.sin) enough to confirm a 3rd
@@ -6128,5 +6255,61 @@ describe('Fib table lines never print a non-positive level', () => {
             2
         );
         expect(line).toBe('Fib ABC table: 100% 20.00 / 161.8% N/A');
+    });
+});
+
+describe('retracementDepthSuffix', () => {
+    const up = { direction: 'up' as const, high: 386.83, low: 354.05 };
+    const down = { direction: 'down' as const, high: 234.76, low: 208.93 };
+
+    it('is the pullback from the leg end as a share of the leg (TSLA 2026-10-02: 44.9%, not 55%)', () => {
+        expect(retracementDepthSuffix(up, 372.12)).toBe(
+            '; price 44.9% retraced'
+        );
+        expect(retracementDepthSuffix(down, 221.84)).toBe(
+            '; price 50.0% retraced'
+        );
+    });
+
+    it('says the price is beyond the leg end instead of a negative depth', () => {
+        expect(retracementDepthSuffix(up, 390)).toBe(
+            '; price beyond the swing high (no retracement)'
+        );
+        expect(retracementDepthSuffix(down, 200)).toBe(
+            '; price beyond the swing low (no retracement)'
+        );
+    });
+
+    it('says the leg is fully retraced instead of a depth over 100%', () => {
+        expect(retracementDepthSuffix(down, 236.66)).toBe(
+            '; price beyond the swing high (leg fully retraced)'
+        );
+        expect(retracementDepthSuffix(up, 350)).toBe(
+            '; price beyond the swing low (leg fully retraced)'
+        );
+    });
+
+    it('is empty when the price or the leg is unusable', () => {
+        expect(retracementDepthSuffix(up, null)).toBe('');
+        expect(retracementDepthSuffix(up, Number.NaN)).toBe('');
+        expect(
+            retracementDepthSuffix({ direction: 'up', high: 10, low: 10 }, 10)
+        ).toBe('');
+    });
+});
+
+describe('distanceFromExtreme', () => {
+    it('reads as a distance, not a ratio (NVDA 2026-10-02: +173.22%, not "273.22%")', () => {
+        expect(distanceFromExtreme(236.66, 86.62, 'low')).toBe(
+            '173.22% above the period low'
+        );
+        expect(distanceFromExtreme(57.16, 67.45, 'high')).toBe(
+            '15.26% below the period high'
+        );
+    });
+
+    it('is N/A when the extreme is not a positive number', () => {
+        expect(distanceFromExtreme(10, 0, 'low')).toBe('N/A');
+        expect(distanceFromExtreme(10, Number.NaN, 'high')).toBe('N/A');
     });
 });

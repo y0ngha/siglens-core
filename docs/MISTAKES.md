@@ -362,6 +362,19 @@ and have been removed from this file.
    ✅ Every JSDoc tag's claim must be verified by (1) reading the actual implementation, (2) adding test cases for documented branches/exceptions
    → Recurring mistake (PR #99, PR #210 R2): @adapter on factory function, @throws incomplete/missing, documentation of "never throws" contradicts actual catch/rethrow logic
       When JSDoc describes error handling, exception contract, or tag placement (class vs factory), verify with implementation code and test the documented path
+
+11.5. JSDoc blocks must immediately precede their target declaration
+   → Inserting code (functions, constants, types) between a JSDoc block and its target symbol orphans the JSDoc, causing it to misapply to the new code or leave the target undocumented
+   → When refactoring, adding related constants, or splitting functions, verify JSDoc remains adjacent to its intended target
+   ❌ /** @internal Input to buildIndicatorStateSection. */
+      const MA_CYCLE_PERIODS = { short: 5, medium: 20, long: 60 } as const;  // inserted here
+      export interface IndicatorStateInput { ... }  // lost its doc and @internal; the doc now "documents" the constant
+   ❌ When splitting a function into two pieces, leaving original JSDoc above only the new piece leaves the original piece undocumented
+   ✅ /** MA periods of the MA cycle strategy. */ const MA_CYCLE_PERIODS = { ... } as const;
+      /** @internal Input to buildIndicatorStateSection. */ export interface IndicatorStateInput { ... }
+   ✅ When splitting a function, split its JSDoc too: give each piece its own JSDoc describing that specific piece
+   → Recurring (fix/history-window-cache-churn, fix/ma-spread-facts R1–R2): new constants inserted between JSDoc and target type; split functions leaving JSDoc with only one piece.
+      Checkpoint: after any refactoring that adds declarations, verify each JSDoc still immediately precedes its intended target (no intervening code).
 ```
 
 ---

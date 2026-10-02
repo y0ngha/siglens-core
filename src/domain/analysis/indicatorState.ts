@@ -1,9 +1,12 @@
 // All AI-facing prompt strings must be in English — Korean reduces analysis quality.
 
 import {
+    RSI_OVERBOUGHT_LEVEL,
+    RSI_OVERSOLD_LEVEL,
     STOCHASTIC_OVERBOUGHT_LEVEL,
     STOCHASTIC_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
+import { GAP_MIN_ATR_MULT } from '@/domain/signals/constants';
 import { ADX_TRENDING_THRESHOLD } from '@/domain/analysis/marketReferenceConstants';
 import {
     formatNullableNumber,
@@ -83,9 +86,12 @@ function maEmaLine(
 }
 
 /**
- * @internal `bullish (MA5>MA20>MA60>MA120)` / `bearish (…<…)` / `mixed`, or
- * `'N/A'` when fewer than 2 of `periods` have a value. Only periods with a
- * value are included, in the caller's period order (spec §2.2).
+ * @internal `bullish (MA5>MA20>MA60>MA120)` / `bearish (…<…)` /
+ * `mixed (MA20>MA200>MA60…)`, or `'N/A'` when fewer than 2 of `periods` have
+ * a value. Only periods with a value are included. `bullish`/`bearish` keep
+ * the caller's period order; `mixed` lists the MAs from highest to lowest
+ * value, so the model reads the actual order instead of inferring one — a
+ * bare `mixed` was narrated as "정배열" (MSTR, 2026-10-02).
  */
 function stackLine(
     label: 'MA' | 'EMA',
@@ -97,10 +103,42 @@ function stackLine(
         .filter((x): x is { p: number; v: number } => x.v !== null);
     const verdict = classifyStackOrder(points.map(x => x.v));
     if (verdict === null) return `- ${label} stack: N/A`;
-    if (verdict === 'mixed') return `- ${label} stack: mixed`;
+    if (verdict === 'mixed') {
+        const byValue = points.toSorted((a, b) => b.v - a.v);
+        return `- ${label} stack: mixed (${byValue.map(x => `${label}${x.p}`).join('>')})`;
+    }
     const labels = points.map(x => `${label}${x.p}`);
     const joiner = verdict === 'bullish' ? '>' : '<';
     return `- ${label} stack: ${verdict} (${labels.join(joiner)})`;
+}
+
+/**
+ * @internal `- MA spreads: MA5 above MA20 by x.xx% / MA60 below MA120 by …` —
+ * each MA's distance from the next-longer one, adjacent pairs in period
+ * order. The model has only price-vs-MA distances otherwise and turned
+ * "price 36.1% above MA60" into "the MA20–MA60 gap is 36%" (MSTR,
+ * 2026-10-02); giving the real MA-to-MA figure leaves nothing to derive.
+ * Written as a sentence ("A below B by x%") rather than "A vs B below by x%":
+ * the latter was read backwards ("MA60 대비 MA120 9.02% 아래") in the A/B run.
+ * Pairs missing either value are skipped; `N/A` when no pair survives.
+ */
+function maSpreadLine(
+    label: 'MA' | 'EMA',
+    periods: readonly number[],
+    series: Record<number, (number | null)[]>
+): string {
+    const parts = periods.slice(1).flatMap((longer, i) => {
+        const shorter = periods[i];
+        const dist = distanceFromLevel(
+            lastValueOf(series[shorter]),
+            lastValueOf(series[longer])
+        );
+        if (!dist) return [];
+        // dist is `above by x%` / `below by x%` — put the other MA between side and amount
+        const [side, amount] = dist.split(' by ');
+        return [`${label}${shorter} ${side} ${label}${longer} by ${amount}`];
+    });
+    return `- ${label} spreads: ${parts.length ? parts.join(' / ') : 'N/A'}`;
 }
 
 /** @internal Histogram trend as already classified by the caller's own `detectTrend`. */
@@ -339,6 +377,108 @@ function volumeLine(
     return `- Volume: last bar ${formatNullableNumber(ratio, PCT_DP)}× 20-bar average`;
 }
 
+/** MA periods of the 이동평균선 대순환 (MA cycle) strategy: short, medium, long. */
+const MA_CYCLE_PERIODS = { short: 5, medium: 20, long: 60 } as const;
+
+type MaCycleRole = keyof typeof MA_CYCLE_PERIODS;
+
+/** MA cycle stage by top-to-bottom role order (skills/strategies/ma-cycle.md stage table). */
+const MA_CYCLE_STAGE: Readonly<Record<string, number>> = {
+    'short>medium>long': 1,
+    'medium>short>long': 2,
+    'medium>long>short': 3,
+    'long>medium>short': 4,
+    'long>short>medium': 5,
+    'short>long>medium': 6,
+};
+
+const MA_CYCLE_LABEL = `- MA cycle (${(['short', 'medium', 'long'] as const)
+    .map(role => `MA${MA_CYCLE_PERIODS[role]}`)
+    .join('/')})`;
+
+/**
+ * @internal `- MA cycle (MA5/MA20/MA60): MA5>MA20>MA60; stage 1` — the
+ * 이동평균선 대순환 stage, which is fixed by the order of the three MAs alone.
+ * The model read the order off the values itself and wrote "MA5 44.24 >
+ * MA60 39.97 > MA20 40.90" with the stage that order implies, in every IONQ
+ * run of the 2026-10-02 A/B. `N/A` on a missing value or a tie.
+ */
+function maCycleLine(series: Record<number, (number | null)[]>): string {
+    const pts = (['short', 'medium', 'long'] as const).map(role => ({
+        role,
+        p: MA_CYCLE_PERIODS[role],
+        v: lastValueOf(series[MA_CYCLE_PERIODS[role]]),
+    }));
+    const valued = pts.filter(
+        (x): x is { role: MaCycleRole; p: (typeof x)['p']; v: number } =>
+            x.v !== null
+    );
+    if (valued.length < pts.length) return `${MA_CYCLE_LABEL}: N/A`;
+    const sorted = valued.toSorted((a, b) => b.v - a.v);
+    if (sorted[0].v === sorted[1].v || sorted[1].v === sorted[2].v)
+        return `${MA_CYCLE_LABEL}: N/A (two MAs equal)`;
+    const stage = MA_CYCLE_STAGE[sorted.map(x => x.role).join('>')];
+    return `${MA_CYCLE_LABEL}: ${sorted.map(x => `MA${x.p}`).join('>')}; stage ${stage}`;
+}
+
+/** @internal `- RSI(14): 64.83 neutral (overbought ≥ 70, oversold ≤ 30)` — so "과열" is never said of a sub-70 RSI. */
+function rsiLine(rsi: number | null | undefined): string {
+    if (!isFinite(rsi)) return '- RSI zone: N/A';
+    const zone =
+        rsi >= RSI_OVERBOUGHT_LEVEL
+            ? 'overbought'
+            : rsi <= RSI_OVERSOLD_LEVEL
+              ? 'oversold'
+              : 'neutral';
+    return `- RSI zone: ${formatNullableNumber(rsi, PCT_DP)} ${zone} (overbought ≥ ${RSI_OVERBOUGHT_LEVEL}, oversold ≤ ${RSI_OVERSOLD_LEVEL})`;
+}
+
+/** @internal High/low of one bar, for the gap line. */
+export interface BarRange {
+    high: number;
+    low: number;
+}
+
+/**
+ * @internal `- Gap (last bar vs previous bar): up 3.52 = 0.39× ATR …` — the
+ * same rule as the engine's `gap_up`/`gap_down` signals (last low above the
+ * previous high, or last high below the previous low, by ≥ 0.25× ATR). The
+ * gap skill used to leave this comparison to the model, which saw a 3.52
+ * gap over a 2.25 minimum and called it "no gap" (MSTR, 2026-10-02 A/B).
+ */
+function gapLine(
+    last: BarRange | undefined,
+    prev: BarRange | undefined,
+    atr: number | null | undefined,
+    dp: number
+): string {
+    const label = '- Gap (last bar vs previous bar)';
+    if (
+        !last ||
+        !prev ||
+        ![last.high, last.low, prev.high, prev.low].every(isFinite)
+    )
+        return `${label}: N/A`;
+    const up = last.low - prev.high;
+    const down = prev.low - last.high;
+    if (up <= 0 && down <= 0) return `${label}: none (the two bars overlap)`;
+    const size = up > 0 ? up : down;
+    const desc =
+        up > 0
+            ? `up — last low ${formatNullableNumber(last.low, dp)} above previous high ${formatNullableNumber(prev.high, dp)} by ${formatNullableNumber(size, dp)}`
+            : `down — last high ${formatNullableNumber(last.high, dp)} below previous low ${formatNullableNumber(prev.low, dp)} by ${formatNullableNumber(size, dp)}`;
+    if (!isFinitePositive(atr)) return `${label}: ${desc} (ATR N/A)`;
+    const mult = size / atr;
+    // Same comparison as `detectGapUp`/`detectGapDown` (size vs mult × ATR, not
+    // the rounded ratio), so the line can never disagree with the engine signal
+    // at the boundary.
+    const counts =
+        size >= GAP_MIN_ATR_MULT * atr
+            ? `counts as a gap (≥ ${GAP_MIN_ATR_MULT}× ATR)`
+            : `below the ${GAP_MIN_ATR_MULT}× ATR minimum — not a gap`;
+    return `${label}: ${desc} = ${formatNullableNumber(mult, PCT_DP)}× ATR, ${counts}`;
+}
+
 /** @internal Input to {@link buildIndicatorStateSection}. Every field is nullable/optional per the null rule. */
 export interface IndicatorStateInput {
     /** Last bar close. */
@@ -377,6 +517,11 @@ export interface IndicatorStateInput {
      * `N/A` when fewer than {@link VOLUME_AVG_WINDOW} are available.
      */
     priorVolumes: readonly (number | null | undefined)[];
+    /** Latest RSI(14). Optional so older callers/tests keep compiling; the prompt always passes it. */
+    rsi?: number | null;
+    /** Last and previous bar high/low for the gap line. Optional for the same reason. */
+    lastBar?: BarRange;
+    prevBar?: BarRange;
 }
 
 /**
@@ -395,6 +540,10 @@ export function buildIndicatorStateSection(input: IndicatorStateInput): string {
         maEmaLine('MA', input.price, input.maPeriods, input.ma),
         maEmaLine('EMA', input.price, input.emaPeriods, input.ema),
         stackLine('MA', input.maPeriods, input.ma),
+        maSpreadLine('MA', input.maPeriods, input.ma),
+        stackLine('EMA', input.emaPeriods, input.ema),
+        maCycleLine(input.ma),
+        rsiLine(input.rsi),
         macdLine(input.macd, input.macdHistogramTrend),
         dmiLine(input.dmi),
         stochasticLine(input.stochastic),
@@ -413,5 +562,6 @@ export function buildIndicatorStateSection(input: IndicatorStateInput): string {
         atrPctLine(input.atr, input.price),
         macdCycleLine(input.ema, input.diffDp),
         volumeLine(input.lastVolume, input.priorVolumes),
+        gapLine(input.lastBar, input.prevBar, input.atr, input.diffDp),
     ].join('\n');
 }
