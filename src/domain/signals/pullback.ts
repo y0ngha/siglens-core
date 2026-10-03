@@ -10,8 +10,8 @@ import type { Bar } from '@/domain/types';
  * above the 200-day average, replacing the confluence rule), re-measured on independent data
  * for the analysis products (docs/superpowers/specs/2026-09-25-pullback-washout-design.md).
  *
- * Named as readings of the chart, never as instructions — the same rule that named the
- * confluence triggers `entryRuleMet` / `exitRuleMet` in consumer tool output.
+ * Named as readings of the chart, never as instructions — the same rule that keeps the
+ * confluence trigger states out of the agent's tool output altogether.
  */
 export type PullbackReading =
     'washoutInUptrend' | 'nearWashoutInUptrend' | 'washoutBelowMa200' | 'none';

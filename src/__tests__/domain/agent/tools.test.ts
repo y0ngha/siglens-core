@@ -90,8 +90,13 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_bars_indicators')?.description).toContain(
             'higherTimeframe'
         );
+        // The confluence rule states are no longer in the result (2026-10-03);
+        // the snapped 92/8 score carries them instead.
+        expect(findToolSpec('get_bars_indicators')?.description).not.toContain(
+            'entryRuleMet'
+        );
         expect(findToolSpec('get_bars_indicators')?.description).toContain(
-            'entryRuleMet/exitRuleMet'
+            '92 or 8 means the bullish or the bearish trigger conditions of the tally all held on the last bar;'
         );
         // ranges['20bars']/['60bars'] — 20/60-bar high/low, distinct from the 252-bar `range`.
         expect(findToolSpec('get_bars_indicators')?.description).toContain(
@@ -109,8 +114,15 @@ describe('AGENT_TOOL_SPECS', () => {
         const bars = findToolSpec('get_bars_indicators')?.description ?? '';
         expect(bars).toContain('`pullback`');
         expect(bars).toContain(
-            'washoutInUptrend | nearWashoutInUptrend | washoutBelowMa200 | none'
+            'washoutInUptrend | nearWashoutInUptrend | washoutBelowMa200)'
         );
+        // pullback is null for no washout (2026-10-03); a 'none' reading the
+        // model could report must not come back into the contract.
+        expect(bars).not.toContain('| none');
+        expect(bars).toContain('null when there is no washout reading');
+        expect(bars).not.toContain('still a tally');
+        // RSI(2) stays available when there is no washout block.
+        expect(bars).toContain('RSI(2) as `rsi2` on 1Day only');
         expect(bars).toContain('williamsR, rsi2, closeVsMa200Pct, ma5');
         expect(bars).toContain('`measured`');
         // confluence is described as descriptive, not as a signal with an edge.
