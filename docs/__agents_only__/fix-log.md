@@ -143,10 +143,6 @@
 
 ### ### Round 2 (recommended, fixed)
 
-- Violation 1: RETRACEMENT_DEPTH_DP inserted between `retracementDepthSuffix`'s JSDoc and the function — same displaced-JSDoc defect as R1 Violation 2
-  Rule: MISTAKES 11.5
-  Context: Constant moved above the JSDoc block.
-
 Round 3: approved
 
 ## [Branch fix/history-window-cache-churn | 2026-09-30] — Round 1 review findings
@@ -231,10 +227,6 @@ Round 5: approved
   Rule: Cache builders' template/prompt versions not bumped when rendered bytes change (see Infrastructure #6)
   Context: New Indicator State lines, Long-term Context/Fib anchor/candle/pattern-candidate format changes and the rewritten guidelines changed the technical prompt's bytes; version incremented from p20 to p21 with history comment. config.test expectation updated to match new version.
 
-- Violation 2: New MA-cycle constants inserted between `IndicatorStateInput`'s JSDoc and the interface — the doc described the constants and the export lost `@internal`
-  Rule: MISTAKES 11.5 — a JSDoc block must sit directly on its declaration
-  Context: Moved the JSDoc back onto the interface and documented the constants separately.
-
 - Violation 3: prettier --check failed on the six changed files
   Rule: CONVENTIONS — formatting enforced (`yarn format:check`)
   Context: prettier applied; format:check passes.
@@ -267,10 +259,6 @@ Round 5: approved
 
 ### Round 2 (recommended, fixed)
 
-- Violation 1: RETRACEMENT_DEPTH_DP inserted between `retracementDepthSuffix`'s JSDoc and the function — same displaced-JSDoc defect as R1 Violation 2
-  Rule: MISTAKES 11.5
-  Context: Constant moved above the JSDoc block.
-
 Round 3: approved
 
 ## [Branch feat/agent-style-confluence | 2026-10-03] — Round 1 review findings
@@ -289,3 +277,17 @@ Round 3: approved
   Context: Hedge bullet now says the caveat is always kept.
 
 Round 2: approved
+
+## [Branch feat/agent-style-confluence | 2026-10-03] — Round 3 review findings (after A/B-driven prompt revision)
+
+- Violation 1 (recommended): A required prompt clause ("rule-based tally, not a forecast") conflicted with the new Writing style contrast ban and hedge-once rule
+  Rule: Rules inside one prompt must not give opposite instructions; required wording needs an explicit carve-out
+  Context: Wording is pinned by a 2026-09-25 user decision, so the contrast bullet now names the caveat and tally qualifier as required wording.
+- Violation 2 (recommended): "Both levels keep ... the invalidation level" stayed unconditional after Plain step 5 allowed no levels for market-wide answers
+  Rule: When a rule gains an exception, update every other line that restates the rule
+  Context: Now "the invalidation level whenever a tool returned one".
+- Violation 3 (recommended): Removed contract text ('| none' in the pullback enum, "still a tally") had no negative assertions
+  Rule: A removal that fixes model misbehaviour needs a not.toContain guard so a revert fails the suite
+  Context: Added not.toContain assertions in tools.test.ts.
+
+Round 4: approved

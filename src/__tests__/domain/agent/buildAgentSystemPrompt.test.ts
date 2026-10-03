@@ -287,7 +287,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-03.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-03.2');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -435,9 +435,12 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).not.toContain('Confluence rules:');
         expect(prompt).not.toContain('entryRuleMet');
         expect(prompt).not.toContain('rule states');
+        // Positive wording, qualifier once: a "never call it a buy/sell rule"
+        // line made the model write "not a buy/sell rule" disclaimers.
         expect(prompt).toContain(
-            'never call the tally, its score or its signals a buy or sell rule or signal'
+            'describe it as how far the indicator families agree, and say once in the answer that it is a rule-based tally, not a forecast'
         );
+        expect(prompt).not.toMatch(/buy or sell rule/);
         expect(prompt).toContain('Higher timeframe:');
         expect(prompt).toContain(
             "higherTimeframe is the next larger timeframe's trend and tally"
@@ -453,7 +456,56 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'These rules decide wording only. Every Depth and Output rule above still decides what goes in the answer.'
         );
+        // The contrast ban must not fight the required caveat / tally qualifier.
+        expect(prompt).toContain(
+            'The one-line caveat and the once-per-answer tally qualifier the confluence rule asks for are required wording, not rhetorical contrast.'
+        );
         expect(prompt).toContain('not "매수 규칙 미충족" / "buy rule not met"');
+        // Raw enum labels and underscore ids leaked into Korean answers.
+        expect(prompt).toContain(
+            'Never print a field name, a raw label (none, mixed, bullish, GREED, NEUTRAL, normal, wait, true/false) or an identifier with underscores'
+        );
+        expect(prompt).toContain('not "three_outside_down"');
+    });
+
+    /** A/B 2026-10-03: 쉬운 답변이 숫자 ~41개를 실었다(기준 ~15). 예산을 세는 단위와 줄일 곳을 못 박는다. */
+    it('쉬운 답변의 숫자 예산을 세는 법과 줄일 곳을 명시한다', () => {
+        // An allow-list per step, not "count to fifteen": counting cut the
+        // A/B average from ~40 to ~31 numbers, the allow-list to ~21.
+        expect(prompt).toContain(
+            'The only numbers a Plain answer carries are the ones each step below allows, about fifteen in total'
+        );
+        expect(prompt).toContain('Numbers: the last price and its change.');
+        expect(prompt).toContain('at most one number per point');
+        expect(prompt).toContain(
+            'a good side and a caution side, one sentence each, in words only'
+        );
+        expect(prompt).toContain(
+            'the up case and the down case, one trigger level each and no targets'
+        );
+        expect(prompt).toContain('No other number goes in');
+        expect(prompt).toContain(
+            'the invalidation level whenever a tool returned one'
+        );
+        // A market-wide answer has no tool-given levels; the model invented
+        // "코스피 7,000선 지지" to fill the summary line.
+        expect(prompt).toContain(
+            'Use only levels a tool returned; when none did (a market-wide question, for instance), give the summary and the caveat without levels rather than picking round numbers.'
+        );
+        // Restated in the closing reminder: the end of the prompt is read last.
+        expect(prompt).toMatch(
+            /Reminder: at the Plain level, keep the answer to about fifteen numbers\.\nReminder: when you call tools/
+        );
+        // The style section must not push numbers back into a Plain answer.
+        expect(prompt).toContain(
+            'never add a figure for it at the Plain level, where the figure budget still applies'
+        );
+    });
+
+    it('눌림 판독이 none이면 언급하지 않게 한다', () => {
+        expect(prompt).toContain(
+            'When pullback is null, say nothing about it at either level.'
+        );
     });
 
     it('문체 규칙은 영어 답변에도 같은 섹션으로 들어간다 — 영어 고유 패턴 포함', () => {
