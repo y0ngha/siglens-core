@@ -278,7 +278,7 @@ ${ruleLines(available, newsGapRule)}
 - Answer in ${language}.
 - Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
 - Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: SIGLENS 시세, 2026-09-12 21:57 KST 기준)").
-- Tool timestamps are already converted to the user's local time and labelled, in the same form as the local time under "Now" below. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
+- Tool timestamps are already converted to the user's local time and labelled, in the same form as the "User's local time" line under "Now" below. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory.
 - Web search results are snippets: say only what a snippet says, name the site or publisher and its date, and say so when the newest result is older than the period the user asked about.

@@ -549,6 +549,11 @@ describe('buildAgentSystemPrompt', () => {
         const b = at(new Date('2026-10-01T03:21:00Z'), ['AAPL']);
         const prefix = (p: string) => p.slice(0, p.indexOf('## User'));
         expect(prefix(a)).toBe(prefix(b));
+        // The Output rule points at the Now line by its exact label.
+        expect(a).toContain(
+            'in the same form as the "User\'s local time" line under "Now" below.'
+        );
+        expect(a).toContain("- User's local time: ");
         expect(a).not.toBe(b);
     });
 
