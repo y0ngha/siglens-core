@@ -121,6 +121,8 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(bars).not.toContain('| none');
         expect(bars).toContain('null when there is no washout reading');
         expect(bars).not.toContain('still a tally');
+        // RSI(2) stays available when there is no washout block.
+        expect(bars).toContain('RSI(2) as `rsi2` on 1Day only');
         expect(bars).toContain('williamsR, rsi2, closeVsMa200Pct, ma5');
         expect(bars).toContain('`measured`');
         // confluence is described as descriptive, not as a signal with an edge.

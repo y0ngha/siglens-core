@@ -291,3 +291,11 @@ Round 2: approved
   Context: Added not.toContain assertions in tools.test.ts.
 
 Round 4: approved
+
+## [Branch feat/agent-style-confluence | 2026-10-03] — Round 5 review findings (RSI(2) surfaced in latest indicators)
+
+- Violation 1 (recommended): Tool description promised a new consumer-built field (`rsi2`) but the PUBLIC_API consumer-action note did not tell consumers to add it
+  Rule: When a tool description promises a field the consumer builds, the PUBLIC_API consumer-action note must list it
+  Context: Note now says to surface RSI(2) as `rsi2` in the 1Day latest-indicator view.
+
+Round 6: approved
