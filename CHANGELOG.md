@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.8.0](https://github.com/y0ngha/siglens-core/compare/v2.7.1...v2.8.0) (2026-10-03)
+
+### Features
+
+* 에이전트 시스템 프롬프트 confluence 통합 및 작문 스타일 개선 ([#248](https://github.com/y0ngha/siglens-core/issues/248)) ([7910322](https://github.com/y0ngha/siglens-core/commit/791032279aa887fd8e46a64ff96cc13888fde9c6))
+
 ## [2.7.1](https://github.com/y0ngha/siglens-core/compare/v2.7.0...v2.7.1) (2026-10-02)
 
 ### Bug Fixes
