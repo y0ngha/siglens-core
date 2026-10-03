@@ -272,3 +272,20 @@ Round 5: approved
   Context: Constant moved above the JSDoc block.
 
 Round 3: approved
+
+## [Branch feat/agent-style-confluence | 2026-10-03] — Round 1 review findings
+
+- Violation 1 (required): AGENT_PROMPT_VERSION bump + prompt text/tool description change without a docs/PUBLIC_API.md revision row
+  Rule: Every agent prompt-text or tool-description change records a PUBLIC_API.md revision row (recurred from the earlier agent-analyst-voice review)
+  Context: Added the 2026-10-03 row (rule-state references removed, Writing style section, cache-prefix invariant, consumer action).
+- Violation 2 (recommended): Tool description claimed 92 or 8 means "every" condition held; the exit (8) side has no HTF/volume gate
+  Rule: Model-facing descriptions must match the engine exactly (confluence.ts entry vs exit triggers)
+  Context: Reworded to "the bullish or the bearish trigger conditions of the tally all held on the last bar".
+- Violation 3 (recommended): Em-dash guard test scanned only "Korean example:" quotes, narrower than its stated purpose
+  Rule: A guard test must cover every instance its name promises
+  Context: Now scans every quoted string containing Hangul.
+- Violation 4 (recommended): Hedge-once style rule could lead the model to drop the Plain not-a-guarantee caveat
+  Rule: Style rules must not override Depth/Output requirements
+  Context: Hedge bullet now says the caveat is always kept.
+
+Round 2: approved

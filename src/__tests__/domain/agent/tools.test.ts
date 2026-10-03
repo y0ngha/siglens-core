@@ -90,8 +90,13 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_bars_indicators')?.description).toContain(
             'higherTimeframe'
         );
+        // The confluence rule states are no longer in the result (2026-10-03);
+        // the snapped 92/8 score carries them instead.
+        expect(findToolSpec('get_bars_indicators')?.description).not.toContain(
+            'entryRuleMet'
+        );
         expect(findToolSpec('get_bars_indicators')?.description).toContain(
-            'entryRuleMet/exitRuleMet'
+            '92 or 8 means the bullish or the bearish trigger conditions of the tally all held on the last bar'
         );
         // ranges['20bars']/['60bars'] — 20/60-bar high/low, distinct from the 252-bar `range`.
         expect(findToolSpec('get_bars_indicators')?.description).toContain(

@@ -287,7 +287,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-09-25.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-03.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -430,12 +430,74 @@ describe('buildAgentSystemPrompt', () => {
             'quote movePct as the move since the analysis'
         );
         expect(prompt).not.toContain('movePct is large relative to the levels');
-        expect(prompt).toContain('Confluence rules:');
-        expect(prompt).toContain('entryRuleMet / exitRuleMet');
+        // The rule states left the tool output (2026-10-03): the model read
+        // them as "매수/매도 규칙 미충족", so the prompt no longer names them.
+        expect(prompt).not.toContain('Confluence rules:');
+        expect(prompt).not.toContain('entryRuleMet');
+        expect(prompt).not.toContain('rule states');
+        expect(prompt).toContain(
+            'never call the tally, its score or its signals a buy or sell rule or signal'
+        );
         expect(prompt).toContain('Higher timeframe:');
         expect(prompt).toContain(
             "higherTimeframe is the next larger timeframe's trend and tally"
         );
+    });
+
+    /** no-ai-slop에서 추린 문체 규칙(2026-10-03). 문체만 다루고 Depth·Output 규칙을 덮지 않는다. */
+    it('문체 섹션이 Output 뒤, User 앞에 한 번 들어간다', () => {
+        expect(prompt.match(/^## Writing style$/gm)).toHaveLength(1);
+        const style = prompt.indexOf('## Writing style');
+        expect(style).toBeGreaterThan(prompt.indexOf('## Output'));
+        expect(style).toBeLessThan(prompt.indexOf('## User'));
+        expect(prompt).toContain(
+            'These rules decide wording only. Every Depth and Output rule above still decides what goes in the answer.'
+        );
+        expect(prompt).toContain('not "매수 규칙 미충족" / "buy rule not met"');
+    });
+
+    it('문체 규칙은 영어 답변에도 같은 섹션으로 들어간다 — 영어 고유 패턴 포함', () => {
+        const en = buildAgentSystemPrompt({
+            locale: 'en',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(en).toContain('Answer in English');
+        expect(en).toContain('They apply in every answer language');
+        expect(en).toContain('- English: use plain verbs and active voice');
+        expect(en).toContain('"It\'s worth noting"');
+    });
+
+    it('문체 섹션의 금지와 어긋나는 한국어 예시를 두지 않는다 — 모델은 예시를 따라 한다', () => {
+        // The style section bans em dashes in answers; a Korean example that
+        // uses one would teach the opposite. Every quoted string with Hangul
+        // counts, labelled "Korean example:" or not.
+        const koreanQuotes = prompt.match(/"[^"\n]*[가-힣][^"\n]*"/g) ?? [];
+        expect(koreanQuotes.length).toBeGreaterThan(10);
+        for (const quote of koreanQuotes) expect(quote).not.toContain('—');
+    });
+
+    /**
+     * DeepSeek caches the longest byte-identical prefix of a request. Anything
+     * that changes per request (the clock, the user's holdings) must sit after
+     * every static rule, or the rules behind it miss the cache on every call —
+     * the old "(e.g. ${localNow})" in the Output section did exactly that.
+     */
+    it('요청마다 바뀌는 값은 ## User 앞에 들어가지 않는다 — 프롬프트 캐시 접두사 보존', () => {
+        const at = (now: Date, portfolioSymbols?: readonly string[]) =>
+            buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS,
+                now,
+                etSessionStatus: 'open',
+                portfolioSymbols,
+            });
+        const a = at(NOW);
+        const b = at(new Date('2026-10-01T03:21:00Z'), ['AAPL']);
+        const prefix = (p: string) => p.slice(0, p.indexOf('## User'));
+        expect(prefix(a)).toBe(prefix(b));
+        expect(a).not.toBe(b);
     });
 
     it('날짜만 있는 타임스탬프(일봉)는 거래일로 인용하고 시각을 붙이지 않게 한다', () => {
