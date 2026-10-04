@@ -1896,9 +1896,10 @@ export interface PromptConfig {
  *   skill set (`sampleSkillsForTier`). Content-address it by its own hash,
  *   not by the catalog fingerprint. Non-empty for skill-bearing builders
  *   (technical, fundamental, financials, congress, news) whenever the loaded
- *   catalog has `always_on` skills for that context; `''` for builders that inject no skills at all
- *   (options, market/macro briefing, economic-event, indicator-translation —
- *   these never read the skill catalog and always return `stable: ''`).
+ *   catalog has `always_on` skills for that context; `''` for builders that
+ *   inject no skills at all (options, market/macro briefing, economic-event,
+ *   indicator-translation — these never read the skill catalog and always
+ *   return `stable: ''`).
  * - `dynamic` — everything else, in production order: the symbol/company
  *   framing, fetched market/news/financial data, gated skill digests chosen
  *   for this specific call, and the per-call request block.
@@ -1910,7 +1911,25 @@ export interface PromptConfig {
  * so the seed still reflects the full assembled content.
  */
 export interface AssembledPrompt {
-    /** The cacheable section folded into the system prompt — never per-call, but it varies by `locale` and, on the free tier, by the per-symbol sampled `always_on` skill set (content-address it by its own hash). Non-empty for skill-bearing builders (technical/fundamental/financials/congress/news) with the production catalog; `''` for no-skill builders (options, market/macro briefing, economic-event, indicator-translation), which never read the skill catalog. (Exception: `buildAnalysisPrompt` (technical) never returns `''` — its `stable` leads with the fixed Analysis Intent + Analysis Guidelines blocks, then the `always_on` digests, so the cross-symbol-identical head precedes the per-symbol-sampled digests; the other skill-bearing builders — fundamental/financials/congress/news/marketNewsDigest — always emit their skill-section wrapper header even with 0 skills.) Folded into the system prompt by dispatch. */
+    /**
+     * The cacheable section folded into the system prompt — never per-call,
+     * but it varies by `locale` and, on the free tier, by the per-symbol
+     * sampled `always_on` skill set (content-address it by its own hash).
+     *
+     * Non-empty for skill-bearing builders (technical/fundamental/financials/
+     * congress/news) with the production catalog; `''` for no-skill builders
+     * (options, market/macro briefing, economic-event, indicator-translation),
+     * which never read the skill catalog.
+     *
+     * Exception: `buildAnalysisPrompt` (technical) never returns `''` — its
+     * `stable` leads with the fixed Analysis Intent + Analysis Guidelines
+     * blocks, then the `always_on` digests, so the cross-symbol-identical head
+     * precedes the per-symbol-sampled digests. The other skill-bearing
+     * builders (fundamental/financials/congress/news/marketNewsDigest) always
+     * emit their skill-section wrapper header even with 0 skills.
+     *
+     * Folded into the system prompt by dispatch.
+     */
     stable: string;
     /** Everything else, in production order: symbol/company framing, fetched data, gated skill digests, the request block. Sent as `prompt` by dispatch. */
     dynamic: string;

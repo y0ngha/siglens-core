@@ -2200,9 +2200,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  * {@link TechnicalAssembledPrompt}) — Design C ("skills-to-system split") rather than
  * the earlier stable-first designs:
  *
- * - `stable` — the fixed Timeframe-independent blocks FIRST (the
- *   analysis-intent block, then the guidelines incl. the contingent-plan
- *   mandate's textual description), followed by the `always_on` skill
+ * - `stable` — the fixed head blocks FIRST, none of which depend on the
+ *   timeframe, symbol, or skills (the analysis-intent block, then the
+ *   guidelines incl. the contingent-plan mandate's textual description),
+ *   followed by the `always_on` skill
  *   digests (`core`, name-sorted, grouped by type via
  *   {@link buildSkillContentSections}). The Intent + Guidelines head is
  *   byte-identical across every call with the same locale — no symbol,
@@ -2440,10 +2441,11 @@ export function buildAnalysisPrompt(
         locale
     );
 
-    // `stable` is the cross-symbol-identical system suffix: the fixed
-    // Timeframe-independent blocks (Analysis Intent, Analysis Guidelines —
-    // ~20k chars, no symbol/timeframe/skill/per-call interpolation beyond the
-    // locale) FIRST, then the always_on skill digests. Fixed text must precede
+    // `stable` is the cross-symbol-identical system suffix: the fixed head
+    // blocks (Analysis Intent, Analysis Guidelines — ~20k chars, no
+    // symbol/timeframe/skill/per-call interpolation beyond the locale) come
+    // FIRST, then the always_on skill digests. The timeframe label and its
+    // interpretation text live in `dynamic`, not here. Fixed text must precede
     // the skill digests because the free tier samples its always_on skills per
     // symbol (`sampleSkillsForTier`): any per-symbol bytes ahead of the
     // Guidelines would end the common prefix right there, and the provider's

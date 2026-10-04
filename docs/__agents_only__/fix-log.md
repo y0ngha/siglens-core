@@ -309,3 +309,7 @@ Round 6: approved
   Rule: After moving content into a variable, re-read comments that describe that variable
 
 Round 3: approved (comment-only fix after R2)
+
+## [PR #250 Claude review | perf/technical-prompt-stable-prefix | 2026-10-04]
+- Violation (suggestion, fixed): over-long single-line field JSDoc and mixed wording in the `stable` comment
+  Rule: Wrap JSDoc to neighbour width; comments describing moved blocks must name them consistently
