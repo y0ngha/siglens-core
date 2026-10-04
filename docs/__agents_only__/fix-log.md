@@ -312,3 +312,9 @@ Round 6: approved
   Rule: Changelog by observable behaviour of the public entry point, not by which internal function changed
 
 Round 2: approved
+
+## [PR #251 Claude review | fix/overall-reuse-latest-technical | 2026-10-04]
+- Violation (suggestion, fixed): two cache-served paths repeated "record usage + shape result" — drift risk
+  Rule: MISTAKES 6 — fold repeated side-effect + return sequences into one helper (`serveCached`)
+- Violation (suggestion, fixed): import out of alphabetical order (`byok/gate` after `market/*`)
+  Rule: MISTAKES 13.5

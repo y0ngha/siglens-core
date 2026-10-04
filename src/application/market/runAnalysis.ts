@@ -1,10 +1,10 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { isEmptyAnalysis } from '@/application/market/peekAnalysisCache';
-import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
     buildTimeframeNotAllowedError,
     type RunAnalysisResult,
@@ -240,6 +240,20 @@ async function runAnalysisImpl(
     const usage = options.usage;
     const usageOccurredAt = usage?.occurredAt ?? new Date();
 
+    // Both cache-served paths (exact-key hit, overall's peek reuse) bill the
+    // call as a usage-counted analysis and return through the same shaping.
+    // One helper keeps them from drifting apart.
+    const serveCached = async (
+        normalized: AnalysisResponse
+    ): Promise<RunAnalysisResult | RunAnalysisForOverallResult> => {
+        await recordAnalysisUsageSafely(
+            usage,
+            effectiveModelId,
+            usageOccurredAt
+        );
+        return toCachedResult(normalized, skipFilter, tier, tierConfig);
+    };
+
     if (usage !== undefined) {
         const allowed = await checkAnalysisUsageAllowed(
             usage,
@@ -314,12 +328,7 @@ async function runAnalysisImpl(
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
                 const normalized = normalizeCachedAnalysisResponse(cached);
-                await recordAnalysisUsageSafely(
-                    usage,
-                    effectiveModelId,
-                    usageOccurredAt
-                );
-                return toCachedResult(normalized, skipFilter, tier, tierConfig);
+                return await serveCached(normalized);
             }
         } catch (error) {
             console.error('[RunAnalysis] Cache read failed:', error);
@@ -343,12 +352,7 @@ async function runAnalysisImpl(
                 )
             );
             if (reused !== null) {
-                await recordAnalysisUsageSafely(
-                    usage,
-                    effectiveModelId,
-                    usageOccurredAt
-                );
-                return toCachedResult(reused, skipFilter, tier, tierConfig);
+                return await serveCached(reused);
             }
         }
     }
