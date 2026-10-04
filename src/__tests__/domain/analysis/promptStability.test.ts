@@ -548,6 +548,41 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('TSLA');
     });
 
+    it.each(['ko', 'en'] as const)(
+        'buildNewsCardAnalysisPrompt: non-empty stable is identical across symbol/title/content/truncation/source language (%s)',
+        locale => {
+            const makeItem = (
+                symbol: string,
+                titleEn: string,
+                bodyEn: string | null,
+                extra: Partial<NewsItem> = {}
+            ): NewsItem => ({
+                id: 'n1',
+                symbol,
+                source: 'Reuters',
+                url: 'https://example.com/article',
+                publishedAt: '2025-04-28T14:30:00Z',
+                titleEn,
+                bodyEn,
+                ...extra,
+            });
+            const a = buildNewsCardAnalysisPrompt(
+                makeItem('NVDA', 'Nvidia unveils chip', 'Body A'),
+                locale
+            );
+            const b = buildNewsCardAnalysisPrompt(
+                makeItem('005930.KS', '삼성전자 실적', '본문 B', {
+                    sourceLanguage: 'ko',
+                    bodyTruncated: true,
+                }),
+                locale
+            );
+            expect(a.stable).not.toBe('');
+            expect(a.stable).toBe(b.stable);
+            expect(a.dynamic).not.toBe(b.dynamic);
+        }
+    );
+
     it('buildMarketNewsDigestPrompt: stable is category-label invariant', () => {
         const a = buildMarketNewsDigestPrompt('미국 암호화폐', [], []);
         const b = buildMarketNewsDigestPrompt('미국 원자재', [], []);

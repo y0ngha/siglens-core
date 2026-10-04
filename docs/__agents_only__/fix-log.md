@@ -299,3 +299,17 @@ Round 4: approved
   Context: Note now says to surface RSI(2) as `rsi2` in the 1Day latest-indicator view.
 
 Round 6: approved
+
+## [Branch perf/newscard-deepseek-prefix-cache | 2026-10-04] — Review findings (news card → DeepSeek + prefix-cache reorder)
+
+- Violation 1 (recommended, R1): After switching a pinned model, doc comments naming the old model remained in 5 places (constants JSDoc, news/digest/overall types, newsPrompt, public NewsCardAnalysis type found in R2)
+  Rule: After changing which model a path uses, grep the old model name repo-wide (incl. public types) and drop model names from comments that don't need them
+  Context: "by flash-lite" → "per-card"/"news-card model".
+- Violation 2 (recommended, R1): Changelog row claimed "text only moved" while one sentence was reworded, and lacked consumer note/semver
+  Rule: A changelog row must list every deliberate wording change and carry the consumer action + semver tail like neighbouring rows
+- Violation 3 (recommended, R1): Reordering left per-article rule bullets without a heading (their heading moved to stable)
+  Rule: When splitting a section across stable/dynamic, each half must read on its own — re-add a heading on the moved half
+- Violation 4 (recommended, R1): Comment said "article sits last in prompt" though a locale reminder follows for non-ko
+  Rule: Position claims in comments must hold for every locale/branch
+
+Round 3: approved (comment-only fix after R2)

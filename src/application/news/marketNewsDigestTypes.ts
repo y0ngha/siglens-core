@@ -25,7 +25,7 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
     /** LLM model identifier used for the analysis and cache scoping. */
     modelId: ModelId;
     /**
-     * Enriched news items (already analyzed per-card by flash-lite).
+     * Enriched news items (already analyzed per-card).
      * If empty, submission returns `{ status: 'no_news' }`.
      */
     news: ReadonlyArray<EnrichedNewsItem>;

@@ -1,6 +1,6 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
-import { GEMINI_FLASH_LITE_MODEL } from '@/application/chat/constants';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import type {
     RunNewsCardAnalysisResult,
     SubmitNewsCardAnalysisOptions,
@@ -23,19 +23,24 @@ import { analysisSeed } from '@/infrastructure/hash/analysisInput';
  * 구 submitNewsCardAnalysis에서 이전 — job 큐 제거로 그 파일이 사라졌다.
  *
  * 카드당 번역+라벨링은 고빈도 저난도 작업이라 가장 싼 non-reasoning 라인이
- * 맞다. DeepSeek로 옮겼다가 되돌린 이유는 비용이다(2026-08-18 마이그레이션
- * 이후 DeepSeek 지출 급증). Gemini 어댑터는 `responseSchema`를 실제로
- * 강제하므로 필드 계약이 프롬프트+normalize에만 실려 있던 DeepSeek 경로보다
- * 오히려 안전하다.
+ * 맞다. DeepSeek를 고른 이유는 **자동 prefix 캐싱**이다 — 프롬프트의 고정부
+ * (`stable`, 로케일별로 고정)가 시스템 프롬프트로 앞에 붙고 기사 본문이 맨
+ * 뒤에 오므로, 카드가 달라져도 앞쪽 큰 덩어리가 캐시 적중된다. Gemini
+ * flash-lite 경로는 캐시 적중이 0%였다.
  *
- * ⚠️ 아래 `reasoning: false`는 스펙의 `reasoning.off` 설정으로 해석된다.
- * Gemini 모델 대부분은 추론을 **완전히 끄지 못한다** — 2026-09-06 라이브 실측
- * 기준 `gemini-3.5-flash-lite`와 `gemini-3.6-flash`만 `thinkingLevel:'minimal'`
- * 에서 사고 토큰 0이고, `3.7-flash`·`3.8-flash`·`3.1-pro-preview`는 `low`가
- * 바닥이며 그마저 계속 생각한다. 이 상수를 바꿀 때는 대상 모델의
- * `supportsHardOff`를 확인할 것. 세대 번호로 갈리지 않는다.
+ * 예전에 "DeepSeek는 `responseSchema`를 강제하지 않는다"는 이유로 Gemini로
+ * 되돌렸지만 그 전제는 이미 낡았다. core #193 이후 DeepSeek 어댑터도
+ * Responses API `json_schema`로 스키마를 강제한다. 8/20 되돌림은 비용 급증이
+ * 뉴스 카드 때문인지 가려지지 않은 채 이뤄졌다 — 같은 시기에 prewarm의 뉴스
+ * 카드 물량이 늘었고(#740), 모든 경로가 DeepSeek로 옮겨 갔으며(#731),
+ * 피크 시간대 2배 요금이 겹쳤다.
+ *
+ * ⚠️ 아래 `reasoning: false`는 스펙의 `reasoning.off` 설정으로 해석된다
+ * (DeepSeek에서는 effort `none`). 이 상수를 Gemini 모델로 되돌릴 때는
+ * 대상 모델의 `supportsHardOff`를 확인할 것 — 대부분의 Gemini 모델은 추론을
+ * 완전히 끄지 못해 이 저비용 경로가 조용히 사고 토큰을 쓰기 시작한다.
  */
-export const NEWS_CARD_MODEL_ID = GEMINI_FLASH_LITE_MODEL;
+export const NEWS_CARD_MODEL_ID = DEEPSEEK_V4_1_FLASH_MODEL;
 
 /**
  * Run a per-card news analysis end-to-end: build prompt → LLM call →
@@ -73,8 +78,9 @@ export async function runNewsCardAnalysis(
 
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildNewsCardAnalysisPrompt(item, locale);
-    // Design C: this builder has no skills catalog, so `stable` is always ''
-    // and `system` stays the base persona unchanged.
+    // `stable` is the locale-fixed rule block; folding it into the system
+    // prompt makes it the cacheable prefix. The article sits last in `prompt`,
+    // followed only by the locale-fixed language reminder (empty for ko).
     const system = stable
         ? `${newsCardSystemPrompt(locale)}\n\n${stable}`
         : newsCardSystemPrompt(locale);

@@ -201,7 +201,7 @@ export interface OverallDependencyInputs {
      */
     skipEnqueueIfMiss?: boolean;
     /**
-     * Enriched news items (already card-analyzed by flash-lite).
+     * Enriched news items (already card-analyzed).
      *
      * Renamed from `news` to disambiguate from the per-axis options field
      * (`news`, see below). Typed as `ReadonlyArray<EnrichedNewsItem>` to
