@@ -3,7 +3,8 @@ import type { ModelId } from '@/domain/types';
 
 /**
  * Cheapest Gemini line — the fixed model for short structured helper tasks
- * (news cards, economic events, indicator translation).
+ * (economic events, indicator translation). News cards moved to DeepSeek in
+ * 2026-10 for prefix caching (see `NEWS_CARD_MODEL_ID`).
  *
  * Succeeds `GEMINI_2_5_FLASH_LITE_MODEL`, removed with the 2.5 generation.
  * Free access class, and one of only two Gemini models that can disable

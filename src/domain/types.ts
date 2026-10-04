@@ -3291,7 +3291,7 @@ export interface MarketEvent {
     readonly impact: NewsImpact;
 }
 
-/** Per-card translation and sentiment result produced by the flash-lite model. */
+/** Per-card translation and sentiment result produced by the news-card model. */
 export interface NewsCardAnalysis {
     titleKo: string;
     bodyKo: string | null;

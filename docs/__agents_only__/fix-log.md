@@ -310,6 +310,7 @@ Round 6: approved
   Context: isEmptyAnalysis exported @internal from peekAnalysisCache.ts.
 - Violation 3 (recommended, R1): Consumer-visible behaviour change of a public function (runOverallAnalysis) had no PUBLIC_API row because the changed function was @internal
   Rule: Changelog by observable behaviour of the public entry point, not by which internal function changed
+  Context:
 
 Round 2: approved
 
@@ -318,6 +319,24 @@ Round 2: approved
   Rule: MISTAKES 6 — fold repeated side-effect + return sequences into one helper (`serveCached`)
 - Violation (suggestion, fixed): import out of alphabetical order (`byok/gate` after `market/*`)
   Rule: MISTAKES 13.5
+
+## [Branch perf/newscard-deepseek-prefix-cache | 2026-10-04] — Review findings (news card → DeepSeek + prefix-cache reorder)
+
+- Violation 1 (recommended, R1): After switching a pinned model, doc comments naming the old model remained in 5 places (constants JSDoc, news/digest/overall types, newsPrompt, public NewsCardAnalysis type found in R2)
+  Rule: After changing which model a path uses, grep the old model name repo-wide (incl. public types) and drop model names from comments that don't need them
+  Context: "by flash-lite" → "per-card"/"news-card model".
+- Violation 2 (recommended, R1): Changelog row claimed "text only moved" while one sentence was reworded, and lacked consumer note/semver
+  Rule: A changelog row must list every deliberate wording change and carry the consumer action + semver tail like neighbouring rows
+- Violation 3 (recommended, R1): Reordering left per-article rule bullets without a heading (their heading moved to stable)
+  Rule: When splitting a section across stable/dynamic, each half must read on its own — re-add a heading on the moved half
+- Violation 4 (recommended, R1): Comment said "article sits last in prompt" though a locale reminder follows for non-ko
+  Rule: Position claims in comments must hold for every locale/branch
+
+Round 3: approved (comment-only fix after R2)
+
+## [PR #249 Claude review | perf/newscard-deepseek-prefix-cache | 2026-10-04]
+- Violation (suggestion, fixed): builder JSDoc said "article last" without noting the caller appends a locale reminder
+  Rule: Position claims must say which layer's output they describe (builder vs dispatched prompt)
 
 ## [Branch perf/technical-prompt-stable-prefix | 2026-10-04] — Review findings (Intent + Guidelines into stable, p22)
 

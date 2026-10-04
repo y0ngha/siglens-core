@@ -8,7 +8,9 @@ import {
     runNewsCardAnalysis,
 } from '@/application/news/runNewsCardAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { MODEL_SPECS, supportsHardOff } from '@/domain/analysis/modelSpecs';
+import { buildNewsCardAnalysisPrompt } from '@/domain/analysis/newsCardPrompt';
 import type { NewsItem } from '@/domain/types';
 
 const mockCallAnalysisAi = callAnalysisAi as Mock;
@@ -89,19 +91,36 @@ describe('runNewsCardAnalysis', () => {
             );
         });
 
-        it('고정 모델은 Gemini 저비용 라인이고 thinkingBudget 0을 받는다', async () => {
+        it('고정 모델은 DeepSeek V4.1 Flash이고 추론을 완전히 끌 수 있다', async () => {
             // NEWS_CARD_MODEL_ID를 리터럴로 재선언하지 않고 실제 호출 인자를
             // 본다 — 상수만 바꾸고 정책 주석을 안 고치는 드리프트를 잡는다.
             await runNewsCardAnalysis({ item: testNewsItem });
 
+            expect(NEWS_CARD_MODEL_ID).toBe(DEEPSEEK_V4_1_FLASH_MODEL);
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
-                expect.objectContaining({ model: NEWS_CARD_MODEL_ID })
+                expect.objectContaining({ model: DEEPSEEK_V4_1_FLASH_MODEL })
             );
-            expect(MODEL_SPECS[NEWS_CARD_MODEL_ID].provider).toBe('gemini');
+            expect(MODEL_SPECS[NEWS_CARD_MODEL_ID].provider).toBe('deepseek');
             // 이 경로는 항상 `reasoning: false`를 보낸다. 추론을 완전히 끄지
-            // 못하는 Gemini 모델로 상수가 바뀌면(대부분이 그렇다) 이 저비용
-            // 헬퍼 경로가 조용히 사고 토큰을 쓰기 시작한다.
+            // 못하는 모델로 상수가 바뀌면 이 저비용 경로가 조용히 사고 토큰을
+            // 쓰기 시작한다.
             expect(supportsHardOff(NEWS_CARD_MODEL_ID)).toBe(true);
+        });
+
+        it('고정부는 system에, 기사는 prompt에 실려 기사가 prefix를 깨지 않는다', async () => {
+            // prefix 캐싱의 전제: system(앞쪽 큰 덩어리)에는 기사 바이트가
+            // 없고, prompt는 기사 본문으로 끝난다.
+            await runNewsCardAnalysis({ item: testNewsItem });
+
+            const { system, prompt } = mockCallAnalysisAi.mock.calls[0]![0] as {
+                system: string;
+                prompt: string;
+            };
+            const { stable } = buildNewsCardAnalysisPrompt(testNewsItem);
+            expect(system.endsWith(stable)).toBe(true);
+            expect(system).not.toContain(testNewsItem.titleEn);
+            expect(system).not.toContain(testNewsItem.bodyEn!);
+            expect(prompt.endsWith(testNewsItem.bodyEn!)).toBe(true);
         });
     });
 

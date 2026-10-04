@@ -290,7 +290,7 @@ export function formatSentimentTally(
  *   recap is needed to preserve rule recency.
  *
  * Accepts enriched news items (each already tagged with a
- * {@link NewsCardAnalysis} via the flash-lite model), the upcoming earnings
+ * {@link NewsCardAnalysis} via the news-card model), the upcoming earnings
  * calendar, and a list of loaded {@link Skill}s. Skills are routed through
  * {@link selectSkills} in the `'news'` prompt context: only
  * `category === 'news'` skills qualify, untagged ones throw (fail-closed),
