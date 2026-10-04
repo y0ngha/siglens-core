@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.9.0](https://github.com/y0ngha/siglens-core/compare/v2.8.1...v2.9.0) (2026-10-04)
+
+### Features
+
+* 공포·탐욕 구간 전환·극단 구간 사후 집계·시장 대비 차이 계산 추가 ([#253](https://github.com/y0ngha/siglens-core/issues/253)) ([c54a652](https://github.com/y0ngha/siglens-core/commit/c54a652917378d234caa20ed8d931a7b1bd762b3))
+
 ## [2.8.1](https://github.com/y0ngha/siglens-core/compare/v2.8.0...v2.8.1) (2026-10-04)
 
 ### Bug Fixes
