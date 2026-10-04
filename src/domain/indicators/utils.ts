@@ -91,3 +91,16 @@ export function linreg(values: number[], period: number): number | null {
     const intercept = (sumY - slope * sumX) / n;
     return intercept + slope * (n - 1);
 }
+
+/**
+ * @internal Median of a numeric list (sorted ascending on a copy), or `null`
+ * for an empty input. Shared by the fundamental prompt's peer medians and the
+ * Fear & Greed forward-change aggregation.
+ */
+export function median(values: readonly number[]): number | null {
+    const n = values.length;
+    if (n === 0) return null;
+    const sorted = values.toSorted((a, b) => a - b);
+    const mid = Math.floor(n / 2);
+    return n % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}

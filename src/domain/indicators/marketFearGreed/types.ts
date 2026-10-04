@@ -1,6 +1,7 @@
 import type {
     FearGreedConfidence,
     FearGreedLabel,
+    FearGreedReading,
 } from '@/domain/indicators/fearGreed/types';
 
 /**
@@ -118,15 +119,12 @@ export interface MarketFearGreedSnapshot {
     asOf: string;
 }
 
-/** A single point in a walk-forward market Fear & Greed history series. */
-export interface MarketFearGreedHistoryPoint {
-    /** ISO `YYYY-MM-DD` calendar date of the session. */
-    date: string;
-    /** Score in [0, 100], or `null` during warm-up / insufficient sample. */
-    score: number | null;
-    /** Label derived from `score`, or `null` when `score` is `null`. */
-    label: FearGreedLabel | null;
-}
+/**
+ * A single point in a walk-forward market Fear & Greed history series. Same
+ * shape as the per-instrument {@link FearGreedReading}, aliased so the two
+ * cannot drift apart.
+ */
+export type MarketFearGreedHistoryPoint = FearGreedReading;
 
 /** @internal Raw factor bundle, keyed by factor key, shared by the factor and walk-forward modules. */
 export type MarketFactorValues = Record<MarketFearGreedFactorKey, number>;

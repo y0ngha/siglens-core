@@ -415,6 +415,13 @@ export type {
     FearGreedSnapshot,
     FearGreedHistoryPoint,
     ComputeFearGreedOptions,
+    FearGreedReading,
+    FearGreedLabelTransition,
+    ExtremeFearGreedZone,
+    ForwardChangeStat,
+    ExtremeZoneOutcome,
+    ExtremeZoneOutcomeOptions,
+    FearGreedScoreGap,
 } from '@/domain/indicators/fearGreed/types';
 
 export type {

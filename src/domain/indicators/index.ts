@@ -78,9 +78,16 @@ export * from './yangZhang';
 export {
     computeFearGreedIndex,
     computeFearGreedHistory,
+    computeLabelTransitions,
+    computeMarketScoreGap,
+    EXTREME_FEAR_GREED_ZONES,
+    EXTREME_ZONE_FORWARD_HORIZONS,
+    EXTREME_ZONE_MIN_SAMPLE,
+    EXTREME_ZONE_REENTRY_GAP,
     FEAR_GREED_LABEL_CUTOFFS,
     scoreToLabel,
     POC_WINDOW_DEFAULT,
+    summarizeExtremeZoneOutcomes,
 } from './fearGreed';
 export {
     computeMarketFearGreedIndex,

@@ -8,3 +8,12 @@ export {
     scoreToLabel,
 } from '@/domain/indicators/fearGreed/composition';
 export { POC_WINDOW_DEFAULT } from '@/domain/indicators/fearGreed/factors';
+export {
+    computeLabelTransitions,
+    computeMarketScoreGap,
+    EXTREME_FEAR_GREED_ZONES,
+    EXTREME_ZONE_FORWARD_HORIZONS,
+    EXTREME_ZONE_MIN_SAMPLE,
+    EXTREME_ZONE_REENTRY_GAP,
+    summarizeExtremeZoneOutcomes,
+} from '@/domain/indicators/fearGreed/regimeStats';

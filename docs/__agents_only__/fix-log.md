@@ -314,12 +314,6 @@ Round 6: approved
 
 Round 2: approved
 
-## [PR #251 Claude review | fix/overall-reuse-latest-technical | 2026-10-04]
-- Violation (suggestion, fixed): two cache-served paths repeated "record usage + shape result" — drift risk
-  Rule: MISTAKES 6 — fold repeated side-effect + return sequences into one helper (`serveCached`)
-- Violation (suggestion, fixed): import out of alphabetical order (`byok/gate` after `market/*`)
-  Rule: MISTAKES 13.5
-
 ## [Branch perf/newscard-deepseek-prefix-cache | 2026-10-04] — Review findings (news card → DeepSeek + prefix-cache reorder)
 
 - Violation 1 (recommended, R1): After switching a pinned model, doc comments naming the old model remained in 5 places (constants JSDoc, news/digest/overall types, newsPrompt, public NewsCardAnalysis type found in R2)
@@ -351,3 +345,28 @@ Round 3: approved (comment-only fix after R2)
 ## [PR #250 Claude review | perf/technical-prompt-stable-prefix | 2026-10-04]
 - Violation (suggestion, fixed): over-long single-line field JSDoc and mixed wording in the `stable` comment
   Rule: Wrap JSDoc to neighbour width; comments describing moved blocks must name them consistently
+
+## [review-agent | feat/252/fear-greed-regime-stats | 2026-10-05]
+- Violation (R1 required, fixed): new barrel exports (3 functions, 3 constants, 7 types) not added to docs/PUBLIC_API.md
+  Rule: MISTAKES "PUBLIC_API.md inventory becomes stale" — update PUBLIC_API.md in the same change as the barrel exports
+- Violation (R1 recommended, fixed): a second generic median helper added (duplicated fundamentalPrompt's private median)
+  Rule: MISTAKES 1 — grep domain for an existing helper before writing one; share it from a neutral utils module
+- Violation (R1 recommended, fixed): public numeric options (horizons) not validated; 0 / fractional horizons produced trivial or NaN results
+  Rule: (new) Public numeric options that index arrays must be filtered to valid integers, and derived values filtered with Number.isFinite before aggregation
+- Status (R2): approved
+
+## [PR #253 Claude review | feat/252/fear-greed-regime-stats | 2026-10-05]
+- Violation (blocker, fixed): public Tier 4 type fields without per-field JSDoc (`ExtremeZoneOutcome.zone`, `FearGreedScoreGap.symbolScore/marketScore`)
+  Rule: MISTAKES Documentation Sync 4.8 — every field of a public type gets a one-line JSDoc
+- Violation (blocker, fixed): `!Number.isFinite(change)` guard had no test that only it could satisfy
+  Rule: MISTAKES Tests 5.5 — each guard needs a case that fails when the guard is removed (NaN close)
+- Change (author, not from review): re-entry gap (default 20 sessions) — live data showed boundary flip-flops inflating entry counts with overlapping windows
+
+## [PR #253 Claude review R2 | feat/252/fear-greed-regime-stats | 2026-10-05]
+- Violation (suggestion, fixed): private helper `forwardChangeStat` without JSDoc while sibling helpers had one
+  Rule: Keep doc density consistent across sibling helpers in a module
+- Violation (suggestion, fixed): nested option-validation conditional inline in the public function
+  Rule: MISTAKES 8 — extract complex anonymous expressions into a named helper (`resolveReentryGap`)
+- Violation (suggestion, fixed): per-session `slice().some()` window re-scan in entry detection
+  Rule: MISTAKES 15.5 — single pass tracking state (for loop + push) instead of re-slicing per step
+- Skipped (suggestion): interface→type alias consumer check — no declaration merging in siglens / siglens-trader (grep)

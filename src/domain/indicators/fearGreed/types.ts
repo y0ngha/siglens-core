@@ -87,15 +87,12 @@ export interface FearGreedSnapshot {
     warning: FearGreedWarning;
 }
 
-/** A single point in a walk-forward Fear & Greed history series. */
-export interface FearGreedHistoryPoint {
-    /** ISO `YYYY-MM-DD` calendar date corresponding to `bars[t].time`. */
-    date: string;
-    /** Score in [0, 100], or `null` during warm-up / when sample is insufficient. */
-    score: number | null;
-    /** Label derived from `score`, or `null` when `score` is `null`. */
-    label: FearGreedLabel | null;
-}
+/**
+ * A single point in a walk-forward Fear & Greed history series. `date` is the
+ * ISO `YYYY-MM-DD` calendar date of `bars[t].time`. Same shape as
+ * {@link FearGreedReading}, aliased so the two cannot drift apart.
+ */
+export type FearGreedHistoryPoint = FearGreedReading;
 
 /**
  * Optional configuration for the public `computeFearGreedIndex` / `computeFearGreedHistory` APIs.
@@ -112,4 +109,77 @@ export interface FactorValues {
     pocDist: number;
     ma200Dist: number;
     rangePosition: number;
+}
+
+/**
+ * Minimal reading shape shared by the instrument and market-wide history
+ * points (`FearGreedHistoryPoint`, `MarketFearGreedHistoryPoint`).
+ */
+export interface FearGreedReading {
+    /** ISO `YYYY-MM-DD` session date. */
+    date: string;
+    /** Score in [0, 100], or `null` during warm-up / insufficient sample. */
+    score: number | null;
+    /** Label derived from `score`, or `null` when `score` is `null`. */
+    label: FearGreedLabel | null;
+}
+
+/** A label change between two adjacent labelled sessions. */
+export interface FearGreedLabelTransition {
+    /** ISO date of the session that carries the new label. */
+    date: string;
+    /** Label on the previous session. */
+    from: FearGreedLabel;
+    /** Label on `date`. */
+    to: FearGreedLabel;
+}
+
+/** The two extreme labels whose entries are aggregated. */
+export type ExtremeFearGreedZone = 'EXTREME_FEAR' | 'EXTREME_GREED';
+
+/** Close-to-close change after zone entries over one forward horizon. */
+export interface ForwardChangeStat {
+    /** Forward horizon in trading sessions. */
+    horizon: number;
+    /** Number of entries that had `horizon` sessions of data after them. */
+    sampleSize: number;
+    /** Median change in percent, or `null` when `sampleSize` is below the minimum. */
+    median: number | null;
+}
+
+/** Past aggregate for one extreme zone. Descriptive only — not a forecast. */
+export interface ExtremeZoneOutcome {
+    /** The extreme zone this outcome describes. */
+    zone: ExtremeFearGreedZone;
+    /** Times the history entered the zone from a different labelled session. */
+    entryCount: number;
+    /** `'insufficient_sample'` when `entryCount` is below the minimum sample. */
+    status: 'ok' | 'insufficient_sample';
+    /** One entry per requested horizon, in the requested order. */
+    forward: ForwardChangeStat[];
+}
+
+/** Options for `summarizeExtremeZoneOutcomes`. */
+export interface ExtremeZoneOutcomeOptions {
+    /** Forward horizons in trading sessions. Defaults to 5, 20, 60. */
+    horizons?: readonly number[];
+    /** Minimum sample before a median is reported. Defaults to 5. */
+    minSample?: number;
+    /**
+     * Sessions that must pass after leaving a zone before a return counts as a
+     * new entry. Defaults to 20. `0` counts every move into the zone.
+     */
+    reentryGap?: number;
+}
+
+/** Same-session gap between an instrument score and the market score. */
+export interface FearGreedScoreGap {
+    /** ISO date both scores describe. */
+    date: string;
+    /** The instrument's score on `date`. */
+    symbolScore: number;
+    /** The market-wide score on `date`. */
+    marketScore: number;
+    /** `symbolScore - marketScore`. Positive = instrument reads greedier than the market. */
+    gap: number;
 }
