@@ -300,6 +300,25 @@ Round 4: approved
 
 Round 6: approved
 
+## [Branch fix/overall-reuse-latest-technical | 2026-10-04] — Review findings (overall reuses the latest technical via peek)
+
+- Violation 1 (required, R1): Cache-key arguments on the new read path (tier, positionBucket) were not pinned by any test — mutating them left the suite green
+  Rule: When a read path rebuilds a cache key, every key argument needs a test where a mismatch on that argument alone misses
+  Context: member/profit seeded test; mutation-checked.
+- Violation 2 (recommended, R1): New reader of an existing cache entry skipped guards the sibling reader applies (empty-after-normalize, skillsDegraded flag)
+  Rule: A second reader of the same cache entry must apply the same validity guards as the existing reader (share the helper)
+  Context: isEmptyAnalysis exported @internal from peekAnalysisCache.ts.
+- Violation 3 (recommended, R1): Consumer-visible behaviour change of a public function (runOverallAnalysis) had no PUBLIC_API row because the changed function was @internal
+  Rule: Changelog by observable behaviour of the public entry point, not by which internal function changed
+
+Round 2: approved
+
+## [PR #251 Claude review | fix/overall-reuse-latest-technical | 2026-10-04]
+- Violation (suggestion, fixed): two cache-served paths repeated "record usage + shape result" — drift risk
+  Rule: MISTAKES 6 — fold repeated side-effect + return sequences into one helper (`serveCached`)
+- Violation (suggestion, fixed): import out of alphabetical order (`byok/gate` after `market/*`)
+  Rule: MISTAKES 13.5
+
 ## [Branch perf/technical-prompt-stable-prefix | 2026-10-04] — Review findings (Intent + Guidelines into stable, p22)
 
 - Violation 1 (recommended, R1+R2): JSDoc on AssembledPrompt / AssembledPromptRecord (interface block AND field doc) still claimed `stable` is byte-identical per catalog after the change made it vary by locale and free-tier sampled skills
