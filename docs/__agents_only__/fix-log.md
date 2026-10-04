@@ -299,3 +299,16 @@ Round 4: approved
   Context: Note now says to surface RSI(2) as `rsi2` in the 1Day latest-indicator view.
 
 Round 6: approved
+
+## [Branch fix/overall-reuse-latest-technical | 2026-10-04] — Review findings (overall reuses the latest technical via peek)
+
+- Violation 1 (required, R1): Cache-key arguments on the new read path (tier, positionBucket) were not pinned by any test — mutating them left the suite green
+  Rule: When a read path rebuilds a cache key, every key argument needs a test where a mismatch on that argument alone misses
+  Context: member/profit seeded test; mutation-checked.
+- Violation 2 (recommended, R1): New reader of an existing cache entry skipped guards the sibling reader applies (empty-after-normalize, skillsDegraded flag)
+  Rule: A second reader of the same cache entry must apply the same validity guards as the existing reader (share the helper)
+  Context: isEmptyAnalysis exported @internal from peekAnalysisCache.ts.
+- Violation 3 (recommended, R1): Consumer-visible behaviour change of a public function (runOverallAnalysis) had no PUBLIC_API row because the changed function was @internal
+  Rule: Changelog by observable behaviour of the public entry point, not by which internal function changed
+
+Round 2: approved
