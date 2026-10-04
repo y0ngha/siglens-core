@@ -5,6 +5,7 @@ import {
     computeMarketScoreGap,
     EXTREME_ZONE_FORWARD_HORIZONS,
     EXTREME_ZONE_MIN_SAMPLE,
+    EXTREME_ZONE_REENTRY_GAP,
     summarizeExtremeZoneOutcomes,
 } from '@/domain/indicators/fearGreed/regimeStats';
 import type {
@@ -71,10 +72,12 @@ describe('computeLabelTransitions', () => {
         expect(computeLabelTransitions(history, 10)).toEqual([]);
     });
 
-    it('limit이 1보다 작으면 빈 배열이다', () => {
+    it('limit이 1 이상의 정수가 아니면 빈 배열이다', () => {
         const history = historyOf(['FEAR', 'GREED']);
 
         expect(computeLabelTransitions(history, 0)).toEqual([]);
+        expect(computeLabelTransitions(history, 1.5)).toEqual([]);
+        expect(computeLabelTransitions(history, Number.NaN)).toEqual([]);
     });
 
     it('빈 히스토리는 빈 배열이다', () => {
@@ -108,6 +111,7 @@ describe('summarizeExtremeZoneOutcomes', () => {
         const { history, bars } = fiveFearEntries();
 
         const [fear] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
             horizons: [2],
         });
 
@@ -123,9 +127,9 @@ describe('summarizeExtremeZoneOutcomes', () => {
     it('극심한 공포 다음에 극심한 탐욕 순서로 돌려준다', () => {
         const { history, bars } = fiveFearEntries();
 
-        const zones = summarizeExtremeZoneOutcomes(history, bars).map(
-            o => o.zone
-        );
+        const zones = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
+        }).map(o => o.zone);
 
         expect(zones).toEqual(['EXTREME_FEAR', 'EXTREME_GREED']);
     });
@@ -134,6 +138,7 @@ describe('summarizeExtremeZoneOutcomes', () => {
         const { history, bars } = fiveFearEntries();
 
         const [fear] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
             horizons: [2],
             minSample: 6,
         });
@@ -149,6 +154,7 @@ describe('summarizeExtremeZoneOutcomes', () => {
 
         // 마지막 진입(인덱스 17) 뒤에는 2세션만 남아 3세션 구간을 잴 수 없다.
         const [fear] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
             horizons: [3],
             minSample: 4,
         });
@@ -162,6 +168,7 @@ describe('summarizeExtremeZoneOutcomes', () => {
         const { history, bars } = fiveFearEntries();
 
         const [fear] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
             horizons: [3],
         });
 
@@ -212,10 +219,92 @@ describe('summarizeExtremeZoneOutcomes', () => {
         const { history, bars } = fiveFearEntries();
 
         const [fear] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
             horizons: [0, 1.5, -2, 2],
         });
 
         expect(fear.forward.map(f => f.horizon)).toEqual([2]);
+    });
+
+    it('기본 재진입 간격은 20세션이다', () => {
+        expect(EXTREME_ZONE_REENTRY_GAP).toBe(20);
+    });
+
+    it('재진입 간격 안에 같은 구간으로 돌아오면 같은 국면으로 보고 다시 세지 않는다', () => {
+        // 경계에서 하루씩 들락날락: 진입(1) → 이탈 → 3세션 뒤 재진입(4)
+        const history = historyOf([
+            'NEUTRAL',
+            'EXTREME_FEAR',
+            'NEUTRAL',
+            'NEUTRAL',
+            'EXTREME_FEAR',
+        ]);
+        const bars = barsOf([1, 1, 1, 1, 1]);
+
+        const [withGap] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 3,
+        });
+        const [noGap] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
+        });
+
+        expect(withGap.entryCount).toBe(1);
+        expect(noGap.entryCount).toBe(2);
+    });
+
+    it('재진입 간격보다 오래 떨어져 있다 돌아오면 새 진입으로 센다', () => {
+        const history = historyOf([
+            'NEUTRAL',
+            'EXTREME_FEAR',
+            'NEUTRAL',
+            'NEUTRAL',
+            'NEUTRAL',
+            'EXTREME_FEAR',
+        ]);
+
+        const [fear] = summarizeExtremeZoneOutcomes(
+            history,
+            barsOf([1, 1, 1, 1, 1, 1]),
+            { reentryGap: 3 }
+        );
+
+        expect(fear.entryCount).toBe(2);
+    });
+
+    it('재진입 간격이 0 이상의 정수가 아니면 기본값(20)을 쓴다', () => {
+        const history = historyOf([
+            'NEUTRAL',
+            'EXTREME_FEAR',
+            'NEUTRAL',
+            'EXTREME_FEAR',
+        ]);
+        const bars = barsOf([1, 1, 1, 1]);
+
+        const [negative] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: -1,
+        });
+        const [fraction] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 1.5,
+        });
+
+        expect(negative.entryCount).toBe(1);
+        expect(fraction.entryCount).toBe(1);
+    });
+
+    it('종가에 유한하지 않은 값이 섞인 진입은 표본에서 뺀다', () => {
+        // 기준 종가(인덱스 1)는 정상이고 1세션 뒤 종가가 NaN — `returnOver`는
+        // null이 아니라 NaN을 돌려주므로 `Number.isFinite` 가드만 이 진입을 거른다.
+        const history = historyOf(['NEUTRAL', 'EXTREME_FEAR', 'NEUTRAL']);
+
+        const [fear] = summarizeExtremeZoneOutcomes(
+            history,
+            barsOf([1, 1, Number.NaN]),
+            { horizons: [1], minSample: 1 }
+        );
+
+        expect(fear.entryCount).toBe(1);
+        expect(fear.forward[0].sampleSize).toBe(0);
+        expect(fear.forward[0].median).toBeNull();
     });
 
     it('히스토리와 봉 길이가 다르면 정렬을 추측하지 않고 빈 배열을 돌려준다', () => {
@@ -228,6 +317,7 @@ describe('summarizeExtremeZoneOutcomes', () => {
         const { history, bars } = fiveFearEntries();
 
         const [fear] = summarizeExtremeZoneOutcomes(history, bars, {
+            reentryGap: 0,
             horizons: [2],
         });
 

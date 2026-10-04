@@ -1,15 +1,16 @@
-import type { Bar } from '@/domain/types';
-import { median } from '@/domain/indicators/utils';
 import { returnOver } from '@/domain/indicators/fearGreed/returns';
 import type {
     ExtremeFearGreedZone,
     ExtremeZoneOutcome,
     ExtremeZoneOutcomeOptions,
+    FearGreedLabel,
     FearGreedLabelTransition,
     FearGreedReading,
     FearGreedScoreGap,
     ForwardChangeStat,
 } from '@/domain/indicators/fearGreed/types';
+import { median } from '@/domain/indicators/utils';
+import type { Bar } from '@/domain/types';
 
 /**
  * Descriptive statistics over a Fear & Greed score history.
@@ -30,6 +31,15 @@ export const EXTREME_ZONE_FORWARD_HORIZONS = [5, 20, 60] as const;
  */
 export const EXTREME_ZONE_MIN_SAMPLE = 5;
 
+/**
+ * Default minimum gap, in sessions, before a return to the same extreme zone
+ * counts as a **new** entry. Scores that hover at a zone boundary flip in and
+ * out daily; counting every flip inflates the entry count with heavily
+ * overlapping forward windows. A return within this many sessions of the last
+ * session spent in the zone is treated as the same episode.
+ */
+export const EXTREME_ZONE_REENTRY_GAP = 20;
+
 /** The two extreme zones, in display order. */
 export const EXTREME_FEAR_GREED_ZONES: readonly ExtremeFearGreedZone[] = [
     'EXTREME_FEAR',
@@ -37,6 +47,18 @@ export const EXTREME_FEAR_GREED_ZONES: readonly ExtremeFearGreedZone[] = [
 ];
 
 const PERCENT_FACTOR = 100;
+
+/**
+ * Label of the session right before `i`, or `null` when there is none or it is
+ * a warm-up / insufficient-sample gap. Both transitions and zone entries use it,
+ * so "a gap breaks the chain" lives in one place.
+ */
+function previousLabel(
+    history: readonly FearGreedReading[],
+    i: number
+): FearGreedLabel | null {
+    return i > 0 ? history[i - 1].label : null;
+}
 
 /**
  * Label changes between consecutive sessions, newest first.
@@ -48,54 +70,50 @@ const PERCENT_FACTOR = 100;
  *
  * @param history - Score history in chronological order (e.g. the output of
  *   `computeFearGreedHistory` or `computeMarketFearGreedHistory`).
- * @param limit - Maximum number of transitions to return (newest first). Values
- *   below 1 return an empty array.
+ * @param limit - Maximum number of transitions to return (newest first). A
+ *   value that is not a whole number ≥ 1 returns an empty array.
  * @returns Up to `limit` transitions, most recent first.
  */
 export function computeLabelTransitions(
     history: readonly FearGreedReading[],
     limit: number
 ): FearGreedLabelTransition[] {
-    if (limit < 1) return [];
+    if (!Number.isInteger(limit) || limit < 1) return [];
     const transitions = history.flatMap(
         (point, i): FearGreedLabelTransition[] => {
-            const prev = i > 0 ? history[i - 1] : undefined;
-            if (
-                prev === undefined ||
-                prev.label === null ||
-                point.label === null ||
-                prev.label === point.label
-            ) {
+            const prev = previousLabel(history, i);
+            if (prev === null || point.label === null || prev === point.label)
                 return [];
-            }
-            return [{ date: point.date, from: prev.label, to: point.label }];
+            return [{ date: point.date, from: prev, to: point.label }];
         }
     );
     return transitions.toReversed().slice(0, limit);
 }
 
 /**
- * Indices where the history **enters** `zone`: the session is labelled `zone`
- * and the immediately preceding session has a different, non-null label. A
- * session right after a warm-up gap is not an entry (the prior state is unknown).
+ * Indices where the history **enters** `zone`: the session is labelled `zone`,
+ * the immediately preceding session has a different, non-null label, and none
+ * of the previous `reentryGap` sessions was in `zone` (a quick return is the
+ * same episode). A session right after a warm-up gap is not an entry — the
+ * prior state is unknown.
  */
 function zoneEntryIndices(
     history: readonly FearGreedReading[],
-    zone: ExtremeFearGreedZone
+    zone: ExtremeFearGreedZone,
+    reentryGap: number
 ): number[] {
     return history.flatMap((point, i) => {
-        const prev = i > 0 ? history[i - 1] : undefined;
-        return point.label === zone &&
-            prev !== undefined &&
-            prev.label !== null &&
-            prev.label !== zone
-            ? [i]
-            : [];
+        const prev = previousLabel(history, i);
+        if (point.label !== zone || prev === null || prev === zone) return [];
+        const recentlyInZone = history
+            .slice(Math.max(0, i - reentryGap), i)
+            .some(p => p.label === zone);
+        return recentlyInZone ? [] : [i];
     });
 }
 
 function forwardChangeStat(
-    closes: number[],
+    closes: readonly number[],
     entries: readonly number[],
     horizon: number,
     minSample: number
@@ -124,6 +142,9 @@ function forwardChangeStat(
  *   describes `bars[i]`) — exactly what `computeFearGreedHistory(bars, …)`
  *   returns. A length mismatch returns an empty array rather than guessing an
  *   alignment.
+ * - An entry is a move into the zone from a different labelled session. A
+ *   return to the same zone within `reentryGap` sessions (default 20) of the
+ *   last session spent there is the same episode and not counted again.
  * - Forward change for horizon `h` from entry `i` is
  *   `(close[i + h] / close[i] - 1) × 100`, in percent. Entries without `h`
  *   sessions after them are left out of that horizon's sample, so later
@@ -138,7 +159,8 @@ function forwardChangeStat(
  * @param history - Score history aligned to `bars`.
  * @param bars - Daily bars in chronological order.
  * @param options - Optional horizons (sessions) and minimum sample size.
- *   Horizons that are not whole numbers ≥ 1 are ignored.
+ *   Horizons that are not whole numbers ≥ 1 are ignored; a `reentryGap` that
+ *   is not a whole number ≥ 0 falls back to the default.
  * @returns One outcome per extreme zone (`EXTREME_FEAR`, then `EXTREME_GREED`),
  *   or `[]` when `history` and `bars` are not aligned.
  */
@@ -154,9 +176,15 @@ export function summarizeExtremeZoneOutcomes(
         h => Number.isInteger(h) && h >= 1
     );
     const minSample = options.minSample ?? EXTREME_ZONE_MIN_SAMPLE;
+    const reentryGap =
+        options.reentryGap !== undefined &&
+        Number.isInteger(options.reentryGap) &&
+        options.reentryGap >= 0
+            ? options.reentryGap
+            : EXTREME_ZONE_REENTRY_GAP;
     const closes = bars.map(bar => bar.close);
     return EXTREME_FEAR_GREED_ZONES.map(zone => {
-        const entries = zoneEntryIndices(history, zone);
+        const entries = zoneEntryIndices(history, zone, reentryGap);
         return {
             zone,
             entryCount: entries.length,

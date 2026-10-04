@@ -12,7 +12,7 @@ import { sma } from '@/domain/indicators/utils';
  * @internal Shared by the market-wide and crypto Fear & Greed factor modules.
  */
 export function returnOver(
-    closes: number[],
+    closes: readonly number[],
     t: number,
     window: number
 ): number | null {

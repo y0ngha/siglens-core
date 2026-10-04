@@ -12,6 +12,7 @@ import {
     NO_CHART_SELECTION_CONTEXT,
     selectSkills,
 } from '@/domain/analysis/selectSkills';
+import { median } from '@/domain/indicators/utils';
 import type {
     AssembledPrompt,
     CurrencyCode,
@@ -21,7 +22,6 @@ import type {
     PriceTargetSummary,
     Skill,
 } from '@/domain/types';
-import { median } from '@/domain/indicators/utils';
 import {
     calendarDayDiff,
     formatLargeAmount,
