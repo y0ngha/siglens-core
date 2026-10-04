@@ -1598,4 +1598,263 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             expect(mockCacheSet).toHaveBeenCalledTimes(2);
         });
     });
+
+    describe('최신 생성물 재사용 (reuseLatestGeneration — overall 전용)', () => {
+        const peekKey = buildAnalysisPeekCacheKey(
+            mockSymbol,
+            mockTimeframe,
+            DEFAULT_ANALYSIS_MODEL_ID,
+            DEFAULT_TIER,
+            undefined,
+            undefined,
+            undefined
+        );
+        const peekedResult: AnalysisResponse = {
+            ...mockRawResult,
+            summary: '몇 분 전에 생성된 기술적 분석',
+            analyzedAt: '2026-10-04T00:00:00.000Z',
+        };
+
+        /** Exact key misses; only the peek pointer holds a value. */
+        function seedPeekOnly(value: unknown): void {
+            mockCacheGet.mockImplementation(async (key: string) =>
+                key === peekKey ? value : null
+            );
+        }
+
+        /** Keys passed to `cache.get`, split into peek-pointer vs exact reads. */
+        function readKeys(): { peek: string[]; exact: string[] } {
+            const keys = mockCacheGet.mock.calls.map(call => call[0] as string);
+            return {
+                peek: keys.filter(key => key.startsWith('analysis:peek:')),
+                exact: keys.filter(key => !key.startsWith('analysis:peek:')),
+            };
+        }
+
+        const overallCall = (
+            force: boolean,
+            extra: Record<string, unknown> = {}
+        ) =>
+            runAnalysisForOverall(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                force,
+                undefined,
+                { marketDataProvider: fakeProvider, ...extra }
+            );
+
+        it('정확 키 미스 + peek 히트 → LLM·봉 조회·캐시 쓰기 없이 peek 값을 cached로 돌려준다', async () => {
+            seedPeekOnly(peekedResult);
+
+            const result = await overallCall(false);
+
+            expect(result.status).toBe('cached');
+            if (result.status !== 'cached') return;
+            expect(result.result.summary).toBe('몇 분 전에 생성된 기술적 분석');
+            expect(result.result.analyzedAt).toBe('2026-10-04T00:00:00.000Z');
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+            const keys = readKeys();
+            expect(keys.exact).toHaveLength(1);
+            expect(keys.peek).toEqual([peekKey]);
+        });
+
+        it('peek 히트도 정확 키 히트처럼 사용량을 한 번 기록한다', async () => {
+            seedPeekOnly(peekedResult);
+            const usageRepository = {
+                recordUsage: vi
+                    .fn<UsageRepository['recordUsage']>()
+                    .mockResolvedValue(
+                        {} as Awaited<
+                            ReturnType<UsageRepository['recordUsage']>
+                        >
+                    ),
+                getUsageToday: vi
+                    .fn<UsageRepository['getUsageToday']>()
+                    .mockResolvedValue({ analysis: 0, chatbot: 0 }),
+            };
+
+            const result = await overallCall(false, {
+                usage: {
+                    usageRepository,
+                    clientIp: '203.0.113.10',
+                    userId: 'u1',
+                    occurredAt: new Date(),
+                },
+            });
+
+            expect(result.status).toBe('cached');
+            expect(usageRepository.recordUsage).toHaveBeenCalledTimes(1);
+        });
+
+        it('peek 미스 → 기존대로 생성하고 정확 키·peek 키를 모두 쓴다', async () => {
+            const result = await overallCall(false);
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(readKeys().peek).toEqual([peekKey]);
+            expect(mockCacheSet).toHaveBeenCalledTimes(2);
+        });
+
+        it('force → 정확 키도 peek 키도 읽지 않고 생성한다', async () => {
+            seedPeekOnly(peekedResult);
+
+            const result = await overallCall(true);
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+
+        it('skipEnqueueIfMiss + peek 히트 → miss_no_trigger가 아니라 cached', async () => {
+            seedPeekOnly(peekedResult);
+
+            const result = await overallCall(false, {
+                skipEnqueueIfMiss: true,
+            });
+
+            expect(result.status).toBe('cached');
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('skipEnqueueIfMiss + peek 미스 → miss_no_trigger', async () => {
+            const result = await overallCall(false, {
+                skipEnqueueIfMiss: true,
+            });
+
+            expect(result).toEqual({ status: 'miss_no_trigger' });
+            expect(readKeys().peek).toEqual([peekKey]);
+        });
+
+        it('peek 읽기가 실패하면 미스로 보고 로그를 남긴 뒤 생성한다', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            mockCacheGet.mockImplementation(async (key: string) => {
+                if (key === peekKey) throw new Error('redis peek read failed');
+                return null;
+            });
+
+            const result = await overallCall(false);
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            expect(errorSpy).toHaveBeenCalledWith(
+                '[RunAnalysis] Peek cache read failed:',
+                expect.objectContaining({ message: 'redis peek read failed' })
+            );
+            errorSpy.mockRestore();
+        });
+
+        it('peek 키는 reasoning·locale 접미사까지 맞는 항목만 히트한다', async () => {
+            const variantPeekKey = buildAnalysisPeekCacheKey(
+                mockSymbol,
+                mockTimeframe,
+                DEFAULT_ANALYSIS_MODEL_ID,
+                DEFAULT_TIER,
+                true,
+                undefined,
+                'en'
+            );
+            expect(variantPeekKey).not.toBe(peekKey);
+            mockCacheGet.mockImplementation(async (key: string) =>
+                key === variantPeekKey ? peekedResult : null
+            );
+
+            const hit = await overallCall(false, {
+                reasoning: true,
+                locale: 'en',
+            });
+            const miss = await overallCall(false);
+
+            expect(hit.status).toBe('cached');
+            expect(miss.status).toBe('done');
+        });
+
+        it('peek 키는 tier·보유 구간까지 맞는 항목만 히트한다', async () => {
+            const memberPeekKey = buildAnalysisPeekCacheKey(
+                mockSymbol,
+                mockTimeframe,
+                DEFAULT_ANALYSIS_MODEL_ID,
+                'member',
+                undefined,
+                'profit',
+                undefined
+            );
+            expect(memberPeekKey).not.toBe(peekKey);
+            mockCacheGet.mockImplementation(async (key: string) =>
+                key === memberPeekKey ? peekedResult : null
+            );
+
+            const hit = await overallCall(false, {
+                tierContext: { userId: null, tier: 'member' },
+                positionBucket: 'profit',
+            });
+            const sameTierNoPosition = await overallCall(false, {
+                tierContext: { userId: null, tier: 'member' },
+            });
+            const defaultTierSamePosition = await overallCall(false, {
+                positionBucket: 'profit',
+            });
+
+            expect(hit.status).toBe('cached');
+            expect(sameTierNoPosition.status).toBe('done');
+            expect(defaultTierSamePosition.status).toBe('done');
+        });
+
+        it('스킬 로드가 degraded였던 peek 항목은 재사용하지 않고 생성한다', async () => {
+            seedPeekOnly({ ...peekedResult, skillsDegraded: true });
+
+            const result = await overallCall(false);
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        });
+
+        it('정규화 후 내용이 빈 peek 항목(오염된 페이로드)은 미스로 보고 생성한다', async () => {
+            seedPeekOnly({ summary: '' });
+
+            const result = await overallCall(false);
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        });
+
+        it('공개 runAnalysis는 peek 키를 읽지 않는다 — 정확 키만 읽고 생성한다', async () => {
+            seedPeekOnly(peekedResult);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+            const keys = readKeys();
+            expect(keys.peek).toEqual([]);
+            expect(keys.exact).toHaveLength(1);
+        });
+
+        it('공개 runAnalysis + skipEnqueueIfMiss는 peek 값이 있어도 miss_no_trigger', async () => {
+            seedPeekOnly(peekedResult);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, skipEnqueueIfMiss: true }
+            );
+
+            expect(result).toEqual({ status: 'miss_no_trigger' });
+            expect(readKeys().peek).toEqual([]);
+        });
+    });
 });

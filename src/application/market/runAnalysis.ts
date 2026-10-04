@@ -1,9 +1,10 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
+import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
-import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import { isEmptyAnalysis } from '@/application/market/peekAnalysisCache';
 import {
     buildTimeframeNotAllowedError,
     type RunAnalysisResult,
@@ -36,6 +37,7 @@ import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
 import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
+import type { CacheProvider } from '@/domain/ports/cache';
 import {
     DEFAULT_TIER,
     TIER_CONFIG,
@@ -47,6 +49,8 @@ import type {
     AnalysisResponse,
     AssembledPromptRecord,
     FearGreedSnapshot,
+    Tier,
+    TierConfig,
     Timeframe,
 } from '@/domain/types';
 import {
@@ -107,16 +111,93 @@ export type RunAnalysisForOverallResult =
 const DEFAULT_RUN_ANALYSIS_MODEL: ActiveModelId = DEEPSEEK_V4_1_FLASH_MODEL;
 
 /**
+ * Internal switches that distinguish the two entry points of
+ * `runAnalysisImpl`. Never part of the public options surface.
+ */
+interface RunAnalysisImplMode {
+    /**
+     * `false` → applies `filterAnalysisResult` before returning (public API:
+     * caller receives the tier-appropriate field set).
+     * `true`  → returns the raw `AnalysisResponse` without filtering
+     * (internal API: `runOverallAnalysis` needs the full payload for its
+     * prompt builder).
+     */
+    skipFilter: boolean;
+    /**
+     * `true` → when the exact cache key misses (and `force` is off), fall back
+     * to the peek pointer — the latest generation for this
+     * symbol/timeframe/model/tier — before generating. Only
+     * `runAnalysisForOverall` enables it; the public `runAnalysis` reads the
+     * exact key only.
+     *
+     * Why the overall path needs it: the exact key folds a fingerprint of up
+     * to 20 market events' publish time + classification labels, while the
+     * prompt renders only the few events before the last bar. Prewarm runs the
+     * news tab (which ingests and classifies new articles) between the
+     * technical tab and the overall tab, so by the time overall re-reads the
+     * events the KEY has moved while the PROMPT has not — an exact-key miss
+     * that regenerates a technical analysis produced minutes earlier.
+     *
+     * Accepted risk: the peek key carries no skills fingerprint, so on a day
+     * the skills catalog changes, overall may reuse a technical built with the
+     * previous catalog until the peek entry's TTL lapses. The prompt template
+     * version IS part of the peek key, so a prompt change never leaks through.
+     * Because the overall cache key hashes the technical result, reusing it
+     * also keeps overall's own key stable across repeated runs.
+     */
+    reuseLatestGeneration: boolean;
+}
+
+/**
+ * Normalise a cached analysis into the return shape of the caller: the raw
+ * payload for the internal (unfiltered) variant, the tier-filtered payload for
+ * the public one.
+ */
+function toCachedResult(
+    normalized: AnalysisResponse,
+    skipFilter: boolean,
+    tier: Tier,
+    tierConfig: TierConfig
+): RunAnalysisResult | RunAnalysisForOverallResult {
+    if (skipFilter) {
+        return { status: 'cached', result: normalized };
+    }
+    const filtered = filterAnalysisResult(normalized, tier, tierConfig);
+    return { status: 'cached', ...filtered };
+}
+
+/**
+ * Read the peek pointer for reuse. Returns `null` — so the caller falls through
+ * to generation — for a missing entry, a Redis read error or corrupt payload,
+ * an entry generated while the skills load was degraded (the exact key keeps
+ * such a result apart through its skills fingerprint; the peek key has none),
+ * and a content-free shape left by normalizing a poisoned payload (same guard
+ * as `peekAnalysisCache`).
+ */
+async function readPeekGeneration(
+    cache: CacheProvider,
+    peekKey: string
+): Promise<AnalysisResponse | null> {
+    try {
+        const cached = await cache.get<
+            AnalysisResponse & { skillsDegraded?: boolean }
+        >(peekKey);
+        if (cached === null || cached.skillsDegraded === true) return null;
+        const normalized = normalizeCachedAnalysisResponse(cached);
+        return isEmptyAnalysis(normalized) ? null : normalized;
+    } catch (error) {
+        console.error('[RunAnalysis] Peek cache read failed:', error);
+        return null;
+    }
+}
+
+/**
  * Shared implementation for `runAnalysis` (public, filtered) and
- * `runAnalysisForOverall` (internal, unfiltered).
- *
- * `skipFilter = false` → applies `filterAnalysisResult` before returning
- * (public API: caller receives the tier-appropriate field set).
- * `skipFilter = true`  → returns the raw `AnalysisResponse` without filtering
- * (internal API: `runOverallAnalysis` needs the full payload for its prompt builder).
+ * `runAnalysisForOverall` (internal, unfiltered, reuses the latest generation).
+ * See {@link RunAnalysisImplMode} for the two switches.
  */
 async function runAnalysisImpl(
-    skipFilter: boolean,
+    { skipFilter, reuseLatestGeneration }: RunAnalysisImplMode,
     symbol: string,
     companyName: string,
     timeframe: Timeframe,
@@ -158,6 +239,20 @@ async function runAnalysisImpl(
 
     const usage = options.usage;
     const usageOccurredAt = usage?.occurredAt ?? new Date();
+
+    // Both cache-served paths (exact-key hit, overall's peek reuse) bill the
+    // call as a usage-counted analysis and return through the same shaping.
+    // One helper keeps them from drifting apart.
+    const serveCached = async (
+        normalized: AnalysisResponse
+    ): Promise<RunAnalysisResult | RunAnalysisForOverallResult> => {
+        await recordAnalysisUsageSafely(
+            usage,
+            effectiveModelId,
+            usageOccurredAt
+        );
+        return toCachedResult(normalized, skipFilter, tier, tierConfig);
+    };
 
     if (usage !== undefined) {
         const allowed = await checkAnalysisUsageAllowed(
@@ -233,23 +328,32 @@ async function runAnalysisImpl(
             const cached = await cache.get<AnalysisResponse>(cacheKey);
             if (cached !== null) {
                 const normalized = normalizeCachedAnalysisResponse(cached);
-                await recordAnalysisUsageSafely(
-                    usage,
-                    effectiveModelId,
-                    usageOccurredAt
-                );
-                if (skipFilter) {
-                    return { status: 'cached', result: normalized };
-                }
-                const filtered = filterAnalysisResult(
-                    normalized,
-                    tier,
-                    tierConfig
-                );
-                return { status: 'cached', ...filtered };
+                return await serveCached(normalized);
             }
         } catch (error) {
             console.error('[RunAnalysis] Cache read failed:', error);
+        }
+
+        // Exact-key miss. Overall reuses the latest generation instead of
+        // regenerating one whose prompt is unchanged — see
+        // `RunAnalysisImplMode.reuseLatestGeneration`. Read-only: nothing is
+        // written back, the existing entries keep their own TTLs.
+        if (reuseLatestGeneration) {
+            const reused = await readPeekGeneration(
+                cache,
+                buildAnalysisPeekCacheKey(
+                    symbol,
+                    timeframe,
+                    effectiveModelId,
+                    tier,
+                    options.reasoning,
+                    options.positionBucket,
+                    options.locale
+                )
+            );
+            if (reused !== null) {
+                return await serveCached(reused);
+            }
         }
     }
 
@@ -510,7 +614,7 @@ export async function runAnalysis(
     options: SubmitAnalysisOptions = {}
 ): Promise<RunAnalysisResult> {
     return runAnalysisImpl(
-        false,
+        { skipFilter: false, reuseLatestGeneration: false },
         symbol,
         companyName,
         timeframe,
@@ -532,6 +636,14 @@ export async function runAnalysis(
  * Mirrors the `submitAnalysisForOverall` → `submitAnalysisWithVisibility('internal')`
  * pattern from the queued path.
  *
+ * Unlike `runAnalysis`, an exact-key miss (without `force`) falls back to the
+ * latest generation for the same symbol/timeframe/model/tier (the peek
+ * pointer) and returns it as `cached` instead of regenerating: the exact key's
+ * market-event fingerprint moves with every newly classified article even when
+ * the rendered prompt does not.
+ *
+ * @internal Not exported from the package entrypoints.
+ *
  * @see runAnalysis for the public (tier-filtered) variant.
  * @see runOverallAnalysis for the only intended caller.
  */
@@ -544,7 +656,7 @@ export async function runAnalysisForOverall(
     options: SubmitAnalysisOptions = {}
 ): Promise<RunAnalysisForOverallResult> {
     return runAnalysisImpl(
-        true,
+        { skipFilter: true, reuseLatestGeneration: true },
         symbol,
         companyName,
         timeframe,
