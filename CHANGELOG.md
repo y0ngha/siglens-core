@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.8.1](https://github.com/y0ngha/siglens-core/compare/v2.8.0...v2.8.1) (2026-10-04)
+
+### Bug Fixes
+
+* Overall Analysis가 최신 Technical 분석을 peek key로 재사용 ([#251](https://github.com/y0ngha/siglens-core/issues/251)) ([7d8b40f](https://github.com/y0ngha/siglens-core/commit/7d8b40f27e7727051031146925291ad8df5e6978))
+
+### Performance Improvements
+
+* Analysis Intent를 안정 Prefix로 이동하여 Cache 효율 개선 ([#250](https://github.com/y0ngha/siglens-core/issues/250)) ([c1a70a2](https://github.com/y0ngha/siglens-core/commit/c1a70a23a6d6aa76156677ea17cb0ed9a3c1680b))
+* News Card 모델을 DeepSeek으로 전환하고 Prompt Cache 구성 ([#249](https://github.com/y0ngha/siglens-core/issues/249)) ([0de1c35](https://github.com/y0ngha/siglens-core/commit/0de1c3510bbcbb3b74c57ab035d6e7b010f7bbf1))
+
 # [2.8.0](https://github.com/y0ngha/siglens-core/compare/v2.7.1...v2.8.0) (2026-10-03)
 
 ### Features
