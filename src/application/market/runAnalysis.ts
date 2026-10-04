@@ -422,8 +422,10 @@ async function runAnalysisImpl(
         options.currency
     );
 
-    // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
-    // providers with a stable-system cache hit amortise the cost.
+    // `stable` (Analysis Intent + Guidelines, then the always-on skill digests)
+    // folds into SYSTEM so the cross-symbol-identical head becomes the
+    // provider's cached prefix. For technical analysis `stable` is never
+    // empty; the fallback only keeps the shape shared with other builders.
     const system = stable
         ? `${aiSystemPrompt(locale)}\n\n${stable}`
         : aiSystemPrompt(locale);

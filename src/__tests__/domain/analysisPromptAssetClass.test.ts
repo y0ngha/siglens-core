@@ -162,15 +162,22 @@ describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
     });
 
     it('tags at-price reference levels instead of offering them as stops', () => {
-        const p = renderDynamic(
-            'AAPL',
-            syntheticBars(260, 230, 86_400),
-            '1Day'
-        );
+        const series = syntheticBars(260, 230, 86_400);
+        const p = renderDynamic('AAPL', series, '1Day');
         expect(p).toContain(
             'at price — inside bar noise, not a stop or target'
         );
-        expect(p).toContain('never on a level tagged "at price"');
+        // The stopLoss rule lives in the Analysis Guidelines, which sit at the
+        // head of `stable` (system message) rather than in `dynamic`.
+        const { stable } = buildAnalysisPromptRaw(
+            'AAPL',
+            'AAPL',
+            series,
+            calculateIndicators(series),
+            [],
+            '1Day'
+        );
+        expect(stable).toContain('never on a level tagged "at price"');
     });
 
     it('describes crypto horizon spans in wall-clock time, not trading sessions', () => {
