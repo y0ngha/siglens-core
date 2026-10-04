@@ -312,12 +312,15 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 | `evaluatePullback(bars)` — 마지막 봉의 short-term washout 판독(종가 vs MA200, Williams %R(14), RSI(2), MA5 청산 기준). 200봉 미만·비유한 종가면 `null`. 일봉 측정값이므로 호출자가 timeframe을 거른다. Returns `PullbackSnapshot \| null`. | `domain/signals/pullback.ts` |
 | `classifyPullback(aboveMa200, williamsR)` — 판독 분류만(경계: %R ≤ −90 washout, −90 < %R ≤ −80이고 MA200 위면 near). | `domain/signals/pullback.ts` |
 
-**Fear & Greed Index (per-stock) (3)**
+**Fear & Greed Index (per-stock) (6)**
 | Symbol | Source |
 |---|---|
 | `computeFearGreedIndex(bars, buySellVolume, options?)` — per-stock Fear & Greed snapshot. Returns `FearGreedSnapshot \| null`. | `domain/indicators/fearGreed/walkForward.ts` |
 | `computeFearGreedHistory(bars, buySellVolume, options?)` — walk-forward 1-year score history. Returns `FearGreedHistoryPoint[]`. | `domain/indicators/fearGreed/walkForward.ts` |
 | `scoreToLabel(score)` — map a 0..100 score to its 5-stage `FearGreedLabel`, using `FEAR_GREED_LABEL_CUTOFFS`. | `domain/indicators/fearGreed/composition.ts` |
+| `computeLabelTransitions(history, limit)` — 인접한 두 세션의 라벨이 바뀐 지점 목록(최신순, 최대 `limit`개). 라벨 공백(`null`)은 사슬을 끊는다. Returns `FearGreedLabelTransition[]`. | `domain/indicators/fearGreed/regimeStats.ts` |
+| `summarizeExtremeZoneOutcomes(history, bars, options?)` — 극단 구간(`EXTREME_FEAR`·`EXTREME_GREED`)별 진입 횟수와 진입 후 N거래일(기본 5·20·60) 종가 변화율의 **중앙값·표본 수**. 표본이 `minSample`(기본 5) 미만이면 중앙값을 `null`로 숨기고, 진입 수가 모자라면 `status: 'insufficient_sample'`. `history`와 `bars`의 길이가 다르면 `[]`. **과거 사후 집계이며 예측이 아니다** — 숫자와 상태값만 돌려주고 문장·권유성 라벨·평균·승률은 만들지 않는다. 표시 문구와 "미래 보장 아님" 고지는 consumer 몫. Returns `ExtremeZoneOutcome[]`. | `domain/indicators/fearGreed/regimeStats.ts` |
+| `computeMarketScoreGap(symbolHistory, market)` — 같은 날짜의 종목 점수 − 시장 점수. 같은 날짜 쌍이 없거나 한쪽 점수가 `null`이면 `null`(다른 날끼리 비교하지 않는다). Returns `FearGreedScoreGap \| null`. | `domain/indicators/fearGreed/regimeStats.ts` |
 
 **Fear & Greed Index (market-wide) (2)**
 | Symbol | Source |
@@ -542,6 +545,8 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
     - `FearGreedFactor`, `FearGreedGroup`
     - `FearGreedSnapshot`, `FearGreedHistoryPoint`
     - `ComputeFearGreedOptions`
+    - `FearGreedReading`, `FearGreedLabelTransition`, `FearGreedScoreGap` (additive)
+    - `ExtremeFearGreedZone`, `ForwardChangeStat`, `ExtremeZoneOutcome`, `ExtremeZoneOutcomeOptions` (additive — 과거 사후 집계, 예측 아님)
 - Fear & Greed Index (market-wide):
     - `MarketFearGreedSeriesKey`, `MarketFearGreedFactorKey`
     - `MarketDailyClose`, `MarketFearGreedInput`
@@ -596,7 +601,7 @@ Public 함수는 4개 Tier로 분류한다. Tier는 호출자(누가 부르는�
 
 **눌림 판독 상수·타입** — `PULLBACK_TREND_MA_PERIOD`(200), `PULLBACK_EXIT_MA_PERIOD`(5), `PULLBACK_WILLIAMS_R_PERIOD`(14), `PULLBACK_RSI_PERIOD`(2), `PULLBACK_WASHOUT_WILLIAMS_R`(−90), `PULLBACK_NEAR_WILLIAMS_R`(−80), `PULLBACK_BASE_RATES`(판독별 측정 기저율 문장 — 모델이 인용할 수 있게 도구 결과·프롬프트에 싣는다), 타입 `PullbackReading`(`'washoutInUptrend' \| 'nearWashoutInUptrend' \| 'washoutBelowMa200' \| 'none'`)·`PullbackSnapshot` (`domain/signals/pullback.ts`). siglens `get_bars_indicators`와 siglens-trader가 임계값을 복제하지 않고 이 심볼을 쓰도록 공개.
 
-**Fear & Greed 상수** — `FEAR_GREED_LABEL_CUTOFFS` (5단계 분류 경계 25/45/55/75), `POC_WINDOW_DEFAULT` (= 60, POC 거리 팩터 기본 창) (`domain/indicators/fearGreed/`). siglens 게이지 세그먼트 렌더링·점수→라벨 분류에서 사용. 시장 전체 지수는 `MARKET_FEAR_GREED_SERIES_KEYS`(6종 입력 시리즈 키), `MARKET_FEAR_GREED_FACTOR_KEYS`(5종 팩터 키, 표시 순서) (`domain/indicators/marketFearGreed/`) — consumer가 시리즈 fetch·팩터 렌더링을 순회할 때 사용.
+**Fear & Greed 상수** — `FEAR_GREED_LABEL_CUTOFFS` (5단계 분류 경계 25/45/55/75), `POC_WINDOW_DEFAULT` (= 60, POC 거리 팩터 기본 창), `EXTREME_FEAR_GREED_ZONES` (`['EXTREME_FEAR', 'EXTREME_GREED']`, 표시 순서), `EXTREME_ZONE_FORWARD_HORIZONS` (`[5, 20, 60]` 거래일), `EXTREME_ZONE_MIN_SAMPLE` (= 5, 중앙값을 보이는 최소 표본) (`domain/indicators/fearGreed/`). siglens 게이지 세그먼트 렌더링·점수→라벨 분류에서 사용. 시장 전체 지수는 `MARKET_FEAR_GREED_SERIES_KEYS`(6종 입력 시리즈 키), `MARKET_FEAR_GREED_FACTOR_KEYS`(5종 팩터 키, 표시 순서) (`domain/indicators/marketFearGreed/`) — consumer가 시리즈 fetch·팩터 렌더링을 순회할 때 사용.
 
 **티어 제한 상수** — `DEFAULT_TIER`, `TIER_CONFIG` (`domain/tier.ts`).
 

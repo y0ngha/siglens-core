@@ -113,3 +113,68 @@ export interface FactorValues {
     ma200Dist: number;
     rangePosition: number;
 }
+
+/**
+ * Minimal reading shape shared by the instrument and market-wide history
+ * points (`FearGreedHistoryPoint`, `MarketFearGreedHistoryPoint`).
+ */
+export interface FearGreedReading {
+    /** ISO `YYYY-MM-DD` session date. */
+    date: string;
+    /** Score in [0, 100], or `null` during warm-up / insufficient sample. */
+    score: number | null;
+    /** Label derived from `score`, or `null` when `score` is `null`. */
+    label: FearGreedLabel | null;
+}
+
+/** A label change between two adjacent labelled sessions. */
+export interface FearGreedLabelTransition {
+    /** ISO date of the session that carries the new label. */
+    date: string;
+    /** Label on the previous session. */
+    from: FearGreedLabel;
+    /** Label on `date`. */
+    to: FearGreedLabel;
+}
+
+/** The two extreme labels whose entries are aggregated. */
+export type ExtremeFearGreedZone = 'EXTREME_FEAR' | 'EXTREME_GREED';
+
+/** Close-to-close change after zone entries over one forward horizon. */
+export interface ForwardChangeStat {
+    /** Forward horizon in trading sessions. */
+    horizon: number;
+    /** Number of entries that had `horizon` sessions of data after them. */
+    sampleSize: number;
+    /** Median change in percent, or `null` when `sampleSize` is below the minimum. */
+    median: number | null;
+}
+
+/** Past aggregate for one extreme zone. Descriptive only — not a forecast. */
+export interface ExtremeZoneOutcome {
+    zone: ExtremeFearGreedZone;
+    /** Times the history entered the zone from a different labelled session. */
+    entryCount: number;
+    /** `'insufficient_sample'` when `entryCount` is below the minimum sample. */
+    status: 'ok' | 'insufficient_sample';
+    /** One entry per requested horizon, in the requested order. */
+    forward: ForwardChangeStat[];
+}
+
+/** Options for `summarizeExtremeZoneOutcomes`. */
+export interface ExtremeZoneOutcomeOptions {
+    /** Forward horizons in trading sessions. Defaults to 5, 20, 60. */
+    horizons?: readonly number[];
+    /** Minimum sample before a median is reported. Defaults to 5. */
+    minSample?: number;
+}
+
+/** Same-session gap between an instrument score and the market score. */
+export interface FearGreedScoreGap {
+    /** ISO date both scores describe. */
+    date: string;
+    symbolScore: number;
+    marketScore: number;
+    /** `symbolScore - marketScore`. Positive = instrument reads greedier than the market. */
+    gap: number;
+}

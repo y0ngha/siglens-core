@@ -7,6 +7,7 @@ import {
     rollingLowest,
     linreg,
     lastNonNull,
+    median,
 } from '@/domain/indicators/utils';
 
 describe('sma', () => {
@@ -124,5 +125,25 @@ describe('linreg', () => {
             // linreg at offset=0 predicts y at x=4 → 4
             expect(linreg([0, 1, 2, 3, 4], 5)).toBeCloseTo(4, 5);
         });
+    });
+});
+
+describe('median', () => {
+    it('홀수 개는 가운데 값이다', () => {
+        expect(median([3, 1, 2])).toBe(2);
+    });
+
+    it('짝수 개는 가운데 두 값의 평균이다', () => {
+        expect(median([4, 1, 3, 2])).toBe(2.5);
+    });
+
+    it('빈 배열은 null이다', () => {
+        expect(median([])).toBeNull();
+    });
+
+    it('입력 배열을 바꾸지 않는다', () => {
+        const values = [3, 1, 2];
+        median(values);
+        expect(values).toEqual([3, 1, 2]);
     });
 });

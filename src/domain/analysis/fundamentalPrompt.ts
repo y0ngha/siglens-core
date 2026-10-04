@@ -21,6 +21,7 @@ import type {
     PriceTargetSummary,
     Skill,
 } from '@/domain/types';
+import { median } from '@/domain/indicators/utils';
 import {
     calendarDayDiff,
     formatLargeAmount,
@@ -164,16 +165,6 @@ function peerPremiumPct(
 ): number | null {
     if (!isFinitePositive(subjectValue)) return null;
     return percentDelta(subjectValue, peerMedian);
-}
-
-/** Median of a numeric array (sorted ascending internally), or `null` for an empty input. */
-function median(values: readonly number[]): number | null {
-    if (values.length === 0) return null;
-    const sorted = values.toSorted((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 === 0
-        ? (sorted[mid - 1] + sorted[mid]) / 2
-        : sorted[mid];
 }
 
 /** Minimum peer count for `peerMedian` — a "median" of 1 is just that one peer's value, so it is withheld rather than presented as a peer comparison. */
