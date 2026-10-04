@@ -1887,13 +1887,16 @@ export interface PromptConfig {
  * (spec §3.4, `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`)
  * — Design C ("skills-to-system split"):
  *
- * - `stable` — ONLY the `always_on` skill digests for this `(analysisType,
- *   catalog)` pair. Byte-identical across calls sharing the same catalog
- *   fingerprint: never contains a symbol, job id, timestamp, or any other
- *   per-call value — it only changes when the skill catalog fingerprint
- *   changes. Non-empty for skill-bearing builders (technical, fundamental,
- *   financials, congress, news) whenever the loaded catalog has `always_on`
- *   skills for that context; `''` for builders that inject no skills at all
+ * - `stable` — the `always_on` skill digests for this `(analysisType,
+ *   catalog)` pair (technical analysis additionally leads with its fixed
+ *   Analysis Intent + Guidelines blocks, see `buildAnalysisPrompt`). Never
+ *   contains a symbol, job id, timestamp, or any other per-call value, but it
+ *   is NOT one string per catalog: it varies with `locale` (Guidelines are
+ *   localized) and, on the free tier, with the per-symbol sampled `always_on`
+ *   skill set (`sampleSkillsForTier`). Content-address it by its own hash,
+ *   not by the catalog fingerprint. Non-empty for skill-bearing builders
+ *   (technical, fundamental, financials, congress, news) whenever the loaded
+ *   catalog has `always_on` skills for that context; `''` for builders that inject no skills at all
  *   (options, market/macro briefing, economic-event, indicator-translation —
  *   these never read the skill catalog and always return `stable: ''`).
  * - `dynamic` — everything else, in production order: the symbol/company
@@ -1907,7 +1910,7 @@ export interface PromptConfig {
  * so the seed still reflects the full assembled content.
  */
 export interface AssembledPrompt {
-    /** The `always_on` skill-digest section — byte-stable per `(analysisType, catalog fingerprint)`. Non-empty for skill-bearing builders (technical/fundamental/financials/congress/news) with the production catalog; `''` for no-skill builders (options, market/macro briefing, economic-event, indicator-translation), which never read the skill catalog. (Edge case: only `buildAnalysisPrompt` (technical) collapses to `''` when the catalog has no `always_on` skills; the other skill-bearing builders — fundamental/financials/congress/news/marketNewsDigest — always emit their skill-section wrapper header even with 0 skills.) Folded into the system prompt by dispatch. */
+    /** The cacheable section folded into the system prompt — never per-call, but it varies by `locale` and, on the free tier, by the per-symbol sampled `always_on` skill set (content-address it by its own hash). Non-empty for skill-bearing builders (technical/fundamental/financials/congress/news) with the production catalog; `''` for no-skill builders (options, market/macro briefing, economic-event, indicator-translation), which never read the skill catalog. (Exception: `buildAnalysisPrompt` (technical) never returns `''` — its `stable` leads with the fixed Analysis Intent + Analysis Guidelines blocks, then the `always_on` digests, so the cross-symbol-identical head precedes the per-symbol-sampled digests; the other skill-bearing builders — fundamental/financials/congress/news/marketNewsDigest — always emit their skill-section wrapper header even with 0 skills.) Folded into the system prompt by dispatch. */
     stable: string;
     /** Everything else, in production order: symbol/company framing, fetched data, gated skill digests, the request block. Sent as `prompt` by dispatch. */
     dynamic: string;
@@ -1935,16 +1938,17 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
  * prompt to hand out. `system` already has `stable` folded into the base
  * system persona (Design C: `system = basePersona + stable`), so a consumer
  * that wants the exact provider-call arguments needs only `system` and
- * `dynamic`; `stable` is broken out separately because it is
- * BYTE-IDENTICAL across every call sharing the same `(analysisType,
- * catalog)` fingerprint — a consumer storing many of these rows should
- * content-address that half (store it once, reference it by hash) rather
- * than copying it into every row.
+ * `dynamic`; `stable` is broken out separately because it repeats across
+ * many calls — a consumer storing many of these rows should content-address
+ * that half by its own hash (store it once, reference it by hash) rather than
+ * copying it into every row. It is not one string per `(analysisType,
+ * catalog)`: it also varies with `locale` and, on the free tier, with the
+ * per-symbol sampled `always_on` skill set.
  */
 export interface AssembledPromptRecord {
     /** The system message actually sent, including the folded-in `stable` skill digest. */
     readonly system: string;
-    /** The `always_on` skill digest half — byte-identical across calls sharing a catalog. */
+    /** The cacheable half folded into `system` (technical: Intent + Guidelines, then `always_on` digests) — repeats across calls; varies by locale and sampled skill set. */
     readonly stable: string;
     /** Everything else: symbol framing, bar data, indicators, gated skills, prior analyses, output rules. */
     readonly dynamic: string;

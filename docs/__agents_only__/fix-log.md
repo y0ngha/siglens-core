@@ -299,3 +299,13 @@ Round 4: approved
   Context: Note now says to surface RSI(2) as `rsi2` in the 1Day latest-indicator view.
 
 Round 6: approved
+
+## [Branch perf/technical-prompt-stable-prefix | 2026-10-04] — Review findings (Intent + Guidelines into stable, p22)
+
+- Violation 1 (recommended, R1+R2): JSDoc on AssembledPrompt / AssembledPromptRecord (interface block AND field doc) still claimed `stable` is byte-identical per catalog after the change made it vary by locale and free-tier sampled skills
+  Rule: When a contract's shape changes, update every doc on that type — interface block, field docs, and record types — not just one
+  Context: Now says content-address `stable` by its own hash; consumer siglens already does (sha256).
+- Violation 2 (recommended, R1): Comment above `system = stable ? …` described the old stable content
+  Rule: After moving content into a variable, re-read comments that describe that variable
+
+Round 3: approved (comment-only fix after R2)

@@ -92,6 +92,9 @@ domain builder and dispatch it as **two separate fields**, not one combined user
 - `system = AI_SYSTEM_PROMPT + '\n\n' + assembled.stable` (when `stable` is non-empty;
   otherwise just `AI_SYSTEM_PROMPT`) — the `always_on` skill digests live in the
   **system** prompt so providers (Gemini/OpenAI/Claude) cache the stable prefix.
+  For technical analysis `stable` leads with the fixed Analysis Intent + Guidelines
+  blocks (p22) — ahead of the per-symbol-sampled free-tier skill digests — so
+  `persona → Intent → Guidelines` is byte-identical across symbols.
 - `prompt = assembled.dynamic` — the per-call half (symbol framing, fetched data,
   gated skills, request block).
 - `seed = analysisSeed(system + '\n\n' + prompt)` — computed over the full assembled

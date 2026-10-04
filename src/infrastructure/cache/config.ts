@@ -794,10 +794,15 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * candidates gain a `Spacing (bars)` line; candle-pattern lines carry the bar
  * date; the Indicator State guidelines are rewritten and a Consistency Across
  * Fields block is added. Bytes change on every request.
+ * **`p22`** — technical-analysis prompt layout only (no wording change): the
+ * fixed Analysis Intent + Analysis Guidelines blocks move from the head of the
+ * user prompt to the head of `stable` (system message, ahead of the
+ * `always_on` skill digests) so the cross-symbol common prefix covers them for
+ * provider automatic prefix caching. Bytes change on every request.
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p21' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p22' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest
