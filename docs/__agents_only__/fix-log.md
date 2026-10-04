@@ -361,3 +361,12 @@ Round 3: approved (comment-only fix after R2)
 - Violation (blocker, fixed): `!Number.isFinite(change)` guard had no test that only it could satisfy
   Rule: MISTAKES Tests 5.5 — each guard needs a case that fails when the guard is removed (NaN close)
 - Change (author, not from review): re-entry gap (default 20 sessions) — live data showed boundary flip-flops inflating entry counts with overlapping windows
+
+## [PR #253 Claude review R2 | feat/252/fear-greed-regime-stats | 2026-10-05]
+- Violation (suggestion, fixed): private helper `forwardChangeStat` without JSDoc while sibling helpers had one
+  Rule: Keep doc density consistent across sibling helpers in a module
+- Violation (suggestion, fixed): nested option-validation conditional inline in the public function
+  Rule: MISTAKES 8 — extract complex anonymous expressions into a named helper (`resolveReentryGap`)
+- Violation (suggestion, fixed): per-session `slice().some()` window re-scan in entry detection
+  Rule: MISTAKES 15.5 — single pass tracking state (for loop + push) instead of re-slicing per step
+- Skipped (suggestion): interface→type alias consumer check — no declaration merging in siglens / siglens-trader (grep)

@@ -102,16 +102,31 @@ function zoneEntryIndices(
     zone: ExtremeFearGreedZone,
     reentryGap: number
 ): number[] {
-    return history.flatMap((point, i) => {
+    // Single pass that remembers the last session spent in `zone`, so a quick
+    // return is recognised without re-scanning a window per session. A for
+    // loop with push (MISTAKES 14.5 / 15.5): reduce + spread would be O(N²).
+    const entries: number[] = [];
+    let lastInZone: number | null = null;
+    const n = history.length;
+    for (let i = 0; i < n; i++) {
+        if (history[i].label !== zone) continue;
         const prev = previousLabel(history, i);
-        if (point.label !== zone || prev === null || prev === zone) return [];
-        const recentlyInZone = history
-            .slice(Math.max(0, i - reentryGap), i)
-            .some(p => p.label === zone);
-        return recentlyInZone ? [] : [i];
-    });
+        const isEntry =
+            prev !== null &&
+            prev !== zone &&
+            (lastInZone === null || i - lastInZone > reentryGap);
+        if (isEntry) entries.push(i);
+        lastInZone = i;
+    }
+    return entries;
 }
 
+/**
+ * Forward close change after each entry over one `horizon`, in percent. An
+ * entry without `horizon` sessions after it, or whose change is not finite
+ * (non-positive base close, or a NaN/Infinity close), is left out of the
+ * sample. The median is withheld below `minSample`.
+ */
 function forwardChangeStat(
     closes: readonly number[],
     entries: readonly number[],
@@ -132,6 +147,15 @@ function forwardChangeStat(
         sampleSize: changes.length,
         median: changes.length >= minSample ? median(changes) : null,
     };
+}
+
+/** A re-entry gap must be a whole number of sessions ≥ 0; anything else falls back to the default. */
+function resolveReentryGap(reentryGap: number | undefined): number {
+    return reentryGap !== undefined &&
+        Number.isInteger(reentryGap) &&
+        reentryGap >= 0
+        ? reentryGap
+        : EXTREME_ZONE_REENTRY_GAP;
 }
 
 /**
@@ -176,12 +200,7 @@ export function summarizeExtremeZoneOutcomes(
         h => Number.isInteger(h) && h >= 1
     );
     const minSample = options.minSample ?? EXTREME_ZONE_MIN_SAMPLE;
-    const reentryGap =
-        options.reentryGap !== undefined &&
-        Number.isInteger(options.reentryGap) &&
-        options.reentryGap >= 0
-            ? options.reentryGap
-            : EXTREME_ZONE_REENTRY_GAP;
+    const reentryGap = resolveReentryGap(options.reentryGap);
     const closes = bars.map(bar => bar.close);
     return EXTREME_FEAR_GREED_ZONES.map(zone => {
         const entries = zoneEntryIndices(history, zone, reentryGap);
