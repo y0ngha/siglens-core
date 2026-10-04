@@ -26,8 +26,11 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
  * the by-product of normalizing a poisoned / empty cached payload (the writer
  * never persists it; see `pollAnalysis`'s `isFallbackAnalysis` skip), so the
  * peek treats it as a cache miss rather than serving an empty body.
+ *
+ * @internal Shared with `runAnalysis`'s overall reuse path; not exported from
+ * the package entrypoints.
  */
-function isEmptyAnalysis(result: AnalysisResponse): boolean {
+export function isEmptyAnalysis(result: AnalysisResponse): boolean {
     const summary = result.summary.trim();
     const summaryIsEmpty =
         summary === '' || summary === EMPTY_ANALYSIS_FALLBACK_SUMMARY;
