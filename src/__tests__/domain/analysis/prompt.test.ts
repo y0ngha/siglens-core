@@ -3921,11 +3921,10 @@ describe('prompt', () => {
             expect(result).toContain('Analyze the symbol below');
         });
 
-        // Design C (spec §3.4, skills-to-system split): `dynamic` reproduces
-        // the ORIGINAL PRODUCTION ORDER faithfully — Timeframe precedes
-        // Analysis Intent, exactly as in v0.31 (pre-split), since only the
-        // always_on skill digests moved to `stable`.
-        it('Timeframe 섹션이 Analysis Intent 블록 앞에 위치한다 (production order)', () => {
+        // p22: the Analysis Intent block moved from the user prompt's head to
+        // the head of `stable` (system message), so in the combined string it
+        // now precedes the Timeframe framing that opens `dynamic`.
+        it('Analysis Intent 블록이 Timeframe 섹션보다 앞에 위치한다 (stable head)', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3939,7 +3938,7 @@ describe('prompt', () => {
 
             expect(timeframeIndex).toBeGreaterThanOrEqual(0);
             expect(intentIndex).toBeGreaterThanOrEqual(0);
-            expect(timeframeIndex).toBeLessThan(intentIndex);
+            expect(intentIndex).toBeLessThan(timeframeIndex);
         });
 
         it('Analysis Intent 블록이 Indicator Values 섹션보다 앞에 위치한다', () => {

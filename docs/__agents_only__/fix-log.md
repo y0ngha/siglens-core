@@ -318,3 +318,17 @@ Round 2: approved
   Rule: MISTAKES 6 — fold repeated side-effect + return sequences into one helper (`serveCached`)
 - Violation (suggestion, fixed): import out of alphabetical order (`byok/gate` after `market/*`)
   Rule: MISTAKES 13.5
+
+## [Branch perf/technical-prompt-stable-prefix | 2026-10-04] — Review findings (Intent + Guidelines into stable, p22)
+
+- Violation 1 (recommended, R1+R2): JSDoc on AssembledPrompt / AssembledPromptRecord (interface block AND field doc) still claimed `stable` is byte-identical per catalog after the change made it vary by locale and free-tier sampled skills
+  Rule: When a contract's shape changes, update every doc on that type — interface block, field docs, and record types — not just one
+  Context: Now says content-address `stable` by its own hash; consumer siglens already does (sha256).
+- Violation 2 (recommended, R1): Comment above `system = stable ? …` described the old stable content
+  Rule: After moving content into a variable, re-read comments that describe that variable
+
+Round 3: approved (comment-only fix after R2)
+
+## [PR #250 Claude review | perf/technical-prompt-stable-prefix | 2026-10-04]
+- Violation (suggestion, fixed): over-long single-line field JSDoc and mixed wording in the `stable` comment
+  Rule: Wrap JSDoc to neighbour width; comments describing moved blocks must name them consistently

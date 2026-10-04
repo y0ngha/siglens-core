@@ -3,6 +3,8 @@ import {
     buildAnalysisPrompt,
     CORE_SKILL_REFERENCE_POINTER,
 } from '@/domain/analysis/prompt';
+import { sampleSkillsForTier } from '@/domain/analysis/sampleSkillsForTier';
+import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
 import { computeFinancialsScorecard } from '@/domain/analysis/financialsScorecard';
@@ -41,16 +43,17 @@ import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
 import type { OptionsSnapshot } from '@/domain/options/types';
 
 // Spec §3.4 / plan Task 4.2 Step 1 — Design C ("skills-to-system split"): the
-// assembly-split stability invariants. `stable` carries ONLY the always_on
-// skill digests (empty when the catalog has none for this call) and depends
-// only on (analysisType, catalog fingerprint), never on the call's
-// symbol/bars/timestamp, so it can serve as a byte-identical cacheable
-// system-message suffix at the worker/provider layer (see
+// assembly-split stability invariants. `stable` leads with the fixed
+// Timeframe-independent blocks (Analysis Intent, Analysis Guidelines — p22) and
+// then carries the always_on skill digests; it depends only on (locale,
+// analysisType, catalog fingerprint), never on the call's symbol/bars/
+// timestamp, so it can serve as a byte-identical cacheable system-message
+// suffix at the worker/provider layer (see
 // `scripts/ab-harness/buildPrompts.ts`'s `--fold-stable-into-system`).
-// `dynamic` reproduces the ORIGINAL PRODUCTION (v0.31, pre-split) section
-// order faithfully — the user prompt's ordering never changed; only the
-// skill digests moved. These tests pin that contract directly against the
-// shipped `{ stable, dynamic }` shape (no flattening wrapper).
+// `dynamic` keeps the ORIGINAL PRODUCTION (v0.31, pre-split) section order for
+// everything that did not move — Symbol → Timeframe → data → Analysis Request
+// at the tail. These tests pin that contract directly against the shipped
+// `{ stable, dynamic }` shape (no flattening wrapper).
 
 const emptyIndicators = (): IndicatorResult => ({
     ...EMPTY_INDICATOR_RESULT,
@@ -147,6 +150,9 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
         // The symbol/company framing line lives in dynamic instead.
         expect(dynamic).toContain('MSFT');
         expect(dynamic).toContain('Microsoft Corporation');
+        // The Guidelines are the large fixed block that makes `stable` worth
+        // caching across symbols (p22) — and they must be symbol-free.
+        expect(stable).toContain('## Analysis Guidelines');
     });
 
     it('is deterministic: identical inputs build byte-identical stable AND dynamic across two calls', () => {
@@ -259,11 +265,9 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
         expect(combined).toContain('AAPL');
     });
 
-    // Design C: with no `always_on` skills in the catalog, `stable` has
-    // nothing to carry (only always_on skill digests ever live there) and
-    // legitimately collapses to the empty string — mirroring the
-    // already-established pattern in `overallPrompt`/`optionsPrompt`.
-    it('stable is the empty string when the catalog has no always_on skills', () => {
+    // p22: `stable` leads with the fixed Intent + Guidelines blocks, so it is
+    // never empty — with no `always_on` skills it is exactly those two blocks.
+    it('stable is exactly Analysis Intent + Analysis Guidelines when the catalog has no always_on skills', () => {
         const bars = makeBars(30, 100);
         const indicators = emptyIndicators();
         const { stable } = buildAnalysisPrompt(
@@ -274,7 +278,28 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
             [],
             '1Day'
         );
-        expect(stable).toBe('');
+        expect(stable.startsWith('## Analysis Intent\n')).toBe(true);
+        expect(stable).toContain('\n\n## Analysis Guidelines\n');
+        expect(stable).not.toContain('## Analysis Request');
+
+        // An always_on skill digest is appended AFTER that head — the head
+        // itself is unchanged, so it stays the shared prefix.
+        const withSkill = buildAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            bars,
+            indicators,
+            [
+                makeSkill({
+                    name: 'Always Pattern',
+                    type: 'pattern',
+                    gating: alwaysOn,
+                }),
+            ],
+            '1Day'
+        ).stable;
+        expect(withSkill.startsWith(`${stable}\n\n`)).toBe(true);
+        expect(withSkill.length).toBeGreaterThan(stable.length);
     });
 
     // Design C ("skills-to-system split"): two prior orderings both degraded
@@ -307,6 +332,11 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
             '1Day'
         );
 
+        // `dynamic` opens with the per-symbol framing and closes with the
+        // output rules.
+        expect(dynamic.startsWith('Symbol: AAPL\nCompany: Apple Inc.\n')).toBe(
+            true
+        );
         expect(dynamic).toContain('## Analysis Request');
         // The Field Content Guidance BODY (not just the Analysis Intent
         // block's textual reference to the section name) is a reliable
@@ -335,17 +365,161 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
         // `dynamic` for a core (always_on) skill — it belongs in `stable`.
         expect(stable).toContain('### Always Pattern');
         expect(dynamic).not.toContain('### Always Pattern');
-        // The output rules must NOT be in `stable` — `stable` carries ONLY
-        // the always_on skill digests in this design.
+        // The output rules (Analysis Request) must NOT be in `stable` — moving
+        // them forward degraded actionability; only the Intent/Guidelines
+        // head and the always_on skill digests live there.
         expect(stable).not.toContain('## Analysis Request');
         expect(stable).not.toContain(fieldGuidanceMarker);
-        // Guidelines (incl. the Contingent Plan Mandate's textual
-        // description) and the anti-fabrication guardrail now live in
-        // `dynamic`, in their original production position — not `stable`.
-        expect(dynamic).toContain('Contingent Plan Mandate');
-        expect(stable).not.toContain('Contingent Plan Mandate');
+        // p22: the Guidelines (incl. the Contingent Plan Mandate's textual
+        // description) now live in `stable` — the cross-symbol-identical
+        // system prefix — while the anti-fabrication guardrail stays inline in
+        // `dynamic`'s Market Reference section, at its production position.
+        expect(stable).toContain('Contingent Plan Mandate');
+        expect(dynamic).not.toContain('Contingent Plan Mandate');
         expect(dynamic).toContain('Anti-fabrication:');
         expect(stable).not.toContain('Anti-fabrication:');
+        // The fixed head moved wholesale: neither block is left in `dynamic`.
+        expect(stable).toContain('## Analysis Guidelines');
+        // (Line-anchored: the Analysis Request prose merely names the
+        // Guidelines section in passing.)
+        expect(dynamic).not.toMatch(/^## Analysis Guidelines$/m);
+        expect(dynamic).not.toMatch(/^## Analysis Intent$/m);
+    });
+
+    // p22: only the position of the Intent + Guidelines blocks changed. With no
+    // skills, `stable` is exactly those blocks, so splicing `stable` back in
+    // right after the Timeframe framing must rebuild the pre-p22 `dynamic`
+    // ordering: Symbol → Timeframe → Intent → Guidelines → data → Request.
+    it('stable + dynamic hold exactly the pre-p22 blocks — only their order changed', () => {
+        const bars = makeBars(60, 150);
+        const { stable, dynamic } = buildAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            bars,
+            calculateIndicators(bars),
+            [],
+            '1Day'
+        );
+
+        expect(stable.startsWith('## Analysis Intent\n')).toBe(true);
+        expect(dynamic.startsWith('Symbol: AAPL\n')).toBe(true);
+
+        const framingEnd = dynamic.indexOf(
+            '\n\n',
+            dynamic.indexOf('Timeframe interpretation:')
+        );
+        const legacyDynamic = `${dynamic.slice(0, framingEnd)}\n\n${stable}\n\n${dynamic.slice(framingEnd + 2)}`;
+
+        const order = [
+            'Symbol: AAPL',
+            'Timeframe:',
+            '## Analysis Intent',
+            '## Analysis Guidelines',
+            '## Analysis Request',
+        ].map(marker => legacyDynamic.indexOf(marker));
+        expect(order.every(i => i >= 0)).toBe(true);
+        expect(order).toEqual(order.toSorted((x, y) => x - y));
+
+        // Each moved block appears exactly once across the pair (no copy left
+        // behind in `dynamic`, none duplicated).
+        const combined = `${stable}\n\n${dynamic}`;
+        for (const heading of [
+            /^## Analysis Intent$/gm,
+            /^## Analysis Guidelines$/gm,
+            /^## Analysis Request$/gm,
+        ]) {
+            expect(combined.match(heading)).toHaveLength(1);
+        }
+    });
+
+    // Regression for the miss that let the Guidelines sit behind the
+    // per-symbol framing: the stability tests above feed every symbol the SAME
+    // skills, bypassing the free-tier sampler. In production the free tier
+    // draws its always_on skills per symbol (`sampleSkillsForTier`), so
+    // `stable`'s skill digests differ across symbols and anything after them is
+    // outside the shared prefix. Intent + Guidelines must therefore precede
+    // the digests, keeping `persona → Intent → Guidelines` byte-identical
+    // across symbols for provider automatic prefix caching.
+    it('free-tier sampling: system prefix (persona + Intent + Guidelines) is byte-identical across symbols', () => {
+        const catalog = Array.from({ length: 12 }, (_, i) =>
+            makeSkill({
+                name: `Always Pattern ${String(i).padStart(2, '0')}`,
+                type: 'pattern',
+                gating: alwaysOn,
+            })
+        );
+        const bars = makeBars(60, 150);
+        const indicators = calculateIndicators(bars);
+        const symbols = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMD'];
+
+        const systems = symbols.map(symbol => {
+            const sampled = sampleSkillsForTier(catalog, 'free', symbol);
+            const { stable, dynamic } = buildAnalysisPrompt(
+                symbol,
+                `${symbol} Corp.`,
+                bars,
+                indicators,
+                sampled,
+                '1Day'
+            );
+            return {
+                sampledNames: sampled.map(skill => skill.name).join(','),
+                stable,
+                dynamic,
+                system: `${aiSystemPrompt('ko')}\n\n${stable}`,
+            };
+        });
+
+        // Precondition: the sampler really hands different symbols different
+        // skills — otherwise this test would pass vacuously.
+        expect(
+            new Set(systems.map(entry => entry.sampledNames)).size
+        ).toBeGreaterThan(1);
+
+        // Expected shared head: persona + the skill-free stable (Intent +
+        // Guidelines only).
+        const { stable: head } = buildAnalysisPrompt(
+            'AAPL',
+            'AAPL Corp.',
+            bars,
+            indicators,
+            [],
+            '1Day'
+        );
+        expect(head).toContain('## Analysis Intent');
+        expect(head).toContain('## Analysis Guidelines');
+        const sharedPrefix = `${aiSystemPrompt('ko')}\n\n${head}`;
+        for (const entry of systems) {
+            expect(entry.system.startsWith(sharedPrefix)).toBe(true);
+        }
+        // The byte-level common prefix of every pair of real system messages
+        // reaches past the whole Guidelines block, not just the persona.
+        const commonPrefixLength = (left: string, right: string): number => {
+            const limit = Math.min(left.length, right.length);
+            const firstDiff = Array.from({ length: limit }).findIndex(
+                (_, i) => left[i] !== right[i]
+            );
+            return firstDiff === -1 ? limit : firstDiff;
+        };
+        for (const [i, left] of systems.entries()) {
+            for (const right of systems.slice(i + 1)) {
+                expect(
+                    commonPrefixLength(left.system, right.system)
+                ).toBeGreaterThanOrEqual(sharedPrefix.length);
+            }
+        }
+        // ...and the sampled digests really do follow it and differ.
+        expect(
+            new Set(systems.map(entry => entry.system)).size
+        ).toBeGreaterThan(1);
+        // The first symbol-bearing byte of the whole request is in `dynamic`,
+        // never in the system message.
+        for (const [index, entry] of systems.entries()) {
+            expect(entry.system).not.toContain(symbols[index]);
+            expect(
+                entry.dynamic.startsWith(`Symbol: ${symbols[index]}\n`)
+            ).toBe(true);
+        }
     });
 });
 

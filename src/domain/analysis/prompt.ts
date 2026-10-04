@@ -2200,18 +2200,25 @@ export const CORE_SKILL_REFERENCE_POINTER =
  * {@link TechnicalAssembledPrompt}) — Design C ("skills-to-system split") rather than
  * the earlier stable-first designs:
  *
- * - `stable` — ONLY the `always_on` skill digests (`core`, name-sorted,
- *   grouped by type via {@link buildSkillContentSections}). Byte-identical
- *   across calls sharing the same `(analysisType, catalog)` — contains no
- *   symbol, timeframe data, or per-call value — so it can serve as a
- *   cacheable request prefix at the worker/provider layer (folded into the
- *   system message; see `scripts/ab-harness/buildPrompts.ts`'s
- *   `--fold-stable-into-system`). Empty when the catalog has no `always_on`
- *   skills for this prompt type.
- * - `dynamic` — the ENTIRE rest of the prompt, in the ORIGINAL PRODUCTION
- *   ORDER (v0.31, pre-split): symbol/company/asset-class framing, timeframe,
- *   the analysis-intent block, guidelines (incl. the contingent-plan
- *   mandate's textual description), all computed chart data (snapshot,
+ * - `stable` — the fixed head blocks FIRST, none of which depend on the
+ *   timeframe, symbol, or skills (the analysis-intent block, then the
+ *   guidelines incl. the contingent-plan mandate's textual description),
+ *   followed by the `always_on` skill
+ *   digests (`core`, name-sorted, grouped by type via
+ *   {@link buildSkillContentSections}). The Intent + Guidelines head is
+ *   byte-identical across every call with the same locale — no symbol,
+ *   timeframe, skill, or per-call value — and sits ahead of the skill
+ *   digests on purpose: the free tier samples its `always_on` skills per
+ *   symbol, so the digests differ across symbols, and anything placed after
+ *   them would fall outside the cross-symbol common prefix. The whole value
+ *   is folded into the system message at the worker/provider layer (see
+ *   `scripts/ab-harness/buildPrompts.ts`'s `--fold-stable-into-system`),
+ *   making system = persona → intent → guidelines → skill digests. Never
+ *   empty (the Intent/Guidelines head is unconditional).
+ * - `dynamic` — the rest of the prompt, in the ORIGINAL PRODUCTION ORDER
+ *   (v0.31, pre-split) minus the blocks that moved into `stable`:
+ *   symbol/company/asset-class framing, timeframe,
+ *   all computed chart data (snapshot,
  *   long-term context, recent bars, regime/indicator/pro-indicator/SMC
  *   sections), the Market Reference section (with the anti-fabrication
  *   guardrail inline, its original position), a one-line pointer
@@ -2434,10 +2441,24 @@ export function buildAnalysisPrompt(
         locale
     );
 
-    // Design C: `stable` carries ONLY the always_on skill digests — nothing
-    // else moves out of the production order below.
+    // `stable` is the cross-symbol-identical system suffix: the fixed head
+    // blocks (Analysis Intent, Analysis Guidelines — ~20k chars, no
+    // symbol/timeframe/skill/per-call interpolation beyond the locale) come
+    // FIRST, then the always_on skill digests. The timeframe label and its
+    // interpretation text live in `dynamic`, not here. Fixed text must precede
+    // the skill digests because the free tier samples its always_on skills per
+    // symbol (`sampleSkillsForTier`): any per-symbol bytes ahead of the
+    // Guidelines would end the common prefix right there, and the provider's
+    // automatic prefix cache would miss on every symbol's first call.
+    // Only the position of these two blocks moved — their text is unchanged,
+    // and the Analysis Request stays at the tail of `dynamic` (moving the
+    // output rules forward degraded actionability; see buildAnalysisRequest).
     const coreSkillSections = buildSkillContentSections(coreGroups);
-    const stableSections = coreSkillSections;
+    const stableSections = [
+        ANALYSIS_INTENT_BLOCK,
+        analysisGuidelines(locale),
+        ...coreSkillSections,
+    ];
 
     // `formatPositionHintSection` returns '' when `positionBucket` doesn't
     // resolve to a known label (defensive guard against a runtime value
@@ -2470,11 +2491,12 @@ export function buildAnalysisPrompt(
         priceDp
     );
 
-    // Faithful reproduction of the v0.31 production section order (see
+    // The v0.31 production section order (see
     // `git show main:src/domain/analysis/prompt.ts`'s `sections` array),
-    // minus the combined skill-content block (now split: `core` digests live
-    // in `stable`, replaced here by a one-line pointer when non-empty;
-    // `selected` digests stay in `dynamic` at the same position).
+    // minus the blocks that moved into `stable`: the Analysis Intent and
+    // Guidelines blocks, and the `core` skill digests (replaced here by a
+    // one-line pointer when non-empty; `selected` digests stay in `dynamic`
+    // at the same position).
     const patternCandidateGeometries = candidateGeometries(
         patternCandidates,
         bars,
@@ -2483,8 +2505,6 @@ export function buildAnalysisPrompt(
     const dynamicSections = [
         `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
-        ANALYSIS_INTENT_BLOCK,
-        analysisGuidelines(locale),
         formatMarketSection(bars, priceDp),
         formatLongTermContext(bars, priceDp),
         formatRecentBarsSection(

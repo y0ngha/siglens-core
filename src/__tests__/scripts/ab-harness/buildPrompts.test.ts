@@ -127,10 +127,18 @@ describe('buildTechnicalCase', () => {
             );
         });
 
-        it('enabled with an empty stable: system falls back to the plain system prompt', () => {
+        // p22: the technical `stable` always leads with the fixed Analysis
+        // Intent + Guidelines blocks, so it is non-empty even with no skills
+        // and the folded system is the persona plus that head.
+        it('enabled without skills: system is the plain system prompt plus the Intent/Guidelines head', () => {
             const result = buildTechnicalCase(fixture, NO_SKILLS, true);
-            expect(result.system).toBe(AI_SYSTEM_PROMPT);
-            expect(result.prompt.length).toBeGreaterThan(0);
+            expect(
+                result.system.startsWith(
+                    `${AI_SYSTEM_PROMPT}\n\n## Analysis Intent\n`
+                )
+            ).toBe(true);
+            expect(result.system).toContain('## Analysis Guidelines');
+            expect(result.prompt.startsWith('Symbol: ')).toBe(true);
         });
     });
 });
