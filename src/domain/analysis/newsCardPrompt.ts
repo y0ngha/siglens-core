@@ -24,6 +24,11 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
  *   so they cannot live in the prefix), then Article Metadata and Article
  *   Content **last**.
  *
+ * "Last" describes this builder's output. `runNewsCardAnalysis` appends the
+ * locale-fixed `outputLanguageReminder(locale)` after `dynamic`; that suffix is
+ * constant per locale and article-independent, so it does not affect the
+ * cacheable `stable` prefix.
+ *
  * Do not add anything article-specific, or anything that branches on the
  * article, to `stable`: one varying byte in the prefix forfeits the cache for
  * everything after it.

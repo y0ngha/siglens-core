@@ -313,3 +313,7 @@ Round 6: approved
   Rule: Position claims in comments must hold for every locale/branch
 
 Round 3: approved (comment-only fix after R2)
+
+## [PR #249 Claude review | perf/newscard-deepseek-prefix-cache | 2026-10-04]
+- Violation (suggestion, fixed): builder JSDoc said "article last" without noting the caller appends a locale reminder
+  Rule: Position claims must say which layer's output they describe (builder vs dispatched prompt)
