@@ -727,6 +727,7 @@ export type {
 
 export type {
     ActionRecommendation,
+    AnalysisDataAsOf,
     AnalysisResponse,
     FilteredAnalysisResponse,
     FilteredAnalysisResult,

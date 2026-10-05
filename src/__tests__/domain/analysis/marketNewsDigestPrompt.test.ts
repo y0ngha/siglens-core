@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { buildMarketNewsDigestPrompt as buildMarketNewsDigestPromptRaw } from '@/domain/analysis/marketNewsDigestPrompt';
+import { DRIVER_READER_FACING_RULE } from '@/domain/analysis/newsPrompt';
 import type { EnrichedNewsItem, Skill } from '@/domain/types';
 
 // `buildMarketNewsDigestPrompt` now returns `{ stable, dynamic }` (spec §3.4
@@ -155,15 +156,38 @@ describe('buildMarketNewsDigestPrompt — sentiment tally + age (spec 2026-09-18
         expect(dynamic).toContain('Published: 2026-09-18T12:00:00.000Z\n');
         expect(dynamic).not.toMatch(/\(\d+[hd] ago\)/);
     });
+});
 
-    it('스키마 설명에 입력을 가리키는 "제공된"이 없고 commentator 규칙이 있다 (UX audit 2026-10-05 §C2)', () => {
-        const prompt = buildMarketNewsDigestPrompt('미국 암호화폐', [ITEM], []);
-        expect(prompt).not.toContain('제공된');
-        expect(prompt).toContain(
-            'Write as a market commentator addressing readers'
+describe('buildMarketNewsDigestPrompt — 독자용 문구 규칙', () => {
+    const dynamicFor = (locale?: 'ko' | 'en' | 'ja' | 'zh'): string =>
+        buildMarketNewsDigestPromptRaw('미국 암호화폐', [ITEM], [], locale)
+            .dynamic;
+
+    it.each([undefined, 'en', 'ja', 'zh'] as const)(
+        '%s: 스키마 블록에 "제공된" 같은 입력 지칭 표현이 없다',
+        locale => {
+            const dynamic = dynamicFor(locale);
+            const schema = dynamic.slice(
+                dynamic.indexOf('## Output Schema'),
+                dynamic.indexOf('## Allowed Values')
+            );
+            expect(schema).toContain('currentDriverKo');
+            expect(schema).not.toContain('제공된');
+        }
+    );
+
+    it('출처 제한 지시와 독자용 문구 규칙이 Rules 블록에 있다', () => {
+        const dynamic = dynamicFor();
+        const rules = dynamic.slice(dynamic.indexOf('\nRules:'));
+        expect(rules).toContain(
+            'Base currentDriverKo only on the articles above'
         );
-        expect(prompt).toContain('Never describe the input itself');
-        // 기사가 없을 때 규칙은 입력을 "provided"라 부르지 않고 "available"이라 한다.
-        expect(prompt).toContain('no recent articles are available');
+        expect(rules).toContain(DRIVER_READER_FACING_RULE);
+    });
+
+    it('Data Boundary가 가격·거래량 데이터가 없다고 밝히도록 모델을 유도하지 않는다', () => {
+        const dynamic = dynamicFor();
+        expect(dynamic).not.toMatch(/No price\/volume data/);
+        expect(dynamic).toContain('Do not attribute price moves to the news.');
     });
 });

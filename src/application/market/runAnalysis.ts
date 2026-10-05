@@ -535,11 +535,18 @@ async function runAnalysisImpl(
 
     const now = new Date();
     const analyzedAt = now.toISOString();
+    // The last bar is what the prompt anchored the text to, so its start time
+    // and close tell a consumer which data the analysis describes — `analyzedAt`
+    // alone cannot, since an analysis written before a close is reused after it.
+    const lastBar = bars[bars.length - 1];
     const result = {
         ...reconciled,
         trendlines: resolvedOverlays.trendlines,
         chartOverlays: resolvedOverlays.chartOverlays,
         analyzedAt,
+        ...(lastBar !== undefined
+            ? { dataAsOf: { barTime: lastBar.time, close: lastBar.close } }
+            : {}),
     };
 
     if (isFallbackAnalysis(reconciled)) {
@@ -548,7 +555,7 @@ async function runAnalysisImpl(
             { symbol }
         );
     } else if (cache !== null) {
-        const ttl = computeEffectiveTtl(timeframe, now);
+        const ttl = computeEffectiveTtl(timeframe, now, options.session);
         // Fire-and-forget: cache write must not delay the SSE response.
         cache
             .set(cacheKey, { ...result, skillsDegraded }, ttl)

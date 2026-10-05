@@ -8,6 +8,7 @@ import {
     SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
 import {
+    ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES,
     ANALYSIS_CACHE_TTL,
     analysisHistoryQuery,
     BARS_OFFHOURS_TTL_CEILING_SECONDS,
@@ -54,8 +55,10 @@ import {
     PRIOR_ANALYSIS_LIMIT,
     PRIOR_ANALYSIS_SLACK,
 } from '@/domain/analysis/priorAnalysis';
+import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
 import type { PositionBucket, PriorAnalysis } from '@/domain/types';
 import { describe, expect, it } from 'vitest';
+import { makeKrSession } from '../../helpers/krSession';
 
 /** Minimal `PriorAnalysis` fixture — only `generatedAt` matters to the cache-key narrowing under test. */
 function priorAnalysisAt(generatedAt: Date): PriorAnalysis {
@@ -106,6 +109,125 @@ describe('computeEffectiveTtl', () => {
         const now = new Date('2026-04-24T19:59:00.000Z');
         const result = computeEffectiveTtl('1Day', now);
         expect(result).toBe(SECONDS_TO_EXPIRY);
+    });
+});
+
+describe('computeEffectiveTtl — 세션별 만료', () => {
+    const KR = makeKrSession(['2026-07-07']);
+
+    it('세션을 생략하면 종전 KST 05:00 경계와 같다', () => {
+        const now = new Date('2026-04-24T19:59:00.000Z');
+        expect(computeEffectiveTtl('1Day', now)).toBe(
+            computeEffectiveTtl('1Day', now, undefined)
+        );
+        expect(computeEffectiveTtl('1Day', now)).toBe(SECONDS_PER_MINUTE);
+    });
+
+    it('US EDT: 마감 16:00 ET + 정착 버퍼까지 (Mon 15:00 EDT → 90분)', () => {
+        expect(
+            computeEffectiveTtl(
+                '1Day',
+                new Date('2026-07-06T19:00:00Z'),
+                US_EQUITY_SESSION
+            )
+        ).toBe(90 * SECONDS_PER_MINUTE);
+    });
+
+    it('US EST: 같은 현지 시각이면 UTC가 한 시간 늦어도 같은 길이 (Mon 15:00 EST → 90분)', () => {
+        expect(
+            computeEffectiveTtl(
+                '1Day',
+                new Date('2026-01-05T20:00:00Z'),
+                US_EQUITY_SESSION
+            )
+        ).toBe(90 * SECONDS_PER_MINUTE);
+    });
+
+    it('US: 마감 직후 정착 버퍼 안에서는 마감 + 버퍼까지만 산다', () => {
+        // Mon 16:10 EDT. 종전(KST 05:00 = 16:00 EDT 경계)이면 다음 날까지 살았다.
+        expect(
+            computeEffectiveTtl(
+                '1Day',
+                new Date('2026-07-06T20:10:00Z'),
+                US_EQUITY_SESSION
+            )
+        ).toBe(
+            (ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES - 10) * SECONDS_PER_MINUTE
+        );
+    });
+
+    it('US EST: 종전 KST 05:00 경계는 마감 한 시간 전(15:00 EST)에 와서 마감 전 분석이 일찍 죽었다', () => {
+        // Mon 14:30 EST. 세션 생략: KST 05:00(= 15:00 EST)까지 30분. 세션 지정: 16:30 EST까지 2시간.
+        const now = new Date('2026-01-05T19:30:00Z');
+        expect(computeEffectiveTtl('1Day', now)).toBe(30 * SECONDS_PER_MINUTE);
+        expect(computeEffectiveTtl('1Day', now, US_EQUITY_SESSION)).toBe(
+            2 * SECONDS_PER_HOUR
+        );
+    });
+
+    it('KR 평일: 15:30 KST 마감 + 버퍼 = 16:00 KST까지 (Mon 14:00 KST → 2시간)', () => {
+        // 종전 경계(KST 05:00)라면 다음 날 새벽까지 15시간 살았다.
+        const now = new Date('2026-07-06T05:00:00Z');
+        expect(computeEffectiveTtl('1Day', now)).toBe(15 * SECONDS_PER_HOUR);
+        expect(computeEffectiveTtl('1Day', now, KR)).toBe(2 * SECONDS_PER_HOUR);
+    });
+
+    it('KR 휴장일: 휴장일 마감은 없는 마감이라 건너뛴다 (Mon 17:00 KST, 화 휴장 → 수 16:00 KST는 24시간 초과 → 천장)', () => {
+        // 2026-07-07(화) 휴장. 월 08:00Z(17:00 KST)에는 휴장이 없다면 화 07:00Z까지 23시간.
+        const now = new Date('2026-07-06T08:00:00Z');
+        expect(computeEffectiveTtl('1Day', now, makeKrSession())).toBe(
+            23 * SECONDS_PER_HOUR
+        );
+        expect(computeEffectiveTtl('1Day', now, KR)).toBe(
+            ANALYSIS_CACHE_TTL['1Day']
+        );
+    });
+
+    it('KR 휴장일 당일에도 그날 마감을 기다리지 않는다', () => {
+        // 화(휴장) 10:00 KST. 휴장을 모르면 오늘 16:00 KST까지 6시간.
+        const now = new Date('2026-07-07T01:00:00Z');
+        expect(computeEffectiveTtl('1Day', now, KR)).toBe(
+            ANALYSIS_CACHE_TTL['1Day']
+        );
+    });
+
+    it('크립토: 다음 UTC 00:00까지 (18:30Z → 5.5시간)', () => {
+        expect(
+            computeEffectiveTtl(
+                '1Day',
+                new Date('2026-07-06T18:30:00Z'),
+                CRYPTO_SESSION
+            )
+        ).toBe(5.5 * SECONDS_PER_HOUR);
+    });
+
+    it('크립토: 종전 KST 05:00(20:00Z) 경계 이후에도 UTC 자정까지 산다 (20:30Z → 3.5시간)', () => {
+        const now = new Date('2026-07-06T20:30:00Z');
+        expect(computeEffectiveTtl('1Day', now)).toBe(
+            24 * SECONDS_PER_HOUR - 30 * SECONDS_PER_MINUTE
+        );
+        expect(computeEffectiveTtl('1Day', now, CRYPTO_SESSION)).toBe(
+            3.5 * SECONDS_PER_HOUR
+        );
+    });
+
+    it('타임프레임 천장이 경계보다 짧으면 천장이 이긴다', () => {
+        expect(
+            computeEffectiveTtl(
+                '5Min',
+                new Date('2026-07-06T19:00:00Z'),
+                US_EQUITY_SESSION
+            )
+        ).toBe(ANALYSIS_CACHE_TTL['5Min']);
+    });
+
+    it('거래일을 찾지 못하는 잘못된 스펙은 천장으로 폴백한다', () => {
+        expect(
+            computeEffectiveTtl('1Day', new Date('2026-07-06T05:00:00Z'), {
+                ...makeKrSession(),
+                closeMinuteFor: () => 0,
+            })
+        ).toBe(ANALYSIS_CACHE_TTL['1Day']);
     });
 });
 

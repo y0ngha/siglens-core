@@ -1,19 +1,16 @@
 import {
     KST_OFFSET_HOURS,
-    MINUTES_PER_DAY,
     MS_PER_DAY,
     MS_PER_HOUR,
     MS_PER_SECOND,
-    SECONDS_PER_MINUTE,
 } from '@/domain/constants/time';
 import {
     US_EQUITY_SESSION,
     getSessionStatus,
     isRegularSessionOpen,
-    localSessionParts,
+    nextRegularSessionBoundaryMs,
 } from '@/domain/session';
-import { etCalendarDate, isUsTradingDay } from '@/domain/marketCalendar';
-import type { EtSessionStatus } from '@/domain/types';
+import type { EtSessionStatus, MarketSessionSpec } from '@/domain/types';
 
 export function parseNumberOrDefault(
     raw: string | undefined,
@@ -94,50 +91,60 @@ export function isEtRegularSessionOpen(now: Date): boolean {
 }
 
 /**
- * @internal 연휴를 건너뛰기 위한 탐색 상한(일).
+ * @internal 다음 정규장 개장까지 남은 초를 반환한다. 세션 스펙에 따라 어느 시장이든 쓴다.
  *
- * NYSE에서 가장 긴 연속 휴장은 주말 + 인접 휴일 조합이라 나흘을 넘지 않는다
- * (예: 성금요일 금 + 토 + 일). 예정 외 휴장이 며칠 붙어도(2012 샌디 2일) 여유가 있다.
- * 무한 루프 방지용 상한이지 도메인 규칙이 아니다.
+ * 주말과 `closeMinuteFor` 휴장일을 건너뛴다. 종전 `secondsUntilNextEtRegularOpen`도 NYSE
+ * 휴장일은 건너뛰었지만 시간대가 ET로 고정돼 있었다. 이 함수는 스펙의 시간대·주말·
+ * 캘린더를 따르므로 KRX 같은 비-ET 시장도 맞게 잰다 — 시장을 잘못 짚으면(ET 기준으로
+ * KRX를 재면) 한국 장중 내내 TTL이 몇 시간으로 늘어 시세가 얼어붙는다. 또 하루를
+ * 1440분으로 세지 않고 DST 전환일의 실제 경과 시간을 잰다(전환 주말에만 ±3600초 차이).
+ * 이 값이 캐시 TTL·백오프의 상한이라, 짧게 잡히면 열리지도 않은 시장을 향해 재조회가
+ * 반복된다.
+ *
+ * `always-open` 스펙에는 "다음 개장"이 없어 `0`을 돌려준다 — 호출자는 상시 개장
+ * 경로를 따로 처리해야 한다. 탐색 상한 안에 거래일이 없는 잘못된 스펙도 `0`이다.
  */
-const MAX_CLOSURE_LOOKAHEAD_DAYS = 10;
+export function secondsUntilNextRegularOpen(
+    session: MarketSessionSpec,
+    now: Date
+): number {
+    if (session.kind !== 'scheduled') return 0;
+    const atMs = nextRegularSessionBoundaryMs(session, now, 'open');
+    if (atMs === null) return 0;
+    return Math.ceil((atMs - now.getTime()) / MS_PER_SECOND);
+}
 
 /**
- * @internal 다음 뉴욕 정규장 개장(09:30 ET)까지 남은 초를 반환한다.
+ * @internal 다음 정규장 마감 + `bufferMinutes`까지 남은 초를 반환한다.
  *
- * 휴장일을 건너뛴다. 종전에는 주말만 건너뛰어서, 예컨대 목요일이 추수감사절일 때
- * "내일 09:30"을 답했지만 그 목요일은 아예 열리지 않았다. 이 값이 캐시 TTL·백오프의
- * 상한으로 쓰이므로, 짧게 잡히면 열리지도 않은 시장을 향해 재조회가 반복된다.
+ * 버퍼 구간(마감 직후)에는 오늘의 마감+버퍼를 가리키므로, 마감 직후 정착 전 가격으로
+ * 만든 결과가 다음 거래일까지 살아남지 않는다. 휴장일·반장·DST는
+ * {@link secondsUntilNextRegularOpen}과 같은 규칙으로 처리한다.
+ *
+ * @returns 초. `always-open` 스펙이거나 탐색 상한 안에 거래일이 없으면 `null`.
  */
-export function secondsUntilNextEtRegularOpen(now: Date): number {
-    // US_EQUITY_SESSION is a 'scheduled' spec — the kind guard lets TypeScript
-    // narrow to the branch that carries timeZone and openMinute.
-    if (US_EQUITY_SESSION.kind !== 'scheduled') return 0;
-    const { minutesOfDay } = localSessionParts(now, US_EQUITY_SESSION.timeZone);
-    const base = etCalendarDate(now);
+export function secondsUntilNextRegularClose(
+    session: MarketSessionSpec,
+    now: Date,
+    bufferMinutes: number = 0
+): number | null {
+    if (session.kind !== 'scheduled') return null;
+    const atMs = nextRegularSessionBoundaryMs(
+        session,
+        now,
+        'close',
+        bufferMinutes
+    );
+    if (atMs === null) return null;
+    return Math.ceil((atMs - now.getTime()) / MS_PER_SECOND);
+}
 
-    // 오늘 개장 전이면 오늘부터, 아니면 내일부터 찾는다.
-    const start = minutesOfDay < US_EQUITY_SESSION.openMinute ? 0 : 1;
-
-    for (
-        let offset = start;
-        offset <= start + MAX_CLOSURE_LOOKAHEAD_DAYS;
-        offset++
-    ) {
-        // 17:00 UTC로 탐침한다 — EST(정오)든 EDT(13시)든 한낮이라 의도한 ET 날짜를
-        // 가리킨다. 자정 근처를 찍으면 DST 전환일에 날짜가 하루 밀릴 수 있다.
-        const probe = new Date(
-            Date.UTC(base.year, base.month - 1, base.day + offset, 17)
-        );
-        if (!isUsTradingDay(probe)) continue;
-
-        // 하루를 1440분으로 세는 것은 종전과 같다. DST 전환일에 한 시간 어긋나지만
-        // 이 값의 용도가 TTL·백오프라 정확한 타임스탬프가 필요하지 않다.
-        const minutesUntilOpen =
-            offset * MINUTES_PER_DAY +
-            US_EQUITY_SESSION.openMinute -
-            minutesOfDay;
-        return minutesUntilOpen * SECONDS_PER_MINUTE - now.getUTCSeconds();
-    }
-    return 0;
+/** @internal 다음 UTC 00:00(24/7 시장의 일봉 마감)까지 남은 초. 최소 1초. */
+export function secondsUntilNextUtcMidnight(now: Date): number {
+    const nextMidnightMs =
+        (Math.floor(now.getTime() / MS_PER_DAY) + 1) * MS_PER_DAY;
+    return Math.max(
+        1,
+        Math.ceil((nextMidnightMs - now.getTime()) / MS_PER_SECOND)
+    );
 }

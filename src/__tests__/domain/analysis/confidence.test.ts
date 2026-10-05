@@ -865,6 +865,29 @@ describe('confidence', () => {
             expect(result.analyzedAt).toBe('2026-05-06T00:00:00.000Z');
         });
 
+        it('dataAsOf를 보존한다 — 캐시 hit이 마지막 봉 정보를 잃으면 안 된다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                dataAsOf: { barTime: 1705312200, close: 103.5 },
+            });
+
+            expect(result.dataAsOf).toEqual({
+                barTime: 1705312200,
+                close: 103.5,
+            });
+        });
+
+        it.each([
+            ['없는 경우', undefined],
+            ['한쪽 값이 빠진 경우', { barTime: 1705312200 }],
+            ['숫자가 아닌 경우', { barTime: '1705312200', close: 103 }],
+            ['유한하지 않은 경우', { barTime: 1705312200, close: Infinity }],
+            ['객체가 아닌 경우', 'x'],
+        ])('dataAsOf가 %s 키 자체를 만들지 않는다', (_label, dataAsOf) => {
+            const result = normalizeCachedAnalysisResponse({ dataAsOf });
+
+            expect('dataAsOf' in result).toBe(false);
+        });
+
         it('문자열로 저장된 캐시 JSON도 파싱한 뒤 정규화한다', () => {
             const result = normalizeCachedAnalysisResponse(
                 JSON.stringify({

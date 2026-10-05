@@ -8,6 +8,7 @@ import {
     EMPTY_SMC_RESULT,
 } from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
+import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 vi.mock('@/application/analysis/callAnalysisAi');
@@ -305,6 +306,66 @@ describe('runAnalysis', () => {
             expect(result.unfilteredResult.trend).toBe(mockRawResult.trend);
         });
 
+        it('result carries dataAsOf = start time and close of the last bar the prompt used', async () => {
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            if (result.status !== 'done') return;
+            expect(result.result.dataAsOf).toEqual({
+                barTime: 1705312200,
+                close: 103,
+            });
+            expect(result.unfilteredResult.dataAsOf).toEqual({
+                barTime: 1705312200,
+                close: 103,
+            });
+        });
+
+        it('dataAsOf is also written to the cache entry (so cache hits can read it)', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    dataAsOf: { barTime: 1705312200, close: 103 },
+                }),
+                3600
+            );
+        });
+
+        it('with no usable bars dataAsOf is omitted rather than guessed', async () => {
+            mockFetchBarsWithIndicators.mockResolvedValue({
+                ...mockBarsData,
+                bars: [],
+            });
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(result.status).toBe('done');
+            if (result.status !== 'done') return;
+            expect('dataAsOf' in result.result).toBe(false);
+        });
+
         it('callAnalysisAi receives prompt, system, seed, and model', async () => {
             await runAnalysis(
                 mockSymbol,
@@ -538,6 +599,59 @@ describe('runAnalysis', () => {
                 expect.objectContaining({ summary: mockRawResult.summary }),
                 3600
             );
+        });
+
+        it('options.session is forwarded to computeEffectiveTtl', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, session: CRYPTO_SESSION }
+            );
+
+            expect(mockComputeEffectiveTtl).toHaveBeenCalledWith(
+                mockTimeframe,
+                expect.any(Date),
+                CRYPTO_SESSION
+            );
+        });
+
+        it('without options.session computeEffectiveTtl gets no session (previous behaviour)', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockComputeEffectiveTtl).toHaveBeenCalledWith(
+                mockTimeframe,
+                expect.any(Date),
+                undefined
+            );
+        });
+
+        it('session does not change the cache key', async () => {
+            for (const session of [undefined, US_EQUITY_SESSION]) {
+                await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider, session }
+                );
+            }
+
+            const readKeys = new Set(
+                mockCacheGet.mock.calls.map(call => call[0] as string)
+            );
+            expect(mockCacheGet).toHaveBeenCalledTimes(2);
+            expect(readKeys.size).toBe(1);
         });
 
         it('a fresh generation also writes the peek pointer key (same value, same TTL)', async () => {

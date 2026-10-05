@@ -551,6 +551,7 @@ export type {
     RiskLevel,
     TrendDirection,
     PriceTrend,
+    AnalysisDataAsOf,
     AnalysisResponse,
     FilteredAnalysisResponse,
     FilteredAnalysisResult,
