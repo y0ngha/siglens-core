@@ -133,6 +133,32 @@ describe('runMacroBriefing', () => {
         });
     });
 
+    describe('캐시 키 날짜 버킷 (UX audit 2026-10-05 §C1)', () => {
+        const keyUsedAt = async (iso: string): Promise<string> => {
+            vi.setSystemTime(new Date(iso));
+            mockCacheGet.mockClear();
+            await runMacroBriefing(SNAP);
+            return mockCacheGet.mock.calls[0][0] as string;
+        };
+
+        it('같은 UTC 날짜 안에서는 시간이 달라도 같은 키를 쓴다', async () => {
+            const morning = await keyUsedAt('2026-08-02T00:05:00.000Z');
+            const night = await keyUsedAt('2026-08-02T23:55:00.000Z');
+            expect(morning).toBe(night);
+            expect(morning).toContain('briefing:macro:2026-08-02:');
+        });
+
+        it('다음 UTC 날짜가 되면 다른 키를 쓴다', async () => {
+            const today = await keyUsedAt('2026-08-02T23:55:00.000Z');
+            const tomorrow = await keyUsedAt('2026-08-03T00:05:00.000Z');
+            expect(tomorrow).not.toBe(today);
+        });
+
+        it('TTL은 하루다', () => {
+            expect(MACRO_BRIEFING_CACHE_TTL).toBe(86_400);
+        });
+    });
+
     describe('캐시 프로바이더 없음', () => {
         it('cache provider null이면 조회 건너뛰고 LLM을 호출한다', async () => {
             mockCreateCacheProvider.mockReturnValueOnce(null);

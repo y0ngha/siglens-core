@@ -249,3 +249,13 @@ export interface RunIndicatorTranslationOptions {
  */
 export type RunIndicatorTranslationResult =
     { status: 'cached'; nameKo: string } | { status: 'done'; nameKo: string };
+
+/**
+ * Result of `peekMacroBriefingCacheEntry` — a cached macro briefing plus the
+ * time it was generated.
+ */
+export interface MacroBriefingCacheEntry {
+    briefing: MacroBriefingResponse;
+    /** ISO timestamp the briefing was generated at; `null` for a legacy cache entry written without it. */
+    generatedAt: string | null;
+}

@@ -155,4 +155,15 @@ describe('buildMarketNewsDigestPrompt — sentiment tally + age (spec 2026-09-18
         expect(dynamic).toContain('Published: 2026-09-18T12:00:00.000Z\n');
         expect(dynamic).not.toMatch(/\(\d+[hd] ago\)/);
     });
+
+    it('스키마 설명에 입력을 가리키는 "제공된"이 없고 commentator 규칙이 있다 (UX audit 2026-10-05 §C2)', () => {
+        const prompt = buildMarketNewsDigestPrompt('미국 암호화폐', [ITEM], []);
+        expect(prompt).not.toContain('제공된');
+        expect(prompt).toContain(
+            'Write as a market commentator addressing readers'
+        );
+        expect(prompt).toContain('Never describe the input itself');
+        // 기사가 없을 때 규칙은 입력을 "provided"라 부르지 않고 "available"이라 한다.
+        expect(prompt).toContain('no recent articles are available');
+    });
 });

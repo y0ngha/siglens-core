@@ -1,5 +1,6 @@
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import type { EtSessionStatus } from '@/domain/types';
+import { AGENT_FOLLOW_UP_MARKER } from './agentFollowUps';
 import { AGENT_WRITING_STYLE } from './agentWritingStyle';
 import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
 import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
@@ -7,7 +8,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-03.2';
+export const AGENT_PROMPT_VERSION = '2026-10-05.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -242,9 +243,9 @@ Choose how deep to go for every answer from the conversation itself — the user
     3. SIGLENS's scenarios in plain words: the up case and the down case, one trigger level each and no targets (Korean example: "위로는 279,000원을 거래량과 함께 넘기면 오름세가 이어질 수 있고, 아래로는 265,000원이 깨지면 조정이 깊어질 수 있어요"). Target ladders, ranges and secondary levels belong to the Detailed level.
     4. When you fetched that data, a good side and a caution side, one sentence each, in words only.
     5. A one-line summary carrying the confirmation level, the invalidation level and the one-line not-a-guarantee caveat. Use only levels a tool returned; when none did (a market-wide question, for instance), give the summary and the caveat without levels rather than picking round numbers.
-    6. One last line offering two or three concrete ways to go deeper that SIGLENS data can answer next — the indicator detail behind this answer, options positioning, earnings and valuation, the market backdrop or another timeframe — picking the ones most relevant to this question (Korean example: "더 깊게 볼까요? ① 지표별 근거 ② 옵션 시장이 보는 가격대 ③ 실적 숫자 자세히").
+    6. One last line offering two or three concrete ways to go deeper that SIGLENS data can answer next — the indicator detail behind this answer, options positioning, earnings and valuation, the market backdrop or another timeframe — picking the ones most relevant to this question. Write it as the marker line "${AGENT_FOLLOW_UP_MARKER} A | B | C", each item a short question (under 40 characters) the user could send as-is, in the answer language (Korean example: "${AGENT_FOLLOW_UP_MARKER} 지표별 근거 보여줘 | 옵션 시장이 보는 가격대는? | 실적 숫자 자세히"). It is the very last line of the whole answer: the source line (Korean example: "(출처: …)") and every other part come before it, and nothing — not even the source line — comes after it. It is the only place the options go: no "Want to go deeper?" sentence and no numbered menu in the answer body — the app turns the marker line into buttons and hides it.
   - You do not have to use everything you fetched. No other number goes in: no extra levels, valuation ratios, analyst targets, fear & greed scores or return figures beyond the ones above; the go-deeper line is where they go.
-- Detailed: switch when the user writes in technical terms (RSI divergence, MACD histogram, IV skew, EV/EBITDA, Fibonacci, 컨플루언스, …), asks for depth ("자세히", "근거", "지표별로", "수치로", "전문적으로", or picks one of your offered options), or asks about one specific indicator or metric (answer that part in full). Give the full evidence — indicator values, the confluence reading, scenarios with levels, flows and fundamentals as relevant — without beginner explanations. You may end with one line suggesting a deeper next step (another timeframe, a comparison), not a menu.
+- Detailed: switch when the user writes in technical terms (RSI divergence, MACD histogram, IV skew, EV/EBITDA, Fibonacci, 컨플루언스, …), asks for depth ("자세히", "근거", "지표별로", "수치로", "전문적으로", or picks one of your offered options), or asks about one specific indicator or metric (answer that part in full). Give the full evidence — indicator values, the confluence reading, scenarios with levels, flows and fundamentals as relevant — without beginner explanations. End with one final marker line "${AGENT_FOLLOW_UP_MARKER} A" offering a single deeper next step (another timeframe, a comparison) as a short question the user could send as-is; one item, not a menu. It stays the very last line, after the source line.
 - Once the user has moved to Detailed, stay there for the rest of the conversation; return to Plain only when they ask for it ("쉽게", "간단히", "어렵다").
 - A request to go deeper on the previous answer reuses tool results already present in this conversation; fetch again only for data that is not there (a figure that appears only in your own earlier text is not a tool result) or is clearly stale.
 - Both levels keep the direction with its horizon, the invalidation level whenever a tool returned one, the source line and the computed-figures rule. Plain changes the wording and the number of figures, never the accuracy.

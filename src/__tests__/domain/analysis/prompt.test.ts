@@ -4613,6 +4613,83 @@ describe('prompt', () => {
     describe('Confluence Assessment 가이드라인', () => {
         const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
 
+        // UX audit 2026-10-05 §C6: 모델이 "룰 엔진", "washout", "x / 100"을 사용자
+        // 문장에 그대로 옮겨 적었다. 내부 라벨은 설명하되 이름으로 쓰지 못하게 한다.
+        it('tells the model that engine labels are internal and must not appear in output', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+            expect(result).toContain(
+                'are internal. In every output field describe what they measure in plain trading language; never write the words "rule engine", "confluence", or "washout", and never quote an "x / 100" score.'
+            );
+        });
+
+        /**
+         * Internal labels may stay in input-section headers and in quotations of
+         * input text, but an instruction that governs OUTPUT wording must not tell
+         * the model to say them — that contradicts the internal-labels rule and the
+         * model obeys the more specific instruction ("note the confluence in the
+         * description field").
+         */
+        it('no instruction bullet left in the assembled prompt tells the model to write confluence / washout / rule engine', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                [
+                    makeSkill({ name: 'Guide', type: 'indicator_guide' }),
+                    makeSkill({ name: 'Candle', type: 'candlestick' }),
+                    makeSkill({
+                        name: 'SR',
+                        type: 'support_resistance',
+                    }),
+                ]
+            );
+            // The skill-gated instruction blocks must actually be part of what is scanned.
+            expect(result).toContain(
+                'name that combination of indicators in the description field'
+            );
+            expect(result).toContain(
+                'name the converging levels in the reason field'
+            );
+            expect(result).toContain(
+                'which side has more independent indicator groups agreeing'
+            );
+            const BANNED = /confluence|washout|rule engine/i;
+            const INTERNAL_RULE = 'are internal. In every output field';
+            const stripInputQuotes = (line: string): string =>
+                line.replace(/"[^"]*"/g, '');
+            const offenders = result
+                .split('\n')
+                .filter(line => /^\s*(?:-|\d+\.)\s/.test(line))
+                .filter(line => !line.includes(INTERNAL_RULE))
+                // Instructions that merely point at the input section name it by header.
+                .filter(line => !line.includes('## Deterministic Metrics'))
+                .filter(line => BANNED.test(stripInputQuotes(line)));
+            expect(offenders).toEqual([]);
+        });
+
+        it('no longer instructs the model to cite the rule engine or the washout label by name', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+            expect(result).not.toContain('that the rule engine abstained');
+            expect(result).not.toContain('say the confluence is corroborated');
+            expect(result).toContain(
+                'that the automatic indicator tally could not be measured'
+            );
+            expect(result).toContain(
+                'describing it as a short-term sell-off that has run its course rather than naming the label'
+            );
+        });
+
         it('defers the tally to the rule engine instead of asking the model to count', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -4705,13 +4782,13 @@ describe('prompt', () => {
             expect(out).not.toContain('bearish confluence dominates');
         });
 
-        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 washout 경로 밖으로 한정한다', () => {
+        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 단기 급락 경로 밖으로 한정한다', () => {
             const out = result();
             expect(out).toContain(
-                'Outside the washout path, before settling on "enter", check the structural risk:reward'
+                'Outside the short-term sell-off path, before settling on "enter", check the structural risk:reward'
             );
             expect(out).toContain(
-                'A met confluence entry rule does not override this'
+                'A met indicator-agreement entry condition does not override this'
             );
             expect(out).not.toContain(
                 '  - Before settling on "enter", check the structural risk:reward'
@@ -4732,7 +4809,7 @@ describe('prompt', () => {
         it('washout 경로를 가장 먼저 판정하고, 룰 엔진 판정을 재판단 없이 복사하게 한다', () => {
             const out = result();
             const washoutAt = out.indexOf(
-                '  - Washout path first: when ## Deterministic Metrics prints "Entry verdict (rule engine): enter — washout path", entryRecommendation is "enter". Copy it; do not re-judge it'
+                '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (rule engine): enter — washout path", entryRecommendation is "enter". Copy it; do not re-judge it'
             );
             expect(washoutAt).toBeGreaterThan(-1);
             expect(washoutAt).toBeLessThan(
@@ -4752,7 +4829,7 @@ describe('prompt', () => {
 
         it('뉴스성 급락으로 판정이 보류되면 모델이 직접 판단하고 기저율을 근거로 쓰지 않는다', () => {
             expect(result()).toContain(
-                'When the washout block prints "Entry verdict (rule engine): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the washout base rate as support.'
+                'When the short-term sell-off block prints "Entry verdict (rule engine): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.'
             );
         });
 
@@ -4807,13 +4884,13 @@ describe('prompt', () => {
 
         it('컨플루언스 진입·청산 규칙은 어떤 판정의 전제도 거부권도 아니다', () => {
             expect(result()).toContain(
-                'The confluence entry and exit rules are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.'
+                'The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.'
             );
         });
 
         it('near-washout 판독은 "wait"로 분류한다', () => {
             expect(result()).toContain(
-                '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a near-washout reading.'
+                '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a reading that is close to a sharp short-term sell-off inside a longer-term uptrend.'
             );
         });
     });
@@ -5805,8 +5882,10 @@ describe('prompt', () => {
                 .find(l => l.startsWith('- Regime:'));
             expect(regimeLine).toBeDefined();
             expect(regimeLine).toContain(
-                'near-random (low directional conviction; demand stronger confluence)'
+                'near-random (low directional conviction; demand stronger independent confirmation)'
             );
+            // 출력 금지 라벨(confluence/washout/rule engine)이 지시문에 다시 섞이지 않게 한다.
+            expect(regimeLine).not.toMatch(/confluence|washout|rule engine/i);
         });
 
         it('Hurst와 Variance Ratio가 모두 mean-reverting이면 mean-reverting verdict를 렌더한다', () => {

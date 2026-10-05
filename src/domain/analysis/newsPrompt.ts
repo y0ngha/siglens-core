@@ -472,7 +472,7 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "currentDriverKo": "${schemaLang} 한 단락 — 제공된 뉴스만 기준으로 본 핵심 뉴스 동인. 실제 가격 움직임의 원인이라고 단정하지 마세요.",
+  "currentDriverKo": "${schemaLang} 한 단락 — 이 종목을 둘러싼 뉴스 흐름과 그 흐름을 이끄는 핵심 동인. 실제 가격 움직임의 원인이라고 단정하지 마세요.",
   "keyEventsKo": [
     "핵심 이벤트 bullet 1 (${schemaLang})",
     "핵심 이벤트 bullet 2 (${schemaLang})"
@@ -491,9 +491,10 @@ Rules:
 - Respond with valid JSON only. No markdown fences.
 ${localizedFieldDirective(locale)}
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
+- Write as a market commentator addressing readers. Never describe the input itself — the articles, how many there are, or that material was provided or given. Open with the subject of the news (the company, sector, or market theme).
 - keyEventsKo should cover the 3–5 most market-moving events from the articles above when enough articles exist.
 - upcomingEventsKo should highlight scheduled catalysts (earnings, regulatory deadlines, etc.).
-- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because no recent articles were provided.
+- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because no recent articles are available.
 - If no scheduled catalysts are provided, return upcomingEventsKo: [].
 - overallSentiment reflects the net directional bias of the provided news flow only.`;
 

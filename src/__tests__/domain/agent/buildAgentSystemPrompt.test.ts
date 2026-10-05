@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { AGENT_FOLLOW_UP_MARKER } from '@/domain/agent/agentFollowUps';
 import {
     AGENT_PROMPT_VERSION,
     buildAgentSystemPrompt,
@@ -277,6 +278,36 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('is not a tool result');
     });
 
+    /**
+     * 사용자 결정 2026-09-19(항상 더 깊게 볼 선택지를 제안한다)는 유지하되,
+     * 제안을 본문 문장("더 깊게 볼까요? ① ② ③")이 아니라 마지막 줄의
+     * `[[followups]] A | B | C` 마커로 옮긴다(UX audit 2026-10-05 §E5-d).
+     * 앱이 마커 줄을 버튼으로 바꾸고 본문에서는 감춘다.
+     */
+    it('깊게 볼 선택지를 마지막 줄 [[followups]] 마커로 내놓게 한다 (기본 2~3개, Detailed 1개)', () => {
+        expect(prompt).toContain(
+            `the marker line "${AGENT_FOLLOW_UP_MARKER} A | B | C"`
+        );
+        expect(prompt).toContain(
+            'It is the very last line of the whole answer'
+        );
+        expect(prompt).toContain('no numbered menu in the answer body');
+
+        // 출처 줄은 마커 줄보다 앞, 마커 줄이 답변 전체의 마지막 줄이다.
+        expect(prompt).toContain(
+            'the source line (Korean example: "(출처: …)") and every other part come before it, and nothing — not even the source line — comes after it'
+        );
+        expect(prompt).toContain(
+            'It stays the very last line, after the source line.'
+        );
+        expect(prompt).toContain(
+            `End with one final marker line "${AGENT_FOLLOW_UP_MARKER} A" offering a single deeper next step`
+        );
+        // 옛 본문 메뉴 문구는 더 이상 예시로 남지 않는다.
+        expect(prompt).not.toContain('더 깊게 볼까요? ①');
+        expect(AGENT_FOLLOW_UP_MARKER).toBe('[[followups]]');
+    });
+
     it('버전 상수는 날짜 형식', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
@@ -287,7 +318,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-03.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-05.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */

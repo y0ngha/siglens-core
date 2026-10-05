@@ -51,6 +51,7 @@ export type {
 } from './application/news/types';
 export type { RunMarketNewsDigestResult } from './application/news/marketNewsDigestTypes';
 export type {
+    MacroBriefingCacheEntry,
     RunMacroBriefingResult,
     RunEconomicEventAnalysisResult,
     RunIndicatorTranslationResult,
@@ -61,7 +62,10 @@ export { getMarketSummary } from './application/dashboard/getMarketSummary';
 export { getSectorSignals } from './application/dashboard/sectorSignals';
 
 // Economy (macro) briefing — mirrors market briefing for the /economy page
-export { peekMacroBriefingCache } from './application/economy/peekMacroBriefingCache';
+export {
+    peekMacroBriefingCache,
+    peekMacroBriefingCacheEntry,
+} from './application/economy/peekMacroBriefingCache';
 
 // Economy — per-event AI analysis (submit/poll worker-job pattern)
 
@@ -418,6 +422,10 @@ export {
 } from './domain/agent/tools';
 export { validateArgs } from './domain/agent/validateArgs';
 export { findUngroundedNumbers } from './domain/agent/groundedNumbers';
+export {
+    AGENT_FOLLOW_UP_MARKER,
+    splitAgentFollowUps,
+} from './domain/agent/agentFollowUps';
 export {
     buildAgentSystemPrompt,
     AGENT_PROMPT_VERSION,

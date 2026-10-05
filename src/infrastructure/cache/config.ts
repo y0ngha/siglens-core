@@ -19,6 +19,7 @@ import type {
     StatementPeriod,
     Timeframe,
 } from '@/domain/types';
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import {
     TIMEFRAME_BARS_LIMIT,
     TIMEFRAME_LOOKBACK_DAYS,
@@ -799,10 +800,15 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * user prompt to the head of `stable` (system message, ahead of the
  * `always_on` skill digests) so the cross-symbol common prefix covers them for
  * provider automatic prefix caching. Bytes change on every request.
+ * **`p23`** — UX audit 2026-10-05 §C6: the Confluence Assessment block gains an
+ * internal-labels rule (never write "rule engine", "confluence", "washout" or
+ * an "x / 100" score in output) and the two instructions that told the model to
+ * cite the rule engine / washout by name are reworded. Bytes change on every
+ * request.
  *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p22' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p23' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest
@@ -977,15 +983,44 @@ export function buildBriefingCacheKey(
     return `briefing:market:${dateHour}:${model}:${inputHash}:${MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
 }
 
-/** @internal TTL for cached macro (economy) briefings. dateHour-bucketed. */
-export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
+/**
+ * @internal TTL for cached macro (economy) briefings. Day-bucketed (see
+ * {@link buildMacroBriefingDateBucket}) so the TTL covers one whole bucket.
+ */
+export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_DAY;
+
+/**
+ * @internal Day bucket of the macro briefing cache key — the UTC calendar
+ * date (`YYYY-MM-DD`) of `now`.
+ *
+ * Why a day, not an hour: the economy snapshot the briefing is built from is
+ * itself cached for 24 hours by the consumer (siglens ISR `revalidate = 86400`),
+ * so every hour inside a day feeds the model identical input. An hourly
+ * bucket therefore paid a fresh LLM call per hour for nothing and — since the
+ * model is non-deterministic — flipped the verdict (e.g. slowdown vs neutral)
+ * between two renders of the same data. UTC is the boundary because FMP's
+ * calendar timestamps are UTC and `formatRelativeTime` in the prompt already
+ * compares UTC dates. Any real data change still rotates the key through the
+ * input hash (`hashMacroBriefingInput`).
+ *
+ * A day-long cache is safe for the calendar rows' relative-time suffixes
+ * (`in 3h`, `2h ago`) only because the prompt forbids restating them — the
+ * briefing refers to scheduled events by date, so a briefing generated in the
+ * morning does not read stale at night.
+ *
+ * Writer (`runMacroBriefing`) and readers (`peekMacroBriefingCache*`) MUST
+ * derive the bucket through this one function so read key == write key.
+ */
+export function buildMacroBriefingDateBucket(now: Date): string {
+    return now.toISOString().slice(0, ISO_DATE_PREFIX_LENGTH);
+}
 
 /**
  * Prompt-template version for the macro (economy) briefing cache key.
  *
  * Same reason {@link MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION} exists: without
  * this axis a change to `buildMacroBriefingPrompt`'s output takes up to a full
- * TTL (1h) to take effect, because a cache HIT inside the same `dateHour`
+ * TTL (1 day) to take effect, because a cache HIT inside the same date
  * bucket returns a response the old prompt produced.
  *
  * Bump whenever `buildMacroBriefingPrompt`'s output changes in a way that would
@@ -1018,24 +1053,33 @@ export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
  * HH:mm:ss` timestamp as UTC instead of the runtime's local zone. Bytes
  * change for every request.
  *
+ * @remarks
+ * **`p5`** — UX audit 2026-10-05 §C1. Indicator rows print a human label, the
+ * FMP key, and an explicit unit on both values and a unit-bearing delta
+ * (registry: `MACRO_INDICATOR_PROMPT_META`); the prompt gains an
+ * `## Interpretation Rules` block. The cache key bucket also moved from
+ * `dateHour` to a UTC date (`buildMacroBriefingDateBucket`) with a 1-day TTL.
+ * Bytes change for every registry-known indicator.
+ *
  * @internal
  */
-export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * @internal Build the Redis key for a cached macro (economy) briefing.
  *
- * Format: `briefing:macro:<dateHour>:<model>:<inputHash>:<promptVersion>`. Same bucketing
- * contract as {@link buildBriefingCacheKey} (date+hour share, model scopes,
- * input hash folds in the indicator/calendar snapshot) but a distinct `macro:`
- * namespace so market and economy briefings never collide.
+ * Format: `briefing:macro:<dateBucket>:<model>:<inputHash>:<promptVersion>` where
+ * `dateBucket` comes from {@link buildMacroBriefingDateBucket} (a UTC day, unlike
+ * {@link buildBriefingCacheKey}'s hour). Model scopes, input hash folds in the
+ * indicator/calendar snapshot, and the distinct `macro:` namespace keeps market
+ * and economy briefings from colliding.
  */
 export function buildMacroBriefingCacheKey(
-    dateHour: string,
+    dateBucket: string,
     model: string,
     inputHash: string
 ): string {
-    return `briefing:macro:${dateHour}:${model}:${inputHash}:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
+    return `briefing:macro:${dateBucket}:${model}:${inputHash}:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
 }
 
 /**
@@ -1554,9 +1598,16 @@ export function buildCongressTrendCacheKey(
  * and news-analysis calendar rows gain `(in N days | N days ago)`. Bytes
  * change for every request.
  *
+ * **`p8`** — UX audit 2026-10-05 §C2. Output-schema descriptions no longer
+ * say "제공된 뉴스만 기준으로" (the model echoed it as "제공된 25건의 뉴스는…"),
+ * both Rules blocks gain a market-commentator rule that forbids describing the
+ * input itself, and the news-card EXCERPT rule stops asking the model to say
+ * an excerpt/body was cut. The normalizer also strips a sentence-initial
+ * input-describing lead (`stripInputMetaLead`).
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p7' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p8' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.

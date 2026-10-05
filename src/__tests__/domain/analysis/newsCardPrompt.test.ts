@@ -200,9 +200,16 @@ describe('bodyTruncated', () => {
         expect(prompt).toContain(
             'Do not infer or invent figures, guidance, outcomes, or conclusions'
         );
+        // 2026-10-05 UX audit §C2: 옛 문구("say so plainly")는 모델이 "제공된 본문은 ...
+        // 잘려" 같은 입력 설명을 summaryKo에 그대로 옮기게 했다. 공백은 알리되
+        // 발췌·본문·제공 텍스트라는 말은 쓰지 못하게 한다.
         expect(prompt).toContain(
-            'say so plainly in summaryKo rather than guessing'
+            "end summaryKo by noting that the article's later details are not available"
         );
+        expect(prompt).toContain(
+            'never mention an excerpt, a body, or provided text in summaryKo'
+        );
+        expect(prompt).not.toContain('say so plainly in summaryKo');
     });
 
     it('adds nothing when the body is complete', () => {
@@ -351,7 +358,7 @@ const LEGACY_LINES_KO_TRANSLATE_TRUNCATED: readonly string[] = [
     '- Preserve important numbers and comparisons from the article body when they are material to the news implication.',
     '- If the title and body conflict, base summaryKo on the body and mention the tension only if it is explicit in the article.',
     '- If no body was provided, summaryKo may be shorter, but it must clearly state that the judgment is based only on the headline and avoid guessing missing details.',
-    "- The article body below is an EXCERPT cut off mid-article — the rest was never provided. Summarise only what the excerpt actually states. Do not infer or invent figures, guidance, outcomes, or conclusions from the part you cannot see, and do not present the excerpt's opening framing as the article's conclusion. If the excerpt stops before the point is resolved, say so plainly in summaryKo rather than guessing.",
+    "- The article body below is an EXCERPT cut off mid-article — the rest was never provided. Summarise only what the excerpt actually states. Do not infer or invent figures, guidance, outcomes, or conclusions from the part you cannot see, and do not present the excerpt's opening framing as the article's conclusion. If the excerpt stops before the point is resolved, end summaryKo by noting that the article's later details are not available rather than guessing; never mention an excerpt, a body, or provided text in summaryKo.",
     '- sentiment must be exactly one of: "bullish", "neutral", "bearish".',
     '- category must be exactly one of: "earnings", "m_and_a", "guidance", "regulation", "macro", "product", "other".',
     '- priceImpact must be exactly one of: "high", "medium", "low", "negligible".',

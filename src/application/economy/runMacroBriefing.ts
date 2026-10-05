@@ -6,11 +6,11 @@ import type {
 } from '@/application/economy/types';
 import { buildMacroBriefingPrompt } from '@/domain/economy/macroBriefingPrompt';
 import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
-import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import type { EconomySnapshot } from '@/domain/types';
 import {
     BRIEFING_MODEL_ID,
     buildMacroBriefingCacheKey,
+    buildMacroBriefingDateBucket,
     MACRO_BRIEFING_CACHE_TTL,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -26,7 +26,7 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  * Redis meta, no polling loop.
  *
  * Mirrors {@link runBriefing} but for the `/economy` page — the cache is keyed
- * by ISO date+hour, the briefing model, and a deterministic hash of the
+ * by UTC date (day bucket), the briefing model, and a deterministic hash of the
  * indicator/treasury/calendar snapshot. Macro briefings share the same
  * `callBriefingAi` path (Gemini/DeepSeek server key, no tier/BYOK concept).
  *
@@ -46,10 +46,10 @@ export async function runMacroBriefing(
     options?: RunMacroBriefingOptions
 ): Promise<RunMacroBriefingResult> {
     const now = new Date();
-    const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+    const dateBucket = buildMacroBriefingDateBucket(now);
     const inputHash = hashMacroBriefingInput(data);
     const cacheKey = buildMacroBriefingCacheKey(
-        dateHour,
+        dateBucket,
         BRIEFING_MODEL_ID,
         inputHash
     );

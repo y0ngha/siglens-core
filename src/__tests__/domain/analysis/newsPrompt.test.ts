@@ -862,3 +862,34 @@ describe('buildNewsAnalysisPrompt — macro calendar (spec 2026-09-28)', () => {
         );
     });
 });
+
+describe('buildNewsAnalysisPrompt — 입력 설명 금지 (UX audit 2026-10-05 §C2)', () => {
+    it('스키마 설명에 입력을 가리키는 "제공된"이 없고 가격 인과 단정 금지 문구는 유지한다', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [NEWS_ITEM_1],
+            [UPCOMING_EARNINGS],
+            []
+        );
+        expect(prompt).not.toContain('제공된');
+        expect(prompt).toContain(
+            '실제 가격 움직임의 원인이라고 단정하지 마세요'
+        );
+    });
+
+    it('Rules에 commentator 규칙을 둔다', () => {
+        const prompt = buildNewsAnalysisPrompt(
+            TEST_SYMBOL,
+            'Apple Inc.',
+            [NEWS_ITEM_1],
+            [],
+            []
+        );
+        expect(prompt).toContain(
+            'Write as a market commentator addressing readers'
+        );
+        expect(prompt).toContain('Never describe the input itself');
+        expect(prompt).toContain('no recent articles are available');
+    });
+});

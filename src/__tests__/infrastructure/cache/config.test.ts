@@ -142,11 +142,11 @@ describe('cache key builders', () => {
         expect(a).not.toBe(b);
     });
 
-    it('buildMacroBriefingCacheKey uses the briefing:macro: namespace with the dateHour, model, and input hash', () => {
+    it('buildMacroBriefingCacheKey uses the briefing:macro: namespace with the date bucket, model, and input hash', () => {
         expect(
-            buildMacroBriefingCacheKey('2026-06-16T09', 'test-model', 'abc123')
+            buildMacroBriefingCacheKey('2026-06-16', 'test-model', 'abc123')
         ).toBe(
-            `briefing:macro:2026-06-16T09:test-model:abc123:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`
+            `briefing:macro:2026-06-16:test-model:abc123:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`
         );
     });
 
@@ -834,7 +834,9 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // (spec 2026-09-28-chart-overlays). p19 는 탐지 목록을 넓힌다(캔들 6종·차트 패턴 5종·신호 4종).
         // p22 는 기술적 분석 프롬프트에서 고정 Intent·Guidelines 블록을 유저 프롬프트 머리에서
         // 시스템 메시지(stable) 머리로 옮긴다(문구 변경 없음, 심볼 간 공통 접두사 확대).
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p22');
+        // p23 (UX audit 2026-10-05 §C6): Confluence Assessment에 내부 라벨 비노출 규칙을
+        // 추가하고 "rule engine"/"washout"을 이름으로 인용하라던 두 지시를 고쳤다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p23');
     });
 });
 

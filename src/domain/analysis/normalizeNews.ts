@@ -36,10 +36,53 @@ const VALID_NEWS_CATEGORIES: readonly NewsCategory[] = [
     'other',
 ];
 
+/**
+ * Sentence-initial phrases that describe the INPUT instead of the market
+ * (`제공된 25건의 뉴스는…`, `The provided articles…`). The prompts forbid
+ * them, but the model still leaks them now and then, so the normalizer strips
+ * the lead as a deterministic backstop.
+ *
+ * What is trimmed, precisely — all three conditions must hold:
+ * 1. the text STARTS with the qualifier (Korean `제공된`/`주어진`/`입력된`
+ *    followed by whitespace; English `The provided `), so the same words
+ *    mid-sentence stay untouched;
+ * 2. an optional count follows (Korean `N건의 `; English `N `);
+ * 3. the next word is an INPUT noun (Korean 뉴스·기사·기사들·자료·정보·본문·
+ *    데이터; English articles·news·headlines·data·information). A qualifier
+ *    on anything else is real content and stays: `제공된 가이던스는…` (company
+ *    guidance), `주어진 환경에서…` (a given environment).
+ *
+ * Only the qualifier (+ count) is removed; the noun and the rest of the
+ * sentence are kept.
+ */
+const KO_INPUT_META_LEAD =
+    /^(?:제공된|주어진|입력된)\s+(?:\d+\s*건의\s+)?(?=(?:뉴스|기사|자료|정보|본문|데이터)(?:들)?(?:[은는이가을를의에와과도]|\s|$))/;
+const EN_INPUT_META_LEAD =
+    /^The provided (?:\d+ )?(?=(?:articles|news|headlines|data|information)\b)/;
+
+/**
+ * @internal Remove a leading input-describing phrase from one generated
+ * sentence. For English the next character is capitalised so the sentence
+ * still starts like one. Returns the text unchanged when it has no such lead,
+ * or when stripping it would leave nothing.
+ */
+export function stripInputMetaLead(text: string): string {
+    const koStripped = text.replace(KO_INPUT_META_LEAD, '');
+    if (koStripped !== text) return koStripped.length > 0 ? koStripped : text;
+
+    const enStripped = text.replace(EN_INPUT_META_LEAD, '');
+    if (enStripped === text || enStripped.length === 0) return text;
+    return `${enStripped.charAt(0).toUpperCase()}${enStripped.slice(1)}`;
+}
+
 function normalizeStringArray(raw: unknown): string[] {
     return asArray(raw)
         .map(item => asString(item))
         .filter(item => item.length > 0);
+}
+
+function normalizeNarrativeArray(raw: unknown): string[] {
+    return normalizeStringArray(raw).map(stripInputMetaLead);
 }
 
 function normalizeNewsSentiment(value: unknown): NewsSentiment {
@@ -81,7 +124,7 @@ export function normalizeNewsCardAnalysis(raw: unknown): NewsCardAnalysis {
     return {
         titleKo: asString(o.titleKo),
         bodyKo,
-        summaryKo: asString(o.summaryKo),
+        summaryKo: stripInputMetaLead(asString(o.summaryKo)),
         sentiment: normalizeNewsSentiment(o.sentiment),
         category: normalizeNewsCategory(o.category),
         priceImpact: normalizeNewsImpact(o.priceImpact),
@@ -108,8 +151,8 @@ export function normalizeNewsAnalysisResponse(
     const o = (asObject(parsed) ?? {}) as RawNewsAnalysisResponse;
 
     return {
-        currentDriverKo: asString(o.currentDriverKo),
-        keyEventsKo: normalizeStringArray(o.keyEventsKo),
+        currentDriverKo: stripInputMetaLead(asString(o.currentDriverKo)),
+        keyEventsKo: normalizeNarrativeArray(o.keyEventsKo),
         upcomingEventsKo: normalizeStringArray(o.upcomingEventsKo),
         overallSentiment: normalizeNewsSentiment(o.overallSentiment),
     };
