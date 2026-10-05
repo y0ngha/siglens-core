@@ -69,6 +69,9 @@ function isIncompleteMarkerLine(line: string): boolean {
  * marker line may still be growing (`[[followups]] A | B` can become
  * `[[followups]] A | B | C`, and the last item may be cut mid-word). Render the
  * follow-up chips only after the stream has completed.
+ *
+ * @param text - The assistant answer (complete or still streaming).
+ * @returns The visible `body` and up to three `followUps`; `followUps` is empty when there is no valid marker line.
  */
 export function splitAgentFollowUps(text: string): SplitAgentFollowUps {
     const lines = text.split('\n');

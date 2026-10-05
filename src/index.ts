@@ -426,6 +426,7 @@ export {
     AGENT_FOLLOW_UP_MARKER,
     splitAgentFollowUps,
 } from './domain/agent/agentFollowUps';
+export type { SplitAgentFollowUps } from './domain/agent/agentFollowUps';
 export {
     buildAgentSystemPrompt,
     AGENT_PROMPT_VERSION,

@@ -8,6 +8,7 @@ import {
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
 import { PRIOR_ANALYSIS_WINDOW_BARS } from '@/domain/analysis/priorAnalysis';
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import type {
     DashboardTimeframe,
     MarketEvent,
@@ -19,7 +20,6 @@ import type {
     StatementPeriod,
     Timeframe,
 } from '@/domain/types';
-import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import {
     TIMEFRAME_BARS_LIMIT,
     TIMEFRAME_LOOKBACK_DAYS,

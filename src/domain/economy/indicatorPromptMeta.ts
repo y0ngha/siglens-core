@@ -1,5 +1,5 @@
 /**
- * How a macro-briefing indicator row should be read.
+ * @internal How a macro-briefing indicator row should be read.
  *
  * - `rate` / `probability` — a percentage; its delta is a percentage-point
  *   (`pp`) move.
@@ -10,7 +10,7 @@
  */
 export type MacroIndicatorKind = 'rate' | 'probability' | 'level' | 'index';
 
-/** Prompt-side metadata for one FMP economic-indicator series. */
+/** @internal Prompt-side metadata for one FMP economic-indicator series. */
 export interface MacroIndicatorPromptMeta {
     /** Human-readable English label printed in front of the FMP key. */
     label: string;
@@ -87,7 +87,7 @@ export const MACRO_INDICATOR_PROMPT_META: Readonly<
     },
 };
 
-/** Registry lookup that never trusts a prototype key (`constructor`, `__proto__`) as an indicator name. */
+/** @internal Registry lookup that never trusts a prototype key (`constructor`, `__proto__`) as an indicator name. */
 export function getMacroIndicatorPromptMeta(
     name: string
 ): MacroIndicatorPromptMeta | null {

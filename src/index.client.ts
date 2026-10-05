@@ -112,6 +112,7 @@ export {
     AGENT_FOLLOW_UP_MARKER,
     splitAgentFollowUps,
 } from './domain/agent/agentFollowUps';
+export type { SplitAgentFollowUps } from './domain/agent/agentFollowUps';
 
 // Economy (macro) — domain helpers (server-only submit/poll/peek use-cases are
 // intentionally omitted; only pure domain functions belong on the browser

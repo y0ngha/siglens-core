@@ -1,5 +1,5 @@
-import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
 import type { MacroBriefingCacheEntry } from '@/application/economy/types';
+import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
 import type { EconomySnapshot, MacroBriefingResponse } from '@/domain/types';
 import {
     BRIEFING_MODEL_ID,
@@ -55,6 +55,8 @@ export async function peekMacroBriefingCache(
  * `generatedAt` is the ISO timestamp stored in the cache envelope by
  * `runMacroBriefing`; it is `null` only for a legacy entry written without it.
  *
+ * @param data - The economy snapshot the briefing was generated from (its hash is part of the key).
+ * @param modelId - Briefing model id used in the cache key; defaults to `BRIEFING_MODEL_ID`.
  * @returns `{ briefing, generatedAt }` on a hit, or `null` on miss/cold/error.
  */
 export async function peekMacroBriefingCacheEntry(
