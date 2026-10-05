@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
     getMacroIndicatorPromptMeta,
+    getMacroIndicatorRawScale,
+    MACRO_INDICATOR_NAME,
     MACRO_INDICATOR_PROMPT_META,
 } from '@/domain/economy/indicatorPromptMeta';
 
@@ -54,5 +56,26 @@ describe('getMacroIndicatorPromptMeta', () => {
         expect(getMacroIndicatorPromptMeta('constructor')).toBeNull();
         expect(getMacroIndicatorPromptMeta('__proto__')).toBeNull();
         expect(getMacroIndicatorPromptMeta('toString')).toBeNull();
+    });
+});
+
+describe('MACRO_INDICATOR_NAME', () => {
+    it('lists exactly the registry keys, each name mapping to itself', () => {
+        expect(Object.keys(MACRO_INDICATOR_NAME).toSorted()).toEqual(
+            Object.keys(MACRO_INDICATOR_PROMPT_META).toSorted()
+        );
+        for (const [key, value] of Object.entries(MACRO_INDICATOR_NAME)) {
+            expect(value).toBe(key);
+        }
+    });
+});
+
+describe('getMacroIndicatorRawScale', () => {
+    it('returns the registry multiplier, and 1 for an unscaled or unknown series', () => {
+        expect(getMacroIndicatorRawScale('totalNonfarmPayroll')).toBe(1000);
+        expect(getMacroIndicatorRawScale('GDP')).toBe(0.001);
+        expect(getMacroIndicatorRawScale('unemploymentRate')).toBe(1);
+        expect(getMacroIndicatorRawScale('unknownSeries')).toBe(1);
+        expect(getMacroIndicatorRawScale('constructor')).toBe(1);
     });
 });

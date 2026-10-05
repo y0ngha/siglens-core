@@ -1,4 +1,7 @@
-import { MACRO_INDICATOR_PROMPT_META } from './indicatorPromptMeta';
+import {
+    getMacroIndicatorRawScale,
+    MACRO_INDICATOR_NAME,
+} from './indicatorPromptMeta';
 import { computeYieldSpread } from './normalizeTreasuryRates';
 import type {
     EconomicIndicatorSeries,
@@ -19,8 +22,6 @@ const PAYROLL_WEAK_PERSONS = 50_000;
 const SLOWDOWN_SIGNALS_REQUIRED = 2;
 /** Percentage-point deltas are compared after rounding to this many decimals (4.5 − 4.4 is 0.0999…). */
 const PP_COMPARE_DECIMALS = 2;
-
-const FALLBACK_PAYROLL_SCALE = 1000;
 
 /** Which rule decided the regime — finer than the regime itself. */
 export type MacroRegimeRule =
@@ -83,6 +84,194 @@ function roundPp(n: number): number {
     return Math.round(n * factor) / factor;
 }
 
+/** Every figure the rules read, extracted once; `null` means "missing / N/A". */
+interface RegimeInputs {
+    recessionLatest: number | null;
+    recessionPrevious: number | null;
+    /** Unemployment change in percentage points, rounded for comparison. */
+    unemploymentDelta: number | null;
+    /** Monthly payroll change in persons. */
+    payrollChange: number | null;
+    production: PairedSeries | null;
+    spread: number | null;
+}
+
+function readInputs(snapshot: EconomySnapshot): RegimeInputs {
+    const recession = findSeries(
+        snapshot,
+        MACRO_INDICATOR_NAME.smoothedUSRecessionProbabilities
+    );
+    const unemployment = pairOf(
+        findSeries(snapshot, MACRO_INDICATOR_NAME.unemploymentRate)
+    );
+    const payroll = pairOf(
+        findSeries(snapshot, MACRO_INDICATOR_NAME.totalNonfarmPayroll)
+    );
+    const payrollScale = getMacroIndicatorRawScale(
+        MACRO_INDICATOR_NAME.totalNonfarmPayroll
+    );
+    return {
+        recessionLatest: latestValue(recession),
+        recessionPrevious: previousValue(recession),
+        unemploymentDelta:
+            unemployment === null
+                ? null
+                : roundPp(unemployment.latest - unemployment.previous),
+        payrollChange:
+            payroll === null
+                ? null
+                : (payroll.latest - payroll.previous) * payrollScale,
+        production: pairOf(
+            findSeries(
+                snapshot,
+                MACRO_INDICATOR_NAME.industrialProductionTotalIndex
+            )
+        ),
+        spread: computeYieldSpread(snapshot.treasury),
+    };
+}
+
+const isUnemploymentRising = (i: RegimeInputs): boolean =>
+    i.unemploymentDelta !== null && i.unemploymentDelta >= UNEMPLOYMENT_MOVE_PP;
+
+const isUnemploymentFalling = (i: RegimeInputs): boolean =>
+    i.unemploymentDelta !== null &&
+    i.unemploymentDelta <= -UNEMPLOYMENT_MOVE_PP;
+
+const isPayrollShrinking = (i: RegimeInputs): boolean =>
+    i.payrollChange !== null && i.payrollChange < 0;
+
+const isPayrollGrowing = (i: RegimeInputs): boolean =>
+    i.payrollChange !== null && i.payrollChange > 0;
+
+const isPayrollWeak = (i: RegimeInputs): boolean =>
+    i.payrollChange !== null && i.payrollChange < PAYROLL_WEAK_PERSONS;
+
+const isPayrollSolid = (i: RegimeInputs): boolean =>
+    i.payrollChange !== null && i.payrollChange >= PAYROLL_WEAK_PERSONS;
+
+const isRecessionElevated = (i: RegimeInputs): boolean =>
+    i.recessionLatest !== null &&
+    i.recessionLatest >= RECESSION_ELEVATED_PERCENT;
+
+/** Rule 1: a recession signal, or job losses together with rising unemployment. */
+function matchContraction(i: RegimeInputs): DerivedMacroRegime | null {
+    if (
+        i.recessionLatest !== null &&
+        i.recessionLatest > RECESSION_CONTRACTION_PERCENT
+    ) {
+        return {
+            regime: 'contraction',
+            firedRule: 'contraction:recessionHigh',
+            signals: ['recession probability high'],
+        };
+    }
+    if (isPayrollShrinking(i) && isUnemploymentRising(i)) {
+        return {
+            regime: 'contraction',
+            firedRule: 'contraction:jobLossRisingUnemployment',
+            signals: ['payrolls shrinking', 'unemployment rate rising'],
+        };
+    }
+    return null;
+}
+
+/** Rule 2: prior distress together with improving rows. */
+function matchRecovery(i: RegimeInputs): DerivedMacroRegime | null {
+    const priorDistress =
+        isRecessionElevated(i) ||
+        (i.recessionPrevious !== null &&
+            i.recessionPrevious >= RECESSION_ELEVATED_PERCENT);
+    const recessionFalling =
+        i.recessionLatest !== null &&
+        i.recessionPrevious !== null &&
+        i.recessionLatest < i.recessionPrevious;
+    if (!(
+        priorDistress &&
+        isPayrollGrowing(i) &&
+        isUnemploymentFalling(i) &&
+        recessionFalling
+    )) {
+        return null;
+    }
+    return {
+        regime: 'recovery',
+        firedRule: 'recovery',
+        signals: [
+            'recession probability recently elevated and now falling',
+            'payrolls growing',
+            'unemployment rate falling',
+        ],
+    };
+}
+
+/** The slowdown signals that hold, in a fixed order (also the "because" list). */
+function collectSlowdownSignals(i: RegimeInputs): string[] {
+    const { production, spread } = i;
+    return [
+        isUnemploymentRising(i) && 'unemployment rate rising',
+        isPayrollWeak(i) &&
+            (isPayrollShrinking(i)
+                ? 'payrolls shrinking'
+                : 'monthly job gains weak'),
+        production !== null &&
+            production.latest < production.previous &&
+            'industrial production falling',
+        spread !== null && spread < 0 && 'yield curve inverted',
+        isRecessionElevated(i) && 'recession probability elevated',
+    ].filter((signal): signal is string => typeof signal === 'string');
+}
+
+/** Rule 3: a payroll loss alone, or two or more slowdown signals. */
+function matchSlowdown(
+    i: RegimeInputs,
+    signals: readonly string[]
+): DerivedMacroRegime | null {
+    if (isPayrollShrinking(i)) {
+        return {
+            regime: 'slowdown',
+            firedRule: 'slowdown:payrollShrinking',
+            signals: [...signals],
+        };
+    }
+    if (signals.length >= SLOWDOWN_SIGNALS_REQUIRED) {
+        return {
+            regime: 'slowdown',
+            firedRule: 'slowdown:multipleSignals',
+            signals: [...signals],
+        };
+    }
+    return null;
+}
+
+/** Rule 4: solid payroll gain and no slowdown signal on the available rows. */
+function matchExpansion(
+    i: RegimeInputs,
+    signals: readonly string[]
+): DerivedMacroRegime | null {
+    if (!isPayrollSolid(i) || signals.length > 0) return null;
+    return {
+        regime: 'expansion',
+        firedRule: 'expansion',
+        signals: [
+            'monthly job gains solid',
+            'no slowdown signal on the available rows',
+        ],
+    };
+}
+
+/** Rule 5: everything else, including exactly one slowdown signal. */
+function neutralRegime(signals: readonly string[]): DerivedMacroRegime {
+    return {
+        regime: 'neutral',
+        firedRule: 'neutral',
+        signals:
+            signals.length > 0
+                ? [...signals]
+                : ['rows are mixed or incomplete'],
+    };
+}
+
 /**
  * @internal The macro regime, decided in code from the snapshot rows.
  *
@@ -115,138 +304,15 @@ function roundPp(n: number): number {
 export function deriveMacroRegime(
     snapshot: EconomySnapshot
 ): DerivedMacroRegime {
-    const recession = findSeries(snapshot, 'smoothedUSRecessionProbabilities');
-    const recessionLatest = latestValue(recession);
-    const recessionPrevious = previousValue(recession);
-    const unemployment = pairOf(findSeries(snapshot, 'unemploymentRate'));
-    const unemploymentDelta =
-        unemployment === null
-            ? null
-            : roundPp(unemployment.latest - unemployment.previous);
-    const payroll = pairOf(findSeries(snapshot, 'totalNonfarmPayroll'));
-    const payrollScale =
-        MACRO_INDICATOR_PROMPT_META.totalNonfarmPayroll?.rawScale ??
-        FALLBACK_PAYROLL_SCALE;
-    const payrollChange =
-        payroll === null
-            ? null
-            : (payroll.latest - payroll.previous) * payrollScale;
-    const production = pairOf(
-        findSeries(snapshot, 'industrialProductionTotalIndex')
+    const inputs = readInputs(snapshot);
+    const slowdownSignals = collectSlowdownSignals(inputs);
+    return (
+        matchContraction(inputs) ??
+        matchRecovery(inputs) ??
+        matchSlowdown(inputs, slowdownSignals) ??
+        matchExpansion(inputs, slowdownSignals) ??
+        neutralRegime(slowdownSignals)
     );
-    const spread = computeYieldSpread(snapshot.treasury);
-
-    const unemploymentRising =
-        unemploymentDelta !== null && unemploymentDelta >= UNEMPLOYMENT_MOVE_PP;
-    const unemploymentFalling =
-        unemploymentDelta !== null &&
-        unemploymentDelta <= -UNEMPLOYMENT_MOVE_PP;
-    const payrollShrinking = payrollChange !== null && payrollChange < 0;
-    const payrollGrowing = payrollChange !== null && payrollChange > 0;
-    const recessionElevated =
-        recessionLatest !== null &&
-        recessionLatest >= RECESSION_ELEVATED_PERCENT;
-
-    // 1. contraction
-    if (
-        recessionLatest !== null &&
-        recessionLatest > RECESSION_CONTRACTION_PERCENT
-    ) {
-        return {
-            regime: 'contraction',
-            firedRule: 'contraction:recessionHigh',
-            signals: ['recession probability high'],
-        };
-    }
-    if (payrollShrinking && unemploymentRising) {
-        return {
-            regime: 'contraction',
-            firedRule: 'contraction:jobLossRisingUnemployment',
-            signals: ['payrolls shrinking', 'unemployment rate rising'],
-        };
-    }
-
-    // 2. recovery
-    const priorDistress =
-        recessionElevated ||
-        (recessionPrevious !== null &&
-            recessionPrevious >= RECESSION_ELEVATED_PERCENT);
-    const recessionFalling =
-        recessionLatest !== null &&
-        recessionPrevious !== null &&
-        recessionLatest < recessionPrevious;
-    if (
-        priorDistress &&
-        payrollGrowing &&
-        unemploymentFalling &&
-        recessionFalling
-    ) {
-        return {
-            regime: 'recovery',
-            firedRule: 'recovery',
-            signals: [
-                'recession probability recently elevated and now falling',
-                'payrolls growing',
-                'unemployment rate falling',
-            ],
-        };
-    }
-
-    // 3. slowdown — held signals in a fixed order
-    const heldSignals = [
-        unemploymentRising && 'unemployment rate rising',
-        payrollChange !== null &&
-            payrollChange < PAYROLL_WEAK_PERSONS &&
-            (payrollShrinking
-                ? 'payrolls shrinking'
-                : 'monthly job gains weak'),
-        production !== null &&
-            production.latest < production.previous &&
-            'industrial production falling',
-        spread !== null && spread < 0 && 'yield curve inverted',
-        recessionElevated && 'recession probability elevated',
-    ].filter((signal): signal is string => typeof signal === 'string');
-
-    if (payrollShrinking) {
-        return {
-            regime: 'slowdown',
-            firedRule: 'slowdown:payrollShrinking',
-            signals: heldSignals,
-        };
-    }
-    if (heldSignals.length >= SLOWDOWN_SIGNALS_REQUIRED) {
-        return {
-            regime: 'slowdown',
-            firedRule: 'slowdown:multipleSignals',
-            signals: heldSignals,
-        };
-    }
-
-    // 4. expansion
-    if (
-        payrollChange !== null &&
-        payrollChange >= PAYROLL_WEAK_PERSONS &&
-        heldSignals.length === 0
-    ) {
-        return {
-            regime: 'expansion',
-            firedRule: 'expansion',
-            signals: [
-                'monthly job gains solid',
-                'no slowdown signal on the available rows',
-            ],
-        };
-    }
-
-    // 5. neutral
-    return {
-        regime: 'neutral',
-        firedRule: 'neutral',
-        signals:
-            heldSignals.length > 0
-                ? heldSignals
-                : ['rows are mixed or incomplete'],
-    };
 }
 
 /**

@@ -49,6 +49,23 @@ export interface MacroIndicatorPromptMeta {
 }
 
 /**
+ * @internal The FMP economic-indicators `name` of every series the macro
+ * briefing reads, in ONE place: the registry below and `deriveMacroRegime`
+ * both reference these so a rename cannot leave them out of sync.
+ */
+export const MACRO_INDICATOR_NAME = {
+    federalFunds: 'federalFunds',
+    inflationRate: 'inflationRate',
+    unemploymentRate: 'unemploymentRate',
+    smoothedUSRecessionProbabilities: 'smoothedUSRecessionProbabilities',
+    totalNonfarmPayroll: 'totalNonfarmPayroll',
+    initialClaims: 'initialClaims',
+    GDP: 'GDP',
+    CPI: 'CPI',
+    industrialProductionTotalIndex: 'industrialProductionTotalIndex',
+} as const;
+
+/**
  * @internal Unit / label registry for the macro briefing prompt, keyed by the
  * FMP economic-indicators `name` that `EconomicIndicatorSeries.name` carries
  * (the same identifiers siglens' `ECONOMY_INDICATORS` registry requests).
@@ -62,29 +79,29 @@ export interface MacroIndicatorPromptMeta {
 export const MACRO_INDICATOR_PROMPT_META: Readonly<
     Record<string, MacroIndicatorPromptMeta>
 > = {
-    federalFunds: {
+    [MACRO_INDICATOR_NAME.federalFunds]: {
         label: 'Effective federal funds rate (monthly average)',
         unit: '%',
         kind: 'rate',
     },
-    inflationRate: {
+    [MACRO_INDICATOR_NAME.inflationRate]: {
         label: 'Inflation rate (year over year)',
         unit: '%',
         kind: 'rate',
         showPrevious: false,
     },
-    unemploymentRate: {
+    [MACRO_INDICATOR_NAME.unemploymentRate]: {
         label: 'Unemployment rate',
         unit: '%',
         kind: 'rate',
     },
-    smoothedUSRecessionProbabilities: {
+    [MACRO_INDICATOR_NAME.smoothedUSRecessionProbabilities]: {
         label: 'Smoothed US recession probability',
         unit: '%',
         kind: 'probability',
         note: 'the value is already a percentage, not a 0-1 fraction',
     },
-    totalNonfarmPayroll: {
+    [MACRO_INDICATOR_NAME.totalNonfarmPayroll]: {
         label: 'Total nonfarm payroll employment',
         unit: 'persons',
         kind: 'level',
@@ -94,25 +111,25 @@ export const MACRO_INDICATOR_PROMPT_META: Readonly<
         showLevel: false,
         showPercentChange: false,
     },
-    initialClaims: {
+    [MACRO_INDICATOR_NAME.initialClaims]: {
         label: 'Initial jobless claims',
         unit: 'persons per week',
         kind: 'level',
         decimals: 0,
     },
-    GDP: {
+    [MACRO_INDICATOR_NAME.GDP]: {
         label: 'Gross domestic product',
         unit: 'USD trillion',
         kind: 'level',
         rawScale: 0.001,
         decimals: 2,
     },
-    CPI: {
+    [MACRO_INDICATOR_NAME.CPI]: {
         label: 'Consumer price index',
         unit: 'index points',
         kind: 'index',
     },
-    industrialProductionTotalIndex: {
+    [MACRO_INDICATOR_NAME.industrialProductionTotalIndex]: {
         label: 'Industrial production index',
         unit: 'index points',
         kind: 'index',
@@ -126,4 +143,13 @@ export function getMacroIndicatorPromptMeta(
     return Object.hasOwn(MACRO_INDICATOR_PROMPT_META, name)
         ? MACRO_INDICATOR_PROMPT_META[name]
         : null;
+}
+
+/**
+ * @internal Multiplier from a series' raw FMP value to its printed unit
+ * (`rawScale`); `1` when the registry has no entry or no scale, i.e. the raw
+ * value is already in the printed unit.
+ */
+export function getMacroIndicatorRawScale(name: string): number {
+    return getMacroIndicatorPromptMeta(name)?.rawScale ?? 1;
 }

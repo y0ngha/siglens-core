@@ -36,8 +36,30 @@ const VALID_NEWS_CATEGORIES: readonly NewsCategory[] = [
     'other',
 ];
 
+/** Input nouns a leading qualifier may qualify. See {@link stripInputMetaLead} for the full trim rules. */
+const KO_INPUT_NOUN = '(?:뉴스|기사|자료|정보|본문|데이터)';
+
+/** The noun must end the word (optionally plural `들`) or take a particle: `정보기술`/`데이터센터` are not input nouns. */
+const KO_NOUN_BOUNDARY = '(?:들)?(?:[은는이가을를의에와과도]|\\s|$)';
+
+/** Final characters that mark a word as a particle-bearing subject, not a descriptor. */
+const KO_DESCRIPTOR_PARTICLES = '는은이가을를에서의도로와과';
+
+/** One descriptor word: up to 10 characters, no sentence punctuation, not ending in a particle. */
+const KO_DESCRIPTOR_WORD = `[^\\s.!?,。]{0,9}[^\\s.!?,。${KO_DESCRIPTOR_PARTICLES}]\\s+`;
+
+/** Korean qualifier (+ optional count, + up to two descriptor words) that must be followed by an input noun. */
+const KO_INPUT_META_LEAD = new RegExp(
+    `^(?:제공된|주어진|입력된)\\s+(?:\\d+\\s*건의\\s+)?(?=(?:${KO_DESCRIPTOR_WORD}){0,2}${KO_INPUT_NOUN}${KO_NOUN_BOUNDARY})`
+);
+
+/** English qualifier (+ optional count) that must be followed by an input noun; no descriptor words. */
+const EN_INPUT_META_LEAD =
+    /^The provided (?:\d+ )?(?=(?:articles|news|headlines|data|information)\b)/;
+
 /**
- * Sentence-initial phrases that describe the INPUT instead of the market
+ * @internal Remove a leading input-describing phrase from one generated
+ * sentence — phrases that describe the INPUT instead of the market
  * (`제공된 25건의 뉴스는…`, `The provided articles…`). The prompts forbid
  * them, but the model still leaks them now and then, so the normalizer strips
  * the lead as a deterministic backstop.
@@ -58,24 +80,10 @@ const VALID_NEWS_CATEGORIES: readonly NewsCategory[] = [
  *    descriptor words.
  *
  * Only the qualifier (+ count) is removed; the descriptor words, the noun and
- * the rest of the sentence are kept.
- */
-/** The noun must end the word (optionally plural `들`) or take a particle: `정보기술`/`데이터센터` are not input nouns. */
-const KO_INPUT_NOUN = '(?:뉴스|기사|자료|정보|본문|데이터)';
-const KO_NOUN_BOUNDARY = '(?:들)?(?:[은는이가을를의에와과도]|\\s|$)';
-const KO_DESCRIPTOR_PARTICLES = '는은이가을를에서의도로와과';
-const KO_DESCRIPTOR_WORD = `[^\\s.!?,。]{0,9}[^\\s.!?,。${KO_DESCRIPTOR_PARTICLES}]\\s+`;
-const KO_INPUT_META_LEAD = new RegExp(
-    `^(?:제공된|주어진|입력된)\\s+(?:\\d+\\s*건의\\s+)?(?=(?:${KO_DESCRIPTOR_WORD}){0,2}${KO_INPUT_NOUN}${KO_NOUN_BOUNDARY})`
-);
-const EN_INPUT_META_LEAD =
-    /^The provided (?:\d+ )?(?=(?:articles|news|headlines|data|information)\b)/;
-
-/**
- * @internal Remove a leading input-describing phrase from one generated
- * sentence. For English the next character is capitalised so the sentence
- * still starts like one. Returns the text unchanged when it has no such lead,
- * or when stripping it would leave nothing.
+ * the rest of the sentence are kept. For English the next character is
+ * capitalised so the sentence still starts like one. Returns the text
+ * unchanged when it has no such lead, or when stripping it would leave
+ * nothing.
  */
 export function stripInputMetaLead(text: string): string {
     const koStripped = text.replace(KO_INPUT_META_LEAD, '');
