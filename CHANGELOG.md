@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.11.0](https://github.com/y0ngha/siglens-core/compare/v2.10.0...v2.11.0) (2026-10-05)
+
+### Features
+
+* 극단 구간 머문 기록 집계(summarizeExtremeZoneEpisodes)를 추가하고 수익률 집계를 deprecated로 둔다 ([#257](https://github.com/y0ngha/siglens-core/issues/257)) ([cd84fff](https://github.com/y0ngha/siglens-core/commit/cd84fff7286c316840541f03425c405b1aad8912)), closes [#256](https://github.com/y0ngha/siglens-core/issues/256)
+
 # [2.10.0](https://github.com/y0ngha/siglens-core/compare/v2.9.0...v2.10.0) (2026-10-05)
 
 ### Features
