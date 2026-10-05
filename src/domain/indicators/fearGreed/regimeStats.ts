@@ -1,6 +1,9 @@
 import { returnOver } from '@/domain/indicators/fearGreed/returns';
 import type {
     ExtremeFearGreedZone,
+    ExtremeZoneEpisode,
+    ExtremeZoneEpisodeOptions,
+    ExtremeZoneEpisodeSummary,
     ExtremeZoneOutcome,
     ExtremeZoneOutcomeOptions,
     FearGreedLabel,
@@ -180,6 +183,10 @@ function resolveReentryGap(reentryGap: number | undefined): number {
  *   period dependence apply). This is a description of the past, not a
  *   forecast.
  *
+ * @deprecated Use {@link summarizeExtremeZoneEpisodes}. Forward medians from a
+ *   handful of entries proved indistinguishable from random sessions
+ *   (measurement in siglens-core#256), so they read like a pattern but are
+ *   noise. Kept for backward compatibility; removed in a future major version.
  * @param history - Score history aligned to `bars`.
  * @param bars - Daily bars in chronological order.
  * @param options - Optional horizons (sessions) and minimum sample size.
@@ -211,6 +218,111 @@ export function summarizeExtremeZoneOutcomes(
             forward: horizons.map(horizon =>
                 forwardChangeStat(closes, entries, horizon, minSample)
             ),
+        };
+    });
+}
+
+/**
+ * In-zone sessions that belong to the episode starting at `start`: walking the
+ * zone's sessions before the next entry, the episode continues while each one
+ * comes within `reentryGap` sessions of the previous — the same rule that
+ * decides a new entry. A zone session after a longer gap that was not an entry
+ * (it followed a warm-up gap) does not stretch the episode.
+ */
+function episodeMemberIndices(
+    history: readonly FearGreedReading[],
+    zone: ExtremeFearGreedZone,
+    start: number,
+    stop: number,
+    reentryGap: number
+): number[] {
+    const inZone = history
+        .slice(start, stop)
+        .flatMap((point, j) => (point.label === zone ? [start + j] : []));
+    const breakAt = inZone.findIndex(
+        (i, k) => k > 0 && i - inZone[k - 1] > reentryGap
+    );
+    return breakAt === -1 ? inZone : inZone.slice(0, breakAt);
+}
+
+function buildEpisode(
+    history: readonly FearGreedReading[],
+    zone: ExtremeFearGreedZone,
+    members: readonly number[]
+): ExtremeZoneEpisode {
+    // `members[0]` is the entry, labelled `zone`, so the list is never empty. A
+    // label normally implies a score; a malformed reading without one is skipped.
+    const scores = members.flatMap(i => {
+        const score = history[i].score;
+        return score === null ? [] : [score];
+    });
+    const first = members[0];
+    const last = members[members.length - 1];
+    return {
+        startDate: history[first].date,
+        endDate: history[last].date,
+        sessionsInZone: members.length,
+        peakScore:
+            scores.length === 0
+                ? null
+                : zone === 'EXTREME_FEAR'
+                  ? Math.min(...scores)
+                  : Math.max(...scores),
+        ongoing: last === history.length - 1,
+    };
+}
+
+/**
+ * For each extreme zone, every stay in it: when it started, the last session
+ * spent there, how many sessions carried the zone label, and the most extreme
+ * score reached.
+ *
+ * - Entries follow the same rule as the zone entries elsewhere in this module:
+ *   a move into the zone from a different labelled session. A return within
+ *   `reentryGap` sessions (default 20) of the episode's last zone session is
+ *   folded into the same episode instead of starting a new one.
+ * - A zone session right after a warm-up gap (`label: null`) is not an entry —
+ *   the prior state is unknown — and, when it is further than `reentryGap`
+ *   from the previous episode, it belongs to no episode. Such sessions are left
+ *   out of every count, and `ongoing` stays `false` even if the history ends
+ *   on one.
+ * - These are recorded facts — dates, counts and scores — not price outcomes.
+ *   No returns, averages or win rates are computed. Callers own all wording and
+ *   should present the record as history, not as a signal.
+ *
+ * @param history - Score history in chronological order.
+ * @param options - Optional `reentryGap`; a value that is not a whole number ≥ 0
+ *   falls back to the default.
+ * @returns One record per extreme zone (`EXTREME_FEAR`, then `EXTREME_GREED`).
+ */
+export function summarizeExtremeZoneEpisodes(
+    history: readonly FearGreedReading[],
+    options: ExtremeZoneEpisodeOptions = {}
+): ExtremeZoneEpisodeSummary[] {
+    const reentryGap = resolveReentryGap(options.reentryGap);
+    return EXTREME_FEAR_GREED_ZONES.map(zone => {
+        const entries = zoneEntryIndices(history, zone, reentryGap);
+        const episodes = entries.map((start, k) =>
+            buildEpisode(
+                history,
+                zone,
+                episodeMemberIndices(
+                    history,
+                    zone,
+                    start,
+                    entries[k + 1] ?? history.length,
+                    reentryGap
+                )
+            )
+        );
+        return {
+            zone,
+            entryCount: entries.length,
+            medianSessionsInZone:
+                episodes.length === 0
+                    ? null
+                    : median(episodes.map(e => e.sessionsInZone)),
+            episodes: episodes.toReversed(),
         };
     });
 }
