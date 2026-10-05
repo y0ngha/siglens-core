@@ -421,7 +421,7 @@ export type {
     ForwardChangeStat,
     ExtremeZoneEpisode,
     ExtremeZoneEpisodeOptions,
-    ExtremeZoneEpisodes,
+    ExtremeZoneEpisodeSummary,
     ExtremeZoneOutcome,
     ExtremeZoneOutcomeOptions,
     FearGreedScoreGap,

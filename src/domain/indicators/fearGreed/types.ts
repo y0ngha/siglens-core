@@ -202,7 +202,7 @@ export interface ExtremeZoneEpisode {
 }
 
 /** Episode record for one extreme zone. Descriptive only — not a forecast. */
-export interface ExtremeZoneEpisodes {
+export interface ExtremeZoneEpisodeSummary {
     /** The extreme zone these episodes describe. */
     zone: ExtremeFearGreedZone;
     /** Times the history entered the zone (equals `episodes.length`). */

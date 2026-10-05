@@ -122,10 +122,6 @@
 
 ## [fix/overall-technical-cache-key-parity | 2026-09-20] — Type-surface change, cache-key parity
 
-- Violation 1 (R1 REQUIRED, fixed): PUBLIC_API.md missing dated changelog row for Tier 4 type-surface change
-  Rule: CONVENTIONS.md — Every field addition to Tier 4 OverallDependencyInputs / SubmitAnalysisOptions must have dated row in PUBLIC_API.md § 개정 이력 (prior additions of equal or smaller scope all documented)
-  Context: OverallDependencyInputs['technical'] widened by Pick<SubmitAnalysisOptions, 'priorAnalyses' | 'marketEvents'> to resolve cache-key parity. R1 finding: PUBLIC_API.md lacked changelog row; prior equal-scope additions all had one. Fixed in R1. R2: approved.
-
 - Verification result (architectural trap, single occurrence): Type narrowing via untyped spread bypasses test coverage
   Pattern: Type widening (Pick<...> field addition) flows through untyped spread (`...technicalRest`); type narrows in callee but runtime behavior unchanged. All 35 vitest tests pass both before and after the widening; only `yarn typecheck` TS2353 catches the type-level change.
   Rule (generalization): Type-only changes through untyped spreads cannot be guarded by runtime tests. When a change's mechanism is pure type narrowing through a spread, typecheck is mandatory. Failure mode: writing runtime test cases believing they protect type changes; tests pass silently through the narrowing.
@@ -173,9 +169,6 @@ Round 2: approved
   Rule: CONVENTIONS.md — loop-avoidance pattern (map/filter/find preferred over for…of)
   Context: Converted for…of with early return to .find((skill) => skill.name === patternName), aligning with codebase declarative style.
 
-- Violation 3 (APPROVED, fixed): TechnicalAssembledPrompt.patternGeometries is a Map that may not be JSON-serializable; JSDoc did not document in-process-only scope
-  Rule: MISTAKES.md Type Documentation #4 — Tier 4 public type fields require JSDoc; runtime serialization constraints must be documented
-  Context: Added JSDoc note clarifying patternGeometries is a transient in-memory Map used only during prompt generation and not included in serialized analysis results.
 
 ## [review-agent | feat/overlay-invalidation-target-levels | 2026-10-02]
 
@@ -263,9 +256,6 @@ Round 3: approved
 
 ## [Branch feat/agent-style-confluence | 2026-10-03] — Round 1 review findings
 
-- Violation 1 (required): AGENT_PROMPT_VERSION bump + prompt text/tool description change without a docs/PUBLIC_API.md revision row
-  Rule: Every agent prompt-text or tool-description change records a PUBLIC_API.md revision row (recurred from the earlier agent-analyst-voice review)
-  Context: Added the 2026-10-03 row (rule-state references removed, Writing style section, cache-prefix invariant, consumer action).
 - Violation 2 (recommended): Tool description claimed 92 or 8 means "every" condition held; the exit (8) side has no HTF/volume gate
   Rule: Model-facing descriptions must match the engine exactly (confluence.ts entry vs exit triggers)
   Context: Reworded to "the bullish or the bearish trigger conditions of the tally all held on the last bar".
@@ -350,8 +340,6 @@ Round 3: approved (comment-only fix after R2)
 - Status (R2): approved
 
 ## [PR #253 Claude review | feat/252/fear-greed-regime-stats | 2026-10-05]
-- Violation (blocker, fixed): public Tier 4 type fields without per-field JSDoc (`ExtremeZoneOutcome.zone`, `FearGreedScoreGap.symbolScore/marketScore`)
-  Rule: MISTAKES Documentation Sync 4.8 — every field of a public type gets a one-line JSDoc
 - Violation (blocker, fixed): `!Number.isFinite(change)` guard had no test that only it could satisfy
   Rule: MISTAKES Tests 5.5 — each guard needs a case that fails when the guard is removed (NaN close)
 - Change (author, not from review): re-entry gap (default 20 sessions) — live data showed boundary flip-flops inflating entry counts with overlapping windows
@@ -378,3 +366,14 @@ Round 3: approved (comment-only fix after R2)
 - Violation: public JSDoc for a new aggregation omitted an edge case (zone sessions after a warm-up gap belong to no episode, so ongoing stays false) that only a test documented
 - Rule: (new) Every input case that is silently excluded from a public function result must be stated in its JSDoc, the field docs it affects, and PUBLIC_API.md — not only in a test
 - Context: summarizeExtremeZoneEpisodes in domain/indicators/fearGreed/regimeStats.ts
+
+## [PR #257 | feat/256/극단-구간-기록-집계 | 2026-10-05]
+- Violation: @deprecated placed before description bullets, so TSDoc folded the whole description into the deprecation note
+- Rule: (new) Put @deprecated at the end of the description, right before @param/@returns
+- Context: summarizeExtremeZoneOutcomes JSDoc in regimeStats.ts
+- Violation: two new public types differing by one letter (ExtremeZoneEpisode / ExtremeZoneEpisodes)
+- Rule: (new) New public type names must differ by more than a plural suffix; rename before the first release
+- Context: renamed ExtremeZoneEpisodes → ExtremeZoneEpisodeSummary
+- Violation: measurement numbers duplicated into a JSDoc that must be kept in sync with the issue
+- Rule: MISTAKES Documentation Sync 3
+- Context: @deprecated body now states the conclusion and links #256

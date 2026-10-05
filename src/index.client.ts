@@ -434,7 +434,7 @@ export type {
     ExtremeFearGreedZone,
     ExtremeZoneEpisode,
     ExtremeZoneEpisodeOptions,
-    ExtremeZoneEpisodes,
+    ExtremeZoneEpisodeSummary,
     ExtremeZoneOutcome,
     ExtremeZoneOutcomeOptions,
     ForwardChangeStat,

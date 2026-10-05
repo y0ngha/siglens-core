@@ -3,7 +3,7 @@ import type {
     ExtremeFearGreedZone,
     ExtremeZoneEpisode,
     ExtremeZoneEpisodeOptions,
-    ExtremeZoneEpisodes,
+    ExtremeZoneEpisodeSummary,
     ExtremeZoneOutcome,
     ExtremeZoneOutcomeOptions,
     FearGreedLabel,
@@ -165,14 +165,6 @@ function resolveReentryGap(reentryGap: number | undefined): number {
  * For each extreme zone, how many times the history entered it and how the
  * close moved over the following sessions.
  *
- * @deprecated Use {@link summarizeExtremeZoneEpisodes}. Measured on 20
- * instruments over five years of daily bars (siglens-core#256), the forward
- * medians were indistinguishable from medians of the same number of random
- * sessions: 10 of 117 cells had p < 0.10 against a random-draw null, about what
- * chance alone gives, with signs flipping across instruments and horizons. A
- * median of 5–15 entries reads like a pattern but is noise. Kept for backward
- * compatibility; it will be removed in a future major version.
- *
  * - `history` must be **index-aligned** with `bars` (same length, `history[i]`
  *   describes `bars[i]`) — exactly what `computeFearGreedHistory(bars, …)`
  *   returns. A length mismatch returns an empty array rather than guessing an
@@ -191,6 +183,10 @@ function resolveReentryGap(reentryGap: number | undefined): number {
  *   period dependence apply). This is a description of the past, not a
  *   forecast.
  *
+ * @deprecated Use {@link summarizeExtremeZoneEpisodes}. Forward medians from a
+ *   handful of entries proved indistinguishable from random sessions
+ *   (measurement in siglens-core#256), so they read like a pattern but are
+ *   noise. Kept for backward compatibility; removed in a future major version.
  * @param history - Score history aligned to `bars`.
  * @param bars - Daily bars in chronological order.
  * @param options - Optional horizons (sessions) and minimum sample size.
@@ -255,21 +251,23 @@ function buildEpisode(
     members: readonly number[]
 ): ExtremeZoneEpisode {
     // `members[0]` is the entry, labelled `zone`, so the list is never empty. A
-    // label normally implies a score; a malformed reading without one is skipped
-    // rather than turned into `Infinity` by an empty `Math.min`.
+    // label normally implies a score; a malformed reading without one is skipped.
     const scores = members.flatMap(i => {
         const score = history[i].score;
         return score === null ? [] : [score];
     });
-    const peak =
-        zone === 'EXTREME_FEAR' ? Math.min(...scores) : Math.max(...scores);
     const first = members[0];
     const last = members[members.length - 1];
     return {
         startDate: history[first].date,
         endDate: history[last].date,
         sessionsInZone: members.length,
-        peakScore: scores.length === 0 ? null : peak,
+        peakScore:
+            scores.length === 0
+                ? null
+                : zone === 'EXTREME_FEAR'
+                  ? Math.min(...scores)
+                  : Math.max(...scores),
         ongoing: last === history.length - 1,
     };
 }
@@ -300,7 +298,7 @@ function buildEpisode(
 export function summarizeExtremeZoneEpisodes(
     history: readonly FearGreedReading[],
     options: ExtremeZoneEpisodeOptions = {}
-): ExtremeZoneEpisodes[] {
+): ExtremeZoneEpisodeSummary[] {
     const reentryGap = resolveReentryGap(options.reentryGap);
     return EXTREME_FEAR_GREED_ZONES.map(zone => {
         const entries = zoneEntryIndices(history, zone, reentryGap);
