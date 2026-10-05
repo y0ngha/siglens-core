@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.10.0](https://github.com/y0ngha/siglens-core/compare/v2.9.0...v2.10.0) (2026-10-05)
+
+### Features
+
+* 공포·탐욕 지수를 5년 일봉 기준으로 계산 ([#255](https://github.com/y0ngha/siglens-core/issues/255)) ([f5b1cbd](https://github.com/y0ngha/siglens-core/commit/f5b1cbdc19d27dfaa4dcced9b9e67177c868702a))
+
 # [2.9.0](https://github.com/y0ngha/siglens-core/compare/v2.8.1...v2.9.0) (2026-10-04)
 
 ### Features
