@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.12.0](https://github.com/y0ngha/siglens-core/compare/v2.11.0...v2.12.0) (2026-10-05)
+
+### Bug Fixes
+
+* 분석 캐시 만료를 시장 세션별로 하고, 뉴스 동인 문장이 입력을 가리키지 않게 한다 ([#258](https://github.com/y0ngha/siglens-core/issues/258)) ([c3565bf](https://github.com/y0ngha/siglens-core/commit/c3565bf80de3f02280c234829f3bbeca1570b5fb))
+
 # [2.11.0](https://github.com/y0ngha/siglens-core/compare/v2.10.0...v2.11.0) (2026-10-05)
 
 ### Features
