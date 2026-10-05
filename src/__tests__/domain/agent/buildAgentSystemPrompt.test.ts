@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { AGENT_FOLLOW_UP_MARKER } from '@/domain/agent/agentFollowUps';
 import {
     AGENT_PROMPT_VERSION,
     buildAgentSystemPrompt,
@@ -182,10 +183,10 @@ describe('buildAgentSystemPrompt', () => {
 
     it.each([
         ['get_news', 'If get_news returns nothing useful'],
-        ['get_bars_indicators', 'reflect its confluence reading'],
+        ['get_bars_indicators', 'reflect how many indicator groups agree'],
         [
             'get_bars_indicators',
-            'Washout reading: when a get_bars_indicators result carries a pullback',
+            'Short-term sell-off reading: when a get_bars_indicators result carries a pullback',
         ],
         ['get_quote', 'quoteDelayMinutes is greater than 0'],
         ['run_fresh_analysis', 'call run_fresh_analysis right away'],
@@ -257,7 +258,7 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'offering two or three concrete ways to go deeper'
         );
-        expect(prompt).toContain('do not print the confluence score');
+        expect(prompt).toContain('do not print the agreement score');
         expect(prompt).toContain(
             'Name at most two or three indicators in the whole answer'
         );
@@ -277,6 +278,58 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('is not a tool result');
     });
 
+    /**
+     * 사용자 결정 2026-09-19(항상 더 깊게 볼 선택지를 제안한다)는 유지하되,
+     * 제안을 본문 문장("더 깊게 볼까요? ① ② ③")이 아니라 마지막 줄의
+     * `[[followups]] A | B | C` 마커로 옮긴다(UX audit 2026-10-05 §E5-d).
+     * 앱이 마커 줄을 버튼으로 바꾸고 본문에서는 감춘다.
+     */
+    it('깊게 볼 선택지를 마지막 줄 [[followups]] 마커로 내놓게 한다 (기본 2~3개, Detailed 1개)', () => {
+        expect(prompt).toContain(
+            `the marker line "${AGENT_FOLLOW_UP_MARKER} A | B | C"`
+        );
+        expect(prompt).toContain(
+            'It is the very last line of the whole answer'
+        );
+        expect(prompt).toContain('no numbered menu in the answer body');
+
+        // 출처 줄은 마커 줄보다 앞, 마커 줄이 답변 전체의 마지막 줄이다.
+        expect(prompt).toContain(
+            'the source line (Korean example: "(출처: …)") and every other part come before it, and nothing — not even the source line — comes after it'
+        );
+        expect(prompt).toContain(
+            'It stays the very last line, after the source line.'
+        );
+        expect(prompt).toContain(
+            `End with one final marker line "${AGENT_FOLLOW_UP_MARKER} A" offering a single deeper next step`
+        );
+        // 옛 본문 메뉴 문구는 더 이상 예시로 남지 않는다.
+        expect(prompt).not.toContain('더 깊게 볼까요? ①');
+        expect(AGENT_FOLLOW_UP_MARKER).toBe('[[followups]]');
+    });
+
+    /**
+     * 에이전트가 "컨플루언스 점수는 47/100"을 그대로 써 버렸다. 도구 결과 필드명과
+     * 프롬프트의 내부 용어는 답변에 쓰지 않고, 지시문도 그 단어를 쓰라고 하지 않는다.
+     */
+    it('내부 라벨(rule engine·confluence·washout·x/100)을 답변에 쓰지 못하게 하고, 지시문은 그 단어를 쓰라고 하지 않는다', () => {
+        expect(prompt).toContain('- Internal labels: ');
+        expect(prompt).toContain(
+            'Never write them, and never quote an "x/100" or "x / 100" agreement score.'
+        );
+        expect(prompt).not.toContain('reflect its confluence reading');
+        expect(prompt).not.toContain('state the score');
+        expect(prompt).not.toContain('next to the confluence reading');
+        expect(prompt).not.toContain('Washout reading:');
+        // 금지 규칙 줄과 사용자 용어 인식 목록(컨플루언스)을 뺀 지시 줄에는 라벨이 없어야 한다.
+        const offenders = prompt
+            .split('\n')
+            .filter(line => !line.startsWith('- Internal labels: '))
+            .filter(line => /rule engine|confluence|washout/i.test(line))
+            .filter(line => !/washoutInUptrend|washoutBelowMa200/.test(line));
+        expect(offenders).toEqual([]);
+    });
+
     it('버전 상수는 날짜 형식', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
@@ -287,7 +340,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-03.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-05.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -295,7 +348,7 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'about a symbol → get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
         );
-        expect(prompt).toContain('reflect its confluence reading');
+        expect(prompt).toContain('reflect how many indicator groups agree');
         // 컨플루언스는 예측이 아니라 서술용 집계다 — 측정된 우위가 없다(2026-09-25 재측정).
         expect(prompt).toContain(
             'not a forecast (it has no measured forward edge)'
@@ -438,7 +491,7 @@ describe('buildAgentSystemPrompt', () => {
         // Positive wording, qualifier once: a "never call it a buy/sell rule"
         // line made the model write "not a buy/sell rule" disclaimers.
         expect(prompt).toContain(
-            'describe it as how far the indicator families agree, and say once in the answer that it is a rule-based tally, not a forecast'
+            'how far the indicator families agree, never printing its 0–100 score, and say once in the answer that it is a rule-based tally, not a forecast'
         );
         expect(prompt).not.toMatch(/buy or sell rule/);
         expect(prompt).toContain('Higher timeframe:');
@@ -458,7 +511,7 @@ describe('buildAgentSystemPrompt', () => {
         );
         // The contrast ban must not fight the required caveat / tally qualifier.
         expect(prompt).toContain(
-            'The one-line caveat and the once-per-answer tally qualifier the confluence rule asks for are required wording, not rhetorical contrast.'
+            'The one-line caveat and the once-per-answer tally qualifier the indicator-agreement rule asks for are required wording, not rhetorical contrast.'
         );
         expect(prompt).toContain('not "매수 규칙 미충족" / "buy rule not met"');
         // Raw enum labels and underscore ids leaked into Korean answers.

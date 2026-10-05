@@ -1198,7 +1198,7 @@ export const PRO_RELIABILITY_NOTE = {
     bollingerPctB:
         '{signal: daily short mean-reversion — modest measured edge; require confirmation}',
     advisory:
-        '{advisory: no standalone forward-edge measured — use as confluence/context only}',
+        '{advisory: no standalone forward-edge measured — use as context only}',
     impulse:
         '{permission gate: green = longs only, red = shorts only, blue = both allowed}',
     chandelier: '{risk context: trailing stop / trend regime — not an entry}',
@@ -1236,7 +1236,7 @@ const VERDICT_LABEL: Record<RegimeVerdict, string> = {
     trending: 'trending (favour trend-following; do not fade)',
     'mean-reverting':
         'mean-reverting (favour fade/reversion; be wary of breakouts)',
-    random: 'near-random (low directional conviction; demand stronger confluence)',
+    random: 'near-random (low directional conviction; demand stronger independent confirmation)',
 };
 
 // Classify each regime tool into a vote, then combine: any decisive disagreement
@@ -1278,7 +1278,7 @@ export const REGIME_CONTEXT_SECTION_HEADER = '## Market Regime & Risk Context';
 /** @internal Section header — exported so tests reference the exact string. */
 export const INDICATOR_VALUES_SECTION_HEADER = '## Indicator Values';
 /** @internal Section header — exported so tests reference the exact string. */
-export const PRO_INDICATOR_SECTION_HEADER = '## Pro-Indicator Confluence';
+export const PRO_INDICATOR_SECTION_HEADER = '## Pro-Indicator Agreement';
 
 const REGIME_INSUFFICIENT_DATA_LINE =
     '- Regime: insufficient data (regime indicators still in warm-up)';
@@ -1708,13 +1708,14 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         // current chart state, its detailed interpretation is simply not in this prompt — that is the
         // intended behavior, not a regression.
         '',
-        '### Confluence Assessment',
-        '- The indicator tally in ## Deterministic Metrics is computed by a rule engine, not by you. Do not recount it, restate it with a different number, or substitute your own category count.',
+        '### Indicator Agreement Assessment',
+        '- Section names and engine labels in ## Deterministic Metrics (the tally, its Reliability line, Short-term sell-off check, any "x / 100" score) are internal. In every output field describe what they measure in plain trading language; never write the words "rule engine", "confluence", or "washout", and never quote an "x / 100" score.',
+        '- The indicator tally in ## Deterministic Metrics is computed, not judged by you. Do not recount it, restate it with a different number, or substitute your own category count.',
         '- Cite its signal list as the evidence in keyLevels reasoning and in the summary — name the signals, not just the score.',
-        '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the confluence is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
-        '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the rule engine abstained.',
+        '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the signal is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
+        '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the automatic indicator tally could not be measured and the read rests on your own judgment of the indicators.',
         '- The tally is descriptive (read its Reliability line): cite it as how many indicator families agree, never as the reason for a verdict on its own.',
-        "- When ## Deterministic Metrics shows a Short-Term Washout reading other than none, state it next to the tally with its Measured line, and say plainly that a bearish tally is that reading's normal state rather than evidence against it.",
+        "- When ## Deterministic Metrics shows a Short-term sell-off check reading other than none, state it next to the tally with its Measured line, describing it as a short-term sell-off that has run its course rather than naming the label, and say plainly that a bearish tally is that reading's normal state rather than evidence against it.",
         '',
         '### Indicator State',
         '- ## Indicator State is computed; do not re-derive these comparisons. Every line below already holds the answer — cite it, never recompute it, and never contradict it:',
@@ -1738,7 +1739,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- When a level is broken, say the price moved past that level — not that it reached the next one (falling below the 38.2% retracement means the retracement is deeper than 38.2%, not 61.8%).',
         '',
         '### Conflicting Signals',
-        '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has stronger confluence.',
+        '- When indicators give conflicting signals (e.g. RSI overbought but MACD bullish cross), list each signal individually and then state which side has more independent indicator groups agreeing.',
         '- Weight signals by the number of confirming indicators and the strength of each signal.',
         '- Mention the conflict explicitly in the summary so the user understands the mixed picture.',
         '',
@@ -1765,20 +1766,20 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '7. CONCLUDE: "What is happening with this stock and what does it mean for the investor?"',
         '- Use \\n\\n between topic paragraphs. Never write a single long paragraph.',
         '- Prefer 3 to 5 short paragraphs. Each paragraph should cover one context: trend, signals, levels, risk, investor takeaway.',
-        '- If signals conflict, state the mixed picture and which side has stronger confluence.',
+        '- If signals conflict, state the mixed picture and which side has more independent indicator groups agreeing.',
         '',
         '### Action Recommendation Decision Tree',
         '- Framing (see CORE PRINCIPLES → Descriptive, not prescriptive): this section maps price levels into a conditional plan. Describe the plan as structure and conditions, never as an instruction to the reader. Write "이 구간을 회복하기 전까지 구조는 유효하지 않습니다" or "손절 기준으로 삼는 자리는 122,000원입니다", not "사는 편이 낫습니다"/"기다리세요"/"나눠서 매수하세요". The entryRecommendation enum carries the verdict; the prose carries the reasoning.',
         '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
         '- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly.',
         '- Step 1 — Determine entryRecommendation (in this order):',
-        '  - Washout path first: when ## Deterministic Metrics prints "Entry verdict (rule engine): enter — washout path", entryRecommendation is "enter". Copy it; do not re-judge it and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the washout close itself. A sub-1.0 structural ratio, a bearish tally, an unmet confluence entry rule, a met exit rule, a red Elder Impulse and a short-term downtrend are that reading\'s normal state: name them as risks in the prose, never as reasons to change the verdict.',
-        '  - When the washout block prints "Entry verdict (rule engine): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the washout base rate as support.',
+        '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", entryRecommendation is "enter". Copy it; do not re-judge it and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A sub-1.0 structural ratio, a bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading\'s normal state: name them as risks in the prose, never as reasons to change the verdict.',
+        '  - When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.',
         '  - "enter" (other charts): price near support + risk level not high.',
-        '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a near-washout reading.',
-        '  - "avoid": price extended from support, strong resistance overhead, or risk high. A bearish indicator tally alone is not a reason for "avoid" — it has no measured forward edge, and it is the normal state of a short-term washout.',
-        '  - Outside the washout path, before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met confluence entry rule does not override this — the two were measured to be inversely related.',
-        '  - The confluence entry and exit rules are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.',
+        '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a reading that is close to a sharp short-term sell-off inside a longer-term uptrend.',
+        '  - "avoid": price extended from support, strong resistance overhead, or risk high. A bearish indicator tally alone is not a reason for "avoid" — it has no measured forward edge, and it is the normal state of a sharp short-term sell-off inside a longer-term uptrend.',
+        '  - Outside the short-term sell-off path, before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met indicator-agreement entry condition does not override this — the two were measured to be inversely related.',
+        '  - The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.',
         '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a description of what bounds the risk and the reward (no ratio — see Step 3 riskReward rule) — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
         '- Step 2 — Compute prices:',
         '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
@@ -1925,14 +1926,14 @@ const buildAnalysisRequest = (
                   '  3. Each signal\'s `type` MUST be exactly "skill".',
                   '  4. The description field MUST be written in Korean and MUST include the indicator name and specific numeric condition (e.g., "RSI 72.5 — 과매수 임계선에 근접, 단기 조정 가능").',
                   '- Signal strength calibration:',
-                  '  - strong: value is in an extreme zone (e.g., RSI > 80 or < 20, Stochastic > 90 or < 10, CCI > +200 or < -200) OR multiple indicators confirm the same direction with high confluence',
+                  '  - strong: value is in an extreme zone (e.g., RSI > 80 or < 20, Stochastic > 90 or < 10, CCI > +200 or < -200) OR multiple independent indicator groups confirm the same direction',
                   '  - moderate: value is in a standard overbought/oversold zone (e.g., RSI 70–80, Stochastic 80–90, CCI ±100–200) with single-indicator confirmation',
                   '  - weak: value is approaching a threshold but has not yet crossed, or the signal conflicts with the prevailing trend',
                   '- Signal trend assignment:',
                   '  - bullish: the indicator signal suggests upward price movement (e.g., RSI recovering from oversold, MACD golden cross, price above key moving average)',
                   '  - bearish: the indicator signal suggests downward price movement (e.g., RSI entering overbought, MACD death cross, price below key moving average)',
                   '  - neutral: the indicator is in a range-bound or indeterminate state with no clear directional bias',
-                  '- When the Key Combinations section of a guide identifies a multi-indicator confluence that is currently active, increase the strength by one level AND note the confluence in the description field.',
+                  '- When the Key Combinations section of a guide identifies a multi-indicator combination that is currently active, increase the strength by one level AND name that combination of indicators in the description field.',
                   "- Respect each guide's Caveats section: do not generate a signal if the caveats indicate it would be unreliable in the current market context (e.g., Stochastic overbought in a strong uptrend with ADX > 25 should not automatically produce a bearish signal).",
                   '- If no signal conditions are met for a given indicator guide, simply omit that guide from indicatorResults. Do not create placeholder or empty entries.',
                   '',
@@ -1967,7 +1968,7 @@ const buildAnalysisRequest = (
                   '- The reference pivot and Fibonacci levels are advisory context, not a mandate. When relevant, assess which levels the current price is nearest to and which are acting as support or resistance.',
                   '- For Fibonacci Extension levels, consider them for take-profit assessment when they fit your read of the chart.',
                   '- You may add reference pivot/Fibonacci levels to the keyLevels field as support/resistance entries with their basis (e.g. "Standard pivot R1", "Fib 61.8% retracement") as the reason — or derive your own from patterns, SMC, and volume.',
-                  '- When a Fibonacci level or pivot point converges with an existing indicator-based support/resistance level, note the confluence in the reason field as one piece of supporting evidence.',
+                  '- When a Fibonacci level or pivot point converges with an existing indicator-based support/resistance level, name the converging levels in the reason field as one piece of supporting evidence.',
                   '- Include relevant support/resistance tool findings in the summary field, explaining their practical meaning for the investor.',
                   '',
                   'Support/Resistance tool list to apply:',

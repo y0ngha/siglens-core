@@ -133,6 +133,91 @@ describe('runMacroBriefing', () => {
         });
     });
 
+    describe('regime은 코드가 정한 값으로 덮어쓴다 (UX audit 2026-10-05)', () => {
+        const SLOWDOWN_SNAP: EconomySnapshot = {
+            indicators: [
+                {
+                    name: 'totalNonfarmPayroll',
+                    latest: { date: '2026-09-01', value: 158_990 },
+                    previous: { date: '2026-08-01', value: 159_015 },
+                    trend: [],
+                },
+            ],
+            treasury: null,
+            calendar: [],
+        };
+
+        it('모델이 expansion을 써도 done 결과와 캐시에 쓰는 값 모두 계산된 slowdown이다', async () => {
+            mockCallBriefingAi.mockResolvedValue(
+                JSON.stringify({ ...mockBriefingRaw, regime: 'expansion' })
+            );
+            const result = await runMacroBriefing(SLOWDOWN_SNAP);
+
+            expect(result.status).toBe('done');
+            expect(result.briefing.regime).toBe('slowdown');
+            expect(result.briefing.summary).toBe(mockBriefingRaw.summary);
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    briefing: expect.objectContaining({ regime: 'slowdown' }),
+                }),
+                MACRO_BRIEFING_CACHE_TTL
+            );
+        });
+
+        it('프롬프트에 계산된 regime 줄이 들어간다', async () => {
+            await runMacroBriefing(SLOWDOWN_SNAP);
+            const call = mockCallBriefingAi.mock.calls[0][0] as {
+                prompt: string;
+            };
+            expect(call.prompt).toContain(
+                'Regime (computed): slowdown — because: payrolls shrinking'
+            );
+        });
+
+        it('캐시 히트로 돌려주는 값도 같은 규칙으로 맞춘다 (옛 항목이 다른 regime을 담고 있어도)', async () => {
+            mockCacheGet.mockResolvedValueOnce({
+                briefing: {
+                    summary: '캐시된 브리핑',
+                    highlights: [],
+                    regime: 'expansion',
+                },
+                generatedAt: '2026-08-02T09:00:00.000Z',
+            });
+            const result = await runMacroBriefing(SLOWDOWN_SNAP);
+
+            expect(result.status).toBe('cached');
+            expect(result.briefing.regime).toBe('slowdown');
+            expect(mockCallBriefingAi).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('캐시 키 날짜 버킷 (UX audit 2026-10-05 §C1)', () => {
+        const keyUsedAt = async (iso: string): Promise<string> => {
+            vi.setSystemTime(new Date(iso));
+            mockCacheGet.mockClear();
+            await runMacroBriefing(SNAP);
+            return mockCacheGet.mock.calls[0][0] as string;
+        };
+
+        it('같은 UTC 날짜 안에서는 시간이 달라도 같은 키를 쓴다', async () => {
+            const morning = await keyUsedAt('2026-08-02T00:05:00.000Z');
+            const night = await keyUsedAt('2026-08-02T23:55:00.000Z');
+            expect(morning).toBe(night);
+            expect(morning).toContain('briefing:macro:2026-08-02:');
+        });
+
+        it('다음 UTC 날짜가 되면 다른 키를 쓴다', async () => {
+            const today = await keyUsedAt('2026-08-02T23:55:00.000Z');
+            const tomorrow = await keyUsedAt('2026-08-03T00:05:00.000Z');
+            expect(tomorrow).not.toBe(today);
+        });
+
+        it('TTL은 하루다', () => {
+            expect(MACRO_BRIEFING_CACHE_TTL).toBe(86_400);
+        });
+    });
+
     describe('캐시 프로바이더 없음', () => {
         it('cache provider null이면 조회 건너뛰고 LLM을 호출한다', async () => {
             mockCreateCacheProvider.mockReturnValueOnce(null);

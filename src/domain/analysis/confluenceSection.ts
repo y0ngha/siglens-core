@@ -6,9 +6,9 @@ import {
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import {
+    confluenceFamilyWeight,
     evaluateConfluence,
     isExpectedSignal,
-    scoreConfluence,
     signalFamily,
     CONFLUENCE_MIN_BARS,
     type ConfluenceSnapshot,
@@ -163,6 +163,20 @@ function describeSignal(type: string): string {
         : `${type}(${family})`;
 }
 
+/** Decimal places for the weighted family count (half-weight members make `.5`). */
+const FAMILY_COUNT_DECIMALS = 1;
+
+/** Weighted count of distinct indicator families, at most one decimal (`2.5`, `3`). */
+function familyCount(types: readonly string[], expectedWeight: number): string {
+    return String(
+        Number(
+            confluenceFamilyWeight(types, expectedWeight).toFixed(
+                FAMILY_COUNT_DECIMALS
+            )
+        )
+    );
+}
+
 function signalLine(label: string, types: readonly string[]): string {
     return types.length === 0
         ? `${label}: none`
@@ -191,7 +205,7 @@ function formatConfluence(
               })`;
 
     return [
-        `### Indicator Confluence (rule engine, ${timeframe} bars)`,
+        `### Indicator Agreement (computed, ${timeframe} bars)`,
         signalLine('Bullish signals', snapshot.bullish),
         signalLine('Bearish signals', snapshot.bearish),
         signalLine('Newly lit on this bar (bullish)', snapshot.freshBullish),
@@ -203,7 +217,9 @@ function formatConfluence(
         `Exit rule (>= ${params.exitMin} weighted bearish families, >= 1 newly lit, close below SMA50): ${
             snapshot.exitTrigger ? 'MET' : 'not met'
         }`,
-        `Confluence score: ${scoreConfluence(snapshot)} / 100 (50 is neutral)`,
+        // No 0-100 score: the model quoted it ("47/100") as if it were a finding. The two
+        // weighted group counts carry the same direction in a form that reads as what it is.
+        `Agreeing indicator groups (weighted, a half-weight member counts 0.5): ${familyCount(snapshot.bullish, params.expectedWeight)} bullish vs ${familyCount(snapshot.bearish, params.expectedWeight)} bearish`,
         `Reliability: ${CONFLUENCE_RELIABILITY[timeframe]}`,
         // Families, not indicator names, are what the count is over. Without this line the
         // model sees four RSI-derived rows elsewhere in the prompt and reasonably reads
@@ -212,7 +228,7 @@ function formatConfluence(
     ];
 }
 
-const PULLBACK_HEADER = '### Short-Term Washout (rule engine, 1Day bars)';
+const PULLBACK_HEADER = '### Short-term sell-off check (computed, 1Day bars)';
 
 /**
  * The verdict for the washout reading, decided here rather than by the model.
@@ -289,7 +305,7 @@ export function newsDrivenWashoutEvent(
 }
 
 const WASHOUT_ENTRY_VERDICT =
-    'Entry verdict (rule engine): enter — washout path. Copy "enter" into actionRecommendation.entryRecommendation; do not re-judge it. The entry reference is the snapshot close area, the exit reference is MA5 (or about 10 trading days), and the prose names the downside risks and where the reading fails (a close under MA200). No confirmation candle is required.';
+    'Entry verdict (computed): enter — sell-off path. Copy "enter" into actionRecommendation.entryRecommendation; do not re-judge it. The entry reference is the snapshot close area, the exit reference is MA5 (or about 10 trading days), and the prose names the downside risks and where the reading fails (a close under MA200). No confirmation candle is required.';
 
 /**
  * The suspended verdict names the event itself rather than pointing at `## Market Events`:
@@ -297,16 +313,16 @@ const WASHOUT_ENTRY_VERDICT =
  * same-session article this gate exists to catch can be absent from it.
  */
 const washoutNewsVerdict = (event: MarketEvent): string =>
-    `Entry verdict (rule engine): none — a ${event.impact}-impact ${event.category} event (${event.sentiment}, published ${event.publishedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC) landed within the last ${WASHOUT_NEWS_LOOKBACK_SESSIONS} sessions. The measured washout history does not cover news-driven drops, which were its largest failures. Judge entryRecommendation yourself from the event and the chart, and say that the washout base rate does not apply to this drop.`;
+    `Entry verdict (computed): none — a ${event.impact}-impact ${event.category} event (${event.sentiment}, published ${event.publishedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC) landed within the last ${WASHOUT_NEWS_LOOKBACK_SESSIONS} sessions. The measured sell-off history does not cover news-driven drops, which were its largest failures. Judge entryRecommendation yourself from the event and the chart, and say that the sell-off base rate does not apply to this drop.`;
 
 const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
     washoutInUptrend:
-        'washout in an uptrend — close above MA200 and Williams %R(14) at or below -90',
+        'sell-off in an uptrend — close above MA200 and Williams %R(14) at or below -90',
     nearWashoutInUptrend:
-        'near washout in an uptrend — close above MA200 and Williams %R(14) between -90 and -80',
+        'near sell-off in an uptrend — close above MA200 and Williams %R(14) between -90 and -80',
     washoutBelowMa200:
-        'washout below MA200 — Williams %R(14) at or below -90 with the close at or under MA200',
-    none: 'none — no short-term washout on this bar',
+        'sell-off below MA200 — Williams %R(14) at or below -90 with the close at or under MA200',
+    none: 'none — no short-term sell-off on this bar',
 };
 
 /**
@@ -326,7 +342,7 @@ function formatPullback(
         PULLBACK_HEADER,
         `Close ${formatNullableNumber(snapshot.close, priceDp)} vs MA200 ${formatNullableNumber(snapshot.ma200, priceDp)} (${formatNullableNumber(snapshot.closeVsMa200Pct)}%, ${side})`,
         `Williams %R(14): ${formatNullableNumber(snapshot.williamsR)} / RSI(2): ${formatNullableNumber(snapshot.rsi2)}`,
-        `Exit reference MA5: ${formatNullableNumber(snapshot.ma5, priceDp)} — the measured washout is treated as resolved on the first daily close above it, or after about 10 trading days`,
+        `Exit reference MA5: ${formatNullableNumber(snapshot.ma5, priceDp)} — the measured sell-off is treated as resolved on the first daily close above it, or after about 10 trading days`,
         `Reading: ${PULLBACK_READING_TEXT[snapshot.reading]}`,
     ];
     if (snapshot.reading === 'none') return lines;
@@ -360,7 +376,7 @@ function formatPullbackSection(
           )
         : [
               PULLBACK_HEADER,
-              `Not measurable: the reading needs ${PULLBACK_TREND_MA_PERIOD} daily bars for MA200 and received ${bars.length}. This is an absence of measurement, not an absence of a washout.`,
+              `Not measurable: the reading needs ${PULLBACK_TREND_MA_PERIOD} daily bars for MA200 and received ${bars.length}. This is an absence of measurement, not an absence of a sell-off.`,
           ];
 }
 
@@ -443,7 +459,7 @@ function formatRiskReward(
 
     const verdict =
         ratio < 1
-            ? 'Below 1.0: the nearest obstacle above is closer than the nearest support below. Outside the washout path, entering here risks more than the next move offers.'
+            ? 'Below 1.0: the nearest obstacle above is closer than the nearest support below. Outside the sell-off path, entering here risks more than the next move offers.'
             : 'At or above 1.0: there is more room to the next obstacle above than to the support below.';
 
     return [
@@ -454,7 +470,7 @@ function formatRiskReward(
         `Structural risk:reward from current price = ${fmtRatio(ratio)}`,
         verdict,
         // The correlation is the part the model cannot infer from the ratio alone.
-        'Measured downstream: analyses with the strongest indicator agreement carried the WORST ratios (median 0.00 in the highest score band, 1.27 in a middling one). Outside the washout path, strong confluence plus a sub-1.0 ratio is a reason to set entryRecommendation to "wait" and name a pullback level, not a reason to enter. On a washout in an uptrend the nearest levels sit a bar or two away on both sides, so this ratio is not the measured edge and does not override the washout verdict.',
+        'Measured downstream: analyses with the strongest indicator agreement carried the WORST ratios (median 0.00 in the highest agreement band, 1.27 in a middling one). Outside the sell-off path, strong indicator agreement plus a sub-1.0 ratio is a reason to set entryRecommendation to "wait" and name a pullback level, not a reason to enter. On a sell-off in an uptrend the nearest levels sit a bar or two away on both sides, so this ratio is not the measured edge and does not override the sell-off verdict.',
     ];
 }
 
@@ -494,8 +510,8 @@ export function formatDeterministicMetricsSection(
         snapshot !== null
             ? formatConfluence(snapshot, timeframe, priceDp)
             : [
-                  `### Indicator Confluence (rule engine, ${timeframe} bars)`,
-                  `Not measurable: the rule needs more than ${CONFLUENCE_MIN_BARS} bars and received ${bars.length}. This is an absence of measurement, not an absence of confluence — judge the indicators yourself for this chart.`,
+                  `### Indicator Agreement (computed, ${timeframe} bars)`,
+                  `Not measurable: the check needs more than ${CONFLUENCE_MIN_BARS} bars and received ${bars.length}. This is an absence of measurement, not an absence of agreement — judge the indicators yourself for this chart.`,
               ];
 
     const pullback = formatPullbackSection(bars, timeframe, priceDp, events);
@@ -503,7 +519,7 @@ export function formatDeterministicMetricsSection(
 
     return [
         DETERMINISTIC_METRICS_HEADER,
-        'Computed by a rule engine from the same bars given to you. These are arithmetic facts about this chart — cite them, do not recompute or override them.',
+        'Computed from the same bars given to you. These are arithmetic facts about this chart — cite them, do not recompute or override them.',
         ...confluence,
         ...pullback,
         ...riskReward,

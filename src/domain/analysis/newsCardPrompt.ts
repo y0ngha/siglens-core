@@ -100,7 +100,7 @@ export function buildNewsCardAnalysisPrompt(
      * supply them itself. This rule says: report the gap instead of filling it.
      */
     const truncationRule = item.bodyTruncated
-        ? "- The article body below is an EXCERPT cut off mid-article — the rest was never provided. Summarise only what the excerpt actually states. Do not infer or invent figures, guidance, outcomes, or conclusions from the part you cannot see, and do not present the excerpt's opening framing as the article's conclusion. If the excerpt stops before the point is resolved, say so plainly in summaryKo rather than guessing."
+        ? "- The article body below is an EXCERPT cut off mid-article — the rest was never provided. Summarise only what the excerpt actually states. Do not infer or invent figures, guidance, outcomes, or conclusions from the part you cannot see, and do not present the excerpt's opening framing as the article's conclusion. If the excerpt stops before the point is resolved, end summaryKo by noting that the article's later details are not available rather than guessing; never mention an excerpt, a body, or provided text in summaryKo."
         : '';
 
     const bodyRule = echoSource

@@ -4613,15 +4613,101 @@ describe('prompt', () => {
     describe('Confluence Assessment 가이드라인', () => {
         const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
 
-        it('defers the tally to the rule engine instead of asking the model to count', () => {
+        // UX audit 2026-10-05 §C6: 모델이 "룰 엔진", "washout", "x / 100"을 사용자
+        // 문장에 그대로 옮겨 적었다. 내부 라벨은 설명하되 이름으로 쓰지 못하게 한다.
+        it('tells the model that engine labels are internal and must not appear in output', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
                 bars,
                 makeIndicators()
             );
-            expect(result).toContain('### Confluence Assessment');
-            expect(result).toContain('computed by a rule engine, not by you');
+            expect(result).toContain(
+                'are internal. In every output field describe what they measure in plain trading language; never write the words "rule engine", "confluence", or "washout", and never quote an "x / 100" score.'
+            );
+        });
+
+        /**
+         * The model echoes whatever labels it is shown, so neither an instruction
+         * nor a DATA line (section header, verdict line, base-rate text) may carry
+         * "confluence", "washout" or "rule engine" — the one exception is the
+         * internal-labels rule itself, which has to name them to ban them.
+         * Scanned on a short history (not-measurable branches) and a long daily
+         * history (every measured block), with the skill-gated instruction blocks on.
+         */
+        it.each([
+            ['short history', 5],
+            ['long daily history', 260],
+        ])(
+            'no line of the assembled prompt (%s) names confluence / washout / rule engine outside the internal-labels rule',
+            (_label, barCount) => {
+                const result = buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    Array.from({ length: barCount }, (_, i) => makeBar(i)),
+                    makeIndicators(),
+                    [
+                        makeSkill({ name: 'Guide', type: 'indicator_guide' }),
+                        makeSkill({ name: 'Candle', type: 'candlestick' }),
+                        makeSkill({
+                            name: 'SR',
+                            type: 'support_resistance',
+                        }),
+                    ]
+                );
+                // The skill-gated instruction blocks must actually be part of what is scanned.
+                expect(result).toContain(
+                    'name that combination of indicators in the description field'
+                );
+                expect(result).toContain(
+                    'name the converging levels in the reason field'
+                );
+                expect(result).toContain(
+                    'which side has more independent indicator groups agreeing'
+                );
+                expect(result).toContain('## Deterministic Metrics');
+                const BANNED = /confluence|washout|rule engine/i;
+                const INTERNAL_RULE = 'are internal. In every output field';
+                const offenders = result
+                    .split('\n')
+                    .filter(line => !line.includes(INTERNAL_RULE))
+                    .filter(line => BANNED.test(line));
+                expect(offenders).toEqual([]);
+                // The agreement block prints group counts, never a 0-100 score the model could quote.
+                const scoreLines = result
+                    .split('\n')
+                    .filter(line => !line.includes(INTERNAL_RULE))
+                    .filter(line => /Agreement score|\/ ?100\b/i.test(line));
+                expect(scoreLines).toEqual([]);
+            }
+        );
+
+        it('no longer instructs the model to cite the rule engine or the washout label by name', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+            expect(result).not.toContain('that the rule engine abstained');
+            expect(result).not.toContain('say the confluence is corroborated');
+            expect(result).toContain(
+                'that the automatic indicator tally could not be measured'
+            );
+            expect(result).toContain(
+                'describing it as a short-term sell-off that has run its course rather than naming the label'
+            );
+        });
+
+        it('defers the tally to the computation instead of asking the model to count', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
+            );
+            expect(result).toContain('### Indicator Agreement Assessment');
+            expect(result).toContain('is computed, not judged by you');
             // The replaced instruction told the model to tally categories itself, which
             // produced a count nothing downstream could verify and which counted four
             // transforms of the same close series as four confirmations.
@@ -4640,7 +4726,7 @@ describe('prompt', () => {
                 makeIndicators()
             );
             expect(result).toContain('## Deterministic Metrics');
-            expect(result).toContain('### Indicator Confluence');
+            expect(result).toContain('### Indicator Agreement');
         });
 
         it('still claims the non-indicator evidence for the model', () => {
@@ -4671,7 +4757,7 @@ describe('prompt', () => {
                 'never as the reason for a verdict on its own'
             );
             expect(result).toContain(
-                'When ## Deterministic Metrics shows a Short-Term Washout reading other than none, state it next to the tally with its Measured line'
+                'When ## Deterministic Metrics shows a Short-term sell-off check reading other than none, state it next to the tally with its Measured line'
             );
             expect(result).toContain(
                 "a bearish tally is that reading's normal state rather than evidence against it"
@@ -4705,13 +4791,13 @@ describe('prompt', () => {
             expect(out).not.toContain('bearish confluence dominates');
         });
 
-        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 washout 경로 밖으로 한정한다', () => {
+        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 단기 급락 경로 밖으로 한정한다', () => {
             const out = result();
             expect(out).toContain(
-                'Outside the washout path, before settling on "enter", check the structural risk:reward'
+                'Outside the short-term sell-off path, before settling on "enter", check the structural risk:reward'
             );
             expect(out).toContain(
-                'A met confluence entry rule does not override this'
+                'A met indicator-agreement entry condition does not override this'
             );
             expect(out).not.toContain(
                 '  - Before settling on "enter", check the structural risk:reward'
@@ -4732,7 +4818,7 @@ describe('prompt', () => {
         it('washout 경로를 가장 먼저 판정하고, 룰 엔진 판정을 재판단 없이 복사하게 한다', () => {
             const out = result();
             const washoutAt = out.indexOf(
-                '  - Washout path first: when ## Deterministic Metrics prints "Entry verdict (rule engine): enter — washout path", entryRecommendation is "enter". Copy it; do not re-judge it'
+                '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", entryRecommendation is "enter". Copy it; do not re-judge it'
             );
             expect(washoutAt).toBeGreaterThan(-1);
             expect(washoutAt).toBeLessThan(
@@ -4752,7 +4838,7 @@ describe('prompt', () => {
 
         it('뉴스성 급락으로 판정이 보류되면 모델이 직접 판단하고 기저율을 근거로 쓰지 않는다', () => {
             expect(result()).toContain(
-                'When the washout block prints "Entry verdict (rule engine): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the washout base rate as support.'
+                'When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.'
             );
         });
 
@@ -4787,7 +4873,7 @@ describe('prompt', () => {
                     events
                 );
             expect(build([])).toContain(
-                'Entry verdict (rule engine): enter — washout path.'
+                'Entry verdict (computed): enter — sell-off path.'
             );
             const withEarnings = build([
                 {
@@ -4798,22 +4884,22 @@ describe('prompt', () => {
                 },
             ]);
             expect(withEarnings).toContain(
-                'Entry verdict (rule engine): none — a high-impact earnings event'
+                'Entry verdict (computed): none — a high-impact earnings event'
             );
             expect(withEarnings).not.toContain(
-                'Entry verdict (rule engine): enter — washout path.'
+                'Entry verdict (computed): enter — sell-off path.'
             );
         });
 
         it('컨플루언스 진입·청산 규칙은 어떤 판정의 전제도 거부권도 아니다', () => {
             expect(result()).toContain(
-                'The confluence entry and exit rules are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.'
+                'The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.'
             );
         });
 
         it('near-washout 판독은 "wait"로 분류한다', () => {
             expect(result()).toContain(
-                '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a near-washout reading.'
+                '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a reading that is close to a sharp short-term sell-off inside a longer-term uptrend.'
             );
         });
     });
@@ -5805,8 +5891,10 @@ describe('prompt', () => {
                 .find(l => l.startsWith('- Regime:'));
             expect(regimeLine).toBeDefined();
             expect(regimeLine).toContain(
-                'near-random (low directional conviction; demand stronger confluence)'
+                'near-random (low directional conviction; demand stronger independent confirmation)'
             );
+            // 출력 금지 라벨(confluence/washout/rule engine)이 지시문에 다시 섞이지 않게 한다.
+            expect(regimeLine).not.toMatch(/confluence|washout|rule engine/i);
         });
 
         it('Hurst와 Variance Ratio가 모두 mean-reverting이면 mean-reverting verdict를 렌더한다', () => {

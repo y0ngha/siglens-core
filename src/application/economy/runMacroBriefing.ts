@@ -4,13 +4,14 @@ import type {
     RunMacroBriefingOptions,
     RunMacroBriefingResult,
 } from '@/application/economy/types';
+import { withComputedRegime } from '@/domain/economy/deriveMacroRegime';
 import { buildMacroBriefingPrompt } from '@/domain/economy/macroBriefingPrompt';
 import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
-import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import type { EconomySnapshot } from '@/domain/types';
 import {
     BRIEFING_MODEL_ID,
     buildMacroBriefingCacheKey,
+    buildMacroBriefingDateBucket,
     MACRO_BRIEFING_CACHE_TTL,
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -26,13 +27,19 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  * Redis meta, no polling loop.
  *
  * Mirrors {@link runBriefing} but for the `/economy` page — the cache is keyed
- * by ISO date+hour, the briefing model, and a deterministic hash of the
+ * by UTC date (day bucket), the briefing model, and a deterministic hash of the
  * indicator/treasury/calendar snapshot. Macro briefings share the same
  * `callBriefingAi` path (Gemini/DeepSeek server key, no tier/BYOK concept).
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
  * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
  * receive the same result.
+ *
+ * **`regime` is recomputed, not stored.** On every return — fresh, cache hit and
+ * legacy cache entries alike — the briefing's `regime` is overwritten with the
+ * value `deriveMacroRegime` computes from `data`, so it may differ from what the
+ * model wrote or from what a cache entry holds. The prose (`summary`,
+ * `highlights`) is untouched.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
@@ -46,10 +53,10 @@ export async function runMacroBriefing(
     options?: RunMacroBriefingOptions
 ): Promise<RunMacroBriefingResult> {
     const now = new Date();
-    const dateHour = now.toISOString().slice(0, ISO_DATE_HOUR_PREFIX_LENGTH);
+    const dateBucket = buildMacroBriefingDateBucket(now);
     const inputHash = hashMacroBriefingInput(data);
     const cacheKey = buildMacroBriefingCacheKey(
-        dateHour,
+        dateBucket,
         BRIEFING_MODEL_ID,
         inputHash
     );
@@ -64,7 +71,10 @@ export async function runMacroBriefing(
             if (cached !== null && cached.briefing != null) {
                 return {
                     status: 'cached',
-                    briefing: normalizeMacroBriefing(cached.briefing),
+                    briefing: withComputedRegime(
+                        normalizeMacroBriefing(cached.briefing),
+                        data
+                    ),
                     generatedAt: cached.generatedAt,
                 };
             }
@@ -88,7 +98,10 @@ export async function runMacroBriefing(
         })
     );
 
-    const briefing = normalizeMacroBriefing(JSON.parse(raw) as unknown);
+    const briefing = withComputedRegime(
+        normalizeMacroBriefing(JSON.parse(raw) as unknown),
+        data
+    );
     const generatedAt = new Date().toISOString();
 
     if (!briefing.summary) {

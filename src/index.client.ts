@@ -106,6 +106,14 @@ export type {
     OptionsExpirationFilter,
 } from './domain/types';
 
+// Agent — follow-up marker parser (browser-safe: pure function only). The chat
+// UI strips the trailing `[[followups]]` line from the streamed answer with it.
+export {
+    AGENT_FOLLOW_UP_MARKER,
+    splitAgentFollowUps,
+} from './domain/agent/agentFollowUps';
+export type { SplitAgentFollowUps } from './domain/agent/agentFollowUps';
+
 // Economy (macro) — domain helpers (server-only submit/poll/peek use-cases are
 // intentionally omitted; only pure domain functions belong on the browser
 // entry, mirroring the options/financials patterns).

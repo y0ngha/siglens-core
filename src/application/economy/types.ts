@@ -5,7 +5,7 @@ import type { EconomicEventAnalysis } from '@/domain/economy/types';
 // Submit
 // ─────────────────────────────────────────
 
-/** {@link submitMacroBriefing} cache-hit variant — briefing already produced this hour. */
+/** `submitMacroBriefing` (retired queued API) cache-hit variant — briefing already produced for today's UTC-day bucket. */
 export interface SubmitMacroBriefingCached {
     /** Discriminator: cache hit returned a previously produced briefing. */
     status: 'cached';
@@ -15,15 +15,15 @@ export interface SubmitMacroBriefingCached {
     generatedAt: string;
 }
 
-/** {@link submitMacroBriefing} cache-miss variant — a fresh job was enqueued. */
+/** `submitMacroBriefing` (retired queued API) cache-miss variant — a fresh job was enqueued. */
 export interface SubmitMacroBriefingSubmitted {
     /** Discriminator: cache miss; a worker job was enqueued and the caller should poll. */
     status: 'submitted';
-    /** Worker job identifier — pass to {@link pollMacroBriefing} to await the result. */
+    /** Worker job identifier — pass to `pollMacroBriefing` (retired queued API) to await the result. */
     jobId: string;
 }
 
-/** Result of {@link submitMacroBriefing} — either a cache hit or a freshly submitted job. */
+/** Result of `submitMacroBriefing` (retired queued API) — either a cache hit or a freshly submitted job. */
 export type SubmitMacroBriefingResult =
     SubmitMacroBriefingCached | SubmitMacroBriefingSubmitted;
 
@@ -31,13 +31,13 @@ export type SubmitMacroBriefingResult =
 // Poll
 // ─────────────────────────────────────────
 
-/** {@link pollMacroBriefing} variant — worker still running; the caller should retry. */
+/** `pollMacroBriefing` (retired queued API) variant — worker still running; the caller should retry. */
 export interface PollMacroBriefingProcessing {
     /** Discriminator: worker job has not finished yet; caller should poll again. */
     status: 'processing';
 }
 
-/** {@link pollMacroBriefing} variant — worker failed or returned an unusable result. */
+/** `pollMacroBriefing` (retired queued API) variant — worker failed or returned an unusable result. */
 export interface PollMacroBriefingError {
     /** Discriminator: worker reported failure or the result was missing/malformed. */
     status: 'error';
@@ -45,7 +45,7 @@ export interface PollMacroBriefingError {
     error: string;
 }
 
-/** {@link pollMacroBriefing} variant — worker finished successfully with a normalized briefing. */
+/** `pollMacroBriefing` (retired queued API) variant — worker finished successfully with a normalized briefing. */
 export interface PollMacroBriefingDone {
     /** Discriminator: worker finished successfully and a normalized briefing is available. */
     status: 'done';
@@ -55,7 +55,7 @@ export interface PollMacroBriefingDone {
     generatedAt: string;
 }
 
-/** Result of {@link pollMacroBriefing}. */
+/** Result of `pollMacroBriefing` (retired queued API). */
 export type PollMacroBriefingResult =
     | PollMacroBriefingProcessing
     | PollMacroBriefingError
@@ -65,7 +65,7 @@ export type PollMacroBriefingResult =
 // Submit Economic Event Analysis
 // ─────────────────────────────────────────
 
-/** {@link submitEconomicEventAnalysis} cache-hit variant — analysis already cached. */
+/** `submitEconomicEventAnalysis` (retired queued API) cache-hit variant — analysis already cached. */
 export interface SubmitEconomicEventAnalysisCached {
     /** Discriminator: cache hit returned a previously produced analysis. */
     status: 'cached';
@@ -73,15 +73,15 @@ export interface SubmitEconomicEventAnalysisCached {
     result: EconomicEventAnalysis;
 }
 
-/** {@link submitEconomicEventAnalysis} cache-miss variant — a fresh job was enqueued. */
+/** `submitEconomicEventAnalysis` (retired queued API) cache-miss variant — a fresh job was enqueued. */
 export interface SubmitEconomicEventAnalysisSubmitted {
     /** Discriminator: cache miss; a worker job was enqueued and the caller should poll. */
     status: 'submitted';
-    /** Worker job identifier — pass to {@link pollEconomicEventAnalysis} to await the result. */
+    /** Worker job identifier — pass to `pollEconomicEventAnalysis` (retired queued API) to await the result. */
     jobId: string;
 }
 
-/** Result of {@link submitEconomicEventAnalysis} — either a cache hit or a freshly submitted job. */
+/** Result of `submitEconomicEventAnalysis` (retired queued API) — either a cache hit or a freshly submitted job. */
 export type SubmitEconomicEventAnalysisResult =
     SubmitEconomicEventAnalysisCached | SubmitEconomicEventAnalysisSubmitted;
 
@@ -89,13 +89,13 @@ export type SubmitEconomicEventAnalysisResult =
 // Poll Economic Event Analysis
 // ─────────────────────────────────────────
 
-/** {@link pollEconomicEventAnalysis} variant — worker still running; the caller should retry. */
+/** `pollEconomicEventAnalysis` (retired queued API) variant — worker still running; the caller should retry. */
 export interface PollEconomicEventAnalysisProcessing {
     /** Discriminator: worker job has not finished yet; caller should poll again. */
     status: 'processing';
 }
 
-/** {@link pollEconomicEventAnalysis} variant — worker failed or returned an unusable result. */
+/** `pollEconomicEventAnalysis` (retired queued API) variant — worker failed or returned an unusable result. */
 export interface PollEconomicEventAnalysisError {
     /** Discriminator: worker reported failure or the result was missing/malformed. */
     status: 'error';
@@ -103,7 +103,7 @@ export interface PollEconomicEventAnalysisError {
     error: string;
 }
 
-/** {@link pollEconomicEventAnalysis} variant — worker finished successfully with a normalized analysis. */
+/** `pollEconomicEventAnalysis` (retired queued API) variant — worker finished successfully with a normalized analysis. */
 export interface PollEconomicEventAnalysisDone {
     /** Discriminator: worker finished successfully and a normalized analysis is available. */
     status: 'done';
@@ -111,7 +111,7 @@ export interface PollEconomicEventAnalysisDone {
     result: EconomicEventAnalysis;
 }
 
-/** Result of {@link pollEconomicEventAnalysis}. */
+/** Result of `pollEconomicEventAnalysis` (retired queued API). */
 export type PollEconomicEventAnalysisResult =
     | PollEconomicEventAnalysisProcessing
     | PollEconomicEventAnalysisError
@@ -121,7 +121,7 @@ export type PollEconomicEventAnalysisResult =
 // Submit Indicator Translation
 // ─────────────────────────────────────────
 
-/** {@link submitIndicatorTranslation} cache-hit variant — translation already cached. */
+/** `submitIndicatorTranslation` (retired queued API) cache-hit variant — translation already cached. */
 export interface SubmitIndicatorTranslationCached {
     /** Discriminator: cache hit returned a previously produced translation. */
     status: 'cached';
@@ -129,15 +129,15 @@ export interface SubmitIndicatorTranslationCached {
     nameKo: string;
 }
 
-/** {@link submitIndicatorTranslation} cache-miss variant — a fresh job was enqueued. */
+/** `submitIndicatorTranslation` (retired queued API) cache-miss variant — a fresh job was enqueued. */
 export interface SubmitIndicatorTranslationSubmitted {
     /** Discriminator: cache miss; a worker job was enqueued and the caller should poll. */
     status: 'submitted';
-    /** Worker job identifier — pass to {@link pollIndicatorTranslation} to await the result. */
+    /** Worker job identifier — pass to `pollIndicatorTranslation` (retired queued API) to await the result. */
     jobId: string;
 }
 
-/** Result of {@link submitIndicatorTranslation} — either a cache hit or a freshly submitted job. */
+/** Result of `submitIndicatorTranslation` (retired queued API) — either a cache hit or a freshly submitted job. */
 export type SubmitIndicatorTranslationResult =
     SubmitIndicatorTranslationCached | SubmitIndicatorTranslationSubmitted;
 
@@ -145,13 +145,13 @@ export type SubmitIndicatorTranslationResult =
 // Poll Indicator Translation
 // ─────────────────────────────────────────
 
-/** {@link pollIndicatorTranslation} variant — worker still running; the caller should retry. */
+/** `pollIndicatorTranslation` (retired queued API) variant — worker still running; the caller should retry. */
 export interface PollIndicatorTranslationProcessing {
     /** Discriminator: worker job has not finished yet; caller should poll again. */
     status: 'processing';
 }
 
-/** {@link pollIndicatorTranslation} variant — worker failed or returned an unusable result. */
+/** `pollIndicatorTranslation` (retired queued API) variant — worker failed or returned an unusable result. */
 export interface PollIndicatorTranslationError {
     /** Discriminator: worker reported failure or the result was missing/malformed. */
     status: 'error';
@@ -159,7 +159,7 @@ export interface PollIndicatorTranslationError {
     error: string;
 }
 
-/** {@link pollIndicatorTranslation} variant — worker finished successfully with a Korean name. */
+/** `pollIndicatorTranslation` (retired queued API) variant — worker finished successfully with a Korean name. */
 export interface PollIndicatorTranslationDone {
     /** Discriminator: worker finished successfully and a Korean name is available. */
     status: 'done';
@@ -167,7 +167,7 @@ export interface PollIndicatorTranslationDone {
     nameKo: string;
 }
 
-/** Result of {@link pollIndicatorTranslation}. */
+/** Result of `pollIndicatorTranslation` (retired queued API). */
 export type PollIndicatorTranslationResult =
     | PollIndicatorTranslationProcessing
     | PollIndicatorTranslationError
@@ -249,3 +249,14 @@ export interface RunIndicatorTranslationOptions {
  */
 export type RunIndicatorTranslationResult =
     { status: 'cached'; nameKo: string } | { status: 'done'; nameKo: string };
+
+/**
+ * Result of `peekMacroBriefingCacheEntry` — a cached macro briefing plus the
+ * time it was generated.
+ */
+export interface MacroBriefingCacheEntry {
+    /** The normalized cached briefing, with `regime` recomputed from the snapshot. */
+    briefing: MacroBriefingResponse;
+    /** ISO timestamp the briefing was generated at; `null` for a legacy cache entry written without it. */
+    generatedAt: string | null;
+}

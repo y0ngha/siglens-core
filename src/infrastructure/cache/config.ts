@@ -8,6 +8,7 @@ import {
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
 import { PRIOR_ANALYSIS_WINDOW_BARS } from '@/domain/analysis/priorAnalysis';
+import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import type {
     DashboardTimeframe,
     MarketEvent,
@@ -846,9 +847,24 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * `always_on` skill digests) so the cross-symbol common prefix covers them for
  * provider automatic prefix caching. Bytes change on every request.
  *
+ * **`p23`** — UX audit 2026-10-05 §C6 (and the A/B follow-up). The model echoed
+ * the internal labels it was shown, so they are gone from both instructions
+ * and data: the instruction block is now `### Indicator Agreement Assessment`
+ * with an internal-labels rule (never write "rule engine", "confluence",
+ * "washout" or an "x / 100" score); output-directing bullets that said
+ * "stronger confluence" / "note the confluence" / "washout path" are reworded;
+ * and the generated data labels are renamed with the values unchanged —
+ * `### Indicator Agreement (computed, …)` (the printed `N / 100` score is
+ * replaced by weighted bullish-vs-bearish indicator-group counts),
+ * `### Short-term sell-off check (computed, 1Day bars)`,
+ * `Entry verdict (computed): … sell-off path`, the sell-off reading texts,
+ * `## Pro-Indicator Agreement`, and the `PULLBACK_BASE_RATES` wording
+ * ("washout" → "sell-off", "bearish confluence tally" → "bearish indicator
+ * tally"). Bytes change on every request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p22' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p23' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest
@@ -1023,15 +1039,44 @@ export function buildBriefingCacheKey(
     return `briefing:market:${dateHour}:${model}:${inputHash}:${MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
 }
 
-/** @internal TTL for cached macro (economy) briefings. dateHour-bucketed. */
-export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
+/**
+ * @internal TTL for cached macro (economy) briefings. Day-bucketed (see
+ * {@link buildMacroBriefingDateBucket}) so the TTL covers one whole bucket.
+ */
+export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_DAY;
+
+/**
+ * @internal Day bucket of the macro briefing cache key — the UTC calendar
+ * date (`YYYY-MM-DD`) of `now`.
+ *
+ * Why a day, not an hour: the economy snapshot the briefing is built from is
+ * itself cached for 24 hours by the consumer (siglens ISR `revalidate = 86400`),
+ * so every hour inside a day feeds the model identical input. An hourly
+ * bucket therefore paid a fresh LLM call per hour for nothing and — since the
+ * model is non-deterministic — flipped the verdict (e.g. slowdown vs neutral)
+ * between two renders of the same data. UTC is the boundary because FMP's
+ * calendar timestamps are UTC and `formatRelativeTime` in the prompt already
+ * compares UTC dates. Any real data change still rotates the key through the
+ * input hash (`hashMacroBriefingInput`).
+ *
+ * A day-long cache is safe for the calendar rows' relative-time suffixes
+ * (`in 3h`, `2h ago`) only because the prompt forbids restating them — the
+ * briefing refers to scheduled events by date, so a briefing generated in the
+ * morning does not read stale at night.
+ *
+ * Writer (`runMacroBriefing`) and readers (`peekMacroBriefingCache*`) MUST
+ * derive the bucket through this one function so read key == write key.
+ */
+export function buildMacroBriefingDateBucket(now: Date): string {
+    return now.toISOString().slice(0, ISO_DATE_PREFIX_LENGTH);
+}
 
 /**
  * Prompt-template version for the macro (economy) briefing cache key.
  *
  * Same reason {@link MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION} exists: without
  * this axis a change to `buildMacroBriefingPrompt`'s output takes up to a full
- * TTL (1h) to take effect, because a cache HIT inside the same `dateHour`
+ * TTL (1 day) to take effect, because a cache HIT inside the same date
  * bucket returns a response the old prompt produced.
  *
  * Bump whenever `buildMacroBriefingPrompt`'s output changes in a way that would
@@ -1064,24 +1109,44 @@ export const MACRO_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
  * HH:mm:ss` timestamp as UTC instead of the runtime's local zone. Bytes
  * change for every request.
  *
+ * @remarks
+ * **`p5`** — UX audit 2026-10-05 §C1 (and the A/B follow-ups). Indicator rows
+ * print a human label, the FMP key and an explicit unit
+ * (registry: `MACRO_INDICATOR_PROMPT_META`). A level series whose raw unit is a
+ * multiplier is pre-converted so the model never rescales: nonfarm payroll
+ * prints ONLY its monthly change in persons (`monthly change: +29,000
+ * persons`, no level — via `rawScale`/`decimals`/`showLevel`), GDP prints
+ * `USD trillion`, weekly claims print thousands-grouped persons. The regime is
+ * computed in code (`deriveMacroRegime`): the prompt carries a
+ * `Regime (computed): <regime> — because: <signals>` line instead of a rule
+ * list, and `withComputedRegime` overwrites the model's `regime` on every
+ * returned briefing (fresh, cache hit, peek). The `## Interpretation Rules`
+ * block also forbids policy-direction claims without a rate-decision row,
+ * changes for series with no previous value, and a month-over-month reading of
+ * the daily inflation series; asks for `%p` in Korean; bans copying prompt
+ * jargon; and bans restating relative times. The cache key bucket also moved
+ * from `dateHour` to a UTC date (`buildMacroBriefingDateBucket`) with a 1-day
+ * TTL. Bytes change for every request.
+ *
  * @internal
  */
-export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * @internal Build the Redis key for a cached macro (economy) briefing.
  *
- * Format: `briefing:macro:<dateHour>:<model>:<inputHash>:<promptVersion>`. Same bucketing
- * contract as {@link buildBriefingCacheKey} (date+hour share, model scopes,
- * input hash folds in the indicator/calendar snapshot) but a distinct `macro:`
- * namespace so market and economy briefings never collide.
+ * Format: `briefing:macro:<dateBucket>:<model>:<inputHash>:<promptVersion>` where
+ * `dateBucket` comes from {@link buildMacroBriefingDateBucket} (a UTC day, unlike
+ * {@link buildBriefingCacheKey}'s hour). Model scopes, input hash folds in the
+ * indicator/calendar snapshot, and the distinct `macro:` namespace keeps market
+ * and economy briefings from colliding.
  */
 export function buildMacroBriefingCacheKey(
-    dateHour: string,
+    dateBucket: string,
     model: string,
     inputHash: string
 ): string {
-    return `briefing:macro:${dateHour}:${model}:${inputHash}:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
+    return `briefing:macro:${dateBucket}:${model}:${inputHash}:${MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION}`;
 }
 
 /**
@@ -1606,6 +1671,13 @@ export function buildCongressTrendCacheKey(
  * rule against referring to the input itself. The no-articles rule stops
  * telling the model to say no articles "were provided". Bytes change for every
  * request of both builders.
+ *
+ * The news-card EXCERPT rule wording and the `stripInputMetaLead` normalizer
+ * backstop (UX audit 2026-10-05 §C2) are layered on top of it. The card prompt's
+ * bytes DO change (for truncated bodies), but that needs no bump here: core owns
+ * no news-card cache key — consumers store per-article results — so a new
+ * article simply gets the new wording, and the normalizer only post-processes
+ * model output.
  *
  * @internal
  */
