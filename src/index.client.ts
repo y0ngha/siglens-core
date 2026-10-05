@@ -32,6 +32,7 @@ export {
     MARKET_FEAR_GREED_SERIES_KEYS,
     POC_WINDOW_DEFAULT,
     scoreToLabel,
+    summarizeExtremeZoneEpisodes,
     summarizeExtremeZoneOutcomes,
 } from './domain/indicators';
 export { FEAR_GREED_LOOKBACK_DAYS } from './domain/constants/market';
@@ -431,6 +432,9 @@ export type {
     FearGreedReading,
     FearGreedScoreGap,
     ExtremeFearGreedZone,
+    ExtremeZoneEpisode,
+    ExtremeZoneEpisodeOptions,
+    ExtremeZoneEpisodes,
     ExtremeZoneOutcome,
     ExtremeZoneOutcomeOptions,
     ForwardChangeStat,

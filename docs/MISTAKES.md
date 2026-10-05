@@ -769,6 +769,11 @@ and have been removed from this file.
    ❌ Signal.detectedAt JSDoc says 'timestamp' while all detectors return bar index
    ✅ Synchronize examples with enforced rules; remove contradictory instructions and update all references in same commit
    ✅ JSDoc @returns/@param/@throws/@internal must reflect actual implementation code, verified against the function during review
+
+9. Position claims in comments ("X sits last", "article last in prompt") that ignore later layers or branches
+   → A claim about where something sits must name which layer's output it describes (builder vs dispatched prompt) and hold for every locale/branch
+   ❌ // article sits last in prompt  (a caller appends a locale reminder for non-ko)
+   ✅ // builder output ends with the article; the caller may append a locale reminder
 ```
 
 ---

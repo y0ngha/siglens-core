@@ -88,6 +88,7 @@ export {
     fearGreedInputs,
     scoreToLabel,
     POC_WINDOW_DEFAULT,
+    summarizeExtremeZoneEpisodes,
     summarizeExtremeZoneOutcomes,
 } from './fearGreed';
 export {

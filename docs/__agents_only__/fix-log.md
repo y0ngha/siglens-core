@@ -323,14 +323,8 @@ Round 2: approved
   Rule: A changelog row must list every deliberate wording change and carry the consumer action + semver tail like neighbouring rows
 - Violation 3 (recommended, R1): Reordering left per-article rule bullets without a heading (their heading moved to stable)
   Rule: When splitting a section across stable/dynamic, each half must read on its own — re-add a heading on the moved half
-- Violation 4 (recommended, R1): Comment said "article sits last in prompt" though a locale reminder follows for non-ko
-  Rule: Position claims in comments must hold for every locale/branch
 
 Round 3: approved (comment-only fix after R2)
-
-## [PR #249 Claude review | perf/newscard-deepseek-prefix-cache | 2026-10-04]
-- Violation (suggestion, fixed): builder JSDoc said "article last" without noting the caller appends a locale reminder
-  Rule: Position claims must say which layer's output they describe (builder vs dispatched prompt)
 
 ## [Branch perf/technical-prompt-stable-prefix | 2026-10-04] — Review findings (Intent + Guidelines into stable, p22)
 
@@ -379,3 +373,8 @@ Round 3: approved (comment-only fix after R2)
 - Violation (R1 recommended, fixed): a new optional payload field on a cached/serialized library type shipped without consumer guidance (cache growth, mixed-age divergence, server-only)
   Rule: (new) Adding a field to a type consumers cache or serialize requires a changelog note on size, cache-key bump and serialization boundary
 - Status (R2): approved
+
+## [Issue #256 | feat/256/극단-구간-기록-집계 | 2026-10-05]
+- Violation: public JSDoc for a new aggregation omitted an edge case (zone sessions after a warm-up gap belong to no episode, so ongoing stays false) that only a test documented
+- Rule: (new) Every input case that is silently excluded from a public function result must be stated in its JSDoc, the field docs it affects, and PUBLIC_API.md — not only in a test
+- Context: summarizeExtremeZoneEpisodes in domain/indicators/fearGreed/regimeStats.ts

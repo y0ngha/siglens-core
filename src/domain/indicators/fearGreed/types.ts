@@ -172,6 +172,56 @@ export interface ExtremeZoneOutcomeOptions {
     reentryGap?: number;
 }
 
+/**
+ * One stay in an extreme zone: from the entry session to the last session
+ * spent in the zone before the next entry. Quick returns within the re-entry
+ * gap belong to the same episode.
+ */
+export interface ExtremeZoneEpisode {
+    /** ISO date of the entry session. */
+    startDate: string;
+    /** ISO date of the last session in the episode that carried the zone label. */
+    endDate: string;
+    /**
+     * Sessions in the episode that carried the zone label. Sessions that briefly
+     * left the zone between `startDate` and `endDate` are not counted, nor are
+     * zone sessions after a warm-up gap that belong to no episode.
+     */
+    sessionsInZone: number;
+    /**
+     * Most extreme score in the episode — lowest for fear, highest for greed.
+     * `null` only for malformed input where no zone session carries a score.
+     */
+    peakScore: number | null;
+    /**
+     * `true` when the history's last session is in the zone and in this
+     * episode. A last session that follows a warm-up gap belongs to no episode,
+     * so it leaves every episode `false`.
+     */
+    ongoing: boolean;
+}
+
+/** Episode record for one extreme zone. Descriptive only — not a forecast. */
+export interface ExtremeZoneEpisodes {
+    /** The extreme zone these episodes describe. */
+    zone: ExtremeFearGreedZone;
+    /** Times the history entered the zone (equals `episodes.length`). */
+    entryCount: number;
+    /** Median of `sessionsInZone` across episodes, or `null` with no episodes. */
+    medianSessionsInZone: number | null;
+    /** Episodes, newest first. */
+    episodes: ExtremeZoneEpisode[];
+}
+
+/** Options for `summarizeExtremeZoneEpisodes`. */
+export interface ExtremeZoneEpisodeOptions {
+    /**
+     * Sessions that must pass after leaving a zone before a return counts as a
+     * new entry. Defaults to 20. `0` counts every move into the zone.
+     */
+    reentryGap?: number;
+}
+
 /** Same-session gap between an instrument score and the market score. */
 export interface FearGreedScoreGap {
     /** ISO date both scores describe. */
