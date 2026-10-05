@@ -598,6 +598,31 @@ describe('runOverallAnalysis', () => {
         });
     });
 
+    describe('technical dataAsOf and the overall cache key', () => {
+        it('a technical result carrying dataAsOf hashes to the same overall key as one without it', async () => {
+            await runOverallAnalysis(baseOptions());
+            const keyWithout = mockCacheGet.mock.calls.find(([key]) =>
+                String(key).includes(':overall:')
+            )?.[0];
+
+            mockCacheGet.mockClear();
+            mockRunAnalysisForOverall.mockResolvedValue({
+                status: 'done',
+                result: {
+                    ...mockTechnicalResult,
+                    dataAsOf: { barTime: 1_759_363_200, close: 333.69 },
+                },
+            });
+            await runOverallAnalysis(baseOptions());
+            const keyWith = mockCacheGet.mock.calls.find(([key]) =>
+                String(key).includes(':overall:')
+            )?.[0];
+
+            expect(keyWithout).toBeDefined();
+            expect(keyWith).toEqual(keyWithout);
+        });
+    });
+
     describe('in-flight 중복 제거', () => {
         it('같은 캐시 키 동시 호출은 LLM을 1회만 태운다', async () => {
             let resolveAi: (value: string) => void = () => {};

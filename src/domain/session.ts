@@ -78,9 +78,11 @@ const _dtfByZone: Readonly<Record<string, Intl.DateTimeFormat>> = {
  * caller turn another day's open/close into a UTC instant.
  */
 export interface SessionParts {
+    /** Local calendar year (e.g. 2026). */
     year: number;
     /** 1-12. */
     month: number;
+    /** Local day of month, 1-31. */
     day: number;
     /** Local weekday index (0 = Sun … 6 = Sat). */
     weekdayIndex: number;
@@ -110,8 +112,17 @@ export function localSessionParts(now: Date, timeZone: string): SessionParts {
         _dtfByZone[timeZone] ??
         new Intl.DateTimeFormat('en-US', clockFormatOptions(timeZone));
     const parts = fmt.formatToParts(now);
-    const get = (type: Intl.DateTimeFormatPartTypes): string =>
-        parts.find(p => p.type === type)?.value ?? '';
+    // A missing part would otherwise become `Number('') === 0` and flow into
+    // `Date.UTC` as day 0 / month 0 — a silently wrong date. Fail loudly instead.
+    const get = (type: Intl.DateTimeFormatPartTypes): string => {
+        const value = parts.find(p => p.type === type)?.value;
+        if (value === undefined) {
+            throw new RangeError(
+                `localSessionParts: Intl output for ${timeZone} lacks "${type}"`
+            );
+        }
+        return value;
+    };
     return {
         year: Number(get('year')),
         month: Number(get('month')),
