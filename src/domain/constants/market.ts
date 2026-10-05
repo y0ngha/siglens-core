@@ -44,6 +44,18 @@ export const TIMEFRAME_MINUTES: Record<Timeframe, number> = {
     '1Day': 1_440,
 };
 
+/**
+ * Calendar-day lookback for **Fear & Greed** history (≈ 5 years).
+ *
+ * Fear & Greed scores are percentiles against the instrument's (or market's)
+ * own past, so the length of that past is part of the definition. Two years
+ * left only 3–4 extreme-zone episodes per symbol; five years gives enough
+ * episodes for the after-entry aggregates to be meaningful, and a steadier
+ * baseline for the score itself. Only Fear & Greed uses this window — charts,
+ * indicators and analysis prompts keep `TIMEFRAME_LOOKBACK_DAYS`.
+ */
+export const FEAR_GREED_LOOKBACK_DAYS = 1_830;
+
 /** @internal Calendar-day lookback per timeframe — wider than trading days to absorb weekends and holidays. */
 export const TIMEFRAME_LOOKBACK_DAYS: Record<Timeframe, number> = {
     '5Min': 10,

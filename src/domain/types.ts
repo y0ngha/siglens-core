@@ -423,6 +423,7 @@ export type {
     ExtremeZoneOutcomeOptions,
     FearGreedScoreGap,
 } from '@/domain/indicators/fearGreed/types';
+export type { FearGreedInputs } from '@/domain/indicators/fearGreed/inputs';
 
 export type {
     MarketFearGreedSeriesKey,
@@ -1877,6 +1878,14 @@ export interface BarsData {
     bars: Bar[];
     /** Aggregate indicator suite for the same bars. */
     indicators: IndicatorResult;
+    /**
+     * Longer daily history (oldest-first, ≈ `FEAR_GREED_LOOKBACK_DAYS`) used
+     * **only** for Fear & Greed. Present for `1Day` results from
+     * `fetchBarsWithIndicators`; `bars` is its most recent standard-window
+     * slice. Read it through `fearGreedInputs`. Server-side data — consumers
+     * should not ship it to browsers.
+     */
+    fearGreedBars?: Bar[];
 }
 
 /**

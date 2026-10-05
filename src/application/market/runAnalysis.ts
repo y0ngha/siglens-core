@@ -34,7 +34,10 @@ import {
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
 import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
-import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
+import {
+    computeFearGreedIndex,
+    fearGreedInputs,
+} from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
 import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
 import type { CacheProvider } from '@/domain/ports/cache';
@@ -368,12 +371,13 @@ async function runAnalysisImpl(
         );
     }
 
-    const { bars, indicators } = await fetchBarsWithIndicators(
+    const barsData = await fetchBarsWithIndicators(
         marketDataProvider,
         symbol,
         timeframe,
         fmpSymbol
     );
+    const { bars, indicators } = barsData;
 
     // lastClose and atr are local variables — no Redis meta write needed.
     const lastClose = bars[bars.length - 1]?.close;
@@ -381,7 +385,7 @@ async function runAnalysisImpl(
 
     const dailyDataPromise =
         timeframe === '1Day'
-            ? Promise.resolve({ bars, indicators })
+            ? Promise.resolve(barsData)
             : fetchBarsWithIndicators(
                   marketDataProvider,
                   symbol,
@@ -390,7 +394,10 @@ async function runAnalysisImpl(
               );
 
     const fearGreed: FearGreedSnapshot | null = await dailyDataPromise
-        .then(d => computeFearGreedIndex(d.bars, d.indicators.buySellVolume))
+        .then(d => {
+            const input = fearGreedInputs(d);
+            return computeFearGreedIndex(input.bars, input.buySellVolume);
+        })
         .catch(error => {
             console.error(
                 '[RunAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',

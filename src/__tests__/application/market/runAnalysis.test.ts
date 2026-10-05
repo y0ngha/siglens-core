@@ -23,7 +23,10 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternGeometries: new Map(),
     })),
 }));
-vi.mock('@/domain/indicators/fearGreed', () => ({
+vi.mock('@/domain/indicators/fearGreed', async () => ({
+    ...(await vi.importActual<typeof import('@/domain/indicators/fearGreed')>(
+        '@/domain/indicators/fearGreed'
+    )),
     computeFearGreedIndex: vi.fn(),
 }));
 // Partial mock: keep isFallbackAnalysis real so cache-skip predicate
@@ -1228,6 +1231,32 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 mockBarsData.bars,
                 mockBarsData.indicators.buySellVolume
             );
+        });
+
+        it('1Day 응답에 5년 일봉(fearGreedBars)이 있으면 공포탐욕을 그 봉으로 계산한다', async () => {
+            const longBars = [...mockBarsData.bars, ...mockBarsData.bars];
+            mockFetchBarsWithIndicators.mockResolvedValueOnce({
+                ...mockBarsData,
+                fearGreedBars: longBars,
+            });
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Day',
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(mockComputeFearGreedIndex).toHaveBeenCalledWith(
+                longBars,
+                expect.any(Array)
+            );
+            const [, bsv] = mockComputeFearGreedIndex.mock.calls.find(
+                ([bars]) => bars === longBars
+            )!;
+            expect(bsv).toHaveLength(longBars.length);
         });
 
         it('일봉 조회가 실패해도 공포탐욕 없이(undefined) 분석을 계속한다', async () => {

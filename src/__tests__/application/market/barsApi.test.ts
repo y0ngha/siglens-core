@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import {
     DEFAULT_TIMEFRAME,
+    FEAR_GREED_LOOKBACK_DAYS,
     TIMEFRAME_BARS_LIMIT,
     TIMEFRAME_LOOKBACK_DAYS,
 } from '@/domain/constants/market';
@@ -30,6 +31,13 @@ const mockBar = {
     volume: 1000000,
 };
 
+/**
+ * `1Day` re-cuts the standard window from the fetched long history, so a test
+ * bar must fall inside "now − TIMEFRAME_LOOKBACK_DAYS". Pin "now" to the day
+ * after `mockBar` instead of the wall clock.
+ */
+const NEAR_MOCK_BAR = new Date((mockBar.time + 86_400) * 1000);
+
 describe('fetchBarsWithIndicators 함수는', () => {
     beforeEach(() => {
         mockGetBars.mockReset();
@@ -42,7 +50,9 @@ describe('fetchBarsWithIndicators 함수는', () => {
             const result = await fetchBarsWithIndicators(
                 fakeProvider,
                 'AAPL',
-                DEFAULT_TIMEFRAME
+                DEFAULT_TIMEFRAME,
+                undefined,
+                NEAR_MOCK_BAR
             );
 
             expect(result.bars).toHaveLength(1);
@@ -84,7 +94,9 @@ describe('fetchBarsWithIndicators 함수는', () => {
             const result = await fetchBarsWithIndicators(
                 fakeProvider,
                 'AAPL',
-                DEFAULT_TIMEFRAME
+                DEFAULT_TIMEFRAME,
+                undefined,
+                NEAR_MOCK_BAR
             );
 
             expect(result.indicators.rsi[0]).toBeNull();
@@ -113,7 +125,9 @@ describe('fetchBarsWithIndicators 함수는', () => {
             const result = await fetchBarsWithIndicators(
                 fakeProvider,
                 'AAPL',
-                DEFAULT_TIMEFRAME
+                DEFAULT_TIMEFRAME,
+                undefined,
+                NEAR_MOCK_BAR
             );
 
             expect(result.indicators.rsi.every(v => v === null)).toBe(true);
@@ -129,7 +143,9 @@ describe('fetchBarsWithIndicators 함수는', () => {
             const result = await fetchBarsWithIndicators(
                 fakeProvider,
                 'AAPL',
-                DEFAULT_TIMEFRAME
+                DEFAULT_TIMEFRAME,
+                undefined,
+                NEAR_MOCK_BAR
             );
 
             expect(result.indicators.macd.every(v => v.macd === null)).toBe(
@@ -147,7 +163,9 @@ describe('fetchBarsWithIndicators 함수는', () => {
             const result = await fetchBarsWithIndicators(
                 fakeProvider,
                 'AAPL',
-                DEFAULT_TIMEFRAME
+                DEFAULT_TIMEFRAME,
+                undefined,
+                NEAR_MOCK_BAR
             );
 
             expect(
@@ -165,7 +183,9 @@ describe('fetchBarsWithIndicators 함수는', () => {
             const result = await fetchBarsWithIndicators(
                 fakeProvider,
                 'AAPL',
-                DEFAULT_TIMEFRAME
+                DEFAULT_TIMEFRAME,
+                undefined,
+                NEAR_MOCK_BAR
             );
 
             expect(result.indicators.dmi.every(v => v.diPlus === null)).toBe(
@@ -177,7 +197,8 @@ describe('fetchBarsWithIndicators 함수는', () => {
             mockGetBars.mockResolvedValueOnce([]);
 
             const fixedNow = new Date('2025-01-15T00:00:00.000Z');
-            const lookbackDays = TIMEFRAME_LOOKBACK_DAYS[DEFAULT_TIMEFRAME];
+            // `1Day` asks the provider once for the longer Fear & Greed window.
+            const lookbackDays = FEAR_GREED_LOOKBACK_DAYS;
             const expectedFromDate = new Date(fixedNow);
             expectedFromDate.setUTCDate(
                 expectedFromDate.getUTCDate() - lookbackDays
@@ -210,7 +231,8 @@ describe('fetchBarsWithIndicators 함수는', () => {
                 fakeProvider,
                 'SPX',
                 DEFAULT_TIMEFRAME,
-                '^SPX'
+                '^SPX',
+                NEAR_MOCK_BAR
             );
 
             expect(mockGetBars).toHaveBeenCalledWith(
@@ -226,7 +248,13 @@ describe('fetchBarsWithIndicators 함수는', () => {
             );
 
             await expect(
-                fetchBarsWithIndicators(fakeProvider, 'AAPL', DEFAULT_TIMEFRAME)
+                fetchBarsWithIndicators(
+                    fakeProvider,
+                    'AAPL',
+                    DEFAULT_TIMEFRAME,
+                    undefined,
+                    NEAR_MOCK_BAR
+                )
             ).rejects.toThrow('Failed to fetch bars');
         });
     });
@@ -251,7 +279,9 @@ describe('fetchBarsWithIndicators — bars without usable prices', () => {
         const result = await fetchBarsWithIndicators(
             fakeProvider,
             '005930.KS',
-            DEFAULT_TIMEFRAME
+            DEFAULT_TIMEFRAME,
+            undefined,
+            NEAR_MOCK_BAR
         );
 
         expect(result.bars.map(b => b.time)).toEqual([
@@ -269,7 +299,13 @@ describe('fetchBarsWithIndicators — bars without usable prices', () => {
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         mockGetBars.mockResolvedValueOnce([mockBar]);
 
-        await fetchBarsWithIndicators(fakeProvider, 'AAPL', DEFAULT_TIMEFRAME);
+        await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            DEFAULT_TIMEFRAME,
+            undefined,
+            NEAR_MOCK_BAR
+        );
 
         expect(warn).not.toHaveBeenCalled();
         warn.mockRestore();
@@ -299,7 +335,9 @@ describe('fetchBarsWithIndicators — every bar unusable', () => {
         const result = await fetchBarsWithIndicators(
             fakeProvider,
             'OTCX',
-            DEFAULT_TIMEFRAME
+            DEFAULT_TIMEFRAME,
+            undefined,
+            NEAR_MOCK_BAR
         );
 
         expect(result.bars).toEqual([]);
@@ -309,5 +347,132 @@ describe('fetchBarsWithIndicators — every bar unusable', () => {
             expect.objectContaining({ dropped: 2, kept: 0 })
         );
         warn.mockRestore();
+    });
+});
+
+/**
+ * `1Day` fetches the longer Fear & Greed window once, but `bars`/`indicators`
+ * must stay exactly the standard window — charts, indicators and analysis
+ * prompts must not change. Only `fearGreedBars` carries the long history.
+ */
+describe('fetchBarsWithIndicators — 1Day Fear & Greed history', () => {
+    const NOW = new Date('2026-10-05T00:00:00.000Z');
+    const DAY_SEC = 86_400;
+    const nowSec = NOW.getTime() / 1000;
+    // One bar every 30 days across five years, oldest-first.
+    const longHistory = Array.from({ length: 61 }, (_, i) => ({
+        ...mockBar,
+        time: nowSec - (60 - i) * 30 * DAY_SEC,
+    }));
+    const standardCutoffSec = (() => {
+        const d = new Date(NOW);
+        d.setUTCDate(d.getUTCDate() - TIMEFRAME_LOOKBACK_DAYS['1Day']);
+        return (
+            Date.parse(d.toISOString().substring(0, 10) + 'T00:00:00Z') / 1000
+        );
+    })();
+
+    beforeEach(() => {
+        mockGetBars.mockReset();
+    });
+
+    it('requests the provider once with the Fear & Greed window', async () => {
+        mockGetBars.mockResolvedValueOnce(longHistory);
+
+        await fetchBarsWithIndicators(
+            fakeProvider,
+            'NVDA',
+            '1Day',
+            undefined,
+            NOW
+        );
+
+        expect(mockGetBars).toHaveBeenCalledTimes(1);
+        const from = new Date(NOW);
+        from.setUTCDate(from.getUTCDate() - FEAR_GREED_LOOKBACK_DAYS);
+        expect(mockGetBars).toHaveBeenCalledWith(
+            expect.objectContaining({
+                from: from.toISOString().substring(0, 10) + 'T00:00:00Z',
+            })
+        );
+    });
+
+    it('keeps bars to the standard window and returns the full history as fearGreedBars', async () => {
+        mockGetBars.mockResolvedValueOnce(longHistory);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'NVDA',
+            '1Day',
+            undefined,
+            NOW
+        );
+
+        const expectedBars = longHistory.filter(
+            b => b.time >= standardCutoffSec
+        );
+        expect(result.bars).toEqual(expectedBars);
+        expect(result.bars.length).toBeLessThan(longHistory.length);
+        expect(result.fearGreedBars).toEqual(longHistory);
+        expect(result.indicators.rsi).toHaveLength(expectedBars.length);
+    });
+
+    it('computes indicators on the standard window only — same as a standard fetch would', async () => {
+        mockGetBars.mockResolvedValueOnce(longHistory);
+        const standardOnly = longHistory.filter(
+            b => b.time >= standardCutoffSec
+        );
+        mockGetBars.mockResolvedValueOnce(standardOnly);
+
+        const withHistory = await fetchBarsWithIndicators(
+            fakeProvider,
+            'NVDA',
+            '1Day',
+            undefined,
+            NOW
+        );
+        const fromStandard = await fetchBarsWithIndicators(
+            fakeProvider,
+            'NVDA',
+            '1Day',
+            undefined,
+            NOW
+        );
+
+        expect(withHistory.indicators).toEqual(fromStandard.indicators);
+    });
+
+    it('keeps a bar exactly at the standard cutoff and drops one a second earlier', async () => {
+        // The provider's `from` is inclusive, so the boundary-day bar was kept
+        // before the long fetch existed — the re-cut must keep it too.
+        const atCutoff = { ...mockBar, time: standardCutoffSec };
+        const justBefore = { ...mockBar, time: standardCutoffSec - 1 };
+        mockGetBars.mockResolvedValueOnce([justBefore, atCutoff]);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'NVDA',
+            '1Day',
+            undefined,
+            NOW
+        );
+
+        expect(result.bars).toEqual([atCutoff]);
+        expect(result.fearGreedBars).toEqual([justBefore, atCutoff]);
+    });
+
+    it('does not attach fearGreedBars to intraday timeframes', async () => {
+        mockGetBars.mockResolvedValueOnce([mockBar]);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'NVDA',
+            '1Hour',
+            undefined,
+            NEAR_MOCK_BAR
+        );
+
+        expect(result.fearGreedBars).toBeUndefined();
+        expect(result.bars).toEqual([mockBar]);
     });
 });

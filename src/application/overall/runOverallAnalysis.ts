@@ -26,7 +26,10 @@ import {
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import { OVERALL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { overallSystemPrompt } from '@/domain/analysis/systemPrompt';
-import { computeFearGreedIndex } from '@/domain/indicators/fearGreed';
+import {
+    computeFearGreedIndex,
+    fearGreedInputs,
+} from '@/domain/indicators/fearGreed';
 import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import {
     DEFAULT_TIER,
@@ -603,11 +606,11 @@ export async function runOverallAnalysis(
     });
 
     const fearGreedPromise = dailyBarsPromise
-        .then(d =>
-            d === null
-                ? null
-                : computeFearGreedIndex(d.bars, d.indicators.buySellVolume)
-        )
+        .then(d => {
+            if (d === null) return null;
+            const input = fearGreedInputs(d);
+            return computeFearGreedIndex(input.bars, input.buySellVolume);
+        })
         // Guards the COMPUTE step, not the fetch — that already logged above.
         // Before the two paths shared one promise, fetch and compute sat in a
         // single chain under one `catch`; splitting them left the compute step
