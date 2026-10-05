@@ -34,7 +34,9 @@ import {
 } from '@/domain/constants/time';
 import {
     computeSecondsUntilCacheExpiry,
-    secondsUntilNextEtRegularOpen,
+    secondsUntilNextRegularClose,
+    secondsUntilNextRegularOpen,
+    secondsUntilNextUtcMidnight,
 } from '@/domain/utils';
 import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
 import type {
@@ -106,21 +108,67 @@ export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
 export const CACHE_EXPIRY_HOUR_KST = 5;
 
 /**
+ * @internal Minutes after a regular close at which a session-aware analysis
+ * expires, so a result generated off still-settling closing data (KRX quotes
+ * from the free provider lag ~20 minutes; end-of-day bars publish after the
+ * bell) does not survive into the next session.
+ */
+export const ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES = 30;
+
+/**
  * @internal Compute the effective analysis-cache TTL for a given timeframe at `now`.
  *
  * Returns the smaller of:
  * - `ANALYSIS_CACHE_TTL[timeframe]` — the static per-timeframe ceiling.
- * - Seconds remaining until the next `CACHE_EXPIRY_HOUR_KST` boundary —
- *   ensures cached results don't survive into the next trading day.
+ * - Seconds remaining until the next daily expiry boundary — ensures cached
+ *   results don't survive into the next trading day.
+ *
+ * The daily boundary depends on `session`:
+ * - **Omitted** — the next `CACHE_EXPIRY_HOUR_KST` boundary (KST 05:00 = the
+ *   U.S. close in summer). Exactly the pre-`session` behavior.
+ * - **Scheduled** (US, KRX, …) — that session's next regular close (holidays
+ *   and half days honored through `closeMinuteFor`) plus
+ *   {@link ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES}. One U.S.-shaped boundary for
+ *   every market let an analysis written before the KRX close be reused all
+ *   evening, and in winter the KST 05:00 boundary lands an hour before the U.S.
+ *   close.
+ * - **Always-open** (crypto) — the next 00:00 UTC, when the daily bar closes.
+ *
+ * The cache KEY is unaffected by `session`; only the lifetime of what is
+ * written under it changes.
  *
  * @param timeframe - Bar resolution.
  * @param now - The "now" reference; useful in tests.
- * @returns Effective TTL in seconds.
+ * @param session - Market session of the analysed instrument.
+ * @returns Effective TTL in seconds (always at least 1).
  */
-export function computeEffectiveTtl(timeframe: Timeframe, now: Date): number {
-    return Math.min(
-        ANALYSIS_CACHE_TTL[timeframe],
-        computeSecondsUntilCacheExpiry(now, CACHE_EXPIRY_HOUR_KST)
+export function computeEffectiveTtl(
+    timeframe: Timeframe,
+    now: Date,
+    session?: MarketSessionSpec
+): number {
+    if (session === undefined) {
+        return Math.min(
+            ANALYSIS_CACHE_TTL[timeframe],
+            computeSecondsUntilCacheExpiry(now, CACHE_EXPIRY_HOUR_KST)
+        );
+    }
+    const secondsUntilBoundary =
+        session.kind === 'always-open'
+            ? secondsUntilNextUtcMidnight(now)
+            : secondsUntilNextRegularClose(
+                  session,
+                  now,
+                  ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES
+              );
+    // A scheduled spec with no trading day in range (a misconfigured spec) has
+    // no boundary to cut at; the per-timeframe ceiling is the safe fallback.
+    return Math.max(
+        1,
+        Math.min(
+            ANALYSIS_CACHE_TTL[timeframe],
+            secondsUntilBoundary ?? ANALYSIS_CACHE_TTL[timeframe]
+        )
     );
 }
 
@@ -141,11 +189,10 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  * Unlike the analysis-cache TTL policy (which clamps to the session **close**
  * boundary), this function uses the session **open** boundary.
  *
- * **ET-only limitation**: the off-hours fallback (`secondsUntilNextEtRegularOpen`)
- * is hard-wired to the US Eastern Time schedule. Currently only
- * {@link US_EQUITY_SESSION} and {@link CRYPTO_SESSION} (which short-circuits to
- * `BARS_OPEN_TTL_SECONDS`) are fully supported; a spec for another timezone would
- * need a spec-driven next-open calculation in the off-hours fallback.
+ * The off-hours fallback (the seconds until the `session` spec's next regular
+ * open) follows that spec's own time zone, weekend days and `closeMinuteFor`
+ * calendar, so a KRX spec expires at the next KRX open rather than the next NYSE
+ * one. A `CRYPTO_SESSION` short-circuits to `BARS_OPEN_TTL_SECONDS`.
  *
  * @param _timeframe - Bar resolution. Currently all timeframes share the same policy;
  *   the parameter is kept for signature consistency with the analysis-cache TTL helper.
@@ -153,8 +200,7 @@ export const BARS_OFFHOURS_TTL_CEILING_SECONDS = SECONDS_PER_DAY;
  *   deterministic testing.
  * @param session - Market session schedule determining open vs off-hours TTL.
  *   Defaults to US_EQUITY_SESSION; pass CRYPTO_SESSION for 24/7 assets (always
- *   returns BARS_OPEN_TTL_SECONDS). Off-hours fallback timing is ET-based; a
- *   non-ET scheduled spec would fall back to ET next-open timing.
+ *   returns BARS_OPEN_TTL_SECONDS).
  * @returns Effective TTL in seconds.
  */
 export function computeBarsEffectiveTtl(
@@ -167,7 +213,7 @@ export function computeBarsEffectiveTtl(
     if (isRegularSessionOpen(session, now)) return BARS_OPEN_TTL_SECONDS;
     return Math.min(
         BARS_OFFHOURS_TTL_CEILING_SECONDS,
-        secondsUntilNextEtRegularOpen(now)
+        secondsUntilNextRegularOpen(session, now)
     );
 }
 
@@ -1554,9 +1600,16 @@ export function buildCongressTrendCacheKey(
  * and news-analysis calendar rows gain `(in N days | N days ago)`. Bytes
  * change for every request.
  *
+ * **`p8`** — reader-facing `currentDriverKo`. The schema field description no
+ * longer says the driver is based on "provided" news (models copied that into
+ * the published copy); the source boundary moved into Rules, which also gain a
+ * rule against referring to the input itself. The no-articles rule stops
+ * telling the model to say no articles "were provided". Bytes change for every
+ * request of both builders.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p7' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p8' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.

@@ -1767,6 +1767,18 @@ export interface ActionRecommendation {
 }
 
 /**
+ * The last bar an analysis was generated from — "as of" which data the text
+ * describes. Distinct from `analyzedAt` (when the LLM call ran): an analysis
+ * produced before a session's close and reused after it keeps an old `barTime`.
+ */
+export interface AnalysisDataAsOf {
+    /** Unix timestamp (seconds since epoch) of the start of the last bar the analysis used. */
+    barTime: number;
+    /** Close of that bar — the "current price" the analysis text is anchored to. */
+    close: number;
+}
+
+/**
  * Final analysis result returned to consumers.
  *
  * Produced by {@link enrichAnalysisWithConfidence} from a worker raw
@@ -1801,6 +1813,8 @@ export interface AnalysisResponse {
     actionRecommendation?: ActionRecommendation;
     /** ISO 8601 timestamp of when this analysis was performed. */
     analyzedAt?: string;
+    /** Last bar the analysis used. Absent on entries cached before the field existed, so read it as optional. */
+    dataAsOf?: AnalysisDataAsOf;
 }
 
 /**
@@ -1836,6 +1850,8 @@ export interface FilteredAnalysisResponse {
     actionRecommendation: FilteredActionRecommendation | null;
     /** ISO 8601 timestamp of when this analysis was performed. */
     analyzedAt?: string;
+    /** Last bar the analysis used. Absent on entries cached before the field existed, so read it as optional. */
+    dataAsOf?: AnalysisDataAsOf;
 }
 
 /**
@@ -2023,6 +2039,7 @@ export interface RawAnalysisResponse {
     chartOverlays?: unknown;
     actionRecommendation?: unknown;
     analyzedAt?: unknown;
+    dataAsOf?: unknown;
 }
 
 /** @internal Raw LLM/news-card response before runtime normalization. */

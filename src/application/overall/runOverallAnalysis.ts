@@ -89,14 +89,17 @@ const OVERALL_PROMPT_VERSION_PLACEHOLDER = 'overall-unversioned';
  * so the overall input hash stays stable across runs.
  *
  * `analyzedAt` is rewritten on every run; `skillsDegraded` is a transient
- * loader-health flag. Neither belongs in the hashing surface.
- * Mirrors the private helper in `submitOverallAnalysis.ts`.
+ * loader-health flag; `dataAsOf` is consumer-facing metadata derived from the
+ * same bars the technical text already reflects, and entries cached before it
+ * existed lack it — keeping it would change the overall key once per symbol
+ * for no change in prompt content. None belongs in the hashing surface.
  */
 function stripVolatileTechnicalFields(
     technical: AnalysisResponse
-): Omit<AnalysisResponse, 'analyzedAt'> {
+): Omit<AnalysisResponse, 'analyzedAt' | 'dataAsOf'> {
     const {
         analyzedAt: _analyzedAt,
+        dataAsOf: _dataAsOf,
         skillsDegraded: _skillsDegraded,
         ...rest
     } = technical as AnalysisResponse & { skillsDegraded?: boolean };
@@ -106,7 +109,6 @@ function stripVolatileTechnicalFields(
 /**
  * Strip the `analyzedAt` field from an options response so the overall hash
  * stays stable. `null` (graceful skip / crypto) passes through unchanged.
- * Mirrors the private helper in `submitOverallAnalysis.ts`.
  */
 function stripVolatileOptionsFields(
     options: OptionsAnalysisResponse | null | undefined
