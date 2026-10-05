@@ -19,6 +19,7 @@ const MARKER_OPENER = '[[';
 
 const MARKER_FIRST_CHAR = '[';
 
+/** Result of {@link splitAgentFollowUps}: the visible answer and its follow-up suggestions. */
 export interface SplitAgentFollowUps {
     /** The answer without the follow-up line. Identical to the input when there is none. */
     body: string;

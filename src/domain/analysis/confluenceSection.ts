@@ -163,10 +163,17 @@ function describeSignal(type: string): string {
         : `${type}(${family})`;
 }
 
+/** Decimal places for the weighted family count (half-weight members make `.5`). */
+const FAMILY_COUNT_DECIMALS = 1;
+
 /** Weighted count of distinct indicator families, at most one decimal (`2.5`, `3`). */
 function familyCount(types: readonly string[], expectedWeight: number): string {
     return String(
-        Number(confluenceFamilyWeight(types, expectedWeight).toFixed(1))
+        Number(
+            confluenceFamilyWeight(types, expectedWeight).toFixed(
+                FAMILY_COUNT_DECIMALS
+            )
+        )
     );
 }
 

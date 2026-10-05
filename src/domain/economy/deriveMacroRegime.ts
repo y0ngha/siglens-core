@@ -23,7 +23,7 @@ const SLOWDOWN_SIGNALS_REQUIRED = 2;
 /** Percentage-point deltas are compared after rounding to this many decimals (4.5 − 4.4 is 0.0999…). */
 const PP_COMPARE_DECIMALS = 2;
 
-/** Which rule decided the regime — finer than the regime itself. */
+/** @internal Which rule decided the regime — finer than the regime itself. */
 export type MacroRegimeRule =
     | 'contraction:recessionHigh'
     | 'contraction:jobLossRisingUnemployment'
@@ -33,6 +33,7 @@ export type MacroRegimeRule =
     | 'expansion'
     | 'neutral';
 
+/** @internal What {@link deriveMacroRegime} decided and why. */
 export interface DerivedMacroRegime {
     regime: MacroRegime;
     firedRule: MacroRegimeRule;

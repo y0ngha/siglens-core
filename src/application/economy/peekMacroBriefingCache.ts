@@ -97,6 +97,9 @@ export async function peekMacroBriefingCacheEntry(
             normalizeMacroBriefing(cached.briefing),
             data
         ),
+        // `CachedBriefingData.generatedAt` is typed `string`, but entries written
+        // before it was stored come back from Redis without it — the runtime
+        // check turns that legacy shape into the documented `null`.
         generatedAt:
             typeof cached.generatedAt === 'string' ? cached.generatedAt : null,
     };

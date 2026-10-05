@@ -5,7 +5,7 @@ import type { EconomicEventAnalysis } from '@/domain/economy/types';
 // Submit
 // ─────────────────────────────────────────
 
-/** {@link submitMacroBriefing} cache-hit variant — briefing already produced this hour. */
+/** {@link submitMacroBriefing} cache-hit variant — briefing already produced for today's UTC-day bucket. */
 export interface SubmitMacroBriefingCached {
     /** Discriminator: cache hit returned a previously produced briefing. */
     status: 'cached';
@@ -255,6 +255,7 @@ export type RunIndicatorTranslationResult =
  * time it was generated.
  */
 export interface MacroBriefingCacheEntry {
+    /** The normalized cached briefing, with `regime` recomputed from the snapshot. */
     briefing: MacroBriefingResponse;
     /** ISO timestamp the briefing was generated at; `null` for a legacy cache entry written without it. */
     generatedAt: string | null;

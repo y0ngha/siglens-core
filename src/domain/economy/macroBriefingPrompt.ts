@@ -1,8 +1,8 @@
+import { deriveMacroRegime } from './deriveMacroRegime';
 import {
     getMacroIndicatorPromptMeta,
     type MacroIndicatorPromptMeta,
 } from './indicatorPromptMeta';
-import { deriveMacroRegime } from './deriveMacroRegime';
 import { computeYieldSpread } from './normalizeTreasuryRates';
 import type { EconomySnapshot } from './types';
 import {
