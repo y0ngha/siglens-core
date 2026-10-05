@@ -81,7 +81,8 @@ describe('peekMacroBriefingCache 함수는', () => {
         const result = await peekMacroBriefingCache(SNAP);
         expect(result).not.toBeNull();
         expect(result?.summary).toBe('동결 국면이에요');
-        expect(result?.regime).toBe('recovery');
+        // regime은 캐시에 적힌 값이 아니라 지표에서 계산한 값이다(SNAP에는 판정 근거 행이 없어 neutral).
+        expect(result?.regime).toBe('neutral');
     });
 
     it('cached.briefing이 null이면 null', async () => {
@@ -117,6 +118,31 @@ describe('peekMacroBriefingCache 함수는', () => {
         expect(nextDay).not.toBe(early);
     });
 
+    it('캐시된 regime이 현재 지표와 다르면 계산된 regime으로 맞춰 돌려준다', async () => {
+        const slowdown: EconomySnapshot = {
+            indicators: [
+                {
+                    name: 'totalNonfarmPayroll',
+                    latest: { date: '2026-09-01', value: 158_990 },
+                    previous: { date: '2026-08-01', value: 159_015 },
+                    trend: [],
+                },
+            ],
+            treasury: null,
+            calendar: [],
+        };
+        mockCacheGet.mockResolvedValue({
+            ...VALID_CACHED,
+            briefing: { ...VALID_CACHED.briefing, regime: 'expansion' },
+        });
+        expect((await peekMacroBriefingCache(slowdown))?.regime).toBe(
+            'slowdown'
+        );
+        expect(
+            (await peekMacroBriefingCacheEntry(slowdown))?.briefing.regime
+        ).toBe('slowdown');
+    });
+
     it('캐시 읽기가 throw하면 로깅 후 null', async () => {
         const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
         mockCacheGet.mockRejectedValueOnce(new Error('cache down'));
@@ -150,7 +176,7 @@ describe('peekMacroBriefingCacheEntry 함수는', () => {
     it('generatedAt이 없는 옛 엔트리도 읽고 generatedAt은 null이다', async () => {
         mockCacheGet.mockResolvedValueOnce({ briefing: VALID_CACHED.briefing });
         const entry = await peekMacroBriefingCacheEntry(SNAP);
-        expect(entry?.briefing.regime).toBe('recovery');
+        expect(entry?.briefing.regime).toBe('neutral');
         expect(entry?.generatedAt).toBeNull();
     });
 

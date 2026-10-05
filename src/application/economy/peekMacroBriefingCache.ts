@@ -1,4 +1,5 @@
 import type { MacroBriefingCacheEntry } from '@/application/economy/types';
+import { withComputedRegime } from '@/domain/economy/deriveMacroRegime';
 import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
 import type { EconomySnapshot, MacroBriefingResponse } from '@/domain/types';
 import {
@@ -21,6 +22,12 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  * it safe to call at the start of any server-side handler. On a cold cache
  * (no provider / miss / read error), returns `null` so callers can fall back
  * to the full run path.
+ *
+ * **`regime` is recomputed, not stored.** On every return — cache hits and legacy
+ * cache entries alike — the briefing's `regime` is overwritten with the
+ * value `deriveMacroRegime` computes from `data`, so it may differ from what the
+ * model wrote or from what a cache entry holds. The prose (`summary`,
+ * `highlights`) is untouched.
  *
  * @param data - Economy snapshot (indicators + treasury + calendar). Accepts
  *   `null` / `undefined` so JavaScript callers (or callers whose snapshot
@@ -52,6 +59,10 @@ export async function peekMacroBriefingCache(
  * a day-cached briefing. Additive — {@link peekMacroBriefingCache} keeps its
  * signature.
  *
+ * As with {@link peekMacroBriefingCache}, the returned `briefing.regime` is
+ * recomputed from `data` on every read (legacy entries included) and may differ
+ * from the stored value.
+ *
  * `generatedAt` is the ISO timestamp stored in the cache envelope by
  * `runMacroBriefing`; it is `null` only for a legacy entry written without it.
  *
@@ -82,7 +93,10 @@ export async function peekMacroBriefingCacheEntry(
     // normalizeMacroBriefing is designed to never throw — it returns a
     // well-formed default for null/undefined/malformed input — so no catch is needed.
     return {
-        briefing: normalizeMacroBriefing(cached.briefing),
+        briefing: withComputedRegime(
+            normalizeMacroBriefing(cached.briefing),
+            data
+        ),
         generatedAt:
             typeof cached.generatedAt === 'string' ? cached.generatedAt : null,
     };

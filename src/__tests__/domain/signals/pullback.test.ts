@@ -200,6 +200,12 @@ describe('PULLBACK_BASE_RATES', () => {
         expect(text).not.toContain('about 2.7x as frequent');
     });
 
+    it('기저율 문장은 모델이 그대로 따라 쓰는 내부 라벨(confluence / washout / rule engine)을 담지 않는다', () => {
+        for (const text of Object.values(PULLBACK_BASE_RATES)) {
+            expect(text).not.toMatch(/confluence|washout|rule engine/i);
+        }
+    });
+
     it('none을 뺀 모든 판독에 기저율 문장이 있고, 지시가 아니라고 밝힌다', () => {
         const readings: Exclude<PullbackReading, 'none'>[] = [
             'washoutInUptrend',

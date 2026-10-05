@@ -800,11 +800,20 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * user prompt to the head of `stable` (system message, ahead of the
  * `always_on` skill digests) so the cross-symbol common prefix covers them for
  * provider automatic prefix caching. Bytes change on every request.
- * **`p23`** — UX audit 2026-10-05 §C6: the Confluence Assessment block gains an
- * internal-labels rule (never write "rule engine", "confluence", "washout" or
- * an "x / 100" score in output) and the two instructions that told the model to
- * cite the rule engine / washout by name are reworded. Bytes change on every
- * request.
+ * **`p23`** — UX audit 2026-10-05 §C6 (and the A/B follow-up). The model echoed
+ * the internal labels it was shown, so they are gone from both instructions
+ * and data: the instruction block is now `### Indicator Agreement Assessment`
+ * with an internal-labels rule (never write "rule engine", "confluence",
+ * "washout" or an "x / 100" score); output-directing bullets that said
+ * "stronger confluence" / "note the confluence" / "washout path" are reworded;
+ * and the generated data labels are renamed with the values unchanged —
+ * `### Indicator Agreement (computed, …)` (the printed `N / 100` score is
+ * replaced by weighted bullish-vs-bearish indicator-group counts),
+ * `### Short-term sell-off check (computed, 1Day bars)`,
+ * `Entry verdict (computed): … sell-off path`, the sell-off reading texts,
+ * `## Pro-Indicator Agreement`, and the `PULLBACK_BASE_RATES` wording
+ * ("washout" → "sell-off", "bearish confluence tally" → "bearish indicator
+ * tally"). Bytes change on every request.
  *
  * @internal
  */
@@ -1054,12 +1063,23 @@ export function buildMacroBriefingDateBucket(now: Date): string {
  * change for every request.
  *
  * @remarks
- * **`p5`** — UX audit 2026-10-05 §C1. Indicator rows print a human label, the
- * FMP key, and an explicit unit on both values and a unit-bearing delta
- * (registry: `MACRO_INDICATOR_PROMPT_META`); the prompt gains an
- * `## Interpretation Rules` block. The cache key bucket also moved from
- * `dateHour` to a UTC date (`buildMacroBriefingDateBucket`) with a 1-day TTL.
- * Bytes change for every registry-known indicator.
+ * **`p5`** — UX audit 2026-10-05 §C1 (and the A/B follow-ups). Indicator rows
+ * print a human label, the FMP key and an explicit unit
+ * (registry: `MACRO_INDICATOR_PROMPT_META`). A level series whose raw unit is a
+ * multiplier is pre-converted so the model never rescales: nonfarm payroll
+ * prints ONLY its monthly change in persons (`monthly change: +29,000
+ * persons`, no level — via `rawScale`/`decimals`/`showLevel`), GDP prints
+ * `USD trillion`, weekly claims print thousands-grouped persons. The regime is
+ * computed in code (`deriveMacroRegime`): the prompt carries a
+ * `Regime (computed): <regime> — because: <signals>` line instead of a rule
+ * list, and `withComputedRegime` overwrites the model's `regime` on every
+ * returned briefing (fresh, cache hit, peek). The `## Interpretation Rules`
+ * block also forbids policy-direction claims without a rate-decision row,
+ * changes for series with no previous value, and a month-over-month reading of
+ * the daily inflation series; asks for `%p` in Korean; bans copying prompt
+ * jargon; and bans restating relative times. The cache key bucket also moved
+ * from `dateHour` to a UTC date (`buildMacroBriefingDateBucket`) with a 1-day
+ * TTL. Bytes change for every request.
  *
  * @internal
  */

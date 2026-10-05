@@ -4,6 +4,7 @@ import type {
     RunMacroBriefingOptions,
     RunMacroBriefingResult,
 } from '@/application/economy/types';
+import { withComputedRegime } from '@/domain/economy/deriveMacroRegime';
 import { buildMacroBriefingPrompt } from '@/domain/economy/macroBriefingPrompt';
 import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
 import type { EconomySnapshot } from '@/domain/types';
@@ -33,6 +34,12 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  * Concurrent calls for the same `cacheKey` are deduplicated via
  * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
  * receive the same result.
+ *
+ * **`regime` is recomputed, not stored.** On every return — fresh, cache hit and
+ * legacy cache entries alike — the briefing's `regime` is overwritten with the
+ * value `deriveMacroRegime` computes from `data`, so it may differ from what the
+ * model wrote or from what a cache entry holds. The prose (`summary`,
+ * `highlights`) is untouched.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
@@ -64,7 +71,10 @@ export async function runMacroBriefing(
             if (cached !== null && cached.briefing != null) {
                 return {
                     status: 'cached',
-                    briefing: normalizeMacroBriefing(cached.briefing),
+                    briefing: withComputedRegime(
+                        normalizeMacroBriefing(cached.briefing),
+                        data
+                    ),
                     generatedAt: cached.generatedAt,
                 };
             }
@@ -88,7 +98,10 @@ export async function runMacroBriefing(
         })
     );
 
-    const briefing = normalizeMacroBriefing(JSON.parse(raw) as unknown);
+    const briefing = withComputedRegime(
+        normalizeMacroBriefing(JSON.parse(raw) as unknown),
+        data
+    );
     const generatedAt = new Date().toISOString();
 
     if (!briefing.summary) {

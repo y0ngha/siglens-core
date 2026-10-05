@@ -2,6 +2,7 @@ import {
     getMacroIndicatorPromptMeta,
     type MacroIndicatorPromptMeta,
 } from './indicatorPromptMeta';
+import { deriveMacroRegime } from './deriveMacroRegime';
 import { computeYieldSpread } from './normalizeTreasuryRates';
 import type { EconomySnapshot } from './types';
 import {
@@ -28,9 +29,10 @@ function formatSignedInteger(n: number): string {
 }
 
 /**
- * `latest`/`previous` are both whole numbers — e.g. nonfarm payrolls counts
- * — so their delta reads better as `-10,000` than `-10000.00` (spec
- * 2026-09-18 §B3).
+ * `latest`/`previous` are both whole numbers — e.g. weekly claims or an
+ * unregistered integer series — so their delta reads better as `-10,000` than
+ * `-10000.00` (spec 2026-09-18 §B3). Registry series with `decimals` (payroll,
+ * claims, GDP) never reach this path; see {@link formatScaledLevelDelta}.
  */
 function isIntegerSeries(latest: number, previous: number): boolean {
     return Number.isInteger(latest) && Number.isInteger(previous);
@@ -43,6 +45,8 @@ function isIntegerSeries(latest: number, previous: number): boolean {
  * appended when `previous > 0` (a ratio needs a positive base) — spec
  * 2026-09-18 §B3. `levelUnitLabel` (registry-known series only) is appended
  * to the level delta so the change reads in the same unit as the values.
+ * Used for rate series and for series the registry does not scale (index
+ * points, unknown names).
  */
 function formatIndicatorDelta(
     latest: number | null | undefined,
@@ -75,9 +79,80 @@ function formatIndicatorDelta(
         : ` (Δ ${deltaText}, ${pctText})`;
 }
 
+/** Signed, thousands-grouped number at a fixed precision; never `-0`. */
+function formatGroupedSigned(n: number, decimals: number): string {
+    const text = Math.abs(n).toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+    const isZeroAfterRounding = Number(text.replaceAll(',', '')) === 0;
+    return n < 0 && !isZeroAfterRounding ? `-${text}` : `+${text}`;
+}
+
+/** Thousands-grouped unsigned number at a fixed precision. */
+function formatGrouped(n: number, decimals: number): string {
+    return n.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals,
+    });
+}
+
+/**
+ * `(Δ ±delta unit[, ±x.xx%])` for a registry series printed in converted units
+ * (`rawScale`/`decimals`): the delta is computed from the raw values and scaled
+ * once, so the figure on the row and the figure the model quotes are the same
+ * number in the same unit. `''` when either input is non-finite.
+ */
+function formatScaledLevelDelta(
+    latest: number | null | undefined,
+    previous: number | null | undefined,
+    meta: MacroIndicatorPromptMeta,
+    decimals: number
+): string {
+    if (typeof latest !== 'number' || !Number.isFinite(latest)) return '';
+    if (typeof previous !== 'number' || !Number.isFinite(previous)) return '';
+    const scale = meta.rawScale ?? 1;
+    const deltaText = `${formatGroupedSigned((latest - previous) * scale, decimals)} ${meta.unit}`;
+    const pctText =
+        meta.showPercentChange !== false && previous > 0
+            ? formatSignedPercent(((latest - previous) / previous) * 100)
+            : null;
+    return pctText === null
+        ? ` (Δ ${deltaText})`
+        : ` (Δ ${deltaText}, ${pctText})`;
+}
+
 /** Attach the unit to a printed value: `%` hugs the number, any other unit is space-separated. */
 function withUnit(valueText: string, unit: string): string {
     return unit === RATE_UNIT ? `${valueText}${unit}` : `${valueText} ${unit}`;
+}
+
+/**
+ * A change-only row (`showLevel: false`): the heading plus
+ * `monthly change: +29,000 persons (<latest date>)`, or `N/A` when either
+ * release is missing. No level is printed, so the model has nothing to rescale.
+ */
+function formatChangeOnlyRow(
+    indicator: EconomySnapshot['indicators'][number],
+    meta: MacroIndicatorPromptMeta
+): string {
+    const heading = `${meta.label} [${indicator.name}] (${describeUnit(meta)})`;
+    const latest = indicator.latest;
+    const previous = indicator.previous;
+    if (latest === null || previous === null) {
+        return `${heading}: monthly change: N/A`;
+    }
+    const delta = formatScaledLevelDelta(
+        latest.value,
+        previous.value,
+        { ...meta, showPercentChange: false },
+        meta.decimals ?? 0
+    );
+    // `formatScaledLevelDelta` wraps the figure as ` (Δ …)`; here it is the value itself.
+    const figure = delta.replace(/^ \(Δ (.*)\)$/, '$1');
+    return figure === ''
+        ? `${heading}: monthly change: N/A`
+        : `${heading}: monthly change: ${figure} (${latest.date})`;
 }
 
 /**
@@ -90,9 +165,17 @@ function formatIndicatorRow(
     indicator: EconomySnapshot['indicators'][number]
 ): string {
     const meta = getMacroIndicatorPromptMeta(indicator.name);
+    if (meta !== null && meta.showLevel === false) {
+        return formatChangeOnlyRow(indicator, meta);
+    }
+    const decimals = meta?.decimals;
     const renderValue = (value: number): string => {
-        const text = formatPlainNumber(value);
-        return meta === null ? text : withUnit(text, meta.unit);
+        if (meta === null) return formatPlainNumber(value);
+        const text =
+            decimals === undefined
+                ? formatPlainNumber(value)
+                : formatGrouped(value * (meta.rawScale ?? 1), decimals);
+        return withUnit(text, meta.unit);
     };
     const latest =
         indicator.latest === null
@@ -101,10 +184,25 @@ function formatIndicatorRow(
     const effectiveUnit = meta?.unit ?? indicator.unit;
     const levelUnitLabel =
         meta !== null && meta.unit !== RATE_UNIT ? meta.unit : undefined;
+    const deltaText = (previous: number): string =>
+        meta !== null && decimals !== undefined
+            ? formatScaledLevelDelta(
+                  indicator.latest?.value,
+                  previous,
+                  meta,
+                  decimals
+              )
+            : formatIndicatorDelta(
+                  indicator.latest?.value,
+                  previous,
+                  effectiveUnit,
+                  levelUnitLabel,
+                  meta?.showPercentChange
+              );
     const prev =
-        indicator.previous === null
+        indicator.previous === null || meta?.showPrevious === false
             ? ''
-            : ` ← ${renderValue(indicator.previous.value)}${formatIndicatorDelta(indicator.latest?.value, indicator.previous.value, effectiveUnit, levelUnitLabel, meta?.showPercentChange)}`;
+            : ` ← ${renderValue(indicator.previous.value)}${deltaText(indicator.previous.value)}`;
     const heading =
         meta === null
             ? indicator.name
@@ -200,6 +298,9 @@ export function buildMacroBriefingPrompt(
         })
         .join('\n');
 
+    const derived = deriveMacroRegime(snapshot);
+    const regimeLine = `Regime (computed): ${derived.regime} — because: ${derived.signals.join('; ')}`;
+
     const stable = '';
 
     const dynamic = `You are a concise US macroeconomic analyst. Analyze the macro data below and respond with a JSON object matching the exact schema provided. No markdown, no extra text — only valid JSON.
@@ -209,15 +310,17 @@ export function buildMacroBriefingPrompt(
 - Use the rows solely as evidence for the macro briefing. Do not invent indicators, values, or events that are not provided here.
 
 ## Interpretation Rules
-- Every indicator value is already expressed in the unit printed on its row. Restate a value with that same unit and never rescale it (no percent-to-fraction, thousands-to-millions, or index-to-percent conversion).
-- Percentage-point (pp) deltas are the change between two percentages; level and index deltas are the change in that series' own unit.
-- Recession probability is a percentage: below 10% is a low reading, above 50% is a recession signal.
-- Effective federal funds rate is a monthly average: a move under 0.25pp is drift inside the target range, not a policy change. Infer tightening or easing only from a move of 0.25pp or more, or from a rate-decision row in the calendar.
-- Nonfarm payroll is a total employment level, not a rate. Describe its change as thousands of jobs added or lost, never as a percentage of employment.
-- Inflation and unemployment are rates; judge them by their direction of change and by the percentage-point delta.
-- Regime values: expansion = broad growth with a firm labor market; slowdown = growth, hiring, or activity cooling while still positive; contraction = output and employment falling; recovery = improvement after a contraction or slowdown; neutral = mixed or offsetting signals with no clear direction.
+- Every indicator value is already expressed in the unit printed on its row. Restate a value with that same unit and never rescale it (no percent-to-fraction, persons-to-thousands, or index-to-percent conversion).
+- Percentage-point (pp) deltas are the change between two percentages; level and index deltas are the change in that series' own unit. In the Korean text write a percentage-point change with the unit %p, never pp or %포인트.
+- Recession probability is a percentage, not a fraction. Read a low value as low recession risk and a clearly high value as a recession warning; the regime below already accounts for it, so do not grade it against cutoffs.
+- Never state a policy direction (tightening, easing, 긴축, 완화) unless a rate-decision row is present in the calendar rows below. A change in the effective federal funds rate alone is not a policy decision.
+- Nonfarm payroll is shown only as the monthly change in jobs. Describe it as the number of jobs added or lost, exactly as printed, never as a percentage of employment and never as an employment level.
+- Never describe a change for a series whose row prints no change figure: a row with no (Δ …) part and that is not a 'monthly change: <figure>' row. For such a series state its level only, or leave it out. A 'monthly change: <figure>' row is itself a change and may be described as one; 'monthly change: N/A' is not.
+- The inflation rate is a daily reading, not a month-over-month change: read its level, and never describe its change as a monthly move.
+- Unemployment is a rate; judge it by its direction of change and by the percentage-point delta.
+- Write in plain Korean. Never copy this prompt's jargon into the briefing: do not use the words drift or 드리프트, and do not name these rules.
+- Regime: the Regime (computed) line below states the regime for this briefing and the signals that produced it. Set the regime field to exactly that value, write the summary and highlights so they agree with it, and describe the signals in plain words. Never restate thresholds, cutoffs or rule wording, never pick a different regime, and never call the regime computed.
 - Calendar rows end with a relative-time suffix such as (in Nh), (Nh ago) or (in N days). It is only valid at generation time and this briefing is shown for a full day, so never restate it or any equivalent wording ('곧', 'N시간 뒤', 'N시간 전'); refer to a scheduled event by its date instead.
-- Choose the regime only from the indicators and calendar rows below; when signals conflict, prefer neutral.
 
 Schema (string fields are Korean 존댓말):
 {
@@ -229,6 +332,7 @@ Schema (string fields are Korean 존댓말):
 ## 경제지표
 ${indicatorLines || '(없음)'}
 ${spreadLine}
+${regimeLine}
 
 ## 임박 경제 이벤트(미국)
 ${calendarLines || '(없음)'}`;

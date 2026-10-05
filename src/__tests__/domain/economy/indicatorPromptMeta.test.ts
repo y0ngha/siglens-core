@@ -46,7 +46,7 @@ describe('MACRO_INDICATOR_PROMPT_META', () => {
 
 describe('getMacroIndicatorPromptMeta', () => {
     it('returns the entry for a known name and null for an unknown one', () => {
-        expect(getMacroIndicatorPromptMeta('GDP')?.unit).toBe('USD billions');
+        expect(getMacroIndicatorPromptMeta('GDP')?.unit).toBe('USD trillion');
         expect(getMacroIndicatorPromptMeta('unknownSeries')).toBeNull();
     });
 

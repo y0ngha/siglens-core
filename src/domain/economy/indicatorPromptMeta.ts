@@ -19,6 +19,31 @@ export interface MacroIndicatorPromptMeta {
     kind: MacroIndicatorKind;
     /** Extra reading hint printed next to the unit; must not contain example sentences or sample values. */
     note?: string;
+    /**
+     * Multiplier from the raw FMP value to {@link unit}. Set for a level series
+     * whose raw unit is itself a multiplier (thousands, billions): the prompt
+     * prints the value and delta ALREADY converted, so the model never has to
+     * rescale (it misread `159044` thousand persons as "15만" / "15,904만").
+     */
+    rawScale?: number;
+    /**
+     * Decimal places of the printed value and delta. Setting it switches the
+     * row to the thousands-grouped, scaled rendering (`159,044,000 persons`).
+     */
+    decimals?: number;
+    /**
+     * `false` prints the latest value only — no `← previous` and no delta. For
+     * a series whose `previous` is not the previous release of the same cadence
+     * (FMP's `inflationRate.previous` is the previous DAY), so the delta reads
+     * as "no change" and the model repeats it as a finding.
+     */
+    showPrevious?: boolean;
+    /**
+     * `false` prints only the change between the two releases, not the level
+     * (`monthly change: +29,000 persons`). For a total whose level the model
+     * kept misreading and whose level adds nothing to the briefing.
+     */
+    showLevel?: boolean;
     /** `false` drops the `±x.xx%` change term from the delta (default shown) — for a total whose percent change misleads. */
     showPercentChange?: boolean;
 }
@@ -46,6 +71,7 @@ export const MACRO_INDICATOR_PROMPT_META: Readonly<
         label: 'Inflation rate (year over year)',
         unit: '%',
         kind: 'rate',
+        showPrevious: false,
     },
     unemploymentRate: {
         label: 'Unemployment rate',
@@ -60,20 +86,26 @@ export const MACRO_INDICATOR_PROMPT_META: Readonly<
     },
     totalNonfarmPayroll: {
         label: 'Total nonfarm payroll employment',
-        unit: 'thousand persons',
+        unit: 'persons',
         kind: 'level',
-        note: 'total employment level; the change between releases is the monthly job gain or loss in thousands',
+        note: 'the row shows only the monthly number of jobs added or lost, not the employment level',
+        rawScale: 1000,
+        decimals: 0,
+        showLevel: false,
         showPercentChange: false,
     },
     initialClaims: {
         label: 'Initial jobless claims',
         unit: 'persons per week',
         kind: 'level',
+        decimals: 0,
     },
     GDP: {
         label: 'Gross domestic product',
-        unit: 'USD billions',
+        unit: 'USD trillion',
         kind: 'level',
+        rawScale: 0.001,
+        decimals: 2,
     },
     CPI: {
         label: 'Consumer price index',

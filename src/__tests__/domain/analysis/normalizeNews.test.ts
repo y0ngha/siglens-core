@@ -267,6 +267,48 @@ describe('stripInputMetaLead 함수는 (UX audit 2026-10-05 §C2)', () => {
         );
     });
 
+    it('입력 명사 앞에 짧은 수식어가 끼어도 한정어와 건수만 걷어 낸다 (암호화폐 다이제스트)', () => {
+        expect(
+            stripInputMetaLead(
+                '제공된 암호화폐 카테고리 뉴스는 ETF 유입을 다룹니다.'
+            )
+        ).toBe('암호화폐 카테고리 뉴스는 ETF 유입을 다룹니다.');
+        expect(
+            stripInputMetaLead(
+                '제공된 25건의 암호화폐 뉴스는 비트코인 강세를 가리킵니다.'
+            )
+        ).toBe('암호화폐 뉴스는 비트코인 강세를 가리킵니다.');
+        expect(
+            stripInputMetaLead('주어진 증시 관련 기사들은 실적을 다룹니다.')
+        ).toBe('증시 관련 기사들은 실적을 다룹니다.');
+    });
+
+    it('조사로 끝나는 주어(수식어가 아닌 실제 내용) 뒤에 입력 명사가 와도 걷어 내지 않는다', () => {
+        // 명사 뒤 경계는 통과하므로(`뉴스에`, `뉴스는`) 조사 제외 규칙만이 이를 막는다.
+        const guidance = '제공된 가이던스는 뉴스에 이미 반영됐습니다.';
+        expect(stripInputMetaLead(guidance)).toBe(guidance);
+        const env = '주어진 환경에서 뉴스는 중요하지 않습니다.';
+        expect(stripInputMetaLead(env)).toBe(env);
+    });
+
+    it('조사 없는 수식어가 셋 이상이면 걷어 내지 않는다 (수식어 상한 2개)', () => {
+        const three = '제공된 매우 긴 여러 뉴스는 같습니다.';
+        expect(stripInputMetaLead(three)).toBe(three);
+        const four = '제공된 매우 긴 여러 수식어 뉴스는 같습니다.';
+        expect(stripInputMetaLead(four)).toBe(four);
+        // 두 개까지는 걷어 낸다.
+        expect(stripInputMetaLead('제공된 매우 긴 뉴스는 같습니다.')).toBe(
+            '매우 긴 뉴스는 같습니다.'
+        );
+    });
+
+    it('수식어가 문장부호를 건너면 걷어 내지 않는다', () => {
+        const period = '제공된 변화 없음. 뉴스는 다릅니다.';
+        expect(stripInputMetaLead(period)).toBe(period);
+        const comma = '제공된 변화 없음, 뉴스는 다릅니다.';
+        expect(stripInputMetaLead(comma)).toBe(comma);
+    });
+
     it('자료·정보·본문·데이터·뉴스·기사 앞의 한정어를 모두 걷어 낸다', () => {
         for (const noun of ['자료', '정보', '본문', '데이터', '뉴스', '기사']) {
             expect(

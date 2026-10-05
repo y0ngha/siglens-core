@@ -134,9 +134,13 @@ describe('formatDeterministicMetricsSection', () => {
             reference()
         );
         expect(out).toContain(DETERMINISTIC_METRICS_HEADER);
-        expect(out).toContain('### Indicator Confluence');
+        expect(out).toContain('### Indicator Agreement');
         expect(out).toContain('Entry rule (>= 2.5 weighted bullish families');
-        expect(out).toContain('Confluence score:');
+        // No printed 0-100 score — the model quoted it ("47/100") as a finding.
+        expect(out).not.toMatch(/score|\/ ?100/i);
+        expect(out).toMatch(
+            /Agreeing indicator groups \(weighted, a half-weight member counts 0\.5\): [\d.]+ bullish vs [\d.]+ bearish/
+        );
     });
 
     it('prints the daily threshold on the daily chart', () => {
@@ -273,7 +277,7 @@ describe('formatDeterministicMetricsSection', () => {
         );
         expect(out).toContain('Not measurable');
         expect(out).toContain('received 10');
-        expect(out).not.toContain('Confluence score:');
+        expect(out).not.toMatch(/Agreeing indicator groups/);
     });
 
     it('flags a sub-1.0 ratio as a reason to wait, not to enter', () => {
@@ -322,7 +326,7 @@ describe('formatDeterministicMetricsSection', () => {
             '30Min',
             EMPTY_REFERENCE
         );
-        expect(out).toContain('### Indicator Confluence');
+        expect(out).toContain('### Indicator Agreement');
         expect(out).toContain('### Risk:Reward From Current Price');
         expect(out).toContain('Not measurable:');
         expect(out).not.toContain('Structural risk:reward from current price');
@@ -415,6 +419,86 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
         }));
     }
 
+    /** 상승 추세 끝 14봉 범위(고가 225, 저가 217)의 85% 지점 — %R -85, MA200 위. */
+    function nearWashoutBars(): Bar[] {
+        const closes = [
+            ...Array.from({ length: 249 }, (_, i) => 100 + i * 0.5),
+            218.2,
+        ];
+        return closes.map((close, i) => ({
+            time: 1700000000 + i * 86400,
+            open: close,
+            high: close + 1,
+            low: close - 1,
+            close,
+            volume: 1000 + i,
+        }));
+    }
+
+    /** 하락 추세 끝에서 신저가 — %R ≤ -90, MA200 아래. */
+    function belowMa200Bars(): Bar[] {
+        const closes = [
+            ...Array.from({ length: 249 }, (_, i) => 300 - i * 0.5),
+            170,
+        ];
+        return closes.map((close, i) => ({
+            time: 1700000000 + i * 86400,
+            open: close,
+            high: close + 1,
+            low: close - 1,
+            close,
+            volume: 1000 + i,
+        }));
+    }
+
+    it('never prints the internal labels (confluence / washout / rule engine) in any measured block — the model echoes them', () => {
+        const banned = /confluence|washout|rule engine/i;
+        const lastMs = washoutBars().at(-1)!.time * 1000;
+        const event: MarketEvent = {
+            publishedAt: new Date(lastMs + 13 * 3_600_000),
+            category: 'earnings',
+            sentiment: 'bearish',
+            impact: 'high',
+        };
+        const outputs = [
+            formatDeterministicMetricsSection(
+                washoutBars(),
+                '1Day',
+                reference()
+            ),
+            formatDeterministicMetricsSection(
+                washoutBars(),
+                '1Day',
+                reference(),
+                2,
+                [event]
+            ),
+            formatDeterministicMetricsSection(shortDaily, '1Day', reference()),
+            formatDeterministicMetricsSection(bars(10), '1Day', reference()),
+            // The two readings that carry their own base-rate text.
+            formatDeterministicMetricsSection(
+                nearWashoutBars(),
+                '1Day',
+                reference()
+            ),
+            formatDeterministicMetricsSection(
+                belowMa200Bars(),
+                '1Day',
+                reference()
+            ),
+        ];
+        // The scan only means something if the blocks it covers were really rendered.
+        expect(outputs[4]).toContain('Reading: near sell-off in an uptrend');
+        expect(outputs[4]).toContain('Measured: Historical base rate');
+        expect(outputs[5]).toContain('Reading: sell-off below MA200');
+        expect(outputs[5]).toContain('Measured: Historical base rate');
+        for (const out of outputs) {
+            expect(out.split('\n').filter(line => banned.test(line))).toEqual(
+                []
+            );
+        }
+    });
+
     it('renders the reading, its inputs and the measured base rate on a daily washout, between the tally and risk:reward', () => {
         const out = formatDeterministicMetricsSection(
             washoutBars(),
@@ -422,35 +506,35 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             reference()
         );
         expect(out).toContain(
-            '### Short-Term Washout (rule engine, 1Day bars)'
+            '### Short-term sell-off check (computed, 1Day bars)'
         );
-        expect(out).toContain('Reading: washout in an uptrend');
+        expect(out).toContain('Reading: sell-off in an uptrend');
         expect(out).toMatch(/Williams %R\(14\): -\d/);
         expect(out).toContain('RSI(2): ');
         expect(out).toContain('Exit reference MA5: ');
         expect(out).toContain(
             'Measured: Historical base rate, not an instruction.'
         );
-        const washoutAt = out.indexOf('### Short-Term Washout');
+        const washoutAt = out.indexOf('### Short-term sell-off check');
         expect(washoutAt).toBeGreaterThan(
-            out.indexOf('### Indicator Confluence')
+            out.indexOf('### Indicator Agreement')
         );
         expect(washoutAt).toBeLessThan(
             out.indexOf('### Risk:Reward From Current Price')
         );
     });
 
-    it('prints the rule-engine entry verdict for a washout in an uptrend, before the base rate', () => {
+    it('prints the computed entry verdict for a washout in an uptrend, before the base rate', () => {
         const out = formatDeterministicMetricsSection(
             washoutBars(),
             '1Day',
             reference()
         );
         const verdictAt = out.indexOf(
-            'Entry verdict (rule engine): enter — washout path.'
+            'Entry verdict (computed): enter — sell-off path.'
         );
         expect(verdictAt).toBeGreaterThan(
-            out.indexOf('Reading: washout in an uptrend')
+            out.indexOf('Reading: sell-off in an uptrend')
         );
         expect(verdictAt).toBeLessThan(
             out.indexOf('Measured: Historical base rate')
@@ -480,12 +564,12 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             .slice(0, 16)
             .replace('T', ' ');
         expect(out).toContain(
-            `Entry verdict (rule engine): none — a high-impact earnings event (bearish, published ${publishedUtc} UTC) landed within the last 3 sessions.`
+            `Entry verdict (computed): none — a high-impact earnings event (bearish, published ${publishedUtc} UTC) landed within the last 3 sessions.`
         );
         // 판정 줄은 이벤트를 직접 적는다 — `## Market Events`는 봉 스탬프에서 끊겨 그 기사가 없을 수 있다.
         expect(out).not.toContain('see ## Market Events');
-        expect(out).not.toContain('enter — washout path');
-        expect(out).toContain('Reading: washout in an uptrend');
+        expect(out).not.toContain('enter — sell-off path');
+        expect(out).toContain('Reading: sell-off in an uptrend');
     });
 
     it('keeps the enter verdict when the only event is old, bullish or not a company event', () => {
@@ -520,54 +604,29 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             events
         );
         expect(out).toContain(
-            'Entry verdict (rule engine): enter — washout path.'
+            'Entry verdict (computed): enter — sell-off path.'
         );
     });
 
     it('prints no entry verdict for a near washout, which stays a model judgment', () => {
-        // 상승 추세 끝 14봉 범위(고가 225, 저가 217)의 85% 지점 — %R -85, MA200 위.
-        const closes = [
-            ...Array.from({ length: 249 }, (_, i) => 100 + i * 0.5),
-            218.2,
-        ];
-        const nearBars = closes.map((close, i) => ({
-            time: 1700000000 + i * 86400,
-            open: close,
-            high: close + 1,
-            low: close - 1,
-            close,
-            volume: 1000 + i,
-        }));
         const out = formatDeterministicMetricsSection(
-            nearBars,
+            nearWashoutBars(),
             '1Day',
             reference()
         );
-        expect(out).toContain('Reading: near washout in an uptrend');
+        expect(out).toContain('Reading: near sell-off in an uptrend');
         expect(out).toContain('Measured: Historical base rate');
-        expect(out).not.toContain('Entry verdict (rule engine)');
+        expect(out).not.toContain('Entry verdict (computed)');
     });
 
     it('prints no entry verdict for a washout below MA200', () => {
-        const closes = [
-            ...Array.from({ length: 249 }, (_, i) => 300 - i * 0.5),
-            170,
-        ];
-        const belowBars = closes.map((close, i) => ({
-            time: 1700000000 + i * 86400,
-            open: close,
-            high: close + 1,
-            low: close - 1,
-            close,
-            volume: 1000 + i,
-        }));
         const out = formatDeterministicMetricsSection(
-            belowBars,
+            belowMa200Bars(),
             '1Day',
             reference()
         );
-        expect(out).toContain('Reading: washout below MA200');
-        expect(out).not.toContain('Entry verdict (rule engine)');
+        expect(out).toContain('Reading: sell-off below MA200');
+        expect(out).not.toContain('Entry verdict (computed)');
     });
 
     it('prints no base rate when the reading is none', () => {
@@ -578,7 +637,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
         );
         expect(out).toContain('Reading: none');
         expect(out).not.toContain('Measured: Historical base rate');
-        expect(out).not.toContain('Entry verdict (rule engine)');
+        expect(out).not.toContain('Entry verdict (computed)');
     });
 
     it('says the reading is not measurable below 200 daily bars instead of omitting it', () => {
@@ -587,7 +646,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             '1Day',
             reference()
         );
-        expect(out).toContain('### Short-Term Washout');
+        expect(out).toContain('### Short-term sell-off check');
         expect(out).toContain(
             `the reading needs 200 daily bars for MA200 and received ${shortDaily.length}`
         );
@@ -599,7 +658,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             '30Min',
             reference()
         );
-        expect(out).not.toContain('Short-Term Washout');
+        expect(out).not.toContain('Short-term sell-off check');
     });
 });
 

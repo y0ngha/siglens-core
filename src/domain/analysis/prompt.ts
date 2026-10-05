@@ -1278,7 +1278,7 @@ export const REGIME_CONTEXT_SECTION_HEADER = '## Market Regime & Risk Context';
 /** @internal Section header — exported so tests reference the exact string. */
 export const INDICATOR_VALUES_SECTION_HEADER = '## Indicator Values';
 /** @internal Section header — exported so tests reference the exact string. */
-export const PRO_INDICATOR_SECTION_HEADER = '## Pro-Indicator Confluence';
+export const PRO_INDICATOR_SECTION_HEADER = '## Pro-Indicator Agreement';
 
 const REGIME_INSUFFICIENT_DATA_LINE =
     '- Regime: insufficient data (regime indicators still in warm-up)';
@@ -1708,14 +1708,14 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         // current chart state, its detailed interpretation is simply not in this prompt — that is the
         // intended behavior, not a regression.
         '',
-        '### Confluence Assessment',
-        '- Section names and engine labels in ## Deterministic Metrics (the tally, its Reliability line, Short-Term Washout, any "x / 100" score) are internal. In every output field describe what they measure in plain trading language; never write the words "rule engine", "confluence", or "washout", and never quote an "x / 100" score.',
-        '- The indicator tally in ## Deterministic Metrics is computed by a rule engine, not by you. Do not recount it, restate it with a different number, or substitute your own category count.',
+        '### Indicator Agreement Assessment',
+        '- Section names and engine labels in ## Deterministic Metrics (the tally, its Reliability line, Short-term sell-off check, any "x / 100" score) are internal. In every output field describe what they measure in plain trading language; never write the words "rule engine", "confluence", or "washout", and never quote an "x / 100" score.',
+        '- The indicator tally in ## Deterministic Metrics is computed, not judged by you. Do not recount it, restate it with a different number, or substitute your own category count.',
         '- Cite its signal list as the evidence in keyLevels reasoning and in the summary — name the signals, not just the score.',
         '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the signal is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
         '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the automatic indicator tally could not be measured and the read rests on your own judgment of the indicators.',
         '- The tally is descriptive (read its Reliability line): cite it as how many indicator families agree, never as the reason for a verdict on its own.',
-        "- When ## Deterministic Metrics shows a Short-Term Washout reading other than none, state it next to the tally with its Measured line, describing it as a short-term sell-off that has run its course rather than naming the label, and say plainly that a bearish tally is that reading's normal state rather than evidence against it.",
+        "- When ## Deterministic Metrics shows a Short-term sell-off check reading other than none, state it next to the tally with its Measured line, describing it as a short-term sell-off that has run its course rather than naming the label, and say plainly that a bearish tally is that reading's normal state rather than evidence against it.",
         '',
         '### Indicator State',
         '- ## Indicator State is computed; do not re-derive these comparisons. Every line below already holds the answer — cite it, never recompute it, and never contradict it:',
@@ -1773,8 +1773,8 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
         '- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly.',
         '- Step 1 — Determine entryRecommendation (in this order):',
-        '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (rule engine): enter — washout path", entryRecommendation is "enter". Copy it; do not re-judge it and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the washout close itself. A sub-1.0 structural ratio, a bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading\'s normal state: name them as risks in the prose, never as reasons to change the verdict.',
-        '  - When the short-term sell-off block prints "Entry verdict (rule engine): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.',
+        '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", entryRecommendation is "enter". Copy it; do not re-judge it and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A sub-1.0 structural ratio, a bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading\'s normal state: name them as risks in the prose, never as reasons to change the verdict.',
+        '  - When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.',
         '  - "enter" (other charts): price near support + risk level not high.',
         '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a reading that is close to a sharp short-term sell-off inside a longer-term uptrend.',
         '  - "avoid": price extended from support, strong resistance overhead, or risk high. A bearish indicator tally alone is not a reason for "avoid" — it has no measured forward edge, and it is the normal state of a sharp short-term sell-off inside a longer-term uptrend.',

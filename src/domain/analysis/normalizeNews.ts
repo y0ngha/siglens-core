@@ -47,16 +47,27 @@ const VALID_NEWS_CATEGORIES: readonly NewsCategory[] = [
  *    followed by whitespace; English `The provided `), so the same words
  *    mid-sentence stay untouched;
  * 2. an optional count follows (Korean `N건의 `; English `N `);
- * 3. the next word is an INPUT noun (Korean 뉴스·기사·기사들·자료·정보·본문·
- *    데이터; English articles·news·headlines·data·information). A qualifier
- *    on anything else is real content and stays: `제공된 가이던스는…` (company
- *    guidance), `주어진 환경에서…` (a given environment).
+ * 3. an INPUT noun follows (Korean 뉴스·기사·자료·정보·본문·데이터; English
+ *    articles·news·headlines·data·information). In Korean, up to two short
+ *    descriptor words (no sentence punctuation, each at most 10 characters)
+ *    may sit between the count and the noun — `제공된 암호화폐 카테고리 뉴스`,
+ *    `제공된 25건의 암호화폐 뉴스`. A descriptor ending in a case or topic
+ *    particle (는·은·이·가·을·를·에·에서·의·도·로·와·과) is a real subject, not a
+ *    descriptor, so `제공된 가이던스는 시장 뉴스에…` (company guidance) and
+ *    `주어진 환경에서…` (a given environment) stay untouched. English takes no
+ *    descriptor words.
  *
- * Only the qualifier (+ count) is removed; the noun and the rest of the
- * sentence are kept.
+ * Only the qualifier (+ count) is removed; the descriptor words, the noun and
+ * the rest of the sentence are kept.
  */
-const KO_INPUT_META_LEAD =
-    /^(?:제공된|주어진|입력된)\s+(?:\d+\s*건의\s+)?(?=(?:뉴스|기사|자료|정보|본문|데이터)(?:들)?(?:[은는이가을를의에와과도]|\s|$))/;
+/** The noun must end the word (optionally plural `들`) or take a particle: `정보기술`/`데이터센터` are not input nouns. */
+const KO_INPUT_NOUN = '(?:뉴스|기사|자료|정보|본문|데이터)';
+const KO_NOUN_BOUNDARY = '(?:들)?(?:[은는이가을를의에와과도]|\\s|$)';
+const KO_DESCRIPTOR_PARTICLES = '는은이가을를에서의도로와과';
+const KO_DESCRIPTOR_WORD = `[^\\s.!?,。]{0,9}[^\\s.!?,。${KO_DESCRIPTOR_PARTICLES}]\\s+`;
+const KO_INPUT_META_LEAD = new RegExp(
+    `^(?:제공된|주어진|입력된)\\s+(?:\\d+\\s*건의\\s+)?(?=(?:${KO_DESCRIPTOR_WORD}){0,2}${KO_INPUT_NOUN}${KO_NOUN_BOUNDARY})`
+);
 const EN_INPUT_META_LEAD =
     /^The provided (?:\d+ )?(?=(?:articles|news|headlines|data|information)\b)/;
 
