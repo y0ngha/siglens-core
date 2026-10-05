@@ -8,6 +8,7 @@ export {
     scoreToLabel,
 } from '@/domain/indicators/fearGreed/composition';
 export { POC_WINDOW_DEFAULT } from '@/domain/indicators/fearGreed/factors';
+export { fearGreedInputs } from '@/domain/indicators/fearGreed/inputs';
 export {
     computeLabelTransitions,
     computeMarketScoreGap,

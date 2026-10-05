@@ -370,3 +370,12 @@ Round 3: approved (comment-only fix after R2)
 - Violation (suggestion, fixed): per-session `slice().some()` window re-scan in entry detection
   Rule: MISTAKES 15.5 — single pass tracking state (for loop + push) instead of re-slicing per step
 - Skipped (suggestion): interface→type alias consumer check — no declaration merging in siglens / siglens-trader (grep)
+
+## [review-agent | feat/fear-greed-5y-history (#254) | 2026-10-05]
+- Violation (R1 recommended, fixed): a new range re-cut (`>=` cutoff) had no test at the exact boundary, so `>=`→`>` would pass the suite
+  Rule: (new) A filter that must reproduce a previous inclusive/exclusive boundary needs a test with one item exactly on the boundary and one just outside; verify by mutating the comparator
+- Violation (R1 recommended, fixed): new behaviour relied on an undocumented provider convention (daily Bar.time at UTC midnight)
+  Rule: When logic starts depending on a port's data convention, document the convention at the port or the consuming function
+- Violation (R1 recommended, fixed): a new optional payload field on a cached/serialized library type shipped without consumer guidance (cache growth, mixed-age divergence, server-only)
+  Rule: (new) Adding a field to a type consumers cache or serialize requires a changelog note on size, cache-key bump and serialization boundary
+- Status (R2): approved
