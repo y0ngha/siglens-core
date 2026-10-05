@@ -377,3 +377,27 @@ Round 3: approved (comment-only fix after R2)
 - Violation: measurement numbers duplicated into a JSDoc that must be kept in sync with the issue
 - Rule: MISTAKES Documentation Sync 3
 - Context: @deprecated body now states the conclusion and links #256
+
+## [Branch fix/session-aware-cache-news-prompt | Round 1 review findings | 2026-10-05]
+
+- Violation 1 (R1 required, fixed): public JSDoc of computeBarsEffectiveTtl used {@link} to an @internal unexported symbol
+  Rule: MISTAKES #9.5 — Public JSDoc references must not link to @internal unexported symbols
+  Context: Changed {@link computeSessionAwareCacheKey} to a plain text description.
+
+- Violation 2 (R1 recommended, fixed): PUBLIC_API.md named a removed helper (doc divergence)
+  Rule: MISTAKES #6.5 — When removing a public export, update PUBLIC_API.md to remove its documentation row
+  Context: Removed stale documentation for deleted helper function.
+
+- Violation 3 (R1 recommended, fixed): JSDoc misattributed the old function's holiday behaviour
+  Rule: After refactoring a function's responsibilities, audit JSDoc to ensure descriptions match actual behavior
+  Context: Corrected JSDoc to describe the current implementation's actual behavior.
+
+- Violation 4 (R1 recommended, fixed): duplicate formatter cache in session.ts
+  Rule: MISTAKES Cohesion — avoid duplicate cache instances in the same module
+  Context: Consolidated duplicate cache initialization to use a single instance.
+
+- Violation 5 (R1 recommended, fixed): missing consumer-action statement in PUBLIC_API changelog row
+  Rule: When a public function's behavior changes, the PUBLIC_API.md changelog row must include a consumer-action statement
+  Context: Added consumer-action guidance for the changed function's behavior.
+
+Round 2: approved

@@ -226,6 +226,8 @@ export function filterAnalysisResult(
             allowedDepth
         ),
         analyzedAt: result.analyzedAt,
+        // 공개 시세(마지막 봉 시각·종가)라 tier로 가리지 않는다. 없는 항목엔 키를 만들지 않는다.
+        ...(result.dataAsOf ? { dataAsOf: result.dataAsOf } : {}),
     };
 
     return {

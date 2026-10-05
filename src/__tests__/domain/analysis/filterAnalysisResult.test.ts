@@ -573,3 +573,30 @@ describe('planCheck tier gating', () => {
         });
     });
 });
+
+describe('dataAsOf passthrough', () => {
+    const dataAsOf = { barTime: 1_705_312_200, close: 103 };
+
+    it.each(['free', 'member', 'pro'] as const)(
+        '%s tier keeps the last-bar stamp (public price, not a gated field)',
+        tier => {
+            const { result } = filterAnalysisResult(
+                makeAnalysisResponse({ dataAsOf }),
+                tier,
+                restrictedConfig
+            );
+
+            expect(result.dataAsOf).toEqual(dataAsOf);
+        }
+    );
+
+    it('omits the key entirely when the source analysis carries none (pre-field cache entry)', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse(),
+            'pro',
+            restrictedConfig
+        );
+
+        expect('dataAsOf' in result).toBe(false);
+    });
+});

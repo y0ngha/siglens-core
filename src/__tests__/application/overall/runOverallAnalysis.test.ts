@@ -11,6 +11,7 @@ vi.mock('@/application/fundamental/runFundamentalAnalysis');
 vi.mock('@/application/options/runOptionsAnalysis');
 
 import { runOverallAnalysis } from '@/application/overall/runOverallAnalysis';
+import { CRYPTO_SESSION } from '@/domain/session';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { runAnalysisForOverall } from '@/application/market/runAnalysis';
@@ -966,6 +967,22 @@ describe('runOverallAnalysis', () => {
             );
             expect(call).toBeDefined();
             expect(call?.[5]).toMatchObject({ positionBucket: 'profit' });
+        });
+
+        // `session`은 캐시 키가 아니라 technical 분석의 캐시 수명만 정한다. overall을 거친
+        // technical 생성물도 단독 호출과 같은 만료를 가져야 한다.
+        it('technical.session을 technical 축 호출에 그대로 넘긴다', async () => {
+            await runOverallAnalysis({
+                ...baseOptions(),
+                symbol: 'SESSION',
+                technical: { session: CRYPTO_SESSION },
+            });
+
+            const call = mockRunAnalysisForOverall.mock.calls.find(
+                c => c[0] === 'SESSION'
+            );
+            expect(call).toBeDefined();
+            expect(call?.[5]).toMatchObject({ session: CRYPTO_SESSION });
         });
     });
 

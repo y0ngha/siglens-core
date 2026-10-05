@@ -14,6 +14,7 @@ import type {
     FilteredAnalysisResponse,
     MarketBriefingResponse,
     MarketEvent,
+    MarketSessionSpec,
     ModelId,
     PositionBucket,
     PriorAnalysis,
@@ -178,6 +179,20 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * existed — no `## Market Events` section, no `:evt=` key segment.
      */
     marketEvents?: readonly MarketEvent[];
+
+    /**
+     * Market session of the analysed instrument, used ONLY to decide how long a
+     * freshly generated analysis stays cached (see `computeEffectiveTtl`): the
+     * entry expires at that session's next regular close plus a settle buffer
+     * (crypto: the next 00:00 UTC) instead of the single U.S.-shaped boundary
+     * every market used before. Pass the spec the consumer already resolves for
+     * the symbol — `US_EQUITY_SESSION`, `CRYPTO_SESSION`, or its own KRX spec.
+     *
+     * Omitting it keeps the previous lifetime exactly (backward compatible).
+     * Deliberately NOT part of the cache key: it is a fixed property of a
+     * symbol, and folding it in would change every key and drop the warm cache.
+     */
+    session?: MarketSessionSpec;
 
     /**
      * Callback that receives the exact prompt sent to the model, for a

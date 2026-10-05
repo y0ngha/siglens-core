@@ -72,6 +72,21 @@ export function formatAgeSuffix(
     return ` (${label})`;
 }
 
+/**
+ * @internal
+ * Reader-facing rule for `currentDriverKo`, shared by the symbol news prompt
+ * and the market-news digest prompt.
+ *
+ * `currentDriverKo` is published verbatim as page copy (meta description, RSS
+ * digest summary). Source-boundary wording placed in a schema field
+ * description ("based only on the provided news…") is copied into the answer
+ * by the model, so the boundary lives in Rules and the schema description
+ * stays a neutral placeholder. The rule names the offending category rather
+ * than quoting a sentence — a quoted example is itself copied into the output.
+ */
+export const DRIVER_READER_FACING_RULE =
+    '- currentDriverKo is page copy that end users read, not a note about your input. Open with the subject and what is happening in the news right now. Never refer to the input itself, in any sentence including caveats and limitations: no wording that labels the articles as supplied or given material, no article counts, and no sentences about what data was or was not included (for example the absence of price or volume figures). To respect the no-causation rule, simply do not attribute price moves to the news; no disclaimer sentence is needed.';
+
 /** Format a single enriched news item into a compact block for the prompt. */
 function formatNewsItem(
     item: EnrichedNewsItem,
@@ -443,7 +458,7 @@ export function buildNewsAnalysisPrompt(
               ]
             : []),
         `- Do not fabricate articles, catalysts, earnings dates, regulatory events,${hasMacroCalendar ? ' macro release dates,' : ''} prices, volume, or price movement.`,
-        '- No current price, price change, or volume data is provided in this prompt. Do not claim that news caused an actual price move unless explicit price-movement data is provided here.',
+        '- Do not claim that the news caused an actual price move.',
     ].join('\n');
 
     const assetContext =
@@ -472,7 +487,7 @@ ${CORE_SKILL_REFERENCE_POINTER}
 
 ## Output Schema
 {
-  "currentDriverKo": "${schemaLang} 한 단락 — 제공된 뉴스만 기준으로 본 핵심 뉴스 동인. 실제 가격 움직임의 원인이라고 단정하지 마세요.",
+  "currentDriverKo": "${schemaLang} 한 단락 — 핵심 뉴스 동인.",
   "keyEventsKo": [
     "핵심 이벤트 bullet 1 (${schemaLang})",
     "핵심 이벤트 bullet 2 (${schemaLang})"
@@ -493,8 +508,10 @@ ${localizedFieldDirective(locale)}
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
 - keyEventsKo should cover the 3–5 most market-moving events from the articles above when enough articles exist.
 - upcomingEventsKo should highlight scheduled catalysts (earnings, regulatory deadlines, etc.).
-- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because no recent articles were provided.
+- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because there has been little recent news coverage.
 - If no scheduled catalysts are provided, return upcomingEventsKo: [].
+- Base currentDriverKo only on the articles and calendar rows above. Do not attribute price moves to the news.
+${DRIVER_READER_FACING_RULE}
 - overallSentiment reflects the net directional bias of the provided news flow only.`;
 
     return { stable, dynamic };

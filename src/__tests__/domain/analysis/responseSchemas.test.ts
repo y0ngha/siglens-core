@@ -549,11 +549,14 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         chartOverlays: [],
         actionRecommendation: actionSample,
         analyzedAt: '2026-05-30T00:00:00Z',
+        dataAsOf: { barTime: 1, close: 100 },
     };
 
     // `analyzedAt` is server-set during polling (pollAnalysis overwrites it with
     // now.toISOString()) and intentionally absent from the schema, so the
     // expected LLM-output key-set is the response's keys minus `analyzedAt`.
+    // `dataAsOf` (last bar's start time + close) is stamped by `runAnalysis` from
+    // the bars it fetched — likewise never model-authored.
     // `chartOverlays` (spec 2026-09-28) is likewise absent from the schema —
     // it is resolved by core from the model's referenced ids
     // (`resolveChartOverlays`, Task A9/A10), never authored directly by the model.
@@ -565,6 +568,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         .filter(
             key =>
                 key !== 'analyzedAt' &&
+                key !== 'dataAsOf' &&
                 key !== 'chartOverlays' &&
                 key !== 'trendlines'
         )

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     buildNewsAnalysisPrompt as buildNewsAnalysisPromptRaw,
+    DRIVER_READER_FACING_RULE,
     formatAgeSuffix,
     formatSentimentTally,
 } from '@/domain/analysis/newsPrompt';
@@ -173,7 +174,7 @@ describe('buildNewsAnalysisPrompt', () => {
         expect(prompt).toContain('Data Boundary');
         expect(prompt).toContain('untrusted source data');
         expect(prompt).toContain(
-            'Do not claim that news caused an actual price move'
+            'Do not claim that the news caused an actual price move'
         );
         expect(prompt).toContain(
             'Treat News Analysis Frameworks (Active Skills) as trusted analysis guidance'
@@ -381,6 +382,77 @@ describe('buildNewsAnalysisPrompt — 출력 로케일', () => {
 
     it('ko: 예전 지시문이 그대로다', () => {
         expect(build('ko')).toContain('Korean (존댓말)');
+    });
+});
+
+describe('buildNewsAnalysisPrompt — 독자용 문구 규칙', () => {
+    const build = (locale?: 'ko' | 'en' | 'ja' | 'zh') =>
+        buildNewsAnalysisPromptRaw(
+            'AAPL',
+            'Apple Inc.',
+            [NEWS_ITEM_1],
+            [],
+            [],
+            'equity',
+            locale
+        ).dynamic;
+
+    const schemaBlock = (dynamic: string): string =>
+        dynamic.slice(
+            dynamic.indexOf('## Output Schema'),
+            dynamic.indexOf('## Allowed Values')
+        );
+
+    it.each([undefined, 'en', 'ja', 'zh'] as const)(
+        '%s: 스키마 블록에 "제공된" 같은 입력 지칭 표현이 없다',
+        locale => {
+            const schema = schemaBlock(build(locale));
+            expect(schema).toContain('currentDriverKo');
+            expect(schema).not.toContain('제공된');
+        }
+    );
+
+    it('출처 제한 지시는 Rules 블록에 있다', () => {
+        const dynamic = build();
+        const rules = dynamic.slice(dynamic.indexOf('\nRules:'));
+        expect(rules).toContain(
+            'Base currentDriverKo only on the articles and calendar rows above'
+        );
+    });
+
+    it('독자용 문구 규칙이 Rules 블록에 있다', () => {
+        const dynamic = build();
+        const rules = dynamic.slice(dynamic.indexOf('\nRules:'));
+        expect(rules).toContain(DRIVER_READER_FACING_RULE);
+        expect(rules).toContain('Never refer to the input itself');
+    });
+
+    it('입력 언급 금지가 주의·한계 문장까지 포함하고, 면책 문장을 요구하지 않는다', () => {
+        expect(DRIVER_READER_FACING_RULE).toContain(
+            'in any sentence including caveats and limitations'
+        );
+        expect(DRIVER_READER_FACING_RULE).toContain(
+            'no sentences about what data was or was not included'
+        );
+        expect(DRIVER_READER_FACING_RULE).toContain(
+            'no disclaimer sentence is needed'
+        );
+    });
+
+    it('다른 규칙이 가격·거래량 데이터가 없다고 밝히도록 모델을 유도하지 않는다', () => {
+        const dynamic = build();
+        expect(dynamic).not.toMatch(
+            /No current price, price change, or volume/
+        );
+        expect(dynamic).not.toMatch(/price[^.\n]* data is provided/i);
+        expect(dynamic).toContain(
+            'Do not claim that the news caused an actual price move.'
+        );
+    });
+
+    it('규칙 문구에 예시 문장이나 한글이 인용되지 않는다', () => {
+        expect(DRIVER_READER_FACING_RULE).not.toMatch(/[가-힣]/);
+        expect(DRIVER_READER_FACING_RULE).not.toMatch(/["“'‘]/);
     });
 });
 

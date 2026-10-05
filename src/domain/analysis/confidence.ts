@@ -1,5 +1,6 @@
 import { UNMATCHED_SKILL_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type {
+    AnalysisDataAsOf,
     AnalysisResponse,
     CandlePatternSummary,
     ChartDisplayType,
@@ -411,6 +412,20 @@ function normalizeCachedCandlePattern(
     };
 }
 
+/**
+ * Keep a cached `dataAsOf` only when both members are finite numbers — a
+ * half-formed value would mislead a consumer comparing it against a session
+ * boundary, and absence already means "unknown" to them.
+ */
+function normalizeDataAsOf(value: unknown): AnalysisDataAsOf | undefined {
+    const obj = asObject(value);
+    const barTime = asNumber(obj?.barTime);
+    const close = asNumber(obj?.close);
+    return barTime !== undefined && close !== undefined
+        ? { barTime, close }
+        : undefined;
+}
+
 function parseCachedPayload(raw: unknown): unknown {
     return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
 }
@@ -451,6 +466,7 @@ export function normalizeCachedAnalysisResponse(
     );
 
     const analyzedAt = asString(raw.analyzedAt);
+    const dataAsOf = normalizeDataAsOf(raw.dataAsOf);
 
     return {
         summary: asString(raw.summary, EMPTY_ANALYSIS_FALLBACK_SUMMARY),
@@ -472,5 +488,6 @@ export function normalizeCachedAnalysisResponse(
         strategyResults,
         candlePatterns,
         ...(analyzedAt ? { analyzedAt } : {}),
+        ...(dataAsOf !== undefined ? { dataAsOf } : {}),
     };
 }
