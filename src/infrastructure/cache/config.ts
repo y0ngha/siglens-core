@@ -846,6 +846,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * user prompt to the head of `stable` (system message, ahead of the
  * `always_on` skill digests) so the cross-symbol common prefix covers them for
  * provider automatic prefix caching. Bytes change on every request.
+ *
  * **`p23`** — UX audit 2026-10-05 §C6 (and the A/B follow-up). The model echoed
  * the internal labels it was shown, so they are gone from both instructions
  * and data: the instruction block is now `### Indicator Agreement Assessment`
@@ -1670,9 +1671,13 @@ export function buildCongressTrendCacheKey(
  * rule against referring to the input itself. The no-articles rule stops
  * telling the model to say no articles "were provided". Bytes change for every
  * request of both builders.
+ *
  * The news-card EXCERPT rule wording and the `stripInputMetaLead` normalizer
- * backstop (UX audit 2026-10-05 §C2) are layered on top of it and do not change
- * either builder's bytes.
+ * backstop (UX audit 2026-10-05 §C2) are layered on top of it. The card prompt's
+ * bytes DO change (for truncated bodies), but that needs no bump here: core owns
+ * no news-card cache key — consumers store per-article results — so a new
+ * article simply gets the new wording, and the normalizer only post-processes
+ * model output.
  *
  * @internal
  */

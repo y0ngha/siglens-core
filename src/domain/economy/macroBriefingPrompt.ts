@@ -98,10 +98,27 @@ function formatGrouped(n: number, decimals: number): string {
 }
 
 /**
- * `(Δ ±delta unit[, ±x.xx%])` for a registry series printed in converted units
- * (`rawScale`/`decimals`): the delta is computed from the raw values and scaled
- * once, so the figure on the row and the figure the model quotes are the same
- * number in the same unit. `''` when either input is non-finite.
+ * The signed change figure of a registry series printed in converted units
+ * (`rawScale`/`decimals`), e.g. `+29,000 persons`, or `null` when either input
+ * is non-finite. The delta is computed from the raw values and scaled once, so
+ * the figure on the row and the figure the model quotes are the same number in
+ * the same unit.
+ */
+function formatScaledLevelFigure(
+    latest: number | null | undefined,
+    previous: number | null | undefined,
+    meta: MacroIndicatorPromptMeta,
+    decimals: number
+): string | null {
+    if (typeof latest !== 'number' || !Number.isFinite(latest)) return null;
+    if (typeof previous !== 'number' || !Number.isFinite(previous)) return null;
+    const scale = meta.rawScale ?? 1;
+    return `${formatGroupedSigned((latest - previous) * scale, decimals)} ${meta.unit}`;
+}
+
+/**
+ * `(Δ ±delta unit[, ±x.xx%])` for a registry series printed in converted units,
+ * or `''` when either input is non-finite. See {@link formatScaledLevelFigure}.
  */
 function formatScaledLevelDelta(
     latest: number | null | undefined,
@@ -109,17 +126,18 @@ function formatScaledLevelDelta(
     meta: MacroIndicatorPromptMeta,
     decimals: number
 ): string {
-    if (typeof latest !== 'number' || !Number.isFinite(latest)) return '';
-    if (typeof previous !== 'number' || !Number.isFinite(previous)) return '';
-    const scale = meta.rawScale ?? 1;
-    const deltaText = `${formatGroupedSigned((latest - previous) * scale, decimals)} ${meta.unit}`;
+    const figure = formatScaledLevelFigure(latest, previous, meta, decimals);
+    if (
+        figure === null ||
+        typeof latest !== 'number' ||
+        typeof previous !== 'number'
+    )
+        return '';
     const pctText =
         meta.showPercentChange !== false && previous > 0
             ? formatSignedPercent(((latest - previous) / previous) * 100)
             : null;
-    return pctText === null
-        ? ` (Δ ${deltaText})`
-        : ` (Δ ${deltaText}, ${pctText})`;
+    return pctText === null ? ` (Δ ${figure})` : ` (Δ ${figure}, ${pctText})`;
 }
 
 /** Attach the unit to a printed value: `%` hugs the number, any other unit is space-separated. */
@@ -142,15 +160,13 @@ function formatChangeOnlyRow(
     if (latest === null || previous === null) {
         return `${heading}: monthly change: N/A`;
     }
-    const delta = formatScaledLevelDelta(
+    const figure = formatScaledLevelFigure(
         latest.value,
         previous.value,
-        { ...meta, showPercentChange: false },
+        meta,
         meta.decimals ?? 0
     );
-    // `formatScaledLevelDelta` wraps the figure as ` (Δ …)`; here it is the value itself.
-    const figure = delta.replace(/^ \(Δ (.*)\)$/, '$1');
-    return figure === ''
+    return figure === null
         ? `${heading}: monthly change: N/A`
         : `${heading}: monthly change: ${figure} (${latest.date})`;
 }

@@ -6,9 +6,9 @@ import {
 import { formatNullableNumber } from '@/domain/analysis/promptFormat';
 import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import {
+    confluenceFamilyWeight,
     evaluateConfluence,
     isExpectedSignal,
-    confluenceFamilyWeight,
     signalFamily,
     CONFLUENCE_MIN_BARS,
     type ConfluenceSnapshot,
