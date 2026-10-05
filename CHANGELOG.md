@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.13.0](https://github.com/y0ngha/siglens-core/compare/v2.12.0...v2.13.0) (2026-10-05)
+
+### Features
+
+* 거시 브리핑 단위·뉴스 요약·후속 질문 프롬프트 개선 ([#259](https://github.com/y0ngha/siglens-core/issues/259)) ([809d326](https://github.com/y0ngha/siglens-core/commit/809d326f3c6cde35b5529079fd5d2da3088a01d8))
+
 # [2.12.0](https://github.com/y0ngha/siglens-core/compare/v2.11.0...v2.12.0) (2026-10-05)
 
 ### Bug Fixes
