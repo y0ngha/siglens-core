@@ -37,7 +37,7 @@ export interface NarrowedPriorAnalyses {
  * 1 of.
  */
 export interface NarrowedMarketEvents {
-    /** Impact-filtered, newest-first list. Feed to stage 2 (`selectMarketEvents`), unfiltered by bar. */
+    /** Impact-filtered (and, for `1Day` on a scheduled session, time-horizon-bounded), priority-ordered list. Feed to stage 2 (`selectMarketEvents`), unfiltered by bar. */
     candidates: readonly MarketEvent[];
     /** Cache-key segment for this set; `undefined` when `candidates` is empty (byte-identical to no events at all). */
     fingerprint: string | undefined;

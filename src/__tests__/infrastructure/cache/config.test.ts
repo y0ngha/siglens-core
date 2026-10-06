@@ -1,6 +1,7 @@
 import {
     MARKET_EVENT_CACHE_KEY_CAP,
     MARKET_EVENT_LIMIT,
+    marketEventHorizonMs,
 } from '@/domain/analysis/marketEvents';
 import {
     SECONDS_PER_DAY,
@@ -1669,5 +1670,114 @@ describe('marketEvents가 캐시 키에 반영될 때', () => {
         const b = narrowMarketEventsForCacheKey([event(900_000)]).fingerprint;
 
         expect(a).not.toBe(b);
+    });
+});
+
+describe('marketEvents 시간 상한이 캐시 키에 반영될 때', () => {
+    const SATURDAY = new Date('2026-10-03T15:00:00Z');
+    const SUNDAY = new Date('2026-10-04T15:00:00Z');
+    // 토·일 호출의 마지막 봉은 금요일(10-02) 스탬프, 상한은 토요일 00:00Z(배타).
+    const FRIDAY_HORIZON = Date.parse('2026-10-03T00:00:00Z');
+    const eventAt = (ms: number, impact: 'high' | 'medium' = 'high') => ({
+        publishedAt: new Date(ms),
+        category: 'earnings' as const,
+        sentiment: 'bearish' as const,
+        impact,
+    });
+    const friday = eventAt(Date.parse('2026-10-02T14:00:00Z'));
+    const horizonFor = (now: Date) =>
+        marketEventHorizonMs('1Day', US_EQUITY_SESSION, now);
+
+    it('상한 뒤에 발행된 이벤트는 fingerprint를 바꾸지 않는다', () => {
+        const weekend = eventAt(Date.parse('2026-10-03T14:00:00Z'));
+        const horizon = horizonFor(SATURDAY);
+
+        expect(
+            narrowMarketEventsForCacheKey([friday, weekend], horizon)
+                .fingerprint
+        ).toBe(narrowMarketEventsForCacheKey([friday], horizon).fingerprint);
+    });
+
+    it('상한 직전 이벤트는 fingerprint를 바꾸고, 상한 시각 이벤트는 바꾸지 않는다(배타)', () => {
+        const justBefore = eventAt(FRIDAY_HORIZON - 1, 'medium');
+        const atHorizon = eventAt(FRIDAY_HORIZON, 'medium');
+        const horizon = horizonFor(SATURDAY);
+        const base = narrowMarketEventsForCacheKey([friday], horizon);
+
+        expect(horizon).toBe(FRIDAY_HORIZON);
+        expect(
+            narrowMarketEventsForCacheKey([friday, justBefore], horizon)
+                .fingerprint
+        ).not.toBe(base.fingerprint);
+        expect(
+            narrowMarketEventsForCacheKey([friday, atHorizon], horizon)
+                .fingerprint
+        ).toBe(base.fingerprint);
+    });
+
+    it('토요일·일요일 호출은 주말 이벤트를 무시한다', () => {
+        const weekendEvents = [
+            eventAt(Date.parse('2026-10-03T02:00:00Z')),
+            eventAt(Date.parse('2026-10-04T09:00:00Z'), 'medium'),
+        ];
+        for (const now of [SATURDAY, SUNDAY]) {
+            const horizon = horizonFor(now);
+            expect(
+                narrowMarketEventsForCacheKey(
+                    [friday, ...weekendEvents],
+                    horizon
+                ).fingerprint
+            ).toBe(
+                narrowMarketEventsForCacheKey([friday], horizon).fingerprint
+            );
+        }
+    });
+
+    it('상한 밖 이벤트만 있으면 fingerprint가 생기지 않는다', () => {
+        const { candidates, fingerprint } = narrowMarketEventsForCacheKey(
+            [eventAt(Date.parse('2026-10-04T09:00:00Z'))],
+            horizonFor(SUNDAY)
+        );
+
+        expect(candidates).toEqual([]);
+        expect(fingerprint).toBeUndefined();
+    });
+
+    it('상한은 상한 20개 컷보다 먼저 적용된다 — 상한 밖 high가 후보 자리를 차지하지 않는다', () => {
+        const outside = Array.from({ length: 5 }, (_, i) =>
+            eventAt(FRIDAY_HORIZON + (i + 1) * 3_600_000)
+        );
+        const inside = Array.from(
+            { length: MARKET_EVENT_CACHE_KEY_CAP },
+            (_, i) =>
+                eventAt(
+                    Date.parse('2026-10-02T00:00:00Z') + i * 60_000,
+                    'medium'
+                )
+        );
+
+        const { candidates } = narrowMarketEventsForCacheKey(
+            [...outside, ...inside],
+            horizonFor(SATURDAY)
+        );
+
+        expect(candidates).toHaveLength(MARKET_EVENT_CACHE_KEY_CAP);
+        expect(
+            candidates.every(
+                entry => entry.publishedAt.getTime() < FRIDAY_HORIZON
+            )
+        ).toBe(true);
+    });
+
+    it('상한을 넘기지 않으면(null) 기존 fingerprint와 바이트 단위로 같다', () => {
+        const later = eventAt(Date.parse('2026-10-04T09:00:00Z'));
+
+        expect(
+            narrowMarketEventsForCacheKey([friday, later], null).fingerprint
+        ).toBe(narrowMarketEventsForCacheKey([friday, later]).fingerprint);
+        // 상한 도입 전 구현이 낸 값을 그대로 고정한 fixture — 해시 입력 형식이 바뀌면 깨진다.
+        expect(narrowMarketEventsForCacheKey([friday]).fingerprint).toBe(
+            'e3c3110e6da37bfe'
+        );
     });
 });

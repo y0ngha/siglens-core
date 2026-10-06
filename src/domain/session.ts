@@ -272,3 +272,41 @@ export function nextRegularSessionBoundaryMs(
     }
     return null;
 }
+
+/**
+ * @internal `now`가 속한 현지 날짜 **이하**에서 가장 늦은 거래일의 현지 달력 날짜를 UTC
+ * 자정으로 찍은 epoch ms. 일봉이 UTC 자정으로 스탬프된다는 계약(`fetchBarsWithIndicators`)
+ * 위에서, "지금 존재할 수 있는 가장 늦은 일봉의 `time`"의 상한이다.
+ *
+ * 오늘이 거래일이면 개장 전·마감 후 어느 때든 오늘을 돌려준다. 장 시작 전에는 오늘 봉이
+ * 아직 없을 수 있지만, 상한을 높게 잡는 쪽이 안전하다 — 이 값을 이벤트 캐시 키의 시간
+ * 경계로 쓰기 때문에, 낮게 잡으면 프롬프트가 읽을 수 있는 이벤트를 키가 놓친다. 주말과
+ * `closeMinuteFor` 휴장일(`0`)은 건너뛴다. 날짜는 현지 정오 부근을 찍어 읽는다(DST
+ * 전환일에 자정 근처를 찍으면 날짜가 밀린다 — {@link nextRegularSessionBoundaryMs}와 같다).
+ *
+ * @param spec - 세션 스펙. `always-open`에는 "거래일"이 없어 `null`이다.
+ * @param now - 기준 시각.
+ * @returns epoch ms, `always-open`이거나 탐색 상한({@link MAX_CLOSURE_LOOKAHEAD_DAYS}) 안에
+ *   거래일이 없으면(잘못된 스펙) `null`.
+ */
+export function latestTradingDayStartUtcMs(
+    spec: MarketSessionSpec,
+    now: Date
+): number | null {
+    if (spec.kind !== 'scheduled') return null;
+    const { minutesOfDay } = localSessionParts(now, spec.timeZone);
+    const nowMs = now.getTime();
+    for (let offset = 0; offset <= MAX_CLOSURE_LOOKAHEAD_DAYS; offset++) {
+        const probe = new Date(
+            nowMs -
+                offset * MS_PER_DAY +
+                (MINUTES_PER_DAY / 2 - minutesOfDay) * MS_PER_MINUTE
+        );
+        const day = localSessionParts(probe, spec.timeZone);
+        if (spec.weekendDays.includes(day.weekdayIndex)) continue;
+        const closeMinute = spec.closeMinuteFor?.(probe) ?? spec.closeMinute;
+        if (closeMinute <= 0) continue;
+        return Date.UTC(day.year, day.month - 1, day.day);
+    }
+    return null;
+}

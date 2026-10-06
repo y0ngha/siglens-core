@@ -1,5 +1,13 @@
 import { barTimeMs } from '@/domain/analysis/priorAnalysis';
-import type { Bar, MarketEvent, NewsImpact } from '@/domain/types';
+import { MS_PER_DAY } from '@/domain/constants/time';
+import { latestTradingDayStartUtcMs } from '@/domain/session';
+import type {
+    Bar,
+    MarketEvent,
+    MarketSessionSpec,
+    NewsImpact,
+    Timeframe,
+} from '@/domain/types';
 
 /**
  * @internal
@@ -115,4 +123,57 @@ export function selectMarketEvents(
         .toSorted(compareMarketEventPriority)
         .slice(0, MARKET_EVENT_LIMIT)
         .toSorted((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime());
+}
+
+/**
+ * @internal
+ * Exclusive upper bound on the `publishedAt` any prompt consumer can render,
+ * derived without bars so the cache-key stage can apply it.
+ *
+ * Both consumers of the stage-1 candidates read bars that already exist at
+ * `now`: {@link selectMarketEvents} stops at the last bar's time, and
+ * `newsDrivenWashoutEvent` stops one day past it (exclusive). A daily bar is
+ * stamped at UTC midnight of its exchange date, so the latest bar that can
+ * exist is the latest trading day's — and anything published at or after that
+ * day's stamp + 1 day cannot reach either consumer. Events past it (weekend
+ * and holiday news while the bars are frozen, or news after the next UTC-day
+ * boundary) would otherwise change the cache key, miss the cache and rerun the
+ * model on a byte-identical prompt.
+ *
+ * **Invariant: the horizon never undershoots.** A too-high horizon only keeps a
+ * redundant event in the key (an extra miss); a too-low one would leave a
+ * stale cache entry for an event the prompt renders. So the lookup counts today
+ * as a trading day even before the open and ignores nothing but weekends and
+ * calendar holidays, which can only lower the answer to the true last bar.
+ *
+ * **Known limit, deliberately kept: weekday pre-open news still churns the
+ * key.** On a trading day before the open the horizon already reaches the end
+ * of today, so news published that morning changes the key even though the
+ * bars may still end yesterday. Tightening it with the session's `openMinute`
+ * would undershoot: the consumer appends a today bar built from realtime quotes,
+ * so a pre-open last bar can be today's, and a horizon cut at yesterday would
+ * leave a stale cache entry for an event the prompt renders. Only weekend and
+ * holiday news (and news past the next-day UTC boundary) is cut.
+ *
+ * Bounded only for `1Day` on a `scheduled` session. Intraday bars carry
+ * no calendar-derivable stamp (a provider may or may not include extended-hours
+ * bars), and an `always-open` session's daily bar closes at the next UTC
+ * midnight, which every past event already precedes — so both stay unbounded
+ * (`null`) rather than guess.
+ *
+ * @param timeframe - Bar resolution of the analysis.
+ * @param session - Market session of the instrument, or `undefined` when the
+ *   caller supplies none (unbounded, so the key matches the pre-horizon one).
+ * @param now - The request's reference time.
+ * @returns Exclusive upper bound in epoch ms, or `null` for no bound.
+ */
+export function marketEventHorizonMs(
+    timeframe: Timeframe,
+    session: MarketSessionSpec | undefined,
+    now: Date
+): number | null {
+    if (timeframe !== '1Day') return null;
+    if (session === undefined) return null;
+    const lastBarMs = latestTradingDayStartUtcMs(session, now);
+    return lastBarMs === null ? null : lastBarMs + MS_PER_DAY;
 }

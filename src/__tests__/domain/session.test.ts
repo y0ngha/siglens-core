@@ -4,6 +4,7 @@ import {
     CRYPTO_SESSION,
     getSessionStatus,
     isRegularSessionOpen,
+    latestTradingDayStartUtcMs,
 } from '@/domain/session';
 import { getEtSessionStatus, isEtRegularSessionOpen } from '@/domain/utils';
 import type { MarketSessionSpec } from '@/domain/types';
@@ -213,5 +214,109 @@ describe('getSessionStatus — calendar, DST and custom-spec boundaries', () => 
                 isRegularSessionOpen(holiday, new Date('2026-06-22T03:00:00Z'))
             ).toBe(false);
         });
+    });
+});
+
+describe('latestTradingDayStartUtcMs', () => {
+    const utcMidnight = (iso: string) => Date.parse(`${iso}T00:00:00Z`);
+
+    it('오늘이 거래일이면 장중·개장 전·마감 후 모두 오늘 자정(UTC)을 돌려준다', () => {
+        // 2026-10-06 화요일. 개장 전(04:00 ET)·장중(10:30 ET)·마감 후(20:00 ET).
+        for (const iso of [
+            '2026-10-06T08:00:00Z',
+            '2026-10-06T14:30:00Z',
+            '2026-10-07T00:00:00Z',
+        ]) {
+            expect(
+                latestTradingDayStartUtcMs(US_EQUITY_SESSION, new Date(iso))
+            ).toBe(utcMidnight('2026-10-06'));
+        }
+    });
+
+    it('토요일·일요일은 직전 금요일을 돌려준다', () => {
+        for (const iso of ['2026-10-03T15:00:00Z', '2026-10-04T15:00:00Z']) {
+            expect(
+                latestTradingDayStartUtcMs(US_EQUITY_SESSION, new Date(iso))
+            ).toBe(utcMidnight('2026-10-02'));
+        }
+    });
+
+    it('날짜는 UTC가 아니라 현지 날짜로 읽는다', () => {
+        // 2026-10-07 02:00 UTC = 10-06 22:00 ET(화) → 화요일.
+        expect(
+            latestTradingDayStartUtcMs(
+                US_EQUITY_SESSION,
+                new Date('2026-10-07T02:00:00Z')
+            )
+        ).toBe(utcMidnight('2026-10-06'));
+        // 2026-10-05 02:00 UTC = 10-04 22:00 ET(일) → 직전 금요일.
+        expect(
+            latestTradingDayStartUtcMs(
+                US_EQUITY_SESSION,
+                new Date('2026-10-05T02:00:00Z')
+            )
+        ).toBe(utcMidnight('2026-10-02'));
+    });
+
+    it('휴장일(노동절 월요일)은 건너뛰고 직전 금요일을 돌려준다', () => {
+        expect(
+            latestTradingDayStartUtcMs(
+                US_EQUITY_SESSION,
+                new Date('2026-09-07T15:00:00Z')
+            )
+        ).toBe(utcMidnight('2026-09-04'));
+    });
+
+    it('KRX(UTC+9): 월요일 새벽 KST는 월요일, 토요일 KST는 금요일, 금요일 저녁 KST는 금요일이다', () => {
+        const krx: MarketSessionSpec = {
+            kind: 'scheduled',
+            timeZone: 'Asia/Seoul',
+            openMinute: 9 * 60,
+            closeMinute: 15 * 60 + 30,
+            weekendDays: [0, 6],
+        };
+        // 월요일 08:00 KST = 일요일 23:00Z — UTC 날짜는 일요일이지만 현지는 월요일.
+        expect(
+            latestTradingDayStartUtcMs(krx, new Date('2026-10-04T23:00:00Z'))
+        ).toBe(utcMidnight('2026-10-05'));
+        // 토요일 12:00 KST.
+        expect(
+            latestTradingDayStartUtcMs(krx, new Date('2026-10-03T03:00:00Z'))
+        ).toBe(utcMidnight('2026-10-02'));
+        // 금요일 21:00 KST(= 12:00Z)·23:59 KST(= 14:59Z).
+        for (const iso of ['2026-10-02T12:00:00Z', '2026-10-02T14:59:00Z']) {
+            expect(latestTradingDayStartUtcMs(krx, new Date(iso))).toBe(
+                utcMidnight('2026-10-02')
+            );
+        }
+        // 토요일 00:30 KST(= 금요일 15:30Z)는 이미 토요일 → 금요일.
+        expect(
+            latestTradingDayStartUtcMs(krx, new Date('2026-10-02T15:30:00Z'))
+        ).toBe(utcMidnight('2026-10-02'));
+    });
+
+    it('always-open 스펙에는 거래일이 없어 null이다', () => {
+        expect(
+            latestTradingDayStartUtcMs(
+                CRYPTO_SESSION,
+                new Date('2026-10-06T15:00:00Z')
+            )
+        ).toBeNull();
+    });
+
+    it('거래일이 탐색 상한 안에 없는 스펙은 null이다', () => {
+        const neverOpen: MarketSessionSpec = {
+            kind: 'scheduled',
+            timeZone: 'America/New_York',
+            openMinute: 570,
+            closeMinute: 960,
+            weekendDays: [0, 1, 2, 3, 4, 5, 6],
+        };
+        expect(
+            latestTradingDayStartUtcMs(
+                neverOpen,
+                new Date('2026-10-06T15:00:00Z')
+            )
+        ).toBeNull();
     });
 });

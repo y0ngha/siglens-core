@@ -1068,6 +1068,109 @@ describe('marketEvents 주입', () => {
     });
 });
 
+describe('marketEvents 시간 상한', () => {
+    // 2026-10-04 일요일 — 일봉은 금요일(10-02)에서 멈춰 있다. 상한은 토요일 00:00Z.
+    const SUNDAY = new Date('2026-10-04T15:00:00Z');
+    const fridayEvent = {
+        publishedAt: new Date('2026-10-02T14:00:00Z'),
+        category: 'earnings' as const,
+        sentiment: 'bearish' as const,
+        impact: 'high' as const,
+    };
+    const weekendEvent = {
+        publishedAt: new Date('2026-10-04T09:00:00Z'),
+        category: 'regulation' as const,
+        sentiment: 'bearish' as const,
+        impact: 'high' as const,
+    };
+    const lateFridayEvent = {
+        ...fridayEvent,
+        publishedAt: new Date('2026-10-02T23:59:59Z'),
+        impact: 'medium' as const,
+    };
+    const barProvider: MarketDataProvider = {
+        getBars: vi.fn().mockResolvedValue([]),
+        getQuote: vi.fn().mockResolvedValue(null),
+    };
+    const store = new Map<string, unknown>();
+
+    const run = (
+        marketEvents: NonNullable<
+            Parameters<typeof runAnalysis>[5]
+        >['marketEvents'],
+        withSession = true
+    ) =>
+        runAnalysis(mockSymbol, mockCompanyName, '1Day', false, undefined, {
+            marketDataProvider: barProvider,
+            marketEvents,
+            session: withSession ? US_EQUITY_SESSION : undefined,
+        });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        store.clear();
+        vi.useFakeTimers({ toFake: ['Date'] });
+        vi.setSystemTime(SUNDAY);
+        mockCreateCacheProvider.mockReturnValue(mockCacheProvider);
+        mockLoadSkillsCached.mockResolvedValue({
+            skills: [] as Skill[],
+            skillsDegraded: false,
+        });
+        mockFetchBarsWithIndicators.mockResolvedValue(mockBarsData);
+        mockComputeFearGreedIndex.mockReturnValue(null);
+        mockEnrichAnalysisWithConfidence.mockReturnValue(mockRawResult);
+        mockPostProcessAnalysisWithReconcile.mockReturnValue(mockRawResult);
+        mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+        // 실제 캐시처럼 동작해야 "같은 키면 두 번째 호출이 적중한다"를 볼 수 있다.
+        mockCacheGet.mockImplementation(
+            async (key: string) => store.get(key) ?? null
+        );
+        mockCacheSet.mockImplementation(async (key: string, value: unknown) => {
+            store.set(key, value);
+        });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('주말 이벤트가 추가돼도 같은 입력이면 캐시 키가 같아 LLM을 한 번만 부른다', async () => {
+        const first = await run([fridayEvent]);
+        const second = await run([fridayEvent, weekendEvent]);
+
+        expect(first.status).toBe('done');
+        expect(second.status).toBe('cached');
+        expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        const keys = mockCacheGet.mock.calls.map(call => call[0] as string);
+        expect(new Set(keys).size).toBe(1);
+        expect(keys[0]).toContain(':evt=');
+    });
+
+    it('프롬프트에는 상한 안의 후보만 전달된다 — 키와 프롬프트가 같은 집합을 본다', async () => {
+        await run([fridayEvent, weekendEvent]);
+
+        expect(mockBuildAnalysisPrompt.mock.calls.at(-1)?.[11]).toEqual([
+            fridayEvent,
+        ]);
+    });
+
+    it('상한 직전(금요일 밤) 이벤트가 추가되면 키가 바뀌어 다시 분석한다', async () => {
+        await run([fridayEvent]);
+        const second = await run([fridayEvent, lateFridayEvent]);
+
+        expect(second.status).toBe('done');
+        expect(mockCallAnalysisAi).toHaveBeenCalledTimes(2);
+    });
+
+    it('세션이 없으면 상한이 없어 주말 이벤트도 키를 바꾼다(기존 동작)', async () => {
+        await run([fridayEvent], false);
+        const second = await run([fridayEvent, weekendEvent], false);
+
+        expect(second.status).toBe('done');
+        expect(mockCallAnalysisAi).toHaveBeenCalledTimes(2);
+    });
+});
+
 describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
     beforeEach(() => {
         vi.clearAllMocks();

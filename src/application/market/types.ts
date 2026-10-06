@@ -162,13 +162,20 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * its own store — core has no news storage of its own.
      *
      * Core narrows this list twice before it reaches the LLM: once for the
-     * cache key (impact filter, then capped at `MARKET_EVENT_CACHE_KEY_CAP` —
-     * bars are not available yet, see `narrowMarketEventsForCacheKey`), then
+     * cache key (impact filter, an upper time horizon for `1Day` on a
+     * `scheduled` {@link SubmitAnalysisOptions.session}, then capped at
+     * `MARKET_EVENT_CACHE_KEY_CAP` — bars are not available yet, see
+     * `narrowMarketEventsForCacheKey` and `marketEventHorizonMs`), then
      * again for the prompt itself (bar-window cut, capped at
      * `MARKET_EVENT_LIMIT` — see `selectMarketEvents`). Both cuts use the same
      * impact-first ordering, so the second never has to reach past what the
      * first kept. Both narrowings are internal; the consumer only supplies the
      * raw list.
+     *
+     * The time horizon cuts news published after the latest daily bar the prompt
+     * could hold (weekend and holiday news), so it no longer changes the
+     * `:evt=` key segment. It applies only when `session` is supplied — without
+     * it the key is unbounded, as before.
      *
      * Only the classification travels — never the headline or body. Reading
      * the article is the news and overall axes' job; this axis needs the fact
@@ -181,16 +188,21 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     marketEvents?: readonly MarketEvent[];
 
     /**
-     * Market session of the analysed instrument, used ONLY to decide how long a
+     * Market session of the analysed instrument. It decides how long a
      * freshly generated analysis stays cached (see `computeEffectiveTtl`): the
      * entry expires at that session's next regular close plus a settle buffer
      * (crypto: the next 00:00 UTC) instead of the single U.S.-shaped boundary
      * every market used before. Pass the spec the consumer already resolves for
      * the symbol — `US_EQUITY_SESSION`, `CRYPTO_SESSION`, or its own KRX spec.
      *
-     * Omitting it keeps the previous lifetime exactly (backward compatible).
-     * Deliberately NOT part of the cache key: it is a fixed property of a
-     * symbol, and folding it in would change every key and drop the warm cache.
+     * It also bounds `marketEvents` for the cache key on `1Day` with a
+     * `scheduled` spec (see `marketEventHorizonMs`): news published after the
+     * latest trading day's bar no longer changes the `:evt=` segment.
+     *
+     * Omitting it keeps the previous lifetime and an unbounded events key
+     * exactly (backward compatible). The spec itself is deliberately NOT folded
+     * into the cache key: it is a fixed property of a symbol, and folding it in
+     * would change every key and drop the warm cache.
      */
     session?: MarketSessionSpec;
 

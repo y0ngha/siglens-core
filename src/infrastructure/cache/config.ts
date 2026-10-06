@@ -458,8 +458,10 @@ export function narrowPriorAnalysesForCacheKey(
  * **Deliberately does not take bars.** The cache key must exist before the
  * cache is read, and bars are only fetched after a miss — the same ordering
  * constraint `narrowPriorAnalysesForCacheKey` works around. So stage 1 filters
- * on impact alone, and stage 2 ({@link selectMarketEvents}, called from
- * `formatMarketEventsSection`) applies the bar-window cut once bars exist.
+ * on impact plus an upper time horizon that needs no bars (`1Day` on a
+ * `scheduled` session only, see `marketEventHorizonMs`), and stage 2
+ * ({@link selectMarketEvents}, called from `formatMarketEventsSection`)
+ * applies the bar-window cut once bars exist.
  * Stage 1 is therefore the wider of the two, which is safe: two requests
  * looking at the same symbol with the same caller-supplied lookback see the
  * same candidates, so they agree on the key. It caps at
@@ -474,14 +476,31 @@ export function narrowPriorAnalysesForCacheKey(
  * cannot happen; the one thing that shifts the set is a late-arriving article,
  * which costs a single miss and buys a more accurate answer.
  *
+ * **Time horizon.** `horizonMs` (see `marketEventHorizonMs`) drops events
+ * the prompt can never render — news published after the latest bar the
+ * prompt could hold, such as weekend or holiday news while daily bars are frozen. It is
+ * applied here, **before** the cap, and the prompt reads the same `candidates`,
+ * so key and prompt agree by construction: a cut that is too early can only
+ * drop an event from the prompt, never leave a stale cache entry behind. `null`
+ * (the default) is unbounded and byte-identical to the pre-horizon behaviour.
+ *
  * The fingerprint covers publication times only — the same selection arriving
  * in a different order must not split the cache.
+ *
+ * @param events - Candidate events, any order.
+ * @param horizonMs - Exclusive upper bound on `publishedAt` in epoch ms, or
+ *   `null` for no bound.
  */
 export function narrowMarketEventsForCacheKey(
-    events: readonly MarketEvent[]
+    events: readonly MarketEvent[],
+    horizonMs: number | null = null
 ): NarrowedMarketEvents {
     const candidates = events
         .filter(entry => RANKED_IMPACTS.includes(entry.impact))
+        .filter(
+            entry =>
+                horizonMs === null || entry.publishedAt.getTime() < horizonMs
+        )
         .toSorted(compareMarketEventPriority)
         .slice(0, MARKET_EVENT_CACHE_KEY_CAP);
 
