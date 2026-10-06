@@ -1,5 +1,5 @@
 import { callBriefingAi } from '@/application/analysis/callBriefingAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import type {
     RunBriefingOptions,
     RunBriefingResult,
@@ -26,14 +26,16 @@ import { hashBriefingInput } from './briefingInputHash';
  * Redis meta, no polling loop.
  *
  * The briefing cache is keyed by the current ISO date+hour, the briefing model,
- * and a deterministic hash of the index/sector quote values — identical to the
- * submit path so cache entries are shared between the two paths.
+ * and a deterministic hash of the index/sector moves **bucketed** on a coarse
+ * grid (`hashBriefingInput`) — the prompt carries the exact quotes, but an
+ * intraday tick that stays inside its bucket reuses the slot's briefing instead
+ * of re-billing the LLM. `peekBriefingCache` derives the identical key.
  *
  * Briefings have no tier/BYOK concept — `callBriefingAi` always uses the
  * server key.
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
@@ -85,14 +87,18 @@ export async function runBriefing(
     );
     const prompt = dynamic;
 
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callBriefingAi({
-            prompt,
-            requestedModel: undefined,
-            fallbackModel: BRIEFING_MODEL_ID,
-            signal: options?.signal,
-            correlationId: 'market:briefing',
-        })
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () =>
+            callBriefingAi({
+                prompt,
+                requestedModel: undefined,
+                fallbackModel: BRIEFING_MODEL_ID,
+                signal: options?.signal,
+                correlationId: 'market:briefing',
+            }),
+        { signal: options?.signal }
     );
 
     const briefing = normalizeMarketBriefing(JSON.parse(raw) as unknown);

@@ -1,5 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { GEMINI_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import type {
     RunIndicatorTranslationOptions,
@@ -50,7 +50,7 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_FLASH_LITE_MODEL;
  * back to the original English name when `nameKo === ''`.
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
@@ -90,18 +90,22 @@ export async function runIndicatorTranslation(
     const { dynamic } = buildIndicatorTranslationPrompt(normalizedName);
     const prompt = dynamic;
 
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callAnalysisAi({
-            prompt,
-            model: INDICATOR_TRANSLATION_MODEL,
-            signal: options?.signal,
-            seed: analysisSeed(prompt),
-            // 지표명 한 줄 번역 — 사실상 사전 조회다. 추론은 지연·출력 토큰만
-            // 늘린다. 모델 스펙을 오버라이드하므로 INDICATOR_TRANSLATION_MODEL이
-            // thinking 모델로 바뀌어도 이 경로는 꺼진 상태를 유지한다.
-            reasoning: false,
-            correlationId: `indicator-translation:${normalizedName}`,
-        })
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () =>
+            callAnalysisAi({
+                prompt,
+                model: INDICATOR_TRANSLATION_MODEL,
+                signal: options?.signal,
+                seed: analysisSeed(prompt),
+                // 지표명 한 줄 번역 — 사실상 사전 조회다. 추론은 지연·출력 토큰만
+                // 늘린다. 모델 스펙을 오버라이드하므로 INDICATOR_TRANSLATION_MODEL이
+                // thinking 모델로 바뀌어도 이 경로는 꺼진 상태를 유지한다.
+                reasoning: false,
+                correlationId: `indicator-translation:${normalizedName}`,
+            }),
+        { signal: options?.signal }
     );
 
     // raw를 JSON.parse하지 않고 그대로 넘긴다 — normalizeIndicatorTranslation이

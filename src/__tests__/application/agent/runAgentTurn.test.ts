@@ -174,9 +174,46 @@ describe('runAgentTurn', () => {
         expect(d.events.map(e => e.type)).toEqual(['text', 'usage', 'stop']);
         expect(p.calls[0]!.messages.at(-1)).toEqual({
             role: 'user',
-            content: 'AAPL 지금 얼마야?',
+            content: expect.stringMatching(
+                /^## Now\n[\s\S]*\n\n## Message\nAAPL 지금 얼마야\?$/
+            ),
         });
         expect(p.calls[0]!.system).toContain('Answer in Korean');
+    });
+
+    /**
+     * DeepSeek 컨텍스트 캐시는 바이트가 같은 접두사만 재사용한다. 시각처럼 턴마다
+     * 바뀌는 값이 시스템 프롬프트에 있으면 시스템과 그 뒤 히스토리 전부가 매 턴
+     * 캐시를 놓친다 — 바뀌는 값은 최신 사용자 메시지에만 실린다.
+     */
+    it('시스템 프롬프트와 히스토리는 턴(시각)이 바뀌어도 바이트 동일하다 — 시각은 최신 사용자 메시지에만', async () => {
+        const history = [
+            { role: 'user' as const, content: '엔비디아 어때?' },
+            { role: 'assistant' as const, content: 'RSI 54로 중립입니다.' },
+        ];
+        const run = async (now: Date) => {
+            const p = scriptedProvider([
+                { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+            ]);
+            await runAgentTurn(params({ history, now }), deps(p));
+            return p.calls[0]!;
+        };
+        const a = await run(new Date('2026-09-14T15:00:00Z')); // 월 11:00 ET
+        const b = await run(new Date('2026-09-14T21:37:00Z')); // 월 17:37 ET
+
+        expect(a.system).toBe(b.system);
+        expect(a.system).not.toContain("User's local time:");
+        expect(a.messages.slice(0, -1)).toEqual(history);
+        expect(b.messages.slice(0, -1)).toEqual(history);
+        expect(a.messages.at(-1)!.content).toContain(
+            "User's local time: 2026-09-15 00:00 KST"
+        );
+        expect(a.messages.at(-1)!.content).toContain(
+            'US regular session: open'
+        );
+        expect(b.messages.at(-1)!.content).toContain(
+            'US regular session: closed'
+        );
     });
 
     it('portfolioSymbols는 시스템 프롬프트에 들어간다', async () => {
@@ -304,9 +341,17 @@ describe('runAgentTurn', () => {
             },
         ]);
         expect(p.calls[1]!.messages.slice(-3)).toEqual([
-            { role: 'user', content: 'AAPL 지금 얼마야?' },
+            {
+                role: 'user',
+                content: expect.stringMatching(
+                    /## Message\nAAPL 지금 얼마야\?$/
+                ),
+            },
             ...r.intermediate,
         ]);
+        // 같은 턴의 두 번째 호출도 첫 호출과 접두사가 같다(같은 노트, 같은 시스템).
+        expect(p.calls[1]!.messages[0]).toEqual(p.calls[0]!.messages[0]);
+        expect(p.calls[1]!.system).toBe(p.calls[0]!.system);
         expect(r.usage.steps).toBe(2);
         expect(r.usage.promptTokens).toBe(20);
         expect(r.toolsUsed).toEqual(['get_quote']);
@@ -616,7 +661,10 @@ describe('runAgentTurn', () => {
         expect(toolResults(p.calls[1]!)).toEqual([
             { price: 332.27, asOf: '2026-09-11 14:42 PDT' },
         ]);
-        expect(p.calls[0]!.system).toContain("User's local time:");
+        expect(p.calls[0]!.messages.at(-1)!.content).toContain(
+            "User's local time: 2026-"
+        );
+        expect(p.calls[0]!.messages.at(-1)!.content).toMatch(/ P[DS]T\n/);
     });
 
     it('실행 결과가 순환 참조/BigInt면 직렬화 실패를 unserializable_result로 돌려준다', async () => {

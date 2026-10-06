@@ -1,5 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import type {
     RunNewsAnalysisResult,
@@ -83,7 +83,7 @@ function hashNewsInput(
  * across submit and poll.
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * Usage is recorded AFTER the LLM resolves, so an aborted or failed call
@@ -237,20 +237,24 @@ export async function runNewsAnalysis(
     // ── 7. LLM call (with in-flight deduplication) ──
     // modelId is caller-validated (BYOK gate passed a tierConfig check). Cast
     // to ActiveModelId: caller's responsibility, same contract as the worker had.
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callAnalysisAi({
-            prompt,
-            model: modelId as ActiveModelId,
-            tier,
-            userApiKey: options.userApiKey,
-            signal: options.signal,
-            fallbackOnProviderFailure: options.providerFallback,
-            system,
-            responseSchema: NEWS_RESPONSE_SCHEMA,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            reasoning: options.reasoning,
-            correlationId: `${symbol}:news`,
-        })
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () =>
+            callAnalysisAi({
+                prompt,
+                model: modelId as ActiveModelId,
+                tier,
+                userApiKey: options.userApiKey,
+                signal: options.signal,
+                fallbackOnProviderFailure: options.providerFallback,
+                system,
+                responseSchema: NEWS_RESPONSE_SCHEMA,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                reasoning: options.reasoning,
+                correlationId: `${symbol}:news`,
+            }),
+        { signal: options.signal }
     );
 
     // ── 8. Inline post-processing (formerly in pollNewsAnalysis) ──

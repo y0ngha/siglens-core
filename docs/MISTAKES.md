@@ -488,6 +488,18 @@ and have been removed from this file.
    → When a prompt builder's output changes (new fields, logic changes, output formatting), the builder's `*_PROMPT_TEMPLATE_VERSION` must be incremented
    → Without version increment, cache entries remain stale even though their rendered content is invalid — old output serves indefinitely until TTL expires
    → Cache keys must include the version segment: `buildKey(input, modelId, templateVersion)` so output changes bust the cache
+
+6.8. Infrastructure design trade-offs and optimization choices must be documented with comments
+   → When implementing cache optimizations, fail-open behaviors, or performance trade-offs, explain the choice and when it would need to change
+   → Trade-off comments help maintainers understand the original intent and upgrade paths when constraints shift
+   ❌ const pointer = computeKey(generation); // generated on every call; recomputation in cache-miss path is acceptable
+      // No explanation of why recomputing is acceptable or when it would be optimized away
+   ✅ const pointer = computeKey(generation);
+      // Recomputed on every generation (avoiding cache of pointer key);
+      // this trades memory for CPU. If pointer caching becomes critical, upgrade to memoized storage.
+   ✅ fail-open acquire path (thunder-herd protection): if lock acquisition fails, concurrent requests all proceed.
+      // Trade-off: prevents thundering-herd hangs but multiple concurrent winners may process the same work.
+      // Upgrade path: switch to advisory lock or queue-based sequencing if duplicate work becomes expensive.
    ❌ economicEventPrompt.ts output changes for NaN/float-noise handling, but ECONOMIC_EVENT_PROMPT_TEMPLATE_VERSION not bumped
       → 1-day TTL entries served stale indefinitely; callers receive old output for new edge cases
    ❌ buildOverallCacheKey(symbol, modelId) without OVERALL_PROMPT_TEMPLATE_VERSION in the key; prompt output changes are invisible to cache
@@ -769,6 +781,17 @@ and have been removed from this file.
    ❌ Signal.detectedAt JSDoc says 'timestamp' while all detectors return bar index
    ✅ Synchronize examples with enforced rules; remove contradictory instructions and update all references in same commit
    ✅ JSDoc @returns/@param/@throws/@internal must reflect actual implementation code, verified against the function during review
+
+8.5. JSDoc blocks must be wrapped to standard line width for legibility
+   → JSDoc descriptions and type documentation spanning 2+ lines must be wrapped to match editor line width (neighbour width, ~80–100 chars)
+   → Unwrapped JSDoc with awkward wrapping at display time harms IDE readability and makes diffs harder to review
+   ❌ /** @param assembledPrompt The assembled prompt record containing stable system prefix, dynamic per-session instructions, and model-specific formatting rules */ export function buildChatPrompt(assembledPrompt: AssembledPromptRecord) { ... }
+      // Single 150+ character line; IDE and diff view wrap awkwardly
+   ✅ /**
+      * @param assembledPrompt The assembled prompt record containing stable system prefix,
+      *   dynamic per-session instructions, and model-specific formatting rules
+      */ export function buildChatPrompt(assembledPrompt: AssembledPromptRecord) { ... }
+      // Wrapped to readable width with continuation indentation
 
 9. Position claims in comments ("X sits last", "article last in prompt") that ignore later layers or branches
    → A claim about where something sits must name which layer's output it describes (builder vs dispatched prompt) and hold for every locale/branch

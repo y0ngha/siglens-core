@@ -12,6 +12,7 @@ vi.mock('@/application/options/runOptionsAnalysis');
 
 import { runOverallAnalysis } from '@/application/overall/runOverallAnalysis';
 import { CRYPTO_SESSION } from '@/domain/session';
+import { makeKrSession } from '../../helpers/krSession';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { runAnalysisForOverall } from '@/application/market/runAnalysis';
@@ -738,6 +739,41 @@ describe('runOverallAnalysis', () => {
             const withOldHistoryKey = mockCacheGet.mock.calls[0]![0] as string;
 
             expect(withOldHistoryKey).not.toBe(omittedKey);
+        });
+
+        it('technical.session이 있으면 overall 이력 버킷도 마지막 세션 경계에서 시작한다', async () => {
+            const now = new Date('2026-09-29T21:30:00.000Z'); // 06:30 KST 수
+            const eveningRow: PriorAnalysis = {
+                generatedAt: new Date('2026-09-29T10:30:00.000Z'), // 19:30 KST 화
+                trend: 'bullish',
+                riskLevel: 'low',
+            };
+            const keyFor = async (
+                priorAnalyses: readonly PriorAnalysis[],
+                withSession: boolean
+            ): Promise<string> => {
+                mockCacheGet.mockClear();
+                const base = baseOptions();
+                await runOverallAnalysis({
+                    ...base,
+                    now,
+                    priorAnalyses,
+                    technical: {
+                        ...base.technical,
+                        session: withSession ? makeKrSession() : undefined,
+                    },
+                });
+                return mockCacheGet.mock.calls[0]![0] as string;
+            };
+
+            // 세션 경계(16:00 KST 화) 뒤의 행은 키에서 빠진다 → 이력 없는 키와 같다.
+            expect(await keyFor([eveningRow], true)).toBe(
+                await keyFor([], true)
+            );
+            // 세션 없이는 KST 05:00 앵커라 같은 행이 키를 바꾼다(수정 전 동작).
+            expect(await keyFor([eveningRow], false)).not.toBe(
+                await keyFor([], false)
+            );
         });
     });
 

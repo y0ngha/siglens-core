@@ -288,4 +288,34 @@ describe('runBriefing', () => {
             warnSpy.mockRestore();
         });
     });
+
+    describe('인스턴스 간 생성 dedupe', () => {
+        it('다른 인스턴스가 생성 중이면 LLM을 부르지 않고 그 결과로 done을 반환한다', async () => {
+            const peerRaw = JSON.stringify({
+                ...mockBriefingRaw,
+                summary: '다른 인스턴스가 만든 브리핑.',
+            });
+            const lockingProvider = {
+                ...mockCacheProvider,
+                setIfAbsent: vi.fn().mockResolvedValue(false),
+                get: vi.fn(async (key: string) => {
+                    if (key.includes(':lock:generation:')) return 'generating';
+                    if (key.includes(':generation:raw:'))
+                        return { raw: peerRaw };
+                    return null;
+                }),
+            };
+            mockCreateCacheProvider.mockReturnValue(lockingProvider);
+
+            const pending = runBriefing(MARKET_DATA, US_CONTEXT);
+            await vi.advanceTimersByTimeAsync(5_000);
+            const result = await pending;
+
+            expect(mockCallBriefingAi).not.toHaveBeenCalled();
+            expect(result.status).toBe('done');
+            expect(result.briefing.summary).toBe(
+                '다른 인스턴스가 만든 브리핑.'
+            );
+        });
+    });
 });

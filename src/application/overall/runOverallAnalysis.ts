@@ -1,5 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
@@ -519,7 +519,10 @@ export async function runOverallAnalysis(
     } = narrowPriorAnalysesForCacheKey(
         options.priorAnalyses ?? [],
         OVERALL_CACHE_TTL_SECONDS,
-        occurredAt
+        occurredAt,
+        // The overall window is a day, so with a session it starts at the last
+        // session boundary — the same spec the technical axis expires on.
+        technicalOptions.session
     );
     const inputHash = hashAnalysisInput(
         JSON.stringify({
@@ -691,38 +694,43 @@ export async function runOverallAnalysis(
             : DEFAULT_RUN_OVERALL_MODEL;
 
     // ── 10. LLM call (with in-flight deduplication) ──
-    const raw = await dedupeInFlight(cacheKey, () => {
-        // Fired INSIDE the dedup factory — see the same comment in
-        // `runAnalysis.ts`. Every concurrent caller missing this cache key
-        // builds its own prompt, but only the first one's factory runs; the
-        // rest receive that winner's result. Firing outside would call back
-        // once per caller for one real generation and hand the losers a
-        // prompt that was never sent.
-        notifyPromptAssembled(
-            options.onPromptAssembled,
-            {
-                system,
-                stable,
-                dynamic: prompt,
-                promptVersion: OVERALL_PROMPT_VERSION_PLACEHOLDER,
-            } satisfies AssembledPromptRecord,
-            '[RunOverallAnalysis]'
-        );
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () => {
+            // Fired INSIDE the dedup factory — see the same comment in
+            // `runAnalysis.ts`. Every concurrent caller missing this cache key
+            // builds its own prompt, but only the first one's factory runs; the
+            // rest receive that winner's result. Firing outside would call back
+            // once per caller for one real generation and hand the losers a
+            // prompt that was never sent.
+            notifyPromptAssembled(
+                options.onPromptAssembled,
+                {
+                    system,
+                    stable,
+                    dynamic: prompt,
+                    promptVersion: OVERALL_PROMPT_VERSION_PLACEHOLDER,
+                } satisfies AssembledPromptRecord,
+                '[RunOverallAnalysis]'
+            );
 
-        return callAnalysisAi({
-            prompt,
-            model: callModelId,
-            tier,
-            userApiKey: options.userApiKey,
-            signal,
-            fallbackOnProviderFailure: options.providerFallback,
-            system,
-            responseSchema: OVERALL_RESPONSE_SCHEMA,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            reasoning,
-            correlationId: `${symbol}:overall`,
-        });
-    });
+            return callAnalysisAi({
+                prompt,
+                model: callModelId,
+                tier,
+                userApiKey: options.userApiKey,
+                signal,
+                fallbackOnProviderFailure: options.providerFallback,
+                system,
+                responseSchema: OVERALL_RESPONSE_SCHEMA,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                reasoning,
+                correlationId: `${symbol}:overall`,
+            });
+        },
+        { signal: signal }
+    );
 
     // ── 11. Normalize and cache ──
     const normalized = normalizeOverallAnalysisResponse(

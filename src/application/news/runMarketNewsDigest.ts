@@ -1,5 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { resolveMarketNewsDigestCacheKey } from '@/application/news/marketNewsDigestCacheKey';
 import type {
@@ -37,7 +37,7 @@ const LOG_TAG = '[RunMarketNewsDigest]' as const;
  * internally, matching the submit/poll pair's contract.
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
@@ -109,24 +109,28 @@ export async function runMarketNewsDigest(
             : DEEPSEEK_V4_1_FLASH_MODEL;
 
     // ── 4. LLM call (with in-flight deduplication) ──
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callAnalysisAi({
-            prompt,
-            model: callModelId,
-            tier,
-            signal: options.signal,
-            fallbackOnProviderFailure: options.providerFallback,
-            system,
-            responseSchema: NEWS_RESPONSE_SCHEMA,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            // 호출자가 정하지 않으면 모델 스펙 기본값을 그대로 둔다
-            // (`callAnalysisAi`는 `reasoning === undefined`를 "개입 안 함"으로
-            // 취급). siglens는 `true`를 넘겨, 스펙상 non-thinking인
-            // deepseek-v4.1-flash에서도 추론을 켠다 — 카테고리 피드 전체를 하나의
-            // 서술로 합성하는 작업이라 추론 이득이 실제로 나오는 유일한 뉴스 경로다.
-            reasoning: options.reasoning,
-            correlationId: `${category}:market-news-digest`,
-        })
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () =>
+            callAnalysisAi({
+                prompt,
+                model: callModelId,
+                tier,
+                signal: options.signal,
+                fallbackOnProviderFailure: options.providerFallback,
+                system,
+                responseSchema: NEWS_RESPONSE_SCHEMA,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                // 호출자가 정하지 않으면 모델 스펙 기본값을 그대로 둔다
+                // (`callAnalysisAi`는 `reasoning === undefined`를 "개입 안 함"으로
+                // 취급). siglens는 `true`를 넘겨, 스펙상 non-thinking인
+                // deepseek-v4.1-flash에서도 추론을 켠다 — 카테고리 피드 전체를 하나의
+                // 서술로 합성하는 작업이라 추론 이득이 실제로 나오는 유일한 뉴스 경로다.
+                reasoning: options.reasoning,
+                correlationId: `${category}:market-news-digest`,
+            }),
+        { signal: options.signal }
     );
 
     // ── 5. Inline post-processing (formerly in pollMarketNewsDigest) ──

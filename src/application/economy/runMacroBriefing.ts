@@ -1,5 +1,5 @@
 import { callBriefingAi } from '@/application/analysis/callBriefingAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import type {
     RunMacroBriefingOptions,
     RunMacroBriefingResult,
@@ -32,7 +32,7 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  * `callBriefingAi` path (Gemini/DeepSeek server key, no tier/BYOK concept).
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * **`regime` is recomputed, not stored.** On every return — fresh, cache hit and
@@ -88,14 +88,18 @@ export async function runMacroBriefing(
     const { dynamic } = buildMacroBriefingPrompt(data, now);
     const prompt = dynamic;
 
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callBriefingAi({
-            prompt,
-            requestedModel: undefined,
-            fallbackModel: BRIEFING_MODEL_ID,
-            signal: options?.signal,
-            correlationId: 'economy:macro-briefing',
-        })
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () =>
+            callBriefingAi({
+                prompt,
+                requestedModel: undefined,
+                fallbackModel: BRIEFING_MODEL_ID,
+                signal: options?.signal,
+                correlationId: 'economy:macro-briefing',
+            }),
+        { signal: options?.signal }
     );
 
     const briefing = withComputedRegime(

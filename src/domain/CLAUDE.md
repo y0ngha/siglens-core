@@ -46,6 +46,10 @@ export interface CacheProvider {
     get<T>(key: string): Promise<T | null>;
     set<T>(key: string, value: T, ttlSeconds: number): Promise<void>;
     delete(key: string): Promise<void>;
+    // Optional `SET NX EX` — backs cross-instance generation dedupe.
+    setIfAbsent?<T>(key: string, value: T, ttlSeconds: number): Promise<boolean>;
+    // Optional atomic compare-and-delete — releases only a lock this caller owns.
+    deleteIfEquals?(key: string, value: string): Promise<boolean>;
 }
 
 // infrastructure/cache/redis.ts — adapter

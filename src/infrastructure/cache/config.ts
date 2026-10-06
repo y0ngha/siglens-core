@@ -39,7 +39,11 @@ import {
     secondsUntilNextRegularOpen,
     secondsUntilNextUtcMidnight,
 } from '@/domain/utils';
-import { isRegularSessionOpen, US_EQUITY_SESSION } from '@/domain/session';
+import {
+    isRegularSessionOpen,
+    previousRegularSessionBoundaryMs,
+    US_EQUITY_SESSION,
+} from '@/domain/session';
 import type {
     AnalysisHistoryAxis,
     AnalysisHistoryQuery,
@@ -56,6 +60,41 @@ import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
  * incorporates the ISO date+hour, so rollover happens automatically.
  */
 export const MARKET_BRIEFING_CACHE_TTL = SECONDS_PER_HOUR;
+
+/**
+ * @internal Grid step (percentage points) an index's daily change is rounded
+ * to before it enters the market-briefing cache key (`hashBriefingInput`).
+ *
+ * The prompt still carries the exact change; only the key is coarse, so an
+ * intraday tick no longer misses the hourly slot. Half a point is roughly the
+ * smallest index move a briefing would describe differently.
+ *
+ * **Trade-off, accepted deliberately.** A briefing served from cache quotes the
+ * figures it was *generated* with. While every instrument stays inside its
+ * bucket, that text keeps being served for the rest of the hourly slot (up to
+ * {@link MARKET_BRIEFING_CACHE_TTL}, one hour) even though the page's live
+ * quotes have moved — by less than one bucket step per instrument (0.5pp on
+ * an index, 1pp on a sector, 2pt on volatility). The
+ * alternative — exact values in the key — re-billed the LLM roughly once a
+ * minute during the session. Consumers that show live numbers next to the
+ * briefing should present the briefing as "as of generation" (`generatedAt`).
+ */
+export const BRIEFING_INDEX_CHANGE_BUCKET_PCT = 0.5;
+
+/**
+ * @internal Grid step (percentage points) for a sector ETF's daily change in
+ * the market-briefing cache key. Wider than the index step: there are ~11
+ * sectors, so a finer grid makes *some* sector cross an edge almost every
+ * minute, and a single sector's half-point drift rarely changes the story.
+ */
+export const BRIEFING_SECTOR_CHANGE_BUCKET_PCT = 1;
+
+/**
+ * @internal Grid step (index points) for the volatility reading (VIX,
+ * VKOSPI, …) in the market-briefing cache key. It ticks like any quote; two
+ * points separates "calm" from "elevated" without churning on noise.
+ */
+export const BRIEFING_VOLATILITY_LEVEL_BUCKET = 2;
 
 /** @internal 1시간봉 섹터 시그널 캐시 TTL(분) — 데이터 갱신 주기에 맞춤. */
 export const SECTOR_SIGNALS_1HOUR_TTL_MINUTES = 15;
@@ -295,6 +334,31 @@ function eventsKeySuffix(fingerprint?: string): string {
 
 /**
  * @internal
+ * The latest session boundary at or before `now` — the instant the previous
+ * session's analyses stopped being "current". Mirrors the expiry boundary
+ * {@link computeEffectiveTtl} uses going forward, so `[this, next expiry)` is
+ * exactly one cache lifetime.
+ *
+ * @returns Epoch ms, or `null` for a scheduled spec with no trading day in
+ *   range (a misconfigured spec).
+ */
+function lastSessionBoundaryMs(
+    session: MarketSessionSpec,
+    now: Date
+): number | null {
+    if (session.kind === 'always-open') {
+        return Math.floor(now.getTime() / MS_PER_DAY) * MS_PER_DAY;
+    }
+    return previousRegularSessionBoundaryMs(
+        session,
+        now,
+        'close',
+        ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES
+    );
+}
+
+/**
+ * @internal
  * Start of the cache bucket `now` falls in — the boundary before which prior
  * analyses count toward the history key.
  *
@@ -308,14 +372,34 @@ function eventsKeySuffix(fingerprint?: string): string {
  * coincide with that expiry. Within one bucket no row can newly qualify, so
  * the key is stable; it changes at most once, at the bucket edge.
  *
+ * **Session-aware for day-long windows.** With a `session`, a window of a day
+ * or more (`1Day` technical, the overall axis) starts at the **last session
+ * boundary** instead — the same boundary {@link computeEffectiveTtl} expires
+ * the cache entry at: the latest regular close plus
+ * {@link ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES} on a `scheduled` market, the
+ * latest 00:00 UTC on an `always-open` one. The KST 05:00 anchor is a U.S.
+ * close; for a KRX symbol it fell mid-way through an entry's life (written at
+ * 19:00 KST, alive until the next 16:00 KST), so at 05:00 the evening's own
+ * row joined the `:hist=` set, the key changed, and the first visitor of the
+ * KR trading day regenerated an analysis of the same closed session. Shorter
+ * windows keep the clock-anchored bucket: their bars move within a session.
+ * A scheduled spec with no trading day in range falls back to the anchor.
+ *
  * @param windowSeconds - The consuming axis' cache window.
  * @param now - Reference time (reuse the same instance for key and prompt).
+ * @param session - Market session of the analysed instrument; the same spec
+ *   passed as `SubmitAnalysisOptions.session`. Omit for the anchored bucket.
  * @returns Epoch milliseconds of the bucket start.
  */
 export function priorAnalysisWindowStartMs(
     windowSeconds: number,
-    now: Date
+    now: Date,
+    session?: MarketSessionSpec
 ): number {
+    if (session !== undefined && windowSeconds >= SECONDS_PER_DAY) {
+        const sessionStartMs = lastSessionBoundaryMs(session, now);
+        if (sessionStartMs !== null) return sessionStartMs;
+    }
     const windowMs = windowSeconds * MS_PER_SECOND;
     const offsetMs =
         (((CACHE_EXPIRY_HOUR_KST - KST_OFFSET_HOURS + 24) % 24) * MS_PER_HOUR) %
@@ -409,6 +493,10 @@ export function priorAnalysisWindowStartMs(
  *   two from separate `new Date()` calls risks a boundary crossing between
  *   them, which would make the cache key and the rendered prompt disagree
  *   about which entries are "in the window".
+ * @param session - Market session of the analysed instrument, forwarded to
+ *   {@link priorAnalysisWindowStartMs} (a day-long window then starts at the
+ *   last session boundary). Must be the same spec the consumer passed to
+ *   {@link analysisHistoryQuery}, so the SQL bound and this cut agree.
  * @returns `candidates` — the window-filtered, capped, newest-first list.
  *   Feed it to BOTH this key's `historyFingerprint` segment (via
  *   `fingerprint`) AND, unfiltered by bar (that is stage 2's job), to
@@ -429,9 +517,14 @@ export function priorAnalysisWindowStartMs(
 export function narrowPriorAnalysesForCacheKey(
     priorAnalyses: readonly PriorAnalysis[],
     currentWindowSeconds: number,
-    now: Date
+    now: Date,
+    session?: MarketSessionSpec
 ): NarrowedPriorAnalyses {
-    const windowStartMs = priorAnalysisWindowStartMs(currentWindowSeconds, now);
+    const windowStartMs = priorAnalysisWindowStartMs(
+        currentWindowSeconds,
+        now,
+        session
+    );
     const cap = PRIOR_ANALYSIS_WINDOW_BARS;
 
     const candidates = priorAnalyses
@@ -1002,8 +1095,9 @@ export function buildAnalysisCacheKey(
  * within a given hour share a cached briefing; the `model` segment scopes the
  * cache to the briefing model so a model change produces a new key (cache miss)
  * instead of serving a briefing generated by a different model; and `inputHash`
- * folds in a deterministic hash of the index/sector values so changed
- * underlying data within the same hour also produces a new key.
+ * folds in a hash of the index/sector moves **bucketed** on a coarse grid (see
+ * {@link BRIEFING_INDEX_CHANGE_BUCKET_PCT}) so only a meaningful move within
+ * the same hour produces a new key — not every quote tick.
  *
  * Note: `inputHash` must be derived by the library's internal hashing pipeline.
  *   Do not construct or depend on this key format from outside the core
@@ -1980,6 +2074,13 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  *   {@link OVERALL_CACHE_TTL_SECONDS} (a fixed day) — pass the axis whose
  *   `narrowPriorAnalysesForCacheKey` window the rows will feed.
  * @param now - Reference time; defaults to the current time.
+ * @param session - Market session of the analysed instrument — pass the SAME
+ *   spec given to `runAnalysis`/`runOverallAnalysis` as `session`. On a
+ *   day-long window (`1Day`, the overall axis) it moves `generatedBeforeMs` to
+ *   the last session boundary (see {@link priorAnalysisWindowStartMs}), which
+ *   is what core cuts at when that call carries the session. Omitting it here
+ *   while passing it there leaves the SQL on the KST 05:00 anchor, so the
+ *   row set still shifts at 05:00 and the key churns as before.
  * @returns `limit` — the maximum rows worth fetching — `sinceMs`, how far
  *   back in milliseconds the `WHERE` clause should reach from now, and
  *   `generatedBeforeMs`, the epoch-ms upper bound (exclusive) for
@@ -1988,7 +2089,8 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
 export function analysisHistoryQuery(
     timeframe: Timeframe,
     axis: AnalysisHistoryAxis = 'technical',
-    now: Date = new Date()
+    now: Date = new Date(),
+    session?: MarketSessionSpec
 ): AnalysisHistoryQuery {
     const limit = PRIOR_ANALYSIS_WINDOW_BARS;
     const calendarDaysPerBar =
@@ -2003,7 +2105,11 @@ export function analysisHistoryQuery(
     return {
         limit,
         sinceMs: Math.ceil(days * MS_PER_DAY),
-        generatedBeforeMs: priorAnalysisWindowStartMs(windowSeconds, now),
+        generatedBeforeMs: priorAnalysisWindowStartMs(
+            windowSeconds,
+            now,
+            session
+        ),
     };
 }
 
@@ -2191,3 +2297,54 @@ export function buildOptionsCacheKey(
 ): string {
     return `${CACHE_KEY_SCHEMA_VERSION}:analysis:options:${symbol}:${expirationDate}:${modelId}:${OPTIONS_PROMPT_TEMPLATE_VERSION}:${snapshotInputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
+
+/**
+ * @internal How long a cross-instance generation lock lives (seconds).
+ *
+ * Covers the slowest generation the pipeline allows: a technical analysis can
+ * take ~250s before `withRetry`'s wall-clock budget gives up. The winner
+ * deletes the lock as soon as it publishes, so this only bounds how long a
+ * crashed winner can make peers wait.
+ */
+export const GENERATION_LOCK_TTL_SECONDS = 5 * SECONDS_PER_MINUTE;
+
+/**
+ * @internal How long a winner's raw LLM output stays readable by waiting peers
+ * (seconds). Peers poll every few seconds, so this only has to outlive the
+ * last poll after the winner finishes; the real result lives in the main
+ * cache entry, which every peer writes itself after post-processing.
+ */
+export const GENERATION_RESULT_TTL_SECONDS = 2 * SECONDS_PER_MINUTE;
+
+/**
+ * @internal Build the Redis key a generation for `cacheKey` is locked under.
+ *
+ * Derived from the result's own cache key, so two requests contend exactly
+ * when they would otherwise write the same entry.
+ */
+export function buildGenerationLockKey(cacheKey: string): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:lock:generation:${cacheKey}`;
+}
+
+/**
+ * @internal Build the Redis key under which the lock winner publishes its raw
+ * LLM output for peers that waited instead of generating.
+ *
+ * Scoped to the winner's lock `token`, so a waiter only ever reads the output
+ * of the generation whose lock it saw — a previous winner's result for the
+ * same `cacheKey` (still inside its TTL) lives under a different key and can
+ * never be mistaken for the current one.
+ */
+export function buildGenerationResultKey(
+    cacheKey: string,
+    token: string
+): string {
+    return `${CACHE_KEY_SCHEMA_VERSION}:generation:raw:${cacheKey}:${token}`;
+}
+
+/**
+ * @internal Largest raw LLM output (in UTF-16 code units, ~bytes for JSON)
+ * the lock winner publishes for peers. Anything bigger is not worth a Redis
+ * round trip per poll; peers then generate themselves once the lock is gone.
+ */
+export const GENERATION_RESULT_MAX_LENGTH = 512 * 1024;

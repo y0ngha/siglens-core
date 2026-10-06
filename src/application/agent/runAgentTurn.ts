@@ -1,6 +1,8 @@
 import {
     AGENT_PROMPT_VERSION,
     buildAgentSystemPrompt,
+    buildAgentTurnContext,
+    composeAgentUserMessage,
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
 import {
@@ -45,6 +47,9 @@ const HISTORY_WINDOW = {
     turns: 8,
     toolResultTurns: 2,
     budgetTokens: 32_000,
+    // Drop old turns 4 at a time instead of 1 per turn, so the window's head —
+    // and with it the cached prefix — holds still for 4 turns at a stretch.
+    stride: 4,
 } as const;
 /** Measured medians (spec §4-2) surfaced to the UI as a progress hint. */
 const FRESH_ANALYSIS_ESTIMATED_SECONDS: Record<FreshAnalysisKind, number> = {
@@ -273,19 +278,30 @@ export async function runAgentTurn(
     // 2–3. Prompt and window.
     const tools = selectTools(params.availableTools);
     const timeZone = resolveAgentTimeZone(params.timeZone, params.locale);
+    // Prefix-cache layout (DeepSeek caches the longest byte-identical request
+    // prefix): system prompt → tool defs → history are stable across turns;
+    // everything that changes per turn (the clock, the session status) rides
+    // on the latest user message only. The consumer persists the plain
+    // `userMessage`, so next turn this message is history without the note.
     const system = buildAgentSystemPrompt({
         locale: params.locale,
         tools,
+        portfolioSymbols: params.portfolioSymbols,
+        guest: tier === 'free',
+    });
+    const turnContext = buildAgentTurnContext({
+        locale: params.locale,
         now,
         timeZone,
         etSessionStatus: getEtSessionStatus(now),
-        portfolioSymbols: params.portfolioSymbols,
-        guest: tier === 'free',
     });
     const historyWindow = selectHistoryWindow(params.history, HISTORY_WINDOW);
     const messages: AgentMessage[] = [
         ...historyWindow,
-        { role: 'user', content: params.userMessage },
+        {
+            role: 'user',
+            content: composeAgentUserMessage(turnContext, params.userMessage),
+        },
     ];
     // Earlier answers with no tool results behind them (guest transcripts carry
     // text only): left to choose, the model re-quotes or invents figures for a
