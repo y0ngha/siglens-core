@@ -24,6 +24,7 @@ import {
     normalizeCachedAnalysisResponse,
 } from '@/domain/analysis/confidence';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
+import { marketEventHorizonMs } from '@/domain/analysis/marketEvents';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { normalizeIdList } from '@/domain/analysis/normalize';
 import { asObject } from '@/domain/analysis/normalizePrimitives';
@@ -307,11 +308,20 @@ async function runAnalysisImpl(
 
     // 이벤트는 봉 없이 좁힌다 — 캐시 키가 봉 fetch보다 먼저 만들어져야 하기
     // 때문이다(이력과 같은 순서 제약). 봉 기준 절단은 프롬프트 렌더 단계의
-    // `selectMarketEvents`가 맡는다.
+    // `selectMarketEvents`가 맡는다. 다만 봉이 없어도 정할 수 있는 시간 상한은
+    // 여기서 건다 — 이미 있는 봉의 마지막 시각 이후에 발행된 이벤트(주말·휴장일
+    // 뉴스, 다음 UTC 날짜 경계 뒤 뉴스)는 프롬프트가 읽을 수 없는데도 키만 바꿔
+    // 같은 프롬프트로 LLM을 다시 돌리게 한다. 컷을 1단계 안에서 하므로 키와
+    // 프롬프트는 같은 후보를 본다. 평일 장 시작 전 뉴스는 일부러 자르지 않는다 —
+    // 소비자가 실시간 시세로 오늘 봉을 덧붙이므로 장 전 마지막 봉이 오늘일 수
+    // 있고, `openMinute`로 조이면 상한이 낮아져 오래된 캐시가 남는다.
     const {
         candidates: marketEventCandidates,
         fingerprint: eventsFingerprint,
-    } = narrowMarketEventsForCacheKey(options.marketEvents ?? []);
+    } = narrowMarketEventsForCacheKey(
+        options.marketEvents ?? [],
+        marketEventHorizonMs(timeframe, options.session, priorAnalysisNow)
+    );
 
     const cache = createCacheProvider();
     const cacheKey = buildAnalysisCacheKey(
