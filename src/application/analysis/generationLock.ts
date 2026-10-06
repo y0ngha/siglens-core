@@ -269,7 +269,9 @@ async function generateOnceAcrossInstances(
  *
  * Bounded and fail-open: a waiter gives up after `maxWaitMs`, or as soon as the
  * lock disappears without a usable result (the winner failed), and generates
- * once itself. A cache without `setIfAbsent`, or a Redis error while claiming,
+ * once itself. This is deliberate fail-open: when a winner fails, every
+ * waiting instance generates concurrently (bounded by the number of instances
+ * contending for the key) rather than leaving users without a result. A cache without `setIfAbsent`, or a Redis error while claiming,
  * degrades to process-local dedupe only (and never releases a lock it does not
  * own). Release is an atomic compare-and-delete on the token
  * (`deleteIfEquals`); without that method the lock simply expires after

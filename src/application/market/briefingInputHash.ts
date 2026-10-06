@@ -11,8 +11,7 @@ import {
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
 
 /**
- * @internal
- * Bucket index of `value` on a `step` grid (`round(value / step)`), so two
+ * @internal Bucket index of `value` on a `step` grid (`round(value / step)`), so two
  * readings within half a step of the same grid point share a bucket. A
  * non-finite reading (a failed quote's `NaN`) maps to `null` rather than
  * poisoning the JSON with `null`-vs-`NaN` ambiguity.

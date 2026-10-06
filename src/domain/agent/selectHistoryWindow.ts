@@ -81,8 +81,8 @@ function windowStart(count: number, turns: number, stride: number): number {
 /**
  * Pick the transcript slice sent to the model (spec §4-4): last `turns`
  * user turns (up to `turns + stride - 1` with a `stride`, see
- * {@link HistoryWindowOptions.stride}) verbatim, tool results outside the last `toolResultTurns` turns
- * replaced by an `omitted` marker (the assistant `toolCalls` stay so every
+ * {@link HistoryWindowOptions.stride}) verbatim, tool results outside the
+ * last `toolResultTurns` turns replaced by an `omitted` marker (the assistant `toolCalls` stay so every
  * tool message keeps its pair), then drop oldest turns until under budget.
  * Pure; does not mutate input.
  *

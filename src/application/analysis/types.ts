@@ -1,5 +1,5 @@
-import type { CacheProvider } from '@/domain/ports/cache';
 import type { BriefingModelId } from '@/application/analysis/briefingModel';
+import type { CacheProvider } from '@/domain/ports/cache';
 import type { ActiveModelId, Tier } from '@/domain/types';
 
 /** 분석 AI 호출 옵션. worker의 11개 positional 인자를 옵션 객체로 대체한다. */

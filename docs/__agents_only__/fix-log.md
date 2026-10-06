@@ -141,12 +141,6 @@
 
 Round 3: approved
 
-## [Branch fix/history-window-cache-churn | 2026-09-30] — Round 1 review findings
-
-- Violation 3 (recommended): Pointer key computed on every generation, trade-off not documented
-  - Rule: Infrastructure design trade-offs must be documented with comments explaining the choice and upgrade path
-  - Context: Optimization to skip pointer key recomputation on cache-hit paths was undocumented. Fixed by adding comment explaining memory/CPU trade-off and when full recomputation would be necessary.
-
 ## [Branch fix/strategy-overlay-kind | 2026-10-01] — Strategy overlay kind type export and testing
 
 - Violation 2 (R1 RECOMMENDED, fixed): StrategyOverlayKind literal ('divergence' | 'fibonacci' | 'elliott') duplicated across loader, resolver, and type definitions
@@ -326,10 +320,6 @@ Round 3: approved (comment-only fix after R2)
 
 Round 3: approved (comment-only fix after R2)
 
-## [PR #250 Claude review | perf/technical-prompt-stable-prefix | 2026-10-04]
-- Violation (suggestion, fixed): over-long single-line field JSDoc and mixed wording in the `stable` comment
-  Rule: Wrap JSDoc to neighbour width; comments describing moved blocks must name them consistently
-
 ## [review-agent | feat/252/fear-greed-regime-stats | 2026-10-05]
 - Violation (R1 required, fixed): new barrel exports (3 functions, 3 constants, 7 types) not added to docs/PUBLIC_API.md
   Rule: MISTAKES "PUBLIC_API.md inventory becomes stale" — update PUBLIC_API.md in the same change as the barrel exports
@@ -419,3 +409,13 @@ Round 2: approved
 - Violation 4 (required, fixed): Unvalidated, uncapped LLM output shared with peers
   Rule: Infrastructure Functions — LLM output must be validated and capped before sharing with peer systems
   Context: Added output validation with size caps before peer propagation
+
+## [PR #261 | perf/audit-core-items | 2026-10-06]
+
+- Violation 1 (blocker, fixed): @internal missing on quantizeForBriefingKey (false positive)
+  Rule: MISTAKES.md Public API 9.5 — inline @internal tag placement for clarity
+  Context: @internal tag was present but on separate line; moved inline as `@internal Bucket index…` to make tag unambiguous
+
+- Violation 2 (suggestion, fixed): Import order within same alias group not alphabetical
+  Rule: MISTAKES.md Conventions 13.5 — imports from same alias must be alphabetically sorted
+  Context: Reordered imports within the alias group to follow alphabetical order
