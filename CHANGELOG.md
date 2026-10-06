@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.14.0](https://github.com/y0ngha/siglens-core/compare/v2.13.1...v2.14.0) (2026-10-06)
+
+### Performance Improvements
+
+* 생성 중복·캐시 키 흔들림을 줄이고 에이전트 프롬프트 프리픽스를 고정한다 ([#261](https://github.com/y0ngha/siglens-core/issues/261)) ([121ea69](https://github.com/y0ngha/siglens-core/commit/121ea69b5292a179dd26edc7d81b38d7de77dcd1))
+
 ## [2.13.1](https://github.com/y0ngha/siglens-core/compare/v2.13.0...v2.13.1) (2026-10-06)
 
 ### Bug Fixes
