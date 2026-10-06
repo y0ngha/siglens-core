@@ -3,6 +3,8 @@ import { AGENT_FOLLOW_UP_MARKER } from '@/domain/agent/agentFollowUps';
 import {
     AGENT_PROMPT_VERSION,
     buildAgentSystemPrompt,
+    buildAgentTurnContext,
+    composeAgentUserMessage,
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
 
@@ -32,11 +34,20 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('a market analyst, not a broker');
     });
 
-    it('현재 시각(ET·KST)과 장 상태를 주입한다', () => {
-        expect(prompt).toContain(
+    it('현재 시각(ET·KST)과 장 상태는 턴 컨텍스트에 주입한다', () => {
+        const context = buildAgentTurnContext({
+            locale: 'ko',
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(context).toContain(
             'UTC: 2026-09-12, 15:00 · ET: 2026-09-12, 11:00 · KST: 2026-09-13, 00:00'
         );
-        expect(prompt).toContain('US regular session: open');
+        expect(context).toContain('US regular session: open');
+        // 시스템 프롬프트에는 시각이 없다 — 시계는 턴 노트가 유일한 출처다.
+        expect(prompt).not.toContain('UTC: 2026-09-12');
+        expect(prompt).not.toContain('US regular session: open');
+        expect(prompt).toContain('It is your only clock');
     });
 
     it('보유 심볼이 있으면 사용자 컨텍스트 줄을 넣는다', () => {
@@ -340,7 +351,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-05.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-06.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -402,26 +413,42 @@ describe('buildAgentSystemPrompt', () => {
 
     it('사용자 시간대의 현재 시각을 알리고, 이미 변환된 타임스탬프를 그대로 옮기게 한다', () => {
         // NOW = 2026-09-12T15:00Z
-        expect(prompt).toContain("User's local time: 2026-09-13 00:00 KST");
+        const ko = buildAgentTurnContext({
+            locale: 'ko',
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(ko).toContain("User's local time: 2026-09-13 00:00 KST");
         expect(prompt).toContain('Copy them exactly as written');
         expect(prompt).toContain('never write UTC');
-        const la = buildAgentSystemPrompt({
+        const la = buildAgentTurnContext({
             locale: 'en',
-            tools: AGENT_TOOL_SPECS,
             now: NOW,
             etSessionStatus: 'open',
             timeZone: 'America/Los_Angeles',
         });
         expect(la).toContain("User's local time: 2026-09-12 08:00 PDT");
         // Invalid zone from the browser → the locale's default (en → ET).
-        const bogus = buildAgentSystemPrompt({
+        const bogus = buildAgentTurnContext({
             locale: 'en',
-            tools: AGENT_TOOL_SPECS,
             now: NOW,
             etSessionStatus: 'open',
             timeZone: 'Mars/Olympus',
         });
         expect(bogus).toContain("User's local time: 2026-09-12 11:00 EDT");
+    });
+
+    it('턴 노트는 최신 사용자 메시지 앞에 붙고, 사용자 원문은 ## Message 아래에 그대로 남는다', () => {
+        const context = buildAgentTurnContext({
+            locale: 'ko',
+            now: NOW,
+            etSessionStatus: 'closed',
+        });
+        const composed = composeAgentUserMessage(context, '삼성전자 어때?');
+        expect(composed.startsWith('## Now\n')).toBe(true);
+        expect(composed.endsWith('\n\n## Message\n삼성전자 어때?')).toBe(true);
+        expect(prompt).toContain('"## Now" note written by SIGLENS');
+        expect(prompt).toContain('under "## Message"');
     });
 
     it('툴 호출 전 내레이션·내부 구조 설명·매매 전술 권유를 금지한다', () => {
@@ -602,12 +629,34 @@ describe('buildAgentSystemPrompt', () => {
         const b = at(new Date('2026-10-01T03:21:00Z'), ['AAPL']);
         const prefix = (p: string) => p.slice(0, p.indexOf('## User'));
         expect(prefix(a)).toBe(prefix(b));
-        // The Output rule points at the Now line by its exact label.
+        // The Output rule points at the Now note by its exact label.
         expect(a).toContain(
-            'in the same form as the "User\'s local time" line under "Now" below.'
+            'in the same form as the "User\'s local time" line in the "Now" note of the latest user message.'
         );
-        expect(a).toContain("- User's local time: ");
+        expect(a).not.toContain("- User's local time: ");
         expect(a).not.toBe(b);
+    });
+
+    /**
+     * 시스템 프롬프트 전체가 시각과 무관해야 DeepSeek 접두사 캐시가 시스템
+     * 프롬프트 + 이전 히스토리까지 덮는다. 시각이 시스템 끝에만 있어도 매 분
+     * 시스템 메시지가 바뀌고, 그 뒤의 히스토리 전부가 캐시를 놓친다.
+     */
+    it('시스템 프롬프트 전체가 시각·장 상태와 무관하게 바이트 동일하다', () => {
+        const at = (now: Date, etSessionStatus: 'open' | 'closed') =>
+            buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS,
+                now,
+                etSessionStatus,
+                timeZone: 'Asia/Seoul',
+            });
+        expect(at(NOW, 'open')).toBe(
+            at(new Date('2026-10-01T03:21:00Z'), 'closed')
+        );
+        expect(
+            buildAgentSystemPrompt({ locale: 'ko', tools: AGENT_TOOL_SPECS })
+        ).toBe(at(NOW, 'open'));
     });
 
     it('날짜만 있는 타임스탬프(일봉)는 거래일로 인용하고 시각을 붙이지 않게 한다', () => {

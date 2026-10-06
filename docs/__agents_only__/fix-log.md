@@ -149,10 +149,6 @@ Round 3: approved
 
 ## [Branch fix/strategy-overlay-kind | 2026-10-01] — Strategy overlay kind type export and testing
 
-- Violation 2 (R1 RECOMMENDED, fixed): StrategyOverlayKind literal ('divergence' | 'fibonacci' | 'elliott') duplicated across loader, resolver, and type definitions
-  Rule: Code duplication — magic strings should have single source of truth
-  Context: Three separate lists of kind variants consolidated into a single Record<StrategyOverlayKind, true>-backed constant in domain/overlays/constants.ts.
-
 - Violation 3 (R1 RECOMMENDED, fixed): strategyNameToKind lookup matched any skill type instead of restricting to type==='strategy'
   Rule: Type-matching precision — restrict name lookups to intended skill type
   Context: Fixed lookup to check type==='strategy' before matching against strategy names, preventing false matches on other skill types.
@@ -333,8 +329,6 @@ Round 3: approved (comment-only fix after R2)
 ## [review-agent | feat/252/fear-greed-regime-stats | 2026-10-05]
 - Violation (R1 required, fixed): new barrel exports (3 functions, 3 constants, 7 types) not added to docs/PUBLIC_API.md
   Rule: MISTAKES "PUBLIC_API.md inventory becomes stale" — update PUBLIC_API.md in the same change as the barrel exports
-- Violation (R1 recommended, fixed): a second generic median helper added (duplicated fundamentalPrompt's private median)
-  Rule: MISTAKES 1 — grep domain for an existing helper before writing one; share it from a neutral utils module
 - Violation (R1 recommended, fixed): public numeric options (horizons) not validated; 0 / fractional horizons produced trivial or NaN results
   Rule: (new) Public numeric options that index arrays must be filtered to valid integers, and derived values filtered with Number.isFinite before aggregation
 - Status (R2): approved
@@ -401,3 +395,48 @@ Round 3: approved (comment-only fix after R2)
   Context: Added consumer-action guidance for the changed function's behavior.
 
 Round 2: approved
+
+## [Branch perf/audit-core-items | Claude review R1 | 2026-10-06]
+
+- Violation 1 (required, fixed): Distributed lock released with unconditional DEL and constant value, no owner token
+  Rule: Infrastructure Functions — Distributed lock must validate owner token before deletion to prevent foreign lock deletion after TTL expiry
+  Context: Lock release now checks token match before DEL; fail-open acquire path protected against concurrent lock hijacking
+
+- Violation 2 (required, fixed): Published result not bound to its generation; waiter could reuse stale result
+  Rule: Infrastructure Functions — Cache results must encode generation binding to prevent stale result reuse by waiters
+  Context: Added generation tag to cached result; waiter validates generation matches before using cached value
+
+- Violation 3 (required, fixed): No regression tests for lock ownership or stale results; in-memory stub ignored TTL
+  Rule: Tests — Regression tests needed for critical concurrency patterns (lock ownership, stale-result prevention)
+  Context: Added regression test suite for lock ownership validation and generation binding; in-memory stub now respects TTL
+
+- Violation 4 (required, fixed): Unvalidated, uncapped LLM output shared with peers
+  Rule: Infrastructure Functions — LLM output must be validated and capped before sharing with peer systems
+  Context: Added output validation with size caps before peer propagation
+
+## [PR #10 | perf/server-render-path | 2026-10-06]
+
+- Violation 1 (required, fixed): Cache key derivation was changed under a shared cross-deploy cache prefix without a version keyPart
+  Rule: Infrastructure Functions — Cache key versioning must include shape-change keyPart; shared prefixes without version guards allow stale cross-version reuse
+  Context: Added version keyPart to cache keys; documented shape-change policy in config
+
+- Violation 2 (required, fixed): Degraded renders caused by a new short timeout budget could stay baked into ISR for 24h
+  Rule: Infrastructure Functions — Cache invalidation must prevent baked-in degradation; timeout/failure mode must not persist beyond appropriate TTL
+  Context: Adjusted ISR TTL for degraded renders; added separate TTL path for timeout failures
+
+- Violation 3 (required, fixed): A global Redis timeout was applied to cron and long-running callers
+  Rule: Infrastructure Functions — Timeout policies must be caller-specific, not global; long-running operations need appropriate budgets
+  Context: Separated cron timeout from request timeout; added caller-aware timeout logic
+
+- Violation 4 (required, fixed): A speculative parallel upstream fetch ran before validation, which amplified load for nonexistent inputs
+  Rule: Infrastructure Functions — Input validation must occur before upstream dispatch; speculative load without guards wastes capacity
+  Context: Added input validation gate before parallel fetch dispatch
+
+- Violation 5 (required, fixed): Cron work inherited a render-path retry budget through shared dedup
+  Rule: Infrastructure Functions — Retry budgets must not cross work-type boundaries; cron and render paths need separate dedup policies
+  Context: Isolated cron dedup from render-path dedup; each work type has own retry budget
+
+- Violation 6 (recommended, fixed): A stale-cache failure mode was left undocumented
+  Rule: Documentation — Failure modes and recovery paths must be documented, especially for cache-critical paths
+  Context: Added documentation of stale-cache recovery policy and failover behavior
+

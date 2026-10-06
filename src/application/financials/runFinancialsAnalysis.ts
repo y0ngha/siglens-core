@@ -1,5 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import {
@@ -111,7 +111,7 @@ async function fetchProviderData(
  * no Redis round-trip is needed (invariant 1 of the worker-removal design).
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * Pass `options.signal` (e.g. `request.signal` from the SSE route handler)
@@ -243,20 +243,24 @@ export async function runFinancialsAnalysis(
             ? (modelId as ActiveModelId)
             : DEEPSEEK_V4_1_FLASH_MODEL;
 
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callAnalysisAi({
-            prompt,
-            model: callModelId,
-            tier,
-            userApiKey: options.userApiKey,
-            signal: options.signal,
-            fallbackOnProviderFailure: options.providerFallback,
-            system,
-            responseSchema: FINANCIALS_RESPONSE_SCHEMA,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            reasoning: options.reasoning,
-            correlationId: `${symbol}:financials`,
-        })
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () =>
+            callAnalysisAi({
+                prompt,
+                model: callModelId,
+                tier,
+                userApiKey: options.userApiKey,
+                signal: options.signal,
+                fallbackOnProviderFailure: options.providerFallback,
+                system,
+                responseSchema: FINANCIALS_RESPONSE_SCHEMA,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                reasoning: options.reasoning,
+                correlationId: `${symbol}:financials`,
+            }),
+        { signal: options.signal }
     );
 
     // Inline post-processing (formerly in pollFinancialsAnalysis). No job queue involved.

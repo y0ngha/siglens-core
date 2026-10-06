@@ -274,6 +274,53 @@ export function nextRegularSessionBoundaryMs(
 }
 
 /**
+ * @internal `now` **이하**(같거나 이전)에서 가장 늦은 정규장 개장/마감 순간의 UTC epoch ms.
+ *
+ * {@link nextRegularSessionBoundaryMs}의 거울이다 — 같은 규칙(주말·`closeMinuteFor`
+ * 휴장일 건너뛰기, 반장은 그날의 실제 마감, 날짜별 DST 오프셋)으로 오늘부터 과거로
+ * 훑는다. 그래서 장중에는 직전 거래일 마감, 마감(+버퍼) 직후에는 오늘 마감이 나온다.
+ * 두 함수가 같은 경계를 쓰므로 `[이전 경계, 다음 경계)`가 빈틈 없이 하나의 세션 버킷이다.
+ *
+ * @param spec - `scheduled` 세션 스펙.
+ * @param now - 기준 시각.
+ * @param boundary - `'open'` 개장, `'close'` 마감.
+ * @param offsetMinutes - 경계에 더할 분(예: 마감 후 정착 버퍼).
+ * @returns epoch ms, 탐색 상한 안에 거래일이 없으면 `null`(잘못된 스펙).
+ */
+export function previousRegularSessionBoundaryMs(
+    spec: Extract<MarketSessionSpec, { kind: 'scheduled' }>,
+    now: Date,
+    boundary: 'open' | 'close',
+    offsetMinutes: number = 0
+): number | null {
+    const { minutesOfDay } = localSessionParts(now, spec.timeZone);
+    const nowMs = now.getTime();
+    for (let offset = 0; offset <= MAX_CLOSURE_LOOKAHEAD_DAYS; offset++) {
+        // 현지 정오 부근을 찍어 날짜를 읽는다 — nextRegularSessionBoundaryMs와 같은 이유.
+        const probe = new Date(
+            nowMs -
+                offset * MS_PER_DAY +
+                (MINUTES_PER_DAY / 2 - minutesOfDay) * MS_PER_MINUTE
+        );
+        const day = localSessionParts(probe, spec.timeZone);
+        if (spec.weekendDays.includes(day.weekdayIndex)) continue;
+        const closeMinute = spec.closeMinuteFor?.(probe) ?? spec.closeMinute;
+        if (closeMinute <= 0) continue;
+        const boundaryMinute =
+            boundary === 'open' ? spec.openMinute : closeMinute;
+        const atMs = localWallClockToUtcMs(
+            day.year,
+            day.month,
+            day.day,
+            boundaryMinute + offsetMinutes,
+            spec.timeZone
+        );
+        if (atMs <= nowMs) return atMs;
+    }
+    return null;
+}
+
+/**
  * @internal `now`가 속한 현지 날짜 **이하**에서 가장 늦은 거래일의 현지 달력 날짜를 UTC
  * 자정으로 찍은 epoch ms. 일봉이 UTC 자정으로 스탬프된다는 계약(`fetchBarsWithIndicators`)
  * 위에서, "지금 존재할 수 있는 가장 늦은 일봉의 `time`"의 상한이다.

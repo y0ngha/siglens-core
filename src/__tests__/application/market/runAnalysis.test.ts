@@ -9,6 +9,7 @@ import {
 } from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
 import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
+import { makeKrSession } from '../../helpers/krSession';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 vi.mock('@/application/analysis/callAnalysisAi');
@@ -924,6 +925,42 @@ describe('runAnalysis', () => {
 
             const promptArgs = mockBuildAnalysisPrompt.mock.calls[0]!;
             expect(promptArgs[10]).toEqual([oldEntry]);
+        });
+
+        // M2: KRX 마감 후(19:30 KST)에 쓴 행은 같은 마감 세션 동안 키에 들어오면 안
+        // 된다. 세션 없이는 KST 05:00 앵커가 굴러가며 그 행이 들어와 키가 바뀐다.
+        it('1Day + session이면 마감 후 쓴 행이 다음 날 아침에도 :hist=를 만들지 않는다', async () => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            try {
+                vi.setSystemTime(new Date('2026-09-29T21:30:00.000Z'));
+                const eveningRow = {
+                    generatedAt: new Date('2026-09-29T10:30:00.000Z'),
+                    trend: 'bullish' as const,
+                    riskLevel: 'low' as const,
+                };
+                const run = (withSession: boolean) =>
+                    runAnalysis(
+                        mockSymbol,
+                        mockCompanyName,
+                        '1Day',
+                        false,
+                        undefined,
+                        {
+                            marketDataProvider: fakeProvider,
+                            priorAnalyses: [eveningRow],
+                            session: withSession ? makeKrSession() : undefined,
+                        }
+                    );
+
+                await run(true);
+                expect(mockCacheGet.mock.calls[0]![0]).not.toContain(':hist=');
+
+                mockCacheGet.mockClear();
+                await run(false);
+                expect(mockCacheGet.mock.calls[0]![0]).toContain(':hist=');
+            } finally {
+                vi.useRealTimers();
+            }
         });
     });
 

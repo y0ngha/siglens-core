@@ -134,7 +134,8 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * Prior-analysis-context history for this symbol + timeframe, supplied
      * by the consumer (siglens / siglens-trader) from its own database —
      * core has no storage of its own for past analyses. Size the query with
-     * {@link analysisHistoryQuery} before fetching, **including** its
+     * {@link analysisHistoryQuery} before fetching (passing the same
+     * {@link SubmitAnalysisOptions.session}), **including** its
      * `generatedBeforeMs` bound (`generated_at < generatedBeforeMs`) —
      * without it, fresh generations push older rows out of the `LIMIT` and the
      * cache key changes on every request.
@@ -198,6 +199,12 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * It also bounds `marketEvents` for the cache key on `1Day` with a
      * `scheduled` spec (see `marketEventHorizonMs`): news published after the
      * latest trading day's bar no longer changes the `:evt=` segment.
+     *
+     * On `1Day` it also anchors the `priorAnalyses` bucket at the last session
+     * boundary (the same one the entry expires at — see
+     * `priorAnalysisWindowStartMs`), so rows written after the close stay out
+     * of the `:hist=` fingerprint until that session's entry expires. Pass the
+     * same spec to {@link analysisHistoryQuery} so the SQL bound agrees.
      *
      * Omitting it keeps the previous lifetime and an unbounded events key
      * exactly (backward compatible). The spec itself is deliberately NOT folded

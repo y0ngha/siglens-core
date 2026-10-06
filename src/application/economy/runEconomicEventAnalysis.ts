@@ -1,5 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { GEMINI_FLASH_LITE_MODEL } from '@/application/chat/constants';
 import type {
     RunEconomicEventAnalysisOptions,
@@ -74,7 +74,7 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  * or record. The analysis is public-economy data, same as congress trade analysis.
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
@@ -112,18 +112,22 @@ export async function runEconomicEventAnalysis(
     const { dynamic } = buildEconomicEventAnalysisPrompt(input);
     const prompt = dynamic;
 
-    const raw = await dedupeInFlight(cacheKey, () =>
-        callAnalysisAi({
-            prompt,
-            model: ECONOMIC_EVENT_MODEL,
-            signal: options?.signal,
-            seed: analysisSeed(prompt),
-            // 짧은 구조화 분류(sentiment + 두 문장)라 추론 이득이 없다.
-            // 모델 스펙을 오버라이드하므로 ECONOMIC_EVENT_MODEL이 thinking
-            // 모델로 바뀌어도 이 경로는 꺼진 상태를 유지한다.
-            reasoning: false,
-            correlationId: `economic-event:${input.event}`,
-        })
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () =>
+            callAnalysisAi({
+                prompt,
+                model: ECONOMIC_EVENT_MODEL,
+                signal: options?.signal,
+                seed: analysisSeed(prompt),
+                // 짧은 구조화 분류(sentiment + 두 문장)라 추론 이득이 없다.
+                // 모델 스펙을 오버라이드하므로 ECONOMIC_EVENT_MODEL이 thinking
+                // 모델로 바뀌어도 이 경로는 꺼진 상태를 유지한다.
+                reasoning: false,
+                correlationId: `economic-event:${input.event}`,
+            }),
+        { signal: options?.signal }
     );
 
     // raw를 미리 JSON.parse하지 않는다 — 이 normalize 함수는 parseLlmPayload로

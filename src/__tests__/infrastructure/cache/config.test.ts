@@ -1310,6 +1310,121 @@ describe('priorAnalysisWindowStartMs (anchored cache bucket)', () => {
     });
 });
 
+describe('priorAnalysisWindowStartMs (session-aware day bucket)', () => {
+    const startIso = (
+        windowSeconds: number,
+        now: string,
+        session?: Parameters<typeof priorAnalysisWindowStartMs>[2]
+    ) =>
+        new Date(
+            priorAnalysisWindowStartMs(windowSeconds, new Date(now), session)
+        ).toISOString();
+
+    it('KRX 1Day: 마감 후 저녁에는 오늘 16:00 KST(마감+버퍼)에서 시작한다', () => {
+        expect(
+            startIso(
+                SECONDS_PER_DAY,
+                '2026-09-29T10:00:00.000Z',
+                makeKrSession()
+            )
+        ).toBe('2026-09-29T07:00:00.000Z');
+    });
+
+    it('KRX 1Day: KST 05:00을 넘어도 버킷이 그대로다 — 같은 마감 세션', () => {
+        const kr = makeKrSession();
+        const evening = startIso(
+            SECONDS_PER_DAY,
+            '2026-09-29T10:00:00.000Z',
+            kr
+        );
+        const nextMorning = startIso(
+            SECONDS_PER_DAY,
+            '2026-09-29T21:30:00.000Z',
+            kr
+        );
+        expect(nextMorning).toBe(evening);
+        // 세션 없이는 KST 05:00(UTC 20:00)에서 버킷이 굴러간다 — 수정 전 동작.
+        expect(startIso(SECONDS_PER_DAY, '2026-09-29T21:30:00.000Z')).toBe(
+            '2026-09-29T20:00:00.000Z'
+        );
+    });
+
+    it('US 1Day: 직전 마감 + 30분', () => {
+        expect(
+            startIso(
+                SECONDS_PER_DAY,
+                '2026-09-29T21:00:00.000Z',
+                US_EQUITY_SESSION
+            )
+        ).toBe('2026-09-29T20:30:00.000Z');
+    });
+
+    it('crypto 1Day: 최근 UTC 자정', () => {
+        expect(
+            startIso(
+                SECONDS_PER_DAY,
+                '2026-09-29T21:00:00.000Z',
+                CRYPTO_SESSION
+            )
+        ).toBe('2026-09-29T00:00:00.000Z');
+    });
+
+    it('하루보다 짧은 윈도우는 세션과 무관하게 시계 정렬 버킷을 쓴다', () => {
+        expect(
+            startIso(
+                15 * SECONDS_PER_MINUTE,
+                '2026-09-29T13:07:00.000Z',
+                makeKrSession()
+            )
+        ).toBe('2026-09-29T13:00:00.000Z');
+    });
+
+    it('거래일이 없는 잘못된 스펙은 기존 앵커 버킷으로 폴백한다', () => {
+        const never = { ...makeKrSession(), closeMinuteFor: () => 0 };
+        expect(
+            startIso(SECONDS_PER_DAY, '2026-09-29T21:00:00.000Z', never)
+        ).toBe('2026-09-29T20:00:00.000Z');
+    });
+
+    it('narrow: 마감 후 저녁에 쓴 행은 다음 날 아침에도 키에 들어오지 않는다', () => {
+        const kr = makeKrSession();
+        const history = [
+            priorAnalysisAt(new Date('2026-09-28T10:00:00.000Z')),
+            priorAnalysisAt(new Date('2026-09-29T10:30:00.000Z')),
+        ];
+        const evening = narrowPriorAnalysesForCacheKey(
+            history,
+            SECONDS_PER_DAY,
+            new Date('2026-09-29T11:00:00.000Z'),
+            kr
+        );
+        const nextMorning = narrowPriorAnalysesForCacheKey(
+            history,
+            SECONDS_PER_DAY,
+            new Date('2026-09-29T21:30:00.000Z'),
+            kr
+        );
+        expect(nextMorning.fingerprint).toBe(evening.fingerprint);
+        expect(nextMorning.candidates).toHaveLength(1);
+    });
+
+    it('analysisHistoryQuery는 같은 세션 경계를 generatedBeforeMs로 돌려준다', () => {
+        const now = new Date('2026-09-29T21:30:00.000Z');
+        const kr = makeKrSession();
+        expect(
+            analysisHistoryQuery('1Day', 'technical', now, kr).generatedBeforeMs
+        ).toBe(Date.parse('2026-09-29T07:00:00.000Z'));
+        expect(
+            analysisHistoryQuery('15Min', 'overall', now, kr).generatedBeforeMs
+        ).toBe(Date.parse('2026-09-29T07:00:00.000Z'));
+        // 인트라데이 technical은 시계 버킷 그대로.
+        expect(
+            analysisHistoryQuery('15Min', 'technical', now, kr)
+                .generatedBeforeMs
+        ).toBe(Date.parse('2026-09-29T21:30:00.000Z'));
+    });
+});
+
 describe('historyFingerprint이 캐시 키에 반영될 때 (prior-analysis-context, Task 5b)', () => {
     it('historyFingerprint 생략 시 기존 키와 byte-identical하다', () => {
         const legacy = buildAnalysisCacheKey(

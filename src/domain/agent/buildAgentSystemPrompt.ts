@@ -8,13 +8,21 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-05.1';
+export const AGENT_PROMPT_VERSION = '2026-10-06.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
     tools: readonly AgentToolSpec[];
-    now: Date;
-    etSessionStatus: EtSessionStatus;
+    /**
+     * @deprecated Ignored. The clock moved out of the system prompt into
+     * {@link buildAgentTurnContext} (attached to the latest user message) so
+     * the system prompt stays byte-identical across turns and DeepSeek's
+     * prefix cache covers it plus the earlier history. Kept optional so
+     * existing callers still compile.
+     */
+    now?: Date;
+    /** @deprecated Ignored — see {@link BuildAgentSystemPromptInput.now}. */
+    etSessionStatus?: EtSessionStatus;
     /**
      * Symbols the signed-in user holds (spec §4-3 item 6); quantities stay
      * behind `get_my_portfolio`. Callers must pass only symbols that passed
@@ -29,15 +37,29 @@ export interface BuildAgentSystemPromptInput {
      * promising data it cannot get.
      */
     guest?: boolean;
+    /** @deprecated Ignored — see {@link BuildAgentSystemPromptInput.now}. */
+    timeZone?: string;
+}
+
+/** Inputs of {@link buildAgentTurnContext} — everything that changes per turn. */
+export interface AgentTurnContextInput {
+    locale: AgentLocale;
+    now: Date;
+    etSessionStatus: EtSessionStatus;
     /**
      * The reader's IANA time zone. May be raw (unvalidated) input: it is
      * resolved here with `resolveAgentTimeZone`, so an invalid or missing
      * value falls back to the locale's zone. `runAgentTurn` resolves it once
      * for tool-result conversion and passes the result, which resolves to
-     * itself — the prompt and the tool timestamps can never disagree.
+     * itself — the clock note and the tool timestamps can never disagree.
      */
     timeZone?: string;
 }
+
+/** Heading the turn-context note starts with; the system prompt points at it. */
+const TURN_CONTEXT_HEADING = '## Now';
+/** Heading that separates the note from the user's own words. */
+const TURN_MESSAGE_HEADING = '## Message';
 
 /**
  * One question type → the tools it needs. A row is emitted only when every
@@ -206,8 +228,15 @@ function routingTable(available: ReadonlySet<string>): string {
  * tool schemas are passed separately via the `tools` API field, so the
  * prompt only lists names and usage rules.
  *
- * @param input - Locale, selected tools, current time, ET session status,
- * and the signed-in user's portfolio symbols (if any).
+ * **No clock here.** DeepSeek caches the longest byte-identical prefix of a
+ * request, and the system prompt is the head of every request. When it ended
+ * with the current minute, every turn changed it, so neither it nor the
+ * conversation history behind it ever hit the cache. The time now travels in
+ * {@link buildAgentTurnContext}, attached to the latest user message only;
+ * what remains varies only with locale, tool set and the user's holdings.
+ *
+ * @param input - Locale, selected tools, and the signed-in user's portfolio
+ * symbols (if any).
  * @returns The assembled system prompt string.
  */
 export function buildAgentSystemPrompt(
@@ -217,8 +246,6 @@ export function buildAgentSystemPrompt(
     const toolList = input.tools.map(t => `- ${t.name}`).join('\n');
     const available = new Set(input.tools.map(t => t.name));
     const hasSearch = available.has('web_search');
-    const timeZone = resolveAgentTimeZone(input.timeZone, input.locale);
-    const localNow = formatAgentTimestamp(input.now, timeZone);
     const newsGapRule = hasSearch
         ? 'use web_search for the gap and mention the gap at most once, in one short clause'
         : 'say once, in one short clause, that SIGLENS news has nothing on it yet';
@@ -279,7 +306,7 @@ ${ruleLines(available, newsGapRule)}
 - Answer in ${language}.
 - Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
 - Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: SIGLENS 시세, 2026-09-12 21:57 KST 기준)").
-- Tool timestamps are already converted to the user's local time and labelled, in the same form as the "User's local time" line under "Now" below. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
+- Tool timestamps are already converted to the user's local time and labelled, in the same form as the "User's local time" line in the "Now" note of the latest user message. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory.
 - Web search results are snippets: say only what a snippet says, name the site or publisher and its date, and say so when the newest result is older than the period the user asked about.
@@ -303,11 +330,49 @@ ${
 }
 
 ## Now
-- User's local time: ${localNow}
-- ${formatNowLine(input.now)}
-- US regular session: ${input.etSessionStatus}
+- The latest user message starts with a "${TURN_CONTEXT_HEADING}" note written by SIGLENS, not by the user: the user's local time, the current UTC, ET and KST time, and whether the US regular session is open. It is your only clock — use it for "today", "now", "this week" and market-hours questions. The user's own words follow under "${TURN_MESSAGE_HEADING}".
 - Prompt version: ${AGENT_PROMPT_VERSION}
 
 Reminder: at the Plain level, keep the answer to about fifteen numbers.
 Reminder: when you call tools, send only the tool calls — no text in that message.`;
+}
+
+/**
+ * The per-turn note the agent reads its clock from: the user's local time, the
+ * UTC·ET·KST line and the US session status, prepended to the latest user
+ * message by {@link composeAgentUserMessage}.
+ *
+ * Lives outside the system prompt on purpose (see
+ * {@link buildAgentSystemPrompt}): only the newest message changes per turn,
+ * so the system prompt, tool definitions and earlier history stay a
+ * byte-identical prefix that DeepSeek's context cache can reuse.
+ *
+ * @param input - Locale (for the default zone), time, ET session status and
+ *   the reader's time zone.
+ * @returns The note, starting with the `## Now` heading.
+ */
+export function buildAgentTurnContext(input: AgentTurnContextInput): string {
+    const timeZone = resolveAgentTimeZone(input.timeZone, input.locale);
+    return `${TURN_CONTEXT_HEADING}
+- User's local time: ${formatAgentTimestamp(input.now, timeZone)}
+- ${formatNowLine(input.now)}
+- US regular session: ${input.etSessionStatus}`;
+}
+
+/**
+ * The latest user message as sent to the model: the turn-context note, then
+ * the user's own words. Only the request copy carries the note — the consumer
+ * persists the plain `userMessage`, so when this message becomes history on
+ * the next turn it is the plain text, and the cached prefix stays intact up
+ * to it.
+ *
+ * @param context - Output of {@link buildAgentTurnContext}.
+ * @param userMessage - The user's text, verbatim.
+ * @returns The content to send as the latest user message.
+ */
+export function composeAgentUserMessage(
+    context: string,
+    userMessage: string
+): string {
+    return `${context}\n\n${TURN_MESSAGE_HEADING}\n${userMessage}`;
 }

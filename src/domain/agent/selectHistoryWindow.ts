@@ -7,6 +7,15 @@ export interface HistoryWindowOptions {
     toolResultTurns: number;
     /** Input budget in estimated tokens (spec: 32_000). */
     budgetTokens: number;
+    /**
+     * Drop old turns in blocks of this many instead of one per new turn
+     * (default `1`: the window is exactly the last `turns` turns). With a
+     * stride `s`, the window keeps between `turns` and `turns + s - 1` turns
+     * and its oldest turn moves only every `s` turns — so the history prefix
+     * stays byte-identical for `s` turns at a time and the provider's prefix
+     * cache keeps hitting, instead of shifting (and missing) on every turn.
+     */
+    stride?: number;
 }
 
 /**
@@ -59,8 +68,20 @@ function omitToolResult(m: AgentMessage): AgentMessage {
 }
 
 /**
+ * Index of the first turn the window keeps. Advances in multiples of `stride`
+ * once there are more than `turns` turns, so it is constant across `stride`
+ * consecutive turns. `stride` below 1 (or non-integer) is treated as 1.
+ */
+function windowStart(count: number, turns: number, stride: number): number {
+    const step = Math.max(1, Math.floor(stride));
+    if (count <= turns) return 0;
+    return Math.floor((count - turns) / step) * step;
+}
+
+/**
  * Pick the transcript slice sent to the model (spec §4-4): last `turns`
- * user turns verbatim, tool results outside the last `toolResultTurns` turns
+ * user turns (up to `turns + stride - 1` with a `stride`, see
+ * {@link HistoryWindowOptions.stride}) verbatim, tool results outside the last `toolResultTurns` turns
  * replaced by an `omitted` marker (the assistant `toolCalls` stay so every
  * tool message keeps its pair), then drop oldest turns until under budget.
  * Pure; does not mutate input.
@@ -81,9 +102,10 @@ export function selectHistoryWindow(
     // Drop any leading fragment before the first user message (e.g. a
     // dangling tool exchange from a previous window) so `turns[0]` is always
     // a real user turn and `slice(-turns)` can't hand back everything.
-    const turns = splitTurns(history)
-        .filter(t => t[0]?.role === 'user')
-        .slice(-options.turns);
+    const allTurns = splitTurns(history).filter(t => t[0]?.role === 'user');
+    const turns = allTurns.slice(
+        windowStart(allTurns.length, options.turns, options.stride ?? 1)
+    );
     const verbatimFrom = Math.max(0, turns.length - options.toolResultTurns);
     const shaped = turns.map((turn, index) =>
         index >= verbatimFrom

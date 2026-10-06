@@ -157,4 +157,74 @@ describe('selectHistoryWindow', () => {
         });
         expect(out).toEqual([]);
     });
+
+    describe('stride — 오래된 턴을 묶음으로 떨군다(접두사 캐시 보존)', () => {
+        const opts = {
+            turns: 8,
+            toolResultTurns: 2,
+            budgetTokens: 32_000,
+            stride: 4,
+        };
+        const firstUser = (count: number) =>
+            selectHistoryWindow(
+                Array.from({ length: count }, (_, i) => turn(i)).flat(),
+                opts
+            )[0];
+
+        it('turns 이하일 때는 전부 남긴다', () => {
+            expect(firstUser(8)).toEqual({ role: 'user', content: 'q0' });
+        });
+
+        it('창의 첫 턴은 stride 턴 동안 고정되고, 그다음 stride만큼 한 번에 넘어간다', () => {
+            for (const count of [9, 10, 11]) {
+                expect(firstUser(count)).toEqual({
+                    role: 'user',
+                    content: 'q0',
+                });
+            }
+            for (const count of [12, 13, 14, 15]) {
+                expect(firstUser(count)).toEqual({
+                    role: 'user',
+                    content: 'q4',
+                });
+            }
+            expect(firstUser(16)).toEqual({ role: 'user', content: 'q8' });
+        });
+
+        it('남는 턴 수는 turns 이상 turns + stride - 1 이하다', () => {
+            for (let count = 8; count <= 20; count++) {
+                const kept = selectHistoryWindow(
+                    Array.from({ length: count }, (_, i) => turn(i)).flat(),
+                    opts
+                ).filter(m => m.role === 'user').length;
+                expect(kept).toBeGreaterThanOrEqual(8);
+                expect(kept).toBeLessThanOrEqual(11);
+            }
+        });
+
+        it('턴이 늘어도 stride 구간 안에서는 앞쪽 메시지가 바이트 동일하다', () => {
+            const at = (count: number) =>
+                selectHistoryWindow(
+                    Array.from({ length: count }, (_, i) =>
+                        turn(i, true)
+                    ).flat(),
+                    opts
+                );
+            const before = at(9);
+            const after = at(10);
+            // 도구 결과는 최근 2턴만 원문 — 그 앞(q0..q6)은 두 창에서 같다.
+            const stableUntil = before.findIndex(m => m.content === 'q7');
+            expect(after.slice(0, stableUntil)).toEqual(
+                before.slice(0, stableUntil)
+            );
+        });
+
+        it('stride가 1 미만이면 1로 취급한다(기존 동작)', () => {
+            const history = Array.from({ length: 12 }, (_, i) =>
+                turn(i)
+            ).flat();
+            const out = selectHistoryWindow(history, { ...opts, stride: 0 });
+            expect(out[0]).toEqual({ role: 'user', content: 'q4' });
+        });
+    });
 });

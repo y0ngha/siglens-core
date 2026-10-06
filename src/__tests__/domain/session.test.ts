@@ -5,7 +5,10 @@ import {
     getSessionStatus,
     isRegularSessionOpen,
     latestTradingDayStartUtcMs,
+    nextRegularSessionBoundaryMs,
+    previousRegularSessionBoundaryMs,
 } from '@/domain/session';
+import { makeKrSession } from '../helpers/krSession';
 import { getEtSessionStatus, isEtRegularSessionOpen } from '@/domain/utils';
 import type { MarketSessionSpec } from '@/domain/types';
 
@@ -316,6 +319,104 @@ describe('latestTradingDayStartUtcMs', () => {
             latestTradingDayStartUtcMs(
                 neverOpen,
                 new Date('2026-10-06T15:00:00Z')
+            )
+        ).toBeNull();
+    });
+});
+
+describe('previousRegularSessionBoundaryMs', () => {
+    const US = US_EQUITY_SESSION as Extract<
+        MarketSessionSpec,
+        { kind: 'scheduled' }
+    >;
+    const at = (iso: string) => new Date(iso);
+    const iso = (ms: number | null) =>
+        ms === null ? null : new Date(ms).toISOString();
+
+    it('장중에는 직전 거래일 마감(+버퍼)을 돌려준다', () => {
+        // 2026-09-29 화 14:00 ET → 월 16:00 ET + 30분 = 20:30Z
+        expect(
+            iso(
+                previousRegularSessionBoundaryMs(
+                    US,
+                    at('2026-09-29T18:00:00Z'),
+                    'close',
+                    30
+                )
+            )
+        ).toBe('2026-09-28T20:30:00.000Z');
+    });
+
+    it('마감+버퍼 직후에는 오늘 마감(+버퍼)을 돌려준다', () => {
+        expect(
+            iso(
+                previousRegularSessionBoundaryMs(
+                    US,
+                    at('2026-09-29T21:00:00Z'),
+                    'close',
+                    30
+                )
+            )
+        ).toBe('2026-09-29T20:30:00.000Z');
+    });
+
+    it('경계 순간 자체는 이전 경계로 포함된다(<= now)', () => {
+        expect(
+            iso(
+                previousRegularSessionBoundaryMs(
+                    US,
+                    at('2026-09-29T20:00:00Z'),
+                    'close'
+                )
+            )
+        ).toBe('2026-09-29T20:00:00.000Z');
+    });
+
+    it('휴장일(노동절)과 주말을 건너뛴다', () => {
+        // 2026-09-08 화 10:00 ET — 월요일은 노동절, 직전 마감은 금요일 9/4
+        expect(
+            iso(
+                previousRegularSessionBoundaryMs(
+                    US,
+                    at('2026-09-08T14:00:00Z'),
+                    'close'
+                )
+            )
+        ).toBe('2026-09-04T20:00:00.000Z');
+    });
+
+    it('KRX 스펙: 저녁 19:00 KST에는 같은 날 15:30+30분(16:00 KST)', () => {
+        expect(
+            iso(
+                previousRegularSessionBoundaryMs(
+                    makeKrSession(),
+                    at('2026-09-29T10:00:00Z'),
+                    'close',
+                    30
+                )
+            )
+        ).toBe('2026-09-29T07:00:00.000Z');
+    });
+
+    it('다음 경계와 맞물려 [이전, 다음)이 한 세션 버킷이 된다', () => {
+        const kr = makeKrSession();
+        const now = at('2026-09-29T20:30:00Z'); // 05:30 KST 수
+        const prev = previousRegularSessionBoundaryMs(kr, now, 'close', 30);
+        const next = nextRegularSessionBoundaryMs(kr, now, 'close', 30);
+        expect(iso(prev)).toBe('2026-09-29T07:00:00.000Z');
+        expect(iso(next)).toBe('2026-09-30T07:00:00.000Z');
+    });
+
+    it('탐색 상한 안에 거래일이 없는 스펙은 null', () => {
+        const never: Extract<MarketSessionSpec, { kind: 'scheduled' }> = {
+            ...makeKrSession(),
+            closeMinuteFor: () => 0,
+        };
+        expect(
+            previousRegularSessionBoundaryMs(
+                never,
+                at('2026-09-29T10:00:00Z'),
+                'close'
             )
         ).toBeNull();
     });

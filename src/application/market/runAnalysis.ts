@@ -1,5 +1,5 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
-import { dedupeInFlight } from '@/application/analysis/inFlight';
+import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
 import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
@@ -303,7 +303,10 @@ async function runAnalysisImpl(
     } = narrowPriorAnalysesForCacheKey(
         options.priorAnalyses ?? [],
         ANALYSIS_CACHE_TTL[timeframe],
-        priorAnalysisNow
+        priorAnalysisNow,
+        // 일봉은 마지막 세션 경계부터 버킷을 센다 — 캐시 만료와 같은 경계라
+        // 같은 마감 세션 동안 `:hist=`가 바뀌지 않는다.
+        options.session
     );
 
     // 이벤트는 봉 없이 좁힌다 — 캐시 키가 봉 fetch보다 먼저 만들어져야 하기
@@ -451,41 +454,47 @@ async function runAnalysisImpl(
     // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
-    const raw = await dedupeInFlight(cacheKey, () => {
-        // Fired INSIDE the dedup factory, not before it. Every concurrent
-        // caller that misses the same cache key builds its own prompt, but
-        // `dedupeInFlight` runs only the first one's factory and hands the
-        // rest that winner's result. Firing outside would call back once per
-        // caller for a single real generation, and — worse — hand every
-        // losing caller a prompt that was never sent, while the result they
-        // receive came from the winner's. A consumer persisting "the prompt
-        // that produced this row" would store duplicates and misattribute
-        // the text.
-        notifyPromptAssembled(
-            options.onPromptAssembled,
-            {
-                system,
-                stable,
-                dynamic: prompt,
-                promptVersion: PROMPT_TEMPLATE_VERSION,
-            } satisfies AssembledPromptRecord,
-            '[RunAnalysis]'
-        );
+    const raw = await dedupeGeneration(
+        cache,
+        cacheKey,
+        () => {
+            // Fired INSIDE the dedup factory, not before it. Every concurrent
+            // caller that misses the same cache key builds its own prompt, but
+            // `dedupeGeneration` runs only the first one's factory (in this
+            // process, and across instances via its Redis lock) and hands the
+            // rest that winner's result. Firing outside would call back once per
+            // caller for a single real generation, and — worse — hand every
+            // losing caller a prompt that was never sent, while the result they
+            // receive came from the winner's. A consumer persisting "the prompt
+            // that produced this row" would store duplicates and misattribute
+            // the text.
+            notifyPromptAssembled(
+                options.onPromptAssembled,
+                {
+                    system,
+                    stable,
+                    dynamic: prompt,
+                    promptVersion: PROMPT_TEMPLATE_VERSION,
+                } satisfies AssembledPromptRecord,
+                '[RunAnalysis]'
+            );
 
-        return callAnalysisAi({
-            prompt,
-            model: callModelId,
-            tier,
-            userApiKey: options.userApiKey,
-            signal: options.signal,
-            fallbackOnProviderFailure: options.providerFallback,
-            system,
-            responseSchema: TECHNICAL_RESPONSE_SCHEMA,
-            seed: analysisSeed(`${system}\n\n${prompt}`),
-            reasoning: options.reasoning,
-            correlationId: `${symbol}:${timeframe}`,
-        });
-    });
+            return callAnalysisAi({
+                prompt,
+                model: callModelId,
+                tier,
+                userApiKey: options.userApiKey,
+                signal: options.signal,
+                fallbackOnProviderFailure: options.providerFallback,
+                system,
+                responseSchema: TECHNICAL_RESPONSE_SCHEMA,
+                seed: analysisSeed(`${system}\n\n${prompt}`),
+                reasoning: options.reasoning,
+                correlationId: `${symbol}:${timeframe}`,
+            });
+        },
+        { signal: options.signal }
+    );
 
     // Inline post-processing (formerly in pollAnalysis). No job queue involved.
     const rawResult = JSON.parse(raw) as unknown;
@@ -618,7 +627,7 @@ async function runAnalysisImpl(
  * Redis meta, no polling loop.
  *
  * Concurrent calls for the same `cacheKey` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
+ * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
  * receive the same result.
  *
  * Pass `options.signal` (e.g. `request.signal` from the SSE route handler)

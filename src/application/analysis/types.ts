@@ -1,3 +1,4 @@
+import type { CacheProvider } from '@/domain/ports/cache';
 import type { BriefingModelId } from '@/application/analysis/briefingModel';
 import type { ActiveModelId, Tier } from '@/domain/types';
 
@@ -58,3 +59,45 @@ export interface CallBriefingAiOptions {
     signal?: AbortSignal;
     correlationId?: string;
 }
+
+/** @internal Knobs for `dedupeGeneration`; defaults suit LLM generations. */
+export interface GenerationDedupeOptions {
+    /**
+     * Aborts a peer's wait (rejects with the signal's reason), same as an
+     * aborted LLM call. In-process joiners share the FIRST caller's run, so
+     * only that caller's signal is observed — see `dedupeGeneration`.
+     */
+    signal?: AbortSignal;
+    /** Upper bound on waiting for a peer; defaults to `GENERATION_WAIT_MAX_MS`. */
+    maxWaitMs?: number;
+    /** Delay between checks; defaults to `GENERATION_POLL_INTERVAL_MS`. */
+    pollIntervalMs?: number;
+    /**
+     * Whether a raw output is safe to hand to a peer: the winner publishes only
+     * accepted output, and a waiter that reads output failing it generates
+     * itself instead. Defaults to `isStrictJson` — strict enough that every
+     * caller's own parse (`JSON.parse` or the fence-tolerant `parseLlmPayload`)
+     * succeeds on it.
+     */
+    accept?: (raw: string) => boolean;
+}
+
+/** @internal Shape the winner publishes for waiting peers. */
+export interface PublishedGeneration {
+    raw: string;
+}
+
+/** @internal A provider that can take a cross-instance lock. */
+export interface LockingCacheProvider extends CacheProvider {
+    setIfAbsent: NonNullable<CacheProvider['setIfAbsent']>;
+}
+
+/**
+ * @internal Outcome of trying to take the lock. `failOpen` is a Redis error
+ * while claiming: this instance generates without a lock and must not release
+ * anything, because it owns nothing.
+ */
+export type LockClaim =
+    | { kind: 'owned'; token: string }
+    | { kind: 'contended' }
+    | { kind: 'failOpen' };

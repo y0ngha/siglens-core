@@ -121,6 +121,56 @@ describe('createCacheProvider', () => {
             await provider.delete('my-key');
             expect(mockDel).toHaveBeenCalledWith('my-key');
         });
+
+        it('deleteIfEquals runs a compare-and-delete Lua script on the writer', async () => {
+            const mockEval = vi
+                .fn()
+                .mockResolvedValueOnce(1)
+                .mockResolvedValueOnce(0);
+            MockRedis.mockImplementation(function () {
+                return {
+                    get: vi.fn(),
+                    set: vi.fn(),
+                    del: vi.fn(),
+                    eval: mockEval,
+                };
+            });
+
+            const provider = createCacheProvider()!;
+            await expect(
+                provider.deleteIfEquals!('lock-key', 'tok')
+            ).resolves.toBe(true);
+            await expect(
+                provider.deleteIfEquals!('lock-key', 'tok')
+            ).resolves.toBe(false);
+            const [script, keys, args] = mockEval.mock.calls[0]!;
+            expect(script).toContain("redis.call('get', KEYS[1]) == ARGV[1]");
+            expect(script).toContain("redis.call('del', KEYS[1])");
+            expect(keys).toEqual(['lock-key']);
+            expect(args).toEqual(['tok']);
+        });
+
+        it('setIfAbsent issues SET NX EX on the writer and maps the reply', async () => {
+            const mockSet = vi
+                .fn()
+                .mockResolvedValueOnce('OK')
+                .mockResolvedValueOnce(null);
+            MockRedis.mockImplementation(function () {
+                return { get: vi.fn(), set: mockSet, del: vi.fn() };
+            });
+
+            const provider = createCacheProvider()!;
+            await expect(
+                provider.setIfAbsent!('lock-key', 'token', 30)
+            ).resolves.toBe(true);
+            await expect(
+                provider.setIfAbsent!('lock-key', 'token', 30)
+            ).resolves.toBe(false);
+            expect(mockSet).toHaveBeenCalledWith('lock-key', 'token', {
+                nx: true,
+                ex: 30,
+            });
+        });
     });
 
     it('reader uses readonly client when readonly token is set', async () => {

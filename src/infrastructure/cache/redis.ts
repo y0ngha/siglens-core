@@ -3,6 +3,13 @@ import type { CacheProvider } from '@/domain/ports/cache';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 /**
+ * Lua compare-and-delete: deletes `KEYS[1]` only while it still holds
+ * `ARGV[1]`. Returns 1 when deleted, 0 otherwise.
+ */
+const COMPARE_AND_DELETE_SCRIPT =
+    "if redis.call('get', KEYS[1]) == ARGV[1] then return redis.call('del', KEYS[1]) else return 0 end";
+
+/**
  * @adapter implements {@link CacheProvider}
  *
  * Construct a {@link CacheProvider} backed by Upstash Redis.
@@ -47,6 +54,30 @@ export function createCacheProvider(): CacheProvider | null {
         },
         async delete(key: string): Promise<void> {
             await writer.del(key);
+        },
+        async setIfAbsent<T>(
+            key: string,
+            value: T,
+            ttlSeconds: number
+        ): Promise<boolean> {
+            // `SET key value NX EX ttl` replies `"OK"` when it wrote and `null`
+            // when the key already existed — atomic on the server, so exactly
+            // one concurrent caller across all instances gets `true`.
+            const reply = await writer.set(key, value, {
+                nx: true,
+                ex: ttlSeconds,
+            });
+            return reply !== null;
+        },
+        async deleteIfEquals(key: string, value: string): Promise<boolean> {
+            // GET + DEL in one Lua script so no other client can take the key
+            // between the comparison and the delete.
+            const deleted = await writer.eval<[string], number>(
+                COMPARE_AND_DELETE_SCRIPT,
+                [key],
+                [value]
+            );
+            return deleted === 1;
         },
     };
 }

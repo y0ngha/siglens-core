@@ -429,6 +429,8 @@ export {
 export type { SplitAgentFollowUps } from './domain/agent/agentFollowUps';
 export {
     buildAgentSystemPrompt,
+    buildAgentTurnContext,
+    composeAgentUserMessage,
     AGENT_PROMPT_VERSION,
 } from './domain/agent/buildAgentSystemPrompt';
 export {
@@ -1120,6 +1122,7 @@ export type { ProviderErrorCode } from './application/shared/providerError';
 export type { ArgIssue, ValidateArgsResult } from './domain/agent/validateArgs';
 export type {
     AgentLocale,
+    AgentTurnContextInput,
     BuildAgentSystemPromptInput,
 } from './domain/agent/buildAgentSystemPrompt';
 export type { HistoryWindowOptions } from './domain/agent/selectHistoryWindow';
