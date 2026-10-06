@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.13.1](https://github.com/y0ngha/siglens-core/compare/v2.13.0...v2.13.1) (2026-10-06)
+
+### Bug Fixes
+
+* 프롬프트가 쓸 수 없는 시장 이벤트가 분석 캐시 키를 바꾸지 않게 한다 ([#260](https://github.com/y0ngha/siglens-core/issues/260)) ([f2882ca](https://github.com/y0ngha/siglens-core/commit/f2882ca97ce8903b2bb4585fe47add718cc88e51))
+
 # [2.13.0](https://github.com/y0ngha/siglens-core/compare/v2.12.0...v2.13.0) (2026-10-05)
 
 ### Features
