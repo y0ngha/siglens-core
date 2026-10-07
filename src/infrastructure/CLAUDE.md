@@ -53,6 +53,8 @@ its contract.
 - Factory adapters annotate their return type as the port.
 - Tag the adapter's JSDoc with `@adapter implements {@link <Port>}` so the
   port↔adapter link is greppable.
+- Adapter-internal types live in the module's `types.ts`, never in implementation files and
+  never in `domain/types.ts`.
 
 **Example — cache module:**
 ```typescript
@@ -96,6 +98,14 @@ const url = process.env.UPSTASH_REDIS_REST_URL;
 const key = process.env.API_KEY; // prohibited
 ```
 
+<a id="INF-3"></a>
+#### INF-3 — One config module per external system reads its env
+
+Each external system's environment reads live in a single config module (for example
+`infrastructure/cache/config.ts` for `UPSTASH_*`); other modules import from it instead of
+reading `process.env` themselves. When an env var or endpoint changes, update
+`docs/API.md` (the full required and optional list) in the same change.
+
 ## Graceful Degradation
 
 Missing env vars must not crash the library at construction time.
@@ -130,6 +140,78 @@ async get<T>(key: string): Promise<T | null> {
 }
 ```
 
+## Data & Logging
+
+IDs are stable and never renumbered; cite them as `src/infrastructure/CLAUDE.md#INF-4`.
+
+<a id="INF-1"></a>
+#### INF-1 — Every code path writes the same shape
+
+The main path, retries and background jobs write the same fields. A background refresh that
+caches `{ symbol, name }` where the main path caches `{ symbol, name, fmpSymbol }` leaves
+readers with a shape that depends on which path ran last.
+
+<a id="INF-2"></a>
+#### INF-2 — No untagged or debug logging; operational logs carry a source tag
+
+Do not leave `console.log` debugging or timing prints without a tag. Intentional
+operational logs are allowed and must start with a bracketed source tag so they can be
+attributed and filtered: provider call timing (`[Claude] Response time: …`), usage summaries
+(`[Usage]`), degradation warnings (`[Gemini] Empty text response`). If something does not
+deserve a stable tag, it does not belong in a log line; expose it through the return type
+if callers need it.
+
+<a id="INF-7"></a>
+#### INF-7 — Validate persisted state before use
+
+State read back from a store (Redis, cache, a token record) is validated for format and
+length before comparison or use. A malformed value produces the same invalid result as any
+other bad input; it never throws from deep inside a comparison (`chat/tokenStore.ts`
+validates before comparing).
+
+## Cache Keys & Versions
+
+<a id="INF-4"></a>
+#### INF-4 — Cache keys follow the rendered bytes
+
+- Every LLM-output cache key embeds a `*_PROMPT_TEMPLATE_VERSION` (or a fingerprint that
+  embeds one). Bump it whenever the rendered prompt bytes change, including through shared
+  formatters; without a bump, stale entries are served until the TTL expires.
+- After any bump, audit every `build*Key` in `cache/config.ts`, not just the one you
+  touched. Deterministic non-LLM keys (identifier-only concatenation) are exempt.
+- A read path that rebuilds a key tests each key argument with a case where a mismatch on
+  that argument alone misses (`CONVENTIONS.md#TE-5`).
+- A second reader of an existing cache entry applies the same validity guards as the first
+  (empty-after-normalize, degraded flag); share the guard helper instead of copying it.
+
+<a id="INF-5"></a>
+#### INF-5 — Cross-instance coordination is owner-bound
+
+- Release a distributed lock by comparing its owner token and deleting only on a match
+  (`deleteIfEquals`). An unconditional `DEL` after the TTL expired deletes another
+  instance's lock.
+- Bind a published result to its generation, so a waiter never reuses a stale one.
+- Validate and cap LLM output before sharing it with other instances.
+- Fail-open paths document the trade-off ([INF-10](#INF-10)). Regression tests:
+  `CONVENTIONS.md#TE-15`.
+
+## Outbound Calls & Providers
+
+<a id="INF-6"></a>
+#### INF-6 — Every outbound fetch has a timeout
+
+A `fetch` without `AbortSignal.timeout(ms)` can block indefinitely, including
+fire-and-forget calls. Size the timeout to the call's job (seconds for a cancel request,
+longer for batch polling); never `Infinity`.
+
+<a id="INF-8"></a>
+#### INF-8 — Change one AI provider, apply to all; diff SDK unions on upgrade
+
+When a behavior changes in one provider (error handling, tests, naming), apply it to every
+provider. When upgrading an SDK, diff the enumerated response unions the adapter branches on
+(`stop_reason`, `finishReason`) between the old and new `.d.ts`: a new value falls into a
+catch-all and neither mock tests nor a live smoke test reveal it.
+
 ## HTTP Status Codes
 
 Use constants from `node:http2` — no local redefinitions, no hardcoded numbers.
@@ -161,6 +243,22 @@ async function fetchAndCache(symbol: string, timeframe: string): Promise<string 
 ```
 
 Do not define generator pipelines in infrastructure — those belong in `domain/`.
+
+<a id="INF-9"></a>
+#### INF-9 — Pure helpers move to `domain/`; never re-export domain symbols
+
+A helper that does no I/O (no env, network or filesystem) belongs in `domain/`, not in
+`infrastructure/`. An infrastructure module is not a transit path: it never re-exports
+`@/domain/...` symbols (`export { parseJsonResponse } from '@/domain/utils'`); callers
+import them from `domain/` directly.
+
+<a id="INF-10"></a>
+#### INF-10 — Comment deliberate trade-offs
+
+When you choose a fail-open acquire path, a recomputation instead of a memo, or another
+optimization that gives something up, say in a comment what is traded and when to revisit
+it (for example "concurrent winners may duplicate work; switch to a queue if that becomes
+expensive").
 
 ## Testing
 

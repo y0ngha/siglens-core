@@ -14,7 +14,7 @@
 >
 > **컨벤션 예외 — `@deprecated` alias 없이 삭제 (의도된 결정)**
 >
-> `docs/MISTAKES.md` "Public API & Module Exports" #3은 Tier 4 타입·union 멤버를
+> 이 문서의 `PUBLIC_API.md#API-5` 규칙은 Tier 4 타입·union 멤버를
 > 지울 때 `@deprecated` alias를 남기라고 요구한다. 이번 릴리스는 그 규칙의 예외로
 > 처리하며, 근거는 셋이다.
 >
@@ -30,7 +30,7 @@
 >    "400이 나는가"에서 "off가 진짜 0을 만드는가"로 바뀌어, 같은 이름을 남기면
 >    틀린 의미를 계속 수출하게 된다.
 >
-> 이 예외는 이번 재편에 한정한다. 이후 Tier 4 변경은 #3 규칙을 그대로 따를 것.
+> 이 예외는 이번 재편에 한정한다. 이후 Tier 4 변경은 `API-5` 규칙을 그대로 따를 것.
 >
 > **DeepSeek V4 → V4.1 개명** — 레지스트리 키가 `deepseek-v4-flash` /
 > `deepseek-v4-pro`에서 `deepseek-v4.1-flash` / `deepseek-v4.1-pro`로 바뀌고,
@@ -355,7 +355,7 @@ Server-only on purpose: not re-exported from `index.client.ts` (nor is `buildAge
 | `normalizeFinancialsAnalysisResponse` | `domain/analysis/normalizeFinancials.ts` |
 | `normalizeFinancialsSnapshot` | `domain/analysis/normalizeFinancialsSnapshot.ts` |
 
-> PR #163에서 `buildFinancialsAnalysisPrompt`가 `@internal` 전환 — `submitFinancialsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildFinancialsAnalysisPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
+> PR #163에서 `buildFinancialsAnalysisPrompt`가 `@internal` 전환 — `submitFinancialsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per `PUBLIC_API.md#API-4`: `grep -rn "buildFinancialsAnalysisPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **포지션 버킷 (Position Bucket) (1)** — `src/index.ts`에만 export. **`index.client.ts` 의도적 비공개**: `buildMacroBriefingPrompt`/`normalizeMacroBriefing`과 같은 "documented exclusion" 원칙을 따르되 사유는 다르다 — 저 둘은 "consumer가 부분 조합할 진입점이 없어서"(no partial-consumption entry point)이고, `bucketizePosition`은 **신뢰 경계** 문제다: 입력 `avgPrice`는 개인화 분석 설계상 서버에서만 읽어야 하는 값이며(클라이언트가 값을 조작해 보내면 스푸핑), 버킷화 함수 자체를 브라우저 진입점에 노출하면 consumer가 클라이언트 측에서 버킷을 계산해 공유 분석 캐시(`buildAnalysisCacheKey`)를 오염시킬 수 있는 도구를 쥐어주는 셈이 된다. 이 함수와 `PositionBucket` 타입은 그래서 pure function임에도 `index.client.ts`에 미러링하지 않는다(정의부 `src/index.ts` 주석 참고).
 | Symbol | Source |
@@ -369,7 +369,7 @@ Server-only on purpose: not re-exported from `index.client.ts` (nor is `buildAge
 | `summarizeCongressTrades` | `domain/analysis/summarizeCongressTrades.ts` |
 | `normalizeCongressTrendResponse` | `domain/analysis/normalizeCongressTrend.ts` |
 
-> PR #163에서 `buildCongressTrendPrompt`가 `@internal` 전환 — `submitCongressTrend` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildCongressTrendPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
+> PR #163에서 `buildCongressTrendPrompt`가 `@internal` 전환 — `submitCongressTrend` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per `PUBLIC_API.md#API-4`: `grep -rn "buildCongressTrendPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **거시경제 (economy) 헬퍼 (6)** — `/economy` 페이지가 FMP wire 응답을 도메인 타입으로 변환할 때 사용. 모두 pure하므로 `index.client.ts`에도 노출. (의도적 비공개: `buildMacroBriefingPrompt`와 `normalizeMacroBriefing`은 `@internal`로 유지 — financials와 달리 macro는 prompt/normalize 단계가 `submitMacroBriefing`/`pollMacroBriefing` use-case 내부에서만 호출되며 consumer가 부분 조합할 진입점이 없다. 향후 partial 사용처가 생기면 그때 노출 검토.)
 | Symbol | Source |
@@ -381,7 +381,7 @@ Server-only on purpose: not re-exported from `index.client.ts` (nor is `buildAge
 | `normalizeEconomicEventAnalysis(raw)` — defensively normalizes a raw LLM string/object into a typed `EconomicEventAnalysis`. Returns a neutral default on any parse or normalization failure; never throws. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/normalizeEconomicEventAnalysis.ts` |
 | `normalizeIndicatorTranslation(raw)` — defensively normalizes a raw LLM string/object into a trimmed Korean name string. Returns `''` on any failure; never throws. Pure function; safe for browser consumers (`index.client.ts`). | `domain/economy/normalizeIndicatorTranslation.ts` |
 
-> PR #163에서 `buildEconomicEventAnalysisPrompt`, `buildIndicatorTranslationPrompt`가 `@internal` 전환 — 각각 `submitEconomicEventAnalysis`/`submitIndicatorTranslation` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildEconomicEventAnalysisPrompt\|buildIndicatorTranslationPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
+> PR #163에서 `buildEconomicEventAnalysisPrompt`, `buildIndicatorTranslationPrompt`가 `@internal` 전환 — 각각 `submitEconomicEventAnalysis`/`submitIndicatorTranslation` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per `PUBLIC_API.md#API-4`: `grep -rn "buildEconomicEventAnalysisPrompt\|buildIndicatorTranslationPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **프롬프트 빌더 (1 + 1 상수)**
 | Symbol | Source |
@@ -389,7 +389,7 @@ Server-only on purpose: not re-exported from `index.client.ts` (nor is `buildAge
 | `buildChatPrompt` | `domain/chat/buildChatPrompt.ts` |
 | `AI_SYSTEM_PROMPT` | `domain/analysis/systemPrompt.ts` |
 
-> PR #163에서 `buildOptionsAnalysisPrompt`가 `@internal` 전환 — `submitOptionsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per MISTAKES.md #9: `grep -rn "buildOptionsAnalysisPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
+> PR #163에서 `buildOptionsAnalysisPrompt`가 `@internal` 전환 — `submitOptionsAnalysis` use-case 내부에서만 호출되며 외부 consumer가 프롬프트 문자열을 직접 조합할 진입점이 없다. Removed from public API (→ `@internal`). Consumer cross-check per `PUBLIC_API.md#API-4`: `grep -rn "buildOptionsAnalysisPrompt" ../siglens/src ../siglens-worker/src ../siglens-trader/src` — 0 external usages across all 3 consumer repos. Non-breaking.
 
 **옵션 분석 헬퍼 (4)**
 | Symbol | Source |
@@ -746,6 +746,110 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 - `excludePrivate: true` — 클래스의 `private` 멤버 제외.
 
 생성된 문서에는 Tier 1~4의 public 함수와 타입만 나타난다. internal 함수는 grep으로만 찾을 수 있고, 자동 문서에서는 보이지 않는다.
+
+---
+
+## Export 변경 체크리스트
+
+`src/index.ts`·`src/index.client.ts`를 바꾸거나 export를 추가·삭제·`@internal` 전환할 때
+확인한다. 규칙 ID는 고정이며 번호를 다시 매기지 않는다. 다른 문서와 코드 주석에서는
+`PUBLIC_API.md#API-5` 형태로 인용한다.
+
+<a id="API-1"></a>
+#### API-1 — 두 entrypoint의 정합
+
+- 브라우저가 쓰는 값(상수·함수)은 `src/index.ts`와 `src/index.client.ts` **양쪽**에서
+  export하고, `index.test.ts`·`index.client.test.ts`에 존재·호출 가능 단언을 둔다.
+  한쪽에만 있으면 서버는 통과하고 브라우저 번들이 런타임에 `undefined`로 깨진다.
+- 함수가 실제로 반환하는 타입을 export한다. 일부 variant만 담은 좁은 타입
+  (`SubmitAnalysisResult`)이 아니라 실제 반환 타입(`SubmitAnalysisGatedResult`)이다.
+- barrel을 정리한 뒤에는 `src/index*.ts`의 re-export 대상이 아직 존재하는지 확인한다.
+
+<a id="API-2"></a>
+#### API-2 — 소비자 계약만 export한다
+
+캐시 키·TTL 상수, Redis 옵션, 클라이언트 수명주기 헬퍼(`getDatabaseClient`류), 개별
+지표 계산기(`calculateATR` 등 — Tier 2 진입점은 `calculateIndicators`뿐), 내부 구현
+상수는 export하지 않는다. 이름이 공개되면 내부 리팩터링이 곧 breaking change가 된다.
+소비자가 import해야 하는 이유가 생기면 그때 Tier를 정해 추가한다.
+
+<a id="API-3"></a>
+#### API-3 — 공개 시그니처의 폐포는 모두 공개다
+
+공개 함수의 파라미터·반환 타입, 공개 타입의 필드·union 멤버·`extends`·배열 원소,
+discriminated union의 모든 variant는 export되어야 하고 `@internal`을 달 수 없다.
+`export type { X }` 같은 중간 re-export 줄에 붙은 `@internal`도 모순이므로 함께
+확인한다. Provider 인터페이스는 `@internal`인 `Raw*` 대신 도메인 중립 `*Input` 별칭을
+반환한다.
+
+<a id="API-4"></a>
+#### API-4 — 제거·`@internal` 전환 스윕 절차
+
+심볼을 일괄 제거하거나 `@internal`로 돌리기 전에:
+
+1. 두 entrypoint에서 시작해 도달 가능성 폐포를 계산한다: 공개 함수의 파라미터·반환
+   타입, 공개 타입의 필드·union 멤버·`extends`·배열 원소·variant. 폐포 안의 타입은
+   제거·`@internal` 대상에서 뺀다.
+2. 건드린 파일의 `export`를 **전부** 나열한다(`export ` grep). 제거 목록 순서대로
+   태그를 달면 형제 심볼이 빠진다.
+3. 새로 `@internal`이 된 심볼을 가리키는 `{@link}`를 공개 JSDoc에서 찾아 산문으로
+   바꾼다. TypeDoc(`excludeInternal`)이 깨진 링크로 렌더한다.
+4. 소비자 레포(`../siglens`, `../siglens-worker`, `../siglens-trader`)에서 심볼 이름과
+   `@y0ngha/siglens-core` import를 grep한다. 소비자가 import하거나 구현(`implements
+   <Port>`)하거나 자기 상수의 타입으로 쓰는 심볼(`SectorGroupDef`)은 코어 안에서
+   쓰이지 않아도 공개 계약이다. 제거·전환된 공개 심볼과 소비자 import의 교집합이 비어
+   있어야 릴리스한다.
+
+마지막에 `yarn typecheck`가 "is not exported" 오류 없이 통과하는지 확인한다.
+
+<a id="API-5"></a>
+#### API-5 — Tier 4 개명·삭제는 `@deprecated`로 이행한다
+
+Tier 4 타입·인터페이스 필드·union 멤버·port 메서드의 개명이나 삭제는 소비자의 컴파일을
+깨뜨린다. 옛 이름을 `@deprecated`로 남기고(타입 alias, 선택적 필드와
+`deps.callAiProvider ?? deps.callGemini` 같은 fallback, 삭제하려던 union 멤버 복원,
+제거한 port 메서드는 선택적 멤버로 유지), semver를 올리고 `CHANGELOG.md`에 기록한다.
+이행이 불가능한 예외는 이 문서 상단 배너에 근거와 함께 남긴다(0.60.0 선례).
+공개로 승격하는 타입은 `@internal`을 떼고, 옛 이름이 있으면 보존한다.
+
+<a id="API-6"></a>
+#### API-6 — 인벤토리와 개정 이력 행을 같은 커밋에서 갱신한다
+
+export가 바뀌면 `현재 노출 인벤토리`와 `개정 이력`을 **같은 커밋**에서 고친다.
+삭제한 심볼의 행도 같이 지운다. 개정 이력 행은:
+
+- 바뀐 내부 함수가 아니라 **공개 진입점의 관찰 가능한 동작**을 기준으로 쓴다
+  (`@internal` 함수가 바뀌었어도 `runOverallAnalysis`의 동작이 달라지면 행이 필요하다).
+- 의도한 문구 변경을 빠짐없이 나열한다("text only moved"라고 쓰고 한 문장을 바꾸지
+  않는다).
+- 소비자 조치와 semver 꼬리말을 인접한 행처럼 적는다.
+- 캐시 의미를 적는다(이전 엔트리는 TTL까지 옛 동작을 유지한다). 소비자가 캐시·직렬화하는
+  타입에 필드를 더하면 크기, 캐시 키 bump 여부, 서버 전용 여부를 적는다.
+- 툴 설명이 약속하는 소비자 생성 필드(`rsi2` 등)는 소비자 조치에 이름을 적는다.
+
+```
+| 2026-10-04 | **overall 분석이 최신 technical 결과를 재사용한다.** `runOverallAnalysis`가 캐시에 technical이 있으면 다시 생성하지 않는다. 캐시된 기존 overall은 TTL까지 이전 동작을 유지한다. 소비자 조치: 없음(배선 변경 불필요). 0.x minor. |
+```
+
+<a id="API-7"></a>
+#### API-7 — Tier 3와 Tier 4는 별도 export 블록으로 둔다
+
+`src/index.ts`에서 팩토리·설정(Tier 3)과 스키마 객체·상수 배열(Tier 4)은 서로 다른
+`export { … }` 블록에 둔다. Tier 3 심볼을 기존 블록에 추가할 때 그 블록에 Tier 4
+심볼이 섞여 있으면 다시 나눈다.
+
+```typescript
+// Tier 3: Factories & Config
+export { createCacheProvider, createChatTokenStore } from '@/infrastructure/…';
+// Tier 4: Constants
+export { MODEL_REGISTRY } from '@/domain/…';
+```
+
+<a id="API-8"></a>
+#### API-8 — 공개 helper가 반환하는 목록은 순서가 안정적이다
+
+공개 helper가 돌려주는 목록은 설정 컨테이너(`Record`의 삽입 순서)에 의존하지 않도록
+`toSorted()`로 정렬해서 반환한다.
 
 ---
 

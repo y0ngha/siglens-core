@@ -65,3 +65,29 @@ base 브랜치: main
 ```
 
 **본문 템플릿**: `.github/PULL_REQUEST_TEMPLATE.md` 자동 적용됨.
+
+<a id="G-1"></a>
+#### G-1 — 한 PR은 한 관심사만 다룬다
+
+관련 없는 변경은 별도 PR로 옮기거나 되돌린다. 관련 변경이 꼭 필요하면 커밋 메시지나
+PR 본문에 이유를 적는다. 리뷰 범위가 흐려지고, 되돌려야 할 때 함께 끌려가기 때문이다.
+
+---
+
+## 릴리스
+
+<a id="G-2"></a>
+#### G-2 — publish 워크플로 성공은 패키지 사용 가능을 뜻하지 않는다
+
+워크플로가 `success`로 끝나도 레지스트리의 tarball이 깨져 있을 수 있다(메타데이터는
+정상인데 다운로드가 `409 Package file checksum mismatch`). 소비자(`siglens`,
+`siglens-worker`, `siglens-trader`)의 코어 버전을 올리기 **전에** `dist.tarball`을
+인증 헤더로 직접 받아 본다. `302`가 정상이다.
+
+```bash
+curl -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" <dist.tarball>
+```
+
+같은 버전은 재발행할 수 없으므로 `409`가 고정되면(수 분 폴링해도 그대로면 전파 지연이
+아니다) 버전을 건너뛰어 다시 발행한다. 소비자 쪽 `yarn install`의 `quarantined`
+메시지는 인증 문제처럼 보이지만 "tarball을 받을 수 없다"는 뜻이다.

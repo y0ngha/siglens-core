@@ -147,7 +147,7 @@ export function selectPriorAnalyses(
         // for any candidate reaching this loop; it cannot return null here.
         // Non-null assertion documents that guarantee instead of reintroducing
         // a defensive branch that can never execute (and so can never be
-        // exercised by a test — see MISTAKES.md Tests #5.5).
+        // exercised by a test — see CONVENTIONS.md#TE-5).
         const anchorIndex = findAnchorBarIndex(bars, candidateMs)!;
         const barKey = bars[anchorIndex].time;
 

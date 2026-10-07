@@ -33,6 +33,9 @@ still lives in `infrastructure/<module>/types.ts`. Do not import from a
   `Store`) — natural language over a forced `Port` suffix.
 - DTOs the port returns or receives (`Bar`, `MarketQuote`, `Skill`, …) stay in
   `domain/types.ts`. Ports reference them via import.
+- Document any data convention that callers' logic relies on (for example daily
+  `Bar.time` at UTC midnight) on the port or on the consuming function. Behavior that
+  silently depends on an undocumented provider convention breaks when a provider changes.
 
 **Example:**
 ```typescript
@@ -224,6 +227,46 @@ the U.S. sentence stays byte-identical. Statement amounts are a second currency:
 the filer's `reportedCurrency` (an ADR files in its home currency — TSM in TWD) and stay
 unlabelled when it is unknown.
 
+## Prompt Changes
+
+IDs are stable; cite them as `src/domain/CLAUDE.md#DOM-7`.
+
+<a id="DOM-7"></a>
+#### DOM-7 — A prompt change meant to change model output is validated on real data
+
+Unit tests that check the prompt text cannot tell whether the model's visible answer got
+better. Render the new values over real charts, and for a change in model behavior run a
+real-LLM A/B on the visible result (OLD against NEW, same inputs, enough runs). Count side
+effects too (a card leaving its own field empty) and treat small differences at small n as
+no improvement. When the visible output does not improve, revert the change.
+
+Why: a floor on the structural risk:reward leg passed every unit test and still flipped a
+third of verdicts on real charts (see the note under the confluence section above).
+
+<a id="DOM-8"></a>
+#### DOM-8 — Precomputed prompt values reuse the engine's own rules
+
+A number rendered into a prompt uses the same thresholds, rounding and detector logic as
+the engine that consumers (and the grounded-number checks) recompute from. Gap lines compare
+`size >= GAP_MIN_ATR_MULT * atr` like the gap detector does. Use fixed tolerances, not ones
+that scale with the value's magnitude, and round inputs to the displayed precision before
+computing derived values, so a recomputation from the rendered text matches.
+
+<a id="DOM-9"></a>
+#### DOM-9 — Model-facing text is exact and internally consistent
+
+- Tool descriptions and rules say exactly what the engine does ("the bullish or the bearish
+  trigger conditions all held", not "every condition" when the exit side has no such gate).
+- Rules inside one prompt never contradict. Required wording (a mandated caveat) gets an
+  explicit carve-out in any style rule that could suppress it.
+- A rule split by condition (depth level, tool availability) keeps null and absence handling
+  in every branch; otherwise the uncovered branch fills the gap with an unsupported guess.
+- Style rules never override required content.
+- When content is split into stable and dynamic halves, each half reads on its own (a moved
+  bullet list keeps a heading).
+- Any change to rendered bytes also bumps the cache version
+  (`src/infrastructure/CLAUDE.md#INF-4`).
+
 ## Overall axis weighting (`analysis/overallScore.ts`)
 
 The overall prompt hands five axis reports to one model and asks it to synthesize. The only
@@ -367,6 +410,86 @@ export function calculateRSI(closes: number[], period: number): (number | null)[
 // ✅ interface GainLoss { gain: number; loss: number }
 //    function compute(): GainLoss { ... }
 ```
+
+### Numeric, Time & Semantics Guardrails
+
+IDs are stable and never renumbered; cite them as `src/domain/CLAUDE.md#DOM-4`.
+
+<a id="DOM-1"></a>
+#### DOM-1 — Non-finite results are `null`, never `NaN`; validate inputs
+
+A calculation whose result can be undefined (warm-up, division by zero) returns `null`.
+`NaN` in a cached result or prompt corrupts parsing, sorting and rendering downstream.
+
+- Financial inputs get range guards, not just `Number.isFinite`: prices `> 0`, a take-profit
+  that equals the entry yields no ratio, `tp <= entry` on a long cannot produce a reward.
+- Public numeric options that index arrays or define windows (horizons, periods) are
+  filtered to valid integers (`Number.isInteger(n) && n > 0`) before use; derived values
+  pass `Number.isFinite` before aggregation.
+
+```typescript
+// ❌ return (next - prev) / prev;                       // NaN when prev === 0
+// ✅ const change = (next - prev) / prev; return Number.isFinite(change) ? change : null;
+```
+
+<a id="DOM-2"></a>
+#### DOM-2 — Sentinel values propagate unchanged
+
+A sentinel (`-1`, `null`) passes through the call chain unchanged. Wrapping it in
+`Math.max(0, x)` or `?? fallback` before the check silently converts it into a real value.
+
+```typescript
+// ❌ Math.max(0, sentinel ?? fallback)                 // -1 becomes 0
+// ✅ sentinel === -1 ? -1 : Math.max(0, sentinel)
+```
+
+<a id="DOM-3"></a>
+#### DOM-3 — Use the injected clock everywhere
+
+A function that takes `now` (or `occurredAt`) uses it for every time read; a bare
+`new Date()` next to it breaks clock control in tests. When the clock is always needed,
+make `now` required rather than optional.
+
+```typescript
+// ❌ const time = new Date();                          // ignores options.now
+// ✅ const time = options.now ?? new Date();  // or take `now: Date` and use it directly
+```
+
+<a id="DOM-4"></a>
+#### DOM-4 — Calendar-day differences use date components, not rounded milliseconds
+
+`Math.round((target - now) / MS_PER_DAY)` is off by one depending on the time of day
+(13:00 UTC today and midnight tomorrow round to 0, not 1). Reduce both sides to calendar
+dates in one zone first, then subtract.
+
+```typescript
+// ✅ UTC calendar dates (use the ET session helpers when the market date matters)
+function daysUntilCalendarDate(future: Date, now: Date): number {
+    const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+    const target = Date.UTC(
+        future.getUTCFullYear(),
+        future.getUTCMonth(),
+        future.getUTCDate()
+    );
+    return Math.round((target - today) / MS_PER_DAY);
+}
+```
+
+<a id="DOM-5"></a>
+#### DOM-5 — Encode semantics at build time instead of re-deriving them
+
+When the code that builds a value knows its meaning (which side of a level counts as a
+breach), store that meaning on the value. A later consumer that re-derives it from geometry
+(`price` versus the last pivot) misreads the cases where the geometry is unusual, such as a
+wave 5 that edges past its cap within tolerance.
+
+<a id="DOM-6"></a>
+#### DOM-6 — Error codes and types live in the layer that produces them
+
+A code produced by application logic or infrastructure I/O (a duplicate-check failure, a
+limit error) is defined in `application/` or `infrastructure/`, not `domain/`. The domain
+holds only the error cases of its own pure validation.
+
 
 ## Lazy Evaluation
 
