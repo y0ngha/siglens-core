@@ -2,8 +2,8 @@
 
 ## Rules Reference
 
-- [FF Principles](rules-ff.md) — 4 principles (Readability, Predictability, Cohesion, Coupling) condensed for review
-- [Conventions](rules-conventions.md) — Coding conventions condensed for review
+Rules are not copied into memory. Read `docs/CONVENTIONS.md`, `docs/FF.md`, the layer
+`CLAUDE.md` files and `docs/PUBLIC_API.md` live (see the review-agent startup procedure).
 
 ## Project
 

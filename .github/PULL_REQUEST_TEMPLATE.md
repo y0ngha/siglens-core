@@ -10,11 +10,11 @@ closes #{이슈}
 
 - [ ] @docs/CONVENTIONS.md 준수 확인
 - [ ] @docs/FF.md 준수 확인
-- [ ] @docs/MISTAKES.md 준수 확인
+- [ ] 변경한 레이어의 CLAUDE.md(DOM/APP/INF) 및 PUBLIC_API.md Export 변경 체크리스트 준수 확인
 - [ ] domain/: 외부 라이브러리 import 없음, 순수 함수만
 - [ ] 인디케이터 초기 구간 null 반환 (0, NaN 없음)
 - [ ] 반환 타입 명시
-- [ ] for/while 없이 map/filter/reduce 사용
+- [ ] 선언적 코드 우선 (for/while은 CONVENTIONS.md#CP-5 예외에 해당할 때만)
 - [ ] any 타입 없음
 - [ ] 새 파일에 대응하는 테스트 파일 포함
 - [ ] 테스트 구조: describe → describe(context) → it

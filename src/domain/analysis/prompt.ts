@@ -146,7 +146,7 @@ const MACDV_ZONE_INNER_DIVISOR = 3;
 
 /**
  * @internal Per-timeframe prompt configuration (trend sample counts, decimal places 등).
- * 테스트가 동일 값을 참조할 수 있도록 export (MISTAKES.md Tests #4/#13).
+ * 테스트가 동일 값을 참조할 수 있도록 export (CONVENTIONS.md#TE-3).
  */
 export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
     '5Min': {
@@ -1192,7 +1192,7 @@ const formatMarketReferenceSection = (
 /**
  * @internal Measured-reliability annotation strings appended to each
  * pro-indicator / regime / volatility line. Exported so tests assert the exact
- * substring rendered (MISTAKES.md Tests #4/#13).
+ * substring rendered (CONVENTIONS.md#TE-3).
  */
 export const PRO_RELIABILITY_NOTE = {
     bollingerPctB:
@@ -1273,7 +1273,7 @@ const combineRegimeVerdict = (
     return 'random';
 };
 
-/** @internal Section header — exported so tests reference the exact string (MISTAKES.md Tests #4). */
+/** @internal Section header — exported so tests reference the exact string (CONVENTIONS.md#TE-3). */
 export const REGIME_CONTEXT_SECTION_HEADER = '## Market Regime & Risk Context';
 /** @internal Section header — exported so tests reference the exact string. */
 export const INDICATOR_VALUES_SECTION_HEADER = '## Indicator Values';

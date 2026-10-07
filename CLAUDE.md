@@ -49,7 +49,7 @@ Sub-agents do not call each other — you invoke them one at a time.
 | Agent | Model  | Responsibility |
 |---|---|---|
 | `review-agent` | Sonnet | Code review — returns findings only, never modifies code |
-| `mistake-managing-agent` | Haiku  | Reads docs/__agents_only__/fix-log.md, promotes recurring violations to MISTAKES.md |
+| `mistake-managing-agent` | Sonnet | Reads docs/__agents_only__/fix-log.md, promotes recurring violations into the rule docs listed under Rule Homes |
 | `git-agent` | Haiku  | Commits, pushes, PR creation — never modifies code |
 | `issue-agent` | Haiku  | Creates GitHub issues using the appropriate template — never modifies code |
 
@@ -185,6 +185,7 @@ Invoke the listed skills **before** writing code in each category. Do not skip.
 3. Always write test files alongside implementation files.
 4. Never violate layer dependency directions.
 5. Never import external libraries inside `domain/`.
+6. Before and after implementing, read the Gotchas of `docs/CONVENTIONS.md` plus the `CLAUDE.md` of every layer you touch. When `src/index.ts` or `src/index.client.ts` change, also read the Export 변경 체크리스트 in `docs/PUBLIC_API.md`.
 
 ---
 
@@ -208,4 +209,34 @@ Scripts are listed in `package.json`.
 | `docs/CONVENTIONS.md` | Coding conventions, naming rules, paradigm guidelines |
 | `docs/FF.md` | FF 4 principles in detail (Readability, Predictability, Cohesion, Coupling) |
 | `docs/GIT_CONVENTIONS.md` | Branch naming, commit message format, PR rules |
-| `docs/MISTAKES.md` | Common mistakes Claude Code repeatedly makes — review before and after implementing |
+| `src/{domain,application,infrastructure}/CLAUDE.md` | Layer rules, including the DOM / APP / INF gotchas |
+
+---
+
+## Rule Homes
+
+Recurring-mistake rules live in the document that owns their topic. Each rule has a stable
+ID that is never renumbered (a retired rule keeps its ID with a one-line `(retired → X)`
+stub). IDs are not ordered by position — rules are placed by topic, so find the next free ID
+by searching the file, not by looking at the last heading. The heading carries the ID and an
+anchor line sits right above it:
+
+```md
+<a id="TE-5"></a>
+#### TE-5 — Every branch has a test only it satisfies
+```
+
+| Prefix | Home | Topic |
+|---|---|---|
+| `CP`, `N`, `TS`, `JD`, `DS`, `TE` | `docs/CONVENTIONS.md` | Paradigm gotchas, naming, TypeScript, JSDoc accuracy, comment/doc sync, tests |
+| `API` | `docs/PUBLIC_API.md` (Export 변경 체크리스트) | Entrypoints, `@internal` sweeps, deprecation, inventory |
+| `DOM` | `src/domain/CLAUDE.md` | Numeric guardrails, clock, prompt changes |
+| `APP` | `src/application/CLAUDE.md` | Use-case gotchas |
+| `INF` | `src/infrastructure/CLAUDE.md` | Logging, cache keys, locks, outbound calls, providers |
+| `G` | `docs/GIT_CONVENTIONS.md` | PR scope, release |
+
+**Citing a rule:** `FILE#RULE-ID`, with the basename for `docs/*.md` files and the
+repo-relative path for layer files: `CONVENTIONS.md#TE-5`, `PUBLIC_API.md#API-4`,
+`src/domain/CLAUDE.md#DOM-2`. Code comments, docs, agent prompts and fix-log `Rule:` fields
+all use this form. `src/__tests__/guards/ruleReferences.test.ts` fails when a reference
+points at an anchor that does not exist.

@@ -11,6 +11,6 @@ Pro-indicators is a multi-phase feature (plans under `docs/superpowers/plans/202
 
 **Why:** Phase 2 runs the validation harness (2yr window) to measure forward edge; only indicators with edge get wired in. Reviewers should NOT flag "calc function exists but isn't in IndicatorResult" as a defect during Phase 1.
 
-**How to apply:** When reviewing pro-indicator calc files, treat missing `IndicatorResult` wiring and `@internal`-but-not-exported types as intended. Phase 1 review priorities (per plan): math correctness vs formulas, divide-by-zero/ln guards, functional style + length-caching, `toBeCloseTo` reference-value tests (MISTAKES.md Tests #12), warmup→null.
+**How to apply:** When reviewing pro-indicator calc files, treat missing `IndicatorResult` wiring and `@internal`-but-not-exported types as intended. Phase 1 review priorities (per plan): math correctness vs formulas, divide-by-zero/ln guards, functional style + length-caching, `toBeCloseTo` reference-value tests (CONVENTIONS.md#TE-10), warmup→null.
 
 Related: [[groupb-backtest-near-random]] context — levels/trend have ~zero forward edge, which is why this feature gates on validation before wiring.

@@ -83,7 +83,7 @@ export const spansEnough = (seq: readonly PivotPoint[]): boolean =>
  */
 export function mergeShortLegs(pivots: readonly PivotPoint[]): PivotPoint[] {
     // A loop over a local array: a reduce copying the list per pivot would be
-    // O(n²) for no gain in clarity (MISTAKES Coding Paradigm 15.5).
+    // O(n²) for no gain in clarity (CONVENTIONS.md#CP-5).
     const out: PivotPoint[] = [];
     for (const p of pivots) {
         const last = out[out.length - 1];

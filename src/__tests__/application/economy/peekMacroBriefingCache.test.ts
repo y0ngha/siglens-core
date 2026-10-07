@@ -41,7 +41,7 @@ const VALID_CACHED = {
 describe('peekMacroBriefingCache 함수는', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        // 함수가 내부에서 new Date()로 날짜 버킷을 만든다 — MISTAKES Tests #14.
+        // 함수가 내부에서 new Date()로 날짜 버킷을 만든다 — CONVENTIONS.md#TE-11.
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-06-16T09:30:00.000Z'));
         mockCreateCacheProvider.mockReturnValue(mockCacheProvider);

@@ -14,7 +14,7 @@ import type { Bar, MarketEvent, Timeframe } from '@/domain/types';
  * bar, so `findAnchorBarIndex` always has at least `bars[0]` to return for an
  * entry reaching here — it cannot yield `null`. The non-null assertion
  * documents that guarantee rather than reintroducing a defensive branch no
- * test could exercise (MISTAKES.md Tests #5.5), matching how
+ * test could exercise (CONVENTIONS.md#TE-5), matching how
  * `selectPriorAnalyses` handles the same invariant.
  */
 function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string {

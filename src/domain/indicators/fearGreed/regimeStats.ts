@@ -107,7 +107,7 @@ function zoneEntryIndices(
 ): number[] {
     // Single pass that remembers the last session spent in `zone`, so a quick
     // return is recognised without re-scanning a window per session. A for
-    // loop with push (MISTAKES 14.5 / 15.5): reduce + spread would be O(N²).
+    // loop with push (CONVENTIONS.md#CP-5): reduce + spread would be O(N²).
     const entries: number[] = [];
     let lastInZone: number | null = null;
     const n = history.length;

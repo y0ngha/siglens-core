@@ -306,7 +306,6 @@ export interface BuildOptionsAnalysisPromptOptions {
  * Uses the `(string & {}) | 'all'` pattern instead of `string | 'all'`:
  * `string & {}` is structurally identical to `string` at runtime, but it
  * survives TypeScript's literal-widening pass, so IDEs surface `'all'` as an
- * autocomplete suggestion while still accepting any `string`. See
- * MISTAKES.md TypeScript section for context.
+ * autocomplete suggestion while still accepting any `string`.
  */
 export type OptionsExpirationFilter = (string & {}) | 'all';

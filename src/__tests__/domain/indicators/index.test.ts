@@ -187,7 +187,7 @@ describe('calculateIndicators', () => {
         it('대표 pro-indicator가 올바른 계산기 출력과 일치한다 (wiring 정확성)', () => {
             // Guards against a field being wired to the wrong calculator: the
             // wired value must equal the indicator's own calculator on the same
-            // bars (scalar via toBeCloseTo, MISTAKES.md Tests #12).
+            // bars (scalar via toBeCloseTo, CONVENTIONS.md#TE-10).
             const bars = buildBars(ENOUGH_BARS);
             const result = calculateIndicators(bars);
             const last = ENOUGH_BARS - 1;

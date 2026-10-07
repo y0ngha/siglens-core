@@ -69,7 +69,7 @@ jobs:
                         ## Review Procedure & Agentic Flow
                         1. Run: gh pr comment ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --body "🔍 리뷰를 진행 중입니다."
                         2. Run: gh pr diff ${{ github.event.pull_request.number }} --repo ${{ github.repository }} to analyze the changes.
-                        3. **Contextual Reading**: Based on the diff, read CLAUDE.md, /docs/MISTAKES.md, and ONLY the relevant principle documents from the list below.
+                        3. **Contextual Reading**: Based on the diff, read CLAUDE.md, the Gotchas sections of /docs/CONVENTIONS.md, the CLAUDE.md of each touched layer under /src, and ONLY the relevant principle documents from the list below.
                         4. Review the diff strictly against the loaded rules.
 
                         ## Completeness Rule (CRITICAL — Never Omit)
@@ -97,8 +97,9 @@ jobs:
                         ## Project Principle Documents (Reference Pool)
                         Always derive review criteria from these files rather than general knowledge.
                         - CLAUDE.md: Project overview, layer dependency rules (domain ↔ infrastructure only).
-                        - /docs/MISTAKES.md: Common mistakes to flag (Highest Priority).
-                        - /docs/CONVENTIONS.md: Coding conventions, FP paradigms, TypeScript rules.
+                        - /docs/CONVENTIONS.md: Coding conventions, FP paradigms, TypeScript rules, and the Gotchas sections (CP, TS, JD, DS, TE rule IDs; Highest Priority).
+                        - /docs/PUBLIC_API.md: Tiers and the Export 변경 체크리스트 (API rule IDs; Highest Priority when src/index*.ts change).
+                        - /src/domain/CLAUDE.md, /src/application/CLAUDE.md, /src/infrastructure/CLAUDE.md: Layer rules (DOM, APP, INF rule IDs; Highest Priority).
                         - /docs/FF.md: FF 4 principles (Readability, Predictability, Cohesion, Coupling).
                         - /docs/ARCHITECTURE.md: Layer structure, folder layout, dependency directions.
                         - /docs/DOMAIN.md: Indicator specs, domain rules, IndicatorResult structure.
@@ -110,8 +111,8 @@ jobs:
                         - **Coding paradigm**: FP conventions, immutability, no for/while except approved exceptions (CONVENTIONS.md).
                         - **TypeScript**: No `any`, explicit return types on exported functions (CONVENTIONS.md).
                         - **Infrastructure**: Interface-first design, graceful degradation on missing env vars, no cross-module coupling.
-                        - **Tests**: Vitest, 100% branch coverage on domain + infrastructure, required period-based indicator cases (CONVENTIONS.md).
-                        - **Common mistakes**: All patterns in MISTAKES.md.
+                        - **Tests**: Vitest, 90% coverage (lines/functions/branches/statements) on domain + application + infrastructure, required period-based indicator cases (CONVENTIONS.md).
+                        - **Common mistakes**: All rule IDs in the Gotchas sections, layer CLAUDE.md files and the PUBLIC_API.md checklist; cite the ID (FILE#RULE-ID) in each finding.
 
             - name: Post failure comment if review fails
               if: failure()

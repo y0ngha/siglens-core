@@ -32,15 +32,17 @@ Use this value directly in all `gh` commands.
 #### 1-2. Load Required Documents
 
 Always read (targeted):
-- `docs/MISTAKES.md` — read only the sections relevant to the fix scope:
+- Rule docs — read only the parts relevant to the fix scope (rule IDs are listed in `CLAUDE.md` under Rule Homes):
 
-| Modified layer | MISTAKES.md sections to read |
+| Modified area | Read |
 |---|---|
-| domain/ | Coding Paradigm, TypeScript, Domain Functions |
-| infrastructure/ | Coding Paradigm, TypeScript, Infrastructure Functions |
-| \_\_tests\_\_/ | Tests |
+| domain/ | `src/domain/CLAUDE.md` + `docs/CONVENTIONS.md` Gotchas: Paradigm (CP), TypeScript (TS), JSDoc Accuracy & Placement (JD), Comments & Documentation Sync (DS) |
+| application/ | `src/application/CLAUDE.md` + CONVENTIONS.md CP, TS, JD, DS |
+| infrastructure/ | `src/infrastructure/CLAUDE.md` + CONVENTIONS.md CP, TS, JD, DS |
+| \_\_tests\_\_/ | CONVENTIONS.md Test Gotchas (TE) |
+| `src/index.ts`, `src/index.client.ts`, any `export` added or removed | `docs/PUBLIC_API.md` Export 변경 체크리스트 (API) |
 
-Multiple layers → read the union of their sections.
+Multiple areas → read the union.
 
 Additional documents based on fix scope:
 - domain/ related → `docs/DOMAIN.md`
@@ -99,7 +101,7 @@ Reject a comment (do not apply the fix) if any of the following is true:
 1. **Conflicts with CONVENTIONS.md** — Convention takes precedence.
 2. **Violates FF Principles** — Applying the change would degrade Readability, Predictability, Cohesion, or Coupling.
 3. **Breaks Layer Architecture** — Violates dependency rules in `docs/ARCHITECTURE.md`.
-4. **Matches a Known Mistake Pattern** — Already documented in `docs/MISTAKES.md` as a pattern to avoid.
+4. **Matches a Documented Rule** — The suggestion contradicts a rule ID in CONVENTIONS.md, PUBLIC_API.md or a layer CLAUDE.md (cite the ID in the reply).
 5. **Reviewer Lacks Project Context** — Unaware of an intentional design decision or constraint.
 
 For every rejected comment, post a reply on GitHub:
@@ -121,7 +123,7 @@ After applying, verify against the checklist matching each modified file type:
 - [ ] Return types explicitly declared
 - [ ] Initial period values must be null (never 0 or NaN)
 - [ ] Prefer map, filter, flatMap, reduce; for-loop + push allowed when functional equivalent increases complexity or readability
-  (see CONVENTIONS.md and MISTAKES.md #14, #14.5)
+  (see CONVENTIONS.md#CP-5)
 - [ ] Maintain immutability (no push, reverse, sort — use spread, toReversed)
 - [ ] Path aliases (@/domain/... format)
 - [ ] No hardcoded literals → extract to constants
@@ -131,7 +133,7 @@ After applying, verify against the checklist matching each modified file type:
 - [ ] Type imports from @/domain/types only
 - [ ] process.env access is confined to this layer
 - [ ] External dependencies are wrapped behind an interface in `types.ts`
-- [ ] No console.log or debug artifacts
+- [ ] No untagged or debug logging (src/infrastructure/CLAUDE.md#INF-2)
 - [ ] Graceful degradation on missing env vars / network failure
 - [ ] All conditional branches have dedicated test cases
 
@@ -146,19 +148,21 @@ After applying, verify against the checklist matching each modified file type:
 
 Only check the checklists for file types you actually modified.
 
-#### 1-7a. MISTAKES.md Targeted Self-Review
+#### 1-7a. Rule Self-Review
 
 For each file modified during the fix:
 
-1. Re-read the matching MISTAKES.md sections:
+1. Re-read the matching rules:
 
-   | File type | Sections to read |
+   | File type | Rules to verify |
    |---|---|
-   | .ts (domain/) | Domain Functions, TypeScript, Coding Paradigm |
-   | .ts (infrastructure/) | Infrastructure Functions, TypeScript, Coding Paradigm |
-   | .test.ts | Tests |
+   | .ts (domain/) | `src/domain/CLAUDE.md` (DOM), CONVENTIONS.md CP, TS, JD, DS |
+   | .ts (application/) | `src/application/CLAUDE.md` (APP), CONVENTIONS.md CP, TS, JD, DS |
+   | .ts (infrastructure/) | `src/infrastructure/CLAUDE.md` (INF), CONVENTIONS.md CP, TS, JD, DS |
+   | .test.ts | CONVENTIONS.md TE |
+   | `src/index*.ts` | `docs/PUBLIC_API.md` API checklist |
 
-2. Verify each rule in those sections against the modified file.
+2. Verify each rule against the modified file.
 3. When fixing a pattern violation, verify the entire file for the same pattern —
    not just the specific location mentioned in the review comment.
 4. Fix any violations found before proceeding to validation.
@@ -190,14 +194,14 @@ If any step fails, fix the issue and re-run.
 
 Append each fix to `docs/__agents_only__/fix-log.md`. Create the file if it does not exist.
 
-**Before recording any entry, check `docs/MISTAKES.md` first.**
+**Before recording any entry, check the destination docs first** (CONVENTIONS.md, PUBLIC_API.md, the layer CLAUDE.md files; see Rule Homes in `CLAUDE.md`).
 If the violation is already documented there, **skip that entry entirely**.
 
 Format:
 ```md
 ## [PR #{number} | {branch name} | {date YYYY-MM-DD}]
 - Violation: {short description of what rule was violated}
-- Rule: {which rule from CONVENTIONS.md / MISTAKES.md / FF.md was violated}
+- Rule: {rule ID in FILE#RULE-ID form, e.g. CONVENTIONS.md#TE-5; or FF.md section if no ID exists}
 - Context: {one sentence describing where and why this happened in the code}
 ```
 
@@ -208,7 +212,7 @@ Record one entry per distinct violation. Rejected comments are not recorded.
 ### Step 2 — Invoke mistake-managing-agent
 
 ```
-"Read docs/__agents_only__/fix-log.md and promote recurring violation patterns to MISTAKES.md."
+"Read docs/__agents_only__/fix-log.md and promote recurring violation patterns into CONVENTIONS.md / PUBLIC_API.md / the layer CLAUDE.md files."
 ```
 
 Wait for exit signal.

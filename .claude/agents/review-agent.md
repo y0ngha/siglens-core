@@ -33,6 +33,7 @@ All internal evaluation must remain silent. The only permitted output is the exi
 ### 0. Load Memory
 
 Read `.claude/agent-memory/review-agent/MEMORY.md` and load all files listed in the index.
+The memory holds project context only. Rules are always read live from the documents in Step 2.
 
 ### 1. Determine Round and Identify Files to Read
 
@@ -79,15 +80,16 @@ Never read files under these directories — even if they appear in the file lis
 
 Files and directories listed in `.gitignore` are also excluded.
 
+**Exception — rule sources.** The exclusion applies to files you review. The documents
+listed in Step 2 (including `docs/**` and `src/**/CLAUDE.md`) are rule sources: always read
+them, and never review them as code.
+
 ### 2. Load Required Documents
 
-FF principles and coding conventions are already loaded from memory (Step 0) as condensed summaries.
-Do not re-read the full `docs/FF.md` or `docs/CONVENTIONS.md`.
-The memory versions contain all rules; only verbose code examples are omitted.
-
-Always read:
+Always read the live documents (there are no condensed copies):
 ```
-docs/MISTAKES.md
+docs/CONVENTIONS.md
+docs/FF.md
 docs/ARCHITECTURE.md
 ```
 
@@ -95,9 +97,11 @@ Additionally, based on changed file locations:
 
 | Condition | Also read |
 |---|---|
-| `src/domain/` changed (excluding `__tests__/` only changes) | `docs/DOMAIN.md` |
-| `src/infrastructure/` changed | `docs/API.md` |
-| Only `src/__tests__/` files changed, no source files | Skip all conditional docs |
+| `src/domain/` changed | `src/domain/CLAUDE.md` and `docs/DOMAIN.md` |
+| `src/application/` changed | `src/application/CLAUDE.md` |
+| `src/infrastructure/` changed | `src/infrastructure/CLAUDE.md` and `docs/API.md` |
+| `src/index.ts` or `src/index.client.ts` changed, or any `export` added or removed | `docs/PUBLIC_API.md`: the `Tier 정의`, `@internal 태그 사용 규칙` and `Export 변경 체크리스트` sections |
+| Only `src/__tests__/` files changed, no source files | `docs/CONVENTIONS.md` (Test Gotchas) only; skip the other conditional docs |
 
 **Round 2+ note:** On round 2+, "changed file locations" refers to the `modified_files` list provided by the orchestrator, not the full diff.
 
@@ -113,11 +117,11 @@ Evaluate each item silently. Do not output results — violations go into findin
 - [ ] domain/: no external library imports (technicalindicators, lodash, etc.)
 - [ ] domain/: no imports from infrastructure/
 - [ ] infrastructure/: each module owns a single external system; no transitive coupling
-- [ ] src/index.ts: only re-exports from domain/ and infrastructure/
+- [ ] src/index.ts: only re-exports from domain/, infrastructure/ and application/
 
 **Domain Rules**
 - [ ] Indicator initial period values are null (no 0 or NaN)
-- [ ] Domain functions are pure (no fetch, console.log, Date.now(), process.env)
+- [ ] Domain functions are pure (no fetch, console.*, Date.now(), process.env)
 - [ ] Domain functions have explicit return types
 - [ ] IndicatorResult fields are added only after calculation functions are implemented (no hardcoded empty arrays)
 - [ ] MA/EMA uses Record<number, (number | null)[]> structure
@@ -126,7 +130,7 @@ Evaluate each item silently. Do not output results — violations go into findin
 - [ ] Every external system is wrapped behind an interface in `types.ts`
 - [ ] process.env access is confined to infrastructure/
 - [ ] Graceful degradation on missing env vars / network failure
-- [ ] No debug artifacts (console.log)
+- [ ] No untagged or debug logging (`src/infrastructure/CLAUDE.md#INF-2`)
 
 **Tests**
 - [ ] Corresponding test file exists for every domain/ and infrastructure/ file
@@ -153,7 +157,13 @@ Using the 4 principles from docs/FF.md, look for **code that will become hard to
 
 Evaluate silently. Do not output reasoning — violations go into findings only.
 
-Check docs/MISTAKES.md against the changed code for known repeated patterns.
+Check the changed code against the rule IDs in the loaded documents: the Gotchas sections of
+`docs/CONVENTIONS.md` (`CP`, `N`, `TS`, `JD`, `DS`, `TE`), the layer `CLAUDE.md` rules (`DOM`, `APP`,
+`INF`) and the `API` checklist.
+
+**Cite the rule ID in every finding's `reason`** in `FILE#RULE-ID` form (for example
+`CONVENTIONS.md#TE-5`). The orchestrator logs findings by that ID, so the ID is what lets
+repeated violations be grouped.
 
 ---
 

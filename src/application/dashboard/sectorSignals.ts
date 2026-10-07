@@ -34,7 +34,7 @@ async function fetchInChunks<T, R>(
     fetcher: (item: T) => Promise<R>
 ): Promise<PromiseSettledResult<R>[]> {
     // Sequential chunked fetch keeps concurrent provider calls within FETCH_CONCURRENCY.
-    // for-loop + push is the documented exception (MISTAKES.md #14) for sequential async
+    // for-loop + push is the documented exception (CONVENTIONS.md#CP-5) for sequential async
     // accumulation where reduce + spread would be O(N²).
     const results: PromiseSettledResult<R>[] = [];
     for (let i = 0; i < items.length; i += chunkSize) {

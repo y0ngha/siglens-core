@@ -110,6 +110,7 @@ domain builder and dispatch it as **two separate fields**, not one combined user
 
 **Error propagation:** application functions should not swallow errors from infrastructure.
 Let them propagate to the caller. Only catch when you need to transform or add context.
+The one exception is background work handed to `fireAndForget` (see `src/application/CLAUDE.md#APP-2`).
 
 ```typescript
 // ❌ Silently swallowing
@@ -126,6 +127,66 @@ try {
     throw new Error(`Failed to cache analysis result for ${symbol}`, { cause: err });
 }
 ```
+
+### Use-case Gotchas
+
+IDs are stable and never renumbered; cite them as `src/application/CLAUDE.md#APP-2`.
+
+<a id="APP-1"></a>
+#### APP-1 — A fallback that degrades returns a flag
+
+`loadSkills().catch(() => [])` turns an outage into an empty result the caller cannot tell
+from "no skills". Log the failure and expose the degradation on the return value
+(`skillsDegraded`).
+
+```typescript
+// ❌ const skills = await loadSkills().catch(() => []);
+// ✅ .catch(error => { console.error(TAG, error); return DEGRADED; }) and return
+//    skillsDegraded alongside the data
+```
+
+<a id="APP-2"></a>
+#### APP-2 — Fire-and-forget: read first, write destructively, then background
+
+When one use-case reads prerequisites, mutates, and then triggers background work, keep
+that order: capture every read the later steps need, then perform the destructive write,
+then start the background calls from the captured data. Reading after the write finds
+nothing (a cascade delete removes the tokens you meant to revoke).
+
+Background work is the one place errors are swallowed, and only at the seam
+(`application/background.ts`): the promise handed to `fireAndForget` catches and logs its
+own errors, so a background failure never reaches the caller. Everywhere else the
+"don't swallow errors" rule above applies.
+
+<a id="APP-3"></a>
+#### APP-3 — I/O calls at the same call depth get the same protection
+
+If one I/O call in a use-case is guarded (try/catch, fail-open), every I/O call at that
+depth is guarded the same way. A guarded `recordUsage` next to an unguarded
+`checkUsageAllowed` gives two failure modes for one outage.
+
+<a id="APP-4"></a>
+#### APP-4 — One authoritative source per configuration option
+
+Accept a configuration option (`tierConfig`) once at the entry point and pass it down. If
+both an outer and an inner options object accept it, callers can set conflicting values and
+gating decisions diverge.
+
+<a id="APP-5"></a>
+#### APP-5 — Options that change model output flow into the key, the seed and every sub-call
+
+`reasoning`, `skipEnqueueIfMiss` and similar options change what the model returns. Fold
+them into the cache key and the sampling seed, and force them into every sub-axis option
+object. Otherwise on/off variants collide on one cache entry and the first caller decides
+the output for everyone until the TTL expires. Copy the pattern of the sibling use-case
+(`buildNewsCacheKey(..., reasoning)` plus `reasoningSeedPart`); see
+`src/infrastructure/CLAUDE.md#INF-4`.
+
+<a id="APP-6"></a>
+#### APP-6 — Related use-cases return the same shape for the same lifecycle concept
+
+Use-cases that end the same kind of lifecycle (logout and account deletion both end a
+session) return the same metadata shape, so a caller can chain the same follow-up logic.
 
 ## Testing
 

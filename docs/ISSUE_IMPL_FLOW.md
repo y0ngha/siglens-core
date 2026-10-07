@@ -35,15 +35,17 @@ Use this value directly in all `gh` commands.
 #### 1-2. Load Required Documents
 
 Always read (targeted):
-- `docs/MISTAKES.md` — read only the sections relevant to the task scope:
+- Rule docs — read only the parts relevant to the task scope (rule IDs are listed in `CLAUDE.md` under Rule Homes):
 
-| Modified layer | MISTAKES.md sections to read |
+| Modified area | Read |
 |---|---|
-| domain/ | Coding Paradigm, TypeScript, Domain Functions |
-| infrastructure/ | Coding Paradigm, TypeScript, Infrastructure Functions |
-| \_\_tests\_\_/ | Tests |
+| domain/ | `src/domain/CLAUDE.md` + `docs/CONVENTIONS.md` Gotchas: Paradigm (CP), TypeScript (TS), JSDoc Accuracy & Placement (JD), Comments & Documentation Sync (DS) |
+| application/ | `src/application/CLAUDE.md` + CONVENTIONS.md CP, TS, JD, DS |
+| infrastructure/ | `src/infrastructure/CLAUDE.md` + CONVENTIONS.md CP, TS, JD, DS |
+| \_\_tests\_\_/ | CONVENTIONS.md Test Gotchas (TE) |
+| `src/index.ts`, `src/index.client.ts`, any `export` added or removed | `docs/PUBLIC_API.md` Export 변경 체크리스트 (API) |
 
-Multiple layers → read the union of their sections.
+Multiple areas → read the union.
 
 Additional documents by scope:
 - domain/ related → `docs/DOMAIN.md` + `docs/ARCHITECTURE.md`
@@ -97,8 +99,8 @@ Branch naming: `feat/2/도메인-공통-타입-정의`, `refactor/32/candlestick
 - [ ] Pure functions only (no fetch, console.log, Date.now(), process.env)
 - [ ] Return types must be explicitly declared
 - [ ] Initial period values must be null (never 0 or NaN)
-- [ ] No for/while loops → use map, filter, reduce, flatMap
-  (exceptions: sliding windows, pointer-convergence — see CONVENTIONS.md)
+- [ ] Prefer map, filter, reduce, flatMap; for/while only where CONVENTIONS.md allows it
+  (sliding windows, pointer convergence, multi-push, sequential async — see CONVENTIONS.md#CP-5)
 - [ ] Maintain immutability (no bars.push → use [...bars, newBar])
 - [ ] Use path aliases (@/domain/... format)
 - [ ] No hardcoded literals → extract to constants (domain/indicators/constants.ts)
@@ -108,13 +110,13 @@ Branch naming: `feat/2/도메인-공통-타입-정의`, `refactor/32/candlestick
 - [ ] Type imports from @/domain/types only
 - [ ] process.env access is confined to this layer
 - [ ] External dependencies are wrapped behind an interface in `types.ts`
-- [ ] No console.log or debug artifacts
+- [ ] No untagged or debug logging (src/infrastructure/CLAUDE.md#INF-2)
 - [ ] Graceful degradation on missing env vars / network failure
 - [ ] All conditional branches have dedicated test cases
 
 **Test Layer Checklist** — verify after implementation:
 - [ ] Test file exists for every new domain/infrastructure file
-- [ ] 100% branch coverage (domain and infrastructure)
+- [ ] 90% branch coverage (domain, application and infrastructure)
 - [ ] describe/it text is human-readable, not code expressions
 - [ ] Period-based indicators include all 5 required test cases
 - [ ] No if-guarded assertions (unconditional expect only)
@@ -150,21 +152,23 @@ if part of the public surface.
 | Layer structure or folder layout changed | `docs/ARCHITECTURE.md` |
 | New coding convention established | `docs/CONVENTIONS.md` |
 
-#### 1-6. MISTAKES.md Targeted Self-Review
+#### 1-6. Rule Self-Review
 
-Before running validation, re-read the MISTAKES.md sections loaded in Step 1-2.
-For each modified file, verify every rule in the matching section(s):
+Before running validation, re-read the rule docs loaded in Step 1-2.
+For each modified file, verify every rule in the matching sections:
 
-| File type | Sections to verify |
+| File type | Rules to verify |
 |---|---|
-| .ts (domain/) | Domain Functions, TypeScript, Coding Paradigm |
-| .ts (infrastructure/) | Infrastructure Functions, TypeScript, Coding Paradigm |
-| .test.ts | Tests |
+| .ts (domain/) | `src/domain/CLAUDE.md` (DOM), CONVENTIONS.md CP, TS, JD, DS |
+| .ts (application/) | `src/application/CLAUDE.md` (APP), CONVENTIONS.md CP, TS, JD, DS |
+| .ts (infrastructure/) | `src/infrastructure/CLAUDE.md` (INF), CONVENTIONS.md CP, TS, JD, DS |
+| .test.ts | CONVENTIONS.md TE |
+| `src/index*.ts` | `docs/PUBLIC_API.md` API checklist |
 
 **Procedure:**
 1. List all files you modified or created.
-2. For each file, re-read the matching MISTAKES.md sections.
-3. Verify each rule in those sections against the file.
+2. For each file, re-read the matching rules.
+3. Verify each rule against the file.
 4. Fix any violations found before proceeding.
 
 Do NOT attempt to verify all sections — focus only on the sections
@@ -215,7 +219,7 @@ status: loop_limit_reached → stop, report to user
 1. Fix both `required` and `recommended` findings directly.
 2. **Post-fix Self-Review**: For each file modified during this fix round:
    a. Run the matching checklist from Step 1-5 (Domain / Infrastructure / Test).
-   b. Re-read the matching MISTAKES.md sections and verify no new violations
+   b. Re-read the matching rule sections (Step 1-6) and verify no new violations
       were introduced by the fix.
    c. When fixing a pattern violation, verify the entire file for the same pattern —
       not just the specific line mentioned in the finding.
@@ -226,15 +230,15 @@ status: loop_limit_reached → stop, report to user
 
 Append each fix to `docs/__agents_only__/fix-log.md`. Create the file if it does not exist.
 
-**Before recording any entry, check `docs/MISTAKES.md` first.**
-If the violation is already documented there (same rule, same pattern), **skip that entry entirely**.
-Only record violations that are not yet covered by an existing MISTAKES.md rule.
+**Before recording any entry, check the destination docs first** (CONVENTIONS.md, PUBLIC_API.md, the layer CLAUDE.md files; see Rule Homes in `CLAUDE.md`).
+If the violation is already documented there (same rule ID, same pattern), **skip that entry entirely**.
+Only record violations that are not yet covered by an existing rule.
 
 Format:
 ```md
 ## [Issue #{number} | {branch name} | {date YYYY-MM-DD}]
 - Violation: {short description of what rule was violated}
-- Rule: {which rule from CONVENTIONS.md / MISTAKES.md / FF.md was violated}
+- Rule: {rule ID in FILE#RULE-ID form, e.g. CONVENTIONS.md#TE-5; or FF.md section if no ID exists}
 - Context: {one sentence describing where and why this happened in the code}
 ```
 
@@ -262,7 +266,7 @@ Do not re-review files that were already approved in the previous round.
 ### Step 3 — Invoke mistake-managing-agent
 
 ```
-"Read docs/__agents_only__/fix-log.md and promote recurring violation patterns to MISTAKES.md."
+"Read docs/__agents_only__/fix-log.md and promote recurring violation patterns into CONVENTIONS.md / PUBLIC_API.md / the layer CLAUDE.md files."
 ```
 
 Wait for exit signal.
