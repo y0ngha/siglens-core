@@ -974,9 +974,21 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * ("washout" → "sell-off", "bearish confluence tally" → "bearish indicator
  * tally"). Bytes change on every request.
  *
+ * **`p24`** — chart-pattern qualification (spec
+ * 2026-10-07-chart-pattern-qualification-design.md). `## Chart Pattern
+ * Candidates (computed)` now lists only patterns that pass the strict drawing
+ * checks (confirmed pivots, boundaries through touches, a slope dead band,
+ * minimum size and duration, overlap arbitration) with their numbers and
+ * Candidate id; every other pre-screener hit is one `### <id> — shape hint —
+ * not drawable` line. Levels are fixed per family (sloped H&S neckline, last
+ * confirmed touch as invalidation, pole-and-channel flags), a boundary pair
+ * with no prior trend prints both boundaries and no target, and the intro
+ * gains one sentence about shape hints. Bytes change on any chart with a
+ * pattern hit.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p23' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p24' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

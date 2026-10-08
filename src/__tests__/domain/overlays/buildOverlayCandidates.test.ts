@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Bar, MarketReference } from '@/domain/types';
-import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
+import { qualifyPatterns } from '@/domain/patterns/qualify/qualifyPatterns';
 import {
     buildOverlayCandidates,
     runsForward,
@@ -31,7 +31,8 @@ describe('buildOverlayCandidates', () => {
             bars: f.bars,
             atr: f.atr,
             rsi: f.bars.map(() => 50),
-            patternCandidates: screenChartPatterns(f.bars, f.atr),
+            patternCandidates: qualifyPatterns([], f.bars, f.atr, '1Day')
+                .qualified,
             marketReference: EMPTY_MARKET_REFERENCE,
             fmt: FMT,
         });
@@ -45,7 +46,8 @@ describe('buildOverlayCandidates', () => {
             bars: f.bars,
             atr: f.atr,
             rsi: f.bars.map(() => 50),
-            patternCandidates: screenChartPatterns(f.bars, f.atr),
+            patternCandidates: qualifyPatterns([], f.bars, f.atr, '1Day')
+                .qualified,
             // Forces buildFibonacciCandidates to throw (reads ref[key].fibProjection).
             marketReference: null as unknown as MarketReference,
             fmt: FMT,

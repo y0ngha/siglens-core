@@ -15,6 +15,7 @@ import type {
     Trendline,
 } from '@/domain/types';
 import { patternSkillStem } from '@/domain/overlays/patternOverlays';
+import { isPatternTargetLabel } from '@/domain/analysis/ai-levels';
 import {
     STRATEGY_KIND_SOURCE_REF,
     STRATEGY_OVERLAY_KINDS,
@@ -365,6 +366,21 @@ const CATEGORY_DIRECTION: Partial<
 };
 
 /**
+ * A card resolved to an undirected pattern overlay: no geometry (nothing for
+ * `ai-levels.ts` to project a target from) and no target-labelled
+ * `keyPrices` the model may have written itself — the prompt printed both
+ * boundaries and no direction or target for it.
+ */
+function withoutTarget(p: PatternResult): PatternResult {
+    const { geometry: _undirected, keyPrices, ...rest } = p;
+    if (keyPrices === undefined) return rest;
+    return {
+        ...rest,
+        keyPrices: keyPrices.filter(kp => !isPatternTargetLabel(kp.label)),
+    };
+}
+
+/**
  * @internal
  * Makes each detected pattern card's `geometry` — the input `ai-levels.ts`
  * derives its measured/conservative target `keyPrices` from — agree with what
@@ -377,6 +393,10 @@ const CATEGORY_DIRECTION: Partial<
  *   extreme, direction and invalidation alike, so a miscopied number or an
  *   invented direction can no longer put the card's target on the other side
  *   of the drawn breakout line.
+ * - A card that resolved to an undirected pattern overlay (a `null` entry —
+ *   a boundary pair with no prior trend, spec 2026-10-07 §3.2) loses its
+ *   geometry and any target-labelled `keyPrices`: the prompt printed only
+ *   the two boundaries, so no target may be derived for it.
  * - A card with no resolved overlay keeps the model's geometry, unless its
  *   direction contradicts the card skill's directional category
  *   (`*_bullish` ⇒ `'up'`, `*_bearish` ⇒ `'down'`) — e.g. a double top with
@@ -387,15 +407,15 @@ const CATEGORY_DIRECTION: Partial<
  *
  * @param analysis - The enriched analysis (pattern ids already assigned).
  * @param chartOverlays - {@link resolveChartOverlays}' overlays for `analysis`.
- * @param patternGeometries - Printed geometry per offered pattern overlay id
- *   (`TechnicalAssembledPrompt.patternGeometries`).
+ * @param patternGeometries - Printed geometry per offered pattern overlay id,
+ *   `null` for an undirected pattern (`TechnicalAssembledPrompt.patternGeometries`).
  * @param skills - Skills for the category check; omit to skip it.
  * @returns `analysis` with aligned `patternSummaries[].geometry`.
  */
 export function alignPatternGeometry(
     analysis: AnalysisResponse,
     chartOverlays: readonly ChartOverlay[],
-    patternGeometries: ReadonlyMap<string, PatternTargetGeometry>,
+    patternGeometries: ReadonlyMap<string, PatternTargetGeometry | null>,
     skills: readonly Skill[] = []
 ): AnalysisResponse {
     const overlayIdBySource = new Map(
@@ -407,11 +427,10 @@ export function alignPatternGeometry(
     const align = (p: PatternResult): PatternResult => {
         if (!p.detected) return p;
         const overlayId = overlayIdBySource.get(p.id);
-        const drawn =
-            overlayId === undefined
-                ? undefined
-                : patternGeometries.get(overlayId);
-        if (drawn) return { ...p, geometry: drawn };
+        if (overlayId !== undefined && patternGeometries.has(overlayId)) {
+            const drawn = patternGeometries.get(overlayId);
+            return drawn ? { ...p, geometry: drawn } : withoutTarget(p);
+        }
         const category = patternSkillOf(p, patternBySkillName)?.category;
         const implied =
             category === undefined ? undefined : CATEGORY_DIRECTION[category];

@@ -5,8 +5,10 @@ import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
 
 /**
  * @internal — not yet re-exported from src/index.ts.
- * The chart-pattern pre-screener facade — the single public entry point for
- * analysis-submission observation logging and, later, AI skill-doc selection.
+ * The chart-pattern pre-screener facade — the entry point for
+ * analysis-submission observation logging and AI skill-doc selection. It
+ * never decides what is drawn: `qualifyPatterns` does (spec 2026-10-07), and
+ * a hit that does not qualify is only a "shape hint" in the prompt.
  *
  * Recall-biased by design (see {@link CLASSIFIERS} JSDoc): this is a coarse
  * pre-filter choosing which pattern skill docs are worth injecting into an AI
@@ -63,10 +65,9 @@ export function screenChartPatterns(
             id: candidate.id,
             startIndex: candidate.startIndex + offset,
             endIndex: candidate.endIndex + offset,
-            // Rebase each matched pivot's index the same way — dropping this
-            // (as an earlier version of this facade did) left every
-            // real-data candidate with no `pivots` for `computeCandidateGeometry`
-            // to compute geometry from, degrading every hit to `N/A`.
+            // Rebase each matched pivot's index the same way, so `pivots`
+            // (part of the public `PatternCandidate`) point into the caller's
+            // `bars` like `startIndex`/`endIndex` do.
             ...(candidate.pivots
                 ? {
                       pivots: candidate.pivots.map(p => ({

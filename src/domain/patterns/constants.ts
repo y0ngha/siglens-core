@@ -1,3 +1,5 @@
+import type { Timeframe } from '@/domain/types';
+
 // ─── Pivot extraction ───────────────────────────────────────────────────────
 
 /**
@@ -194,3 +196,199 @@ export const SINGULAR_MATRIX_DET_EPSILON = 1e-9;
  * not at the exact computed level — the same scale as the Elliott spent check.
  */
 export const PATTERN_SPENT_SLACK_ATR = 0.25;
+
+// ─── Qualification (drawing) — spec 2026-10-07 ─────────────────────────────
+// The pre-screener above stays loose (it only picks skill docs). Everything
+// below gates what may be DRAWN and printed with numbers: `qualify/`.
+
+/**
+ * @internal
+ * Containment slack ε, in ATR: a boundary is accepted only when no bar of the
+ * pattern pokes through it by more than this (`high ≤ line + ε` for the upper
+ * boundary, `low ≥ line − ε` for the lower one).
+ */
+export const BOUNDARY_CONTAINMENT_ATR = 0.25;
+
+/** @internal Touch tolerance τ, in ATR: a point within this distance of a boundary touches it. */
+export const BOUNDARY_TOUCH_ATR = 0.35;
+
+/** @internal Touches each boundary needs (triangles, channels, rectangle, flag channels). */
+export const BOUNDARY_MIN_TOUCHES = 2;
+
+/** @internal Touches each wedge boundary needs (wedge skill docs: three per side). */
+export const WEDGE_MIN_TOUCHES = 3;
+
+/**
+ * @internal
+ * Touches each rectangle boundary needs. The spec's two per side is raised to
+ * three: three flat highs over two flat lows is a triple top (and the mirror
+ * a triple bottom), and with only two per side every such range would draw
+ * as a rectangle over the reversal pattern it is.
+ */
+export const RECTANGLE_MIN_TOUCHES = 3;
+
+/** @internal Broadening formation: total touches over both boundaries. */
+export const BROADENING_MIN_TOTAL_TOUCHES = 5;
+
+/** @internal Broadening formation: touches the better-touched boundary needs. */
+export const BROADENING_MIN_SIDE_TOUCHES = 3;
+
+/**
+ * @internal
+ * A boundary whose total move over the pattern span is at most
+ * `min(FLAT_DRIFT_ATR·ATR, FLAT_DRIFT_PRICE_PCT·price)` is flat.
+ */
+export const FLAT_DRIFT_ATR = 0.75;
+
+/** @internal See {@link FLAT_DRIFT_ATR}. */
+export const FLAT_DRIFT_PRICE_PCT = 0.01;
+
+/**
+ * @internal
+ * The rectangle's looser price share for "flat" (rectangle skill doc: slope
+ * < 1.5%). It only ever decides a pair whose two lines both sit in the
+ * general flat class or the dead band: a rising/falling line moves at least
+ * `SLOPED_DRIFT_ATR`·ATR, beyond any flat bound (`FLAT_DRIFT_ATR`·ATR caps
+ * it), so a pair with a sloped line is classified (or rejected) by the
+ * triangle/wedge/channel rows first and never reaches the rectangle test.
+ */
+export const RECTANGLE_FLAT_DRIFT_PRICE_PCT = 0.015;
+
+/**
+ * @internal
+ * A boundary moving at least this many ATR over the pattern span is rising or
+ * falling. Between the flat bound and this one is a dead band where the
+ * pattern is not drawn, so one pivot cannot flip a triangle into a wedge.
+ */
+export const SLOPED_DRIFT_ATR = 1.5;
+
+/** @internal Triangles and wedges: end width at most this share of the start width. */
+export const CONVERGING_MAX_WIDTH_RATIO = 0.7;
+
+/** @internal Channels and flags: end-to-start width ratio lower bound (parallel). */
+export const PARALLEL_MIN_WIDTH_RATIO = 0.85;
+
+/** @internal Channels and flags: end-to-start width ratio upper bound (parallel). */
+export const PARALLEL_MAX_WIDTH_RATIO = 1.15;
+
+/** @internal Broadening formation: end width at least this multiple of the start width. */
+export const BROADENING_MIN_WIDTH_RATIO = 1.3;
+
+/**
+ * @internal
+ * Fewest confirmed pivots a boundary-pair window is tried with. Five, not
+ * four: the two boundaries must interleave (each keeps two touches from the
+ * other's first touch on), which alternating pivots only satisfy from five.
+ */
+export const TRENDLINE_MIN_WINDOW_PIVOTS = 5;
+
+/** @internal Triangles, wedges, rectangles, channels, broadening formations: fewest bars spanned. */
+export const LINE_PATTERN_MIN_BARS = 15;
+
+/** @internal Head & shoulders and triple tops/bottoms: fewest bars spanned. */
+export const LONG_REVERSAL_MIN_BARS = 20;
+
+/** @internal Double/triple tops and bottoms: fewest bars between consecutive extremes. */
+export const EXTREME_MIN_GAP_BARS = 10;
+
+/** @internal Double/triple: repeated extremes match within `min(EXTREME_MATCH_ATR_MULT·ATR, this·price)`. */
+export const EXTREME_MATCH_MAX_PRICE_PCT = 0.03;
+
+/** @internal Head & shoulders: the shoulders match within this share of price. */
+export const HS_SHOULDER_MAX_PRICE_PCT = 0.05;
+
+/**
+ * @internal
+ * Head & shoulders: confirmed pivots allowed after the right shoulder. The
+ * pattern stays drawable while price works through the neckline break
+ * instead of vanishing two legs later; the spent check retires it.
+ */
+export const HS_MAX_PIVOTS_AFTER_RIGHT_SHOULDER = 2;
+
+/**
+ * @internal
+ * Recency: a double/triple's last extreme and a rounding base's right rim may
+ * be at most `max(PATTERN_MAX_AGE_MIN_BARS, PATTERN_MAX_AGE_SPAN_SHARE ·
+ * span)` bars before the last bar. The floor matches the handle and flag
+ * windows (`HANDLE_MAX_BARS`, `FLAG_MAX_BARS`); the span share lets a long
+ * base take proportionally longer to break out. Older patterns describe the
+ * past even when price never reached their target or invalidation. Boundary
+ * pairs, H&S, flags, cups and high tight flags are already bounded (they end
+ * at the last confirmed pivots or within a fixed window).
+ */
+export const PATTERN_MAX_AGE_MIN_BARS = 20;
+
+/** @internal See {@link PATTERN_MAX_AGE_MIN_BARS}. */
+export const PATTERN_MAX_AGE_SPAN_SHARE = 0.5;
+
+/** @internal Minimum pattern height, in ATR (the other floor is a share of price, by timeframe). */
+export const PATTERN_MIN_HEIGHT_ATR = 2.5;
+
+/**
+ * @internal
+ * Minimum pattern height as a share of price, by timeframe. A fixed 3% would
+ * erase every intraday drawing: a 5-minute bar rarely spans a 3% range.
+ */
+export const PATTERN_MIN_HEIGHT_PRICE_PCT: Readonly<Record<Timeframe, number>> =
+    {
+        '5Min': 0.005,
+        '15Min': 0.005,
+        '30Min': 0.005,
+        '1Hour': 0.01,
+        '4Hour': 0.01,
+        '1Day': 0.03,
+    };
+
+/** @internal Prior trend: bars before the pattern start whose close change sets the direction. */
+export const PRIOR_TREND_BARS = 20;
+
+/** @internal Prior trend: close change, in ATR, that counts as a trend. */
+export const PRIOR_TREND_MIN_ATR = 2;
+
+/** @internal Flag pole: most bars from the base pivot to the top pivot. */
+export const FLAG_POLE_MAX_BARS = 20;
+
+/** @internal Flag/pennant: fewest bars after the pole top. */
+export const FLAG_MIN_BARS = 5;
+
+/** @internal Flag/pennant: most bars after the pole top. */
+export const FLAG_MAX_BARS = 20;
+
+/** @internal Flag/pennant: deepest pullback from the pole top, as a share of the pole. */
+export const FLAG_MAX_RETRACE = 0.5;
+
+/** @internal Cup & handle and rounding: rims match within this share of price. */
+export const RIM_MATCH_MAX_PRICE_PCT = 0.05;
+
+/** @internal Cup & handle and rounding: fewest bars from rim to rim. */
+export const CUP_MIN_BARS = 30;
+
+/** @internal Cup & handle: fewest bars after the right rim. */
+export const HANDLE_MIN_BARS = 5;
+
+/** @internal Cup & handle: most bars after the right rim. */
+export const HANDLE_MAX_BARS = 20;
+
+/** @internal U check: the band next to the extreme, as a share of the depth. */
+export const U_EXTREME_BAND = 1 / 3;
+
+/**
+ * @internal
+ * U check: share of the closes between the rims that must sit in the band
+ * next to the extreme. The spec's 25% does not reject a V: price on a
+ * straight-sided V spends a third of its bars in the bottom third of the
+ * depth, and a parabola about 58%. 0.4 sits between the two.
+ */
+export const U_EXTREME_MIN_SHARE = 0.4;
+
+/** @internal Rounding: the quadratic fitted on the closes between the rims explains at least this share of their variance. */
+export const ROUNDING_MIN_R2 = 0.6;
+
+/** @internal Rounding: points sampled from the fitted curve for the drawing. */
+export const ROUNDING_ARC_SAMPLES = 10;
+
+/** @internal Arbitration: two qualified hits sharing at least this many pivots overlap. */
+export const ARBITRATION_MIN_SHARED_PIVOTS = 3;
+
+/** @internal Arbitration: two qualified hits whose spans overlap by more than this share of the shorter one overlap. */
+export const ARBITRATION_MAX_SPAN_OVERLAP = 0.5;

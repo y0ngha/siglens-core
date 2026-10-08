@@ -47,8 +47,24 @@ const eventGated = (triggers: string[]): SkillGating => ({
 
 afterEach(() => {
     vi.doUnmock('@/domain/patterns');
+    vi.doUnmock('@/domain/patterns/qualify/qualifyPatterns');
     vi.resetModules();
 });
+
+/**
+ * Replaces the strict qualifier: nothing qualifies, every pre-screener hit
+ * comes back as a shape hint. Qualification runs independently of the
+ * screener (spec 2026-10-07), so a test about the screener's own hits must
+ * pin it.
+ */
+const mockNothingQualifies = (): void => {
+    vi.doMock('@/domain/patterns/qualify/qualifyPatterns', () => ({
+        qualifyPatterns: (candidates: readonly { id: string }[]) => ({
+            qualified: [],
+            shapeHints: candidates.map(c => c.id),
+        }),
+    }));
+};
 
 describe('buildAnalysisPrompt — pattern-candidate gating (real screener)', () => {
     it('injects a pattern skill whose trigger matches a screener-detected pattern id, and only that one', () => {
@@ -149,6 +165,7 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         const indicators = calculateIndicators(fixture.bars);
 
         vi.resetModules();
+        mockNothingQualifies();
         vi.doMock('@/domain/patterns', () => ({
             screenChartPatterns: () => [],
             computeCandidateGeometry: () => null,
@@ -167,6 +184,7 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         );
 
         vi.resetModules();
+        mockNothingQualifies();
         vi.doMock('@/domain/patterns', () => ({
             screenChartPatterns: () => [
                 { id: 'double_top', startIndex: 0, endIndex: 1 },
@@ -194,8 +212,8 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         // the equality check to that portion — everything up to the first
         // per-call value (`Symbol:`) — rather than the whole prompt, since
         // `## Chart Pattern Candidates (computed)` now legitimately renders
-        // the screener's raw findings (spec 2026-09-18 §A1) and is expected
-        // to differ.
+        // the screener's findings (as shape hints, spec 2026-10-07) and is
+        // expected to differ.
         const skillPortion = (s: string): string =>
             s.slice(0, s.indexOf('Symbol:'));
         expect(skillPortion(withCandidates)).toBe(
@@ -211,5 +229,55 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         expect(withCandidates).not.toContain(
             '- None detected by the pre-screener'
         );
+    });
+});
+
+describe('buildAnalysisPrompt — skill selection sees qualified patterns the screener missed', () => {
+    it('fires the skill of a qualified pattern whose id the loose pre-screener did not report', async () => {
+        vi.resetModules();
+        vi.doMock('@/domain/patterns', () => ({
+            screenChartPatterns: () => [],
+            computeCandidateGeometry: () => null,
+        }));
+        vi.doMock('@/domain/patterns/qualify/qualifyPatterns', () => ({
+            qualifyPatterns: () => ({
+                qualified: [
+                    {
+                        id: 'bull_flag',
+                        startIndex: 0,
+                        endIndex: 1,
+                        pivots: [],
+                        shape: {
+                            kind: 'high_tight_flag',
+                            poleBase: { index: 0, price: 1, kind: 'low' },
+                            poleTop: { index: 1, price: 2, kind: 'high' },
+                            flagLow: { index: 1, price: 1.5 },
+                        },
+                        touches: 2,
+                    },
+                ],
+                shapeHints: [],
+            }),
+        }));
+        const { buildAnalysisPrompt: build } =
+            await import('@/domain/analysis/prompt');
+        const fixture = doubleTop as Fixture;
+        const out = flat(
+            build(
+                TEST_SYMBOL,
+                TEST_COMPANY,
+                fixture.bars,
+                calculateIndicators(fixture.bars),
+                [
+                    makeSkill({
+                        name: 'Bull Flag Guide',
+                        type: 'pattern',
+                        gating: eventGated(['bull_flag']),
+                    }),
+                ],
+                '1Day'
+            )
+        );
+        expect(out).toContain('Bull Flag Guide');
     });
 });

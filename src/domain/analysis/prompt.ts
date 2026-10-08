@@ -64,7 +64,7 @@ import { selectSkills } from '@/domain/analysis/selectSkills';
 import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
 import { screenChartPatterns } from '@/domain/patterns';
-import { isSpentPattern } from '@/domain/patterns/spentPatterns';
+import { qualifyPatterns } from '@/domain/patterns/qualify/qualifyPatterns';
 import type {
     AnalysisResponse,
     TechnicalAssembledPrompt,
@@ -79,7 +79,8 @@ import type {
     IndicatorResult,
     MarketEvent,
     MarketReference,
-    PatternCandidate,
+    ChartPatternId,
+    PatternQualification,
     PivotTables,
     FibonacciProjection,
     AbcExtensionProjection,
@@ -2064,33 +2065,60 @@ const collectDetectedCandleNames = (
     return [...new Set<string>(names)];
 };
 
+/** The chart patterns one prompt build works from — see {@link screenPatternCandidatesSafely}. */
+interface ChartPatternScreen extends PatternQualification {
+    /** Ids that drive skill selection: every qualified id plus every shape hint. */
+    selectionIds: ChartPatternId[];
+}
+
+const NO_CHART_PATTERNS: ChartPatternScreen = {
+    qualified: [],
+    shapeHints: [],
+    selectionIds: [],
+};
+
 /**
- * Chart-pattern candidates surfaced by the pre-screener for this chart —
- * shared by the `patternCandidates` selection-context field AND `##
- * Chart Pattern Candidates (computed)` (spec 2026-09-18: the
- * screener used to run twice per prompt build, once for each consumer).
+ * The chart patterns for this chart, computed once and shared by skill
+ * selection, `## Chart Pattern Candidates (computed)` and the pattern
+ * overlays (spec 2026-09-18: the screener used to run twice per prompt
+ * build). The loose pre-screener (`screenChartPatterns`) only feeds skill
+ * selection and the shape hints; `qualifyPatterns` decides what is drawn,
+ * printed with numbers and offered as a Candidate id, and has already
+ * dropped hits the price failed or fulfilled (spec 2026-10-07). Skill
+ * selection sees the qualified ids and the shape hints, so a drawn pattern's
+ * skill doc is always in the prompt.
+ *
  * Guards `atr` unavailable/non-positive the same way {@link
- * screenChartPatterns} itself does (`[]`), and additionally wraps the call
+ * screenChartPatterns} itself does, and additionally wraps the calls
  * defensively: a screener/classifier bug must degrade to "no candidates"
  * rather than take down prompt building, mirroring `observePatternCandidates`
  * in `submitAnalysis.ts`. Unlike that application-layer call, this domain
  * function cannot `console.error` (domain is zero-I/O per `domain/CLAUDE.md`)
  * — the application-layer observe-only log already surfaces screener
- * failures, so no telemetry is duplicated here. Hits the price has already
- * failed or fulfilled (`isSpentPattern`) are dropped here, so the prompt,
- * skill selection and the drawn overlays all leave them out.
+ * failures, so no telemetry is duplicated here.
  */
 const screenPatternCandidatesSafely = (
     bars: readonly Bar[],
-    atr: number | null
-): PatternCandidate[] => {
-    if (atr === null || atr <= 0) return [];
+    atr: number | null,
+    timeframe: Timeframe
+): ChartPatternScreen => {
+    if (atr === null || atr <= 0) return NO_CHART_PATTERNS;
     try {
-        return screenChartPatterns(bars, atr).filter(
-            c => !isSpentPattern(c, bars, atr)
+        const { qualified, shapeHints } = qualifyPatterns(
+            screenChartPatterns(bars, atr),
+            bars,
+            atr,
+            timeframe
         );
+        return {
+            qualified,
+            shapeHints,
+            selectionIds: [
+                ...new Set([...qualified.map(q => q.id), ...shapeHints]),
+            ],
+        };
     } catch {
-        return [];
+        return NO_CHART_PATTERNS;
     }
 };
 
@@ -2100,7 +2128,7 @@ const buildSkillSelectionContext = (
     indicators: IndicatorResult,
     timeframe: Timeframe,
     candleEntries: CandlePatternEntry[],
-    patternCandidates: readonly PatternCandidate[]
+    patternIds: readonly ChartPatternId[]
 ): SkillSelectionContext => {
     const price = bars.length > 0 ? bars[bars.length - 1].close : 0;
     const atr = lastNonNull(indicators.atr);
@@ -2111,7 +2139,7 @@ const buildSkillSelectionContext = (
         signals: detectSignals(bars, indicators),
         timeframe,
         detectedCandles: collectDetectedCandleNames(candleEntries),
-        patternCandidates: patternCandidates.map(candidate => candidate.id),
+        patternCandidates: patternIds,
         price,
         atrPercent,
     };
@@ -2329,14 +2357,15 @@ export function buildAnalysisPrompt(
     // Hoisted this early (ahead of `precision`, which also needs it further
     // down) so both this ATR read and the screener call below happen once.
     const atrForPatternGeometry = lastNonNull(indicators.atr);
-    // Screened once and shared by skill selection AND `## Chart Pattern
-    // Candidates (computed)` below (spec 2026-09-18) — the
-    // screener used to run a second, redundant time for the candidates
-    // section every prompt build.
-    const patternCandidates = screenPatternCandidatesSafely(
+    // Screened and qualified once, shared by skill selection, `## Chart
+    // Pattern Candidates (computed)` and the pattern overlays below (spec
+    // 2026-09-18, spec 2026-10-07) — only qualified patterns are drawn.
+    const chartPatterns = screenPatternCandidatesSafely(
         bars,
-        atrForPatternGeometry
+        atrForPatternGeometry,
+        timeframe
     );
+    const patternCandidates = chartPatterns.qualified;
 
     // Dynamic gating (chart only): whitelist to chart skills, then split into
     // `core` (always_on, catalog-only — byte-stable across calls) and
@@ -2347,7 +2376,7 @@ export function buildAnalysisPrompt(
         indicators,
         timeframe,
         candleEntries,
-        patternCandidates
+        chartPatterns.selectionIds
     );
     const { core, selected } = selectSkills(
         skills,
@@ -2550,6 +2579,7 @@ export function buildAnalysisPrompt(
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatChartPatternCandidatesSection(
             patternCandidates,
+            chartPatterns.shapeHints,
             bars,
             atrForPatternGeometry,
             priceDp,

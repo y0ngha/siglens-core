@@ -43,7 +43,9 @@ import { PIVOT_REVERSAL_ATR_MULT } from '@/domain/patterns/constants';
  * confirmed-only behavior described above.
  * @returns Confirmed pivots in ascending bar-index order; alternates
  * high/low kind by construction. With `includeProvisional: true`, may have
- * one trailing provisional pivot of the same kind as the last confirmed one.
+ * one trailing provisional pivot of the OPPOSITE kind to the last confirmed
+ * one (confirming a high turns the swing down, so the running extreme is a
+ * low) — the list still alternates.
  */
 export function extractPivots(
     bars: readonly Bar[],

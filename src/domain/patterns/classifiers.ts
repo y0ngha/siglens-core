@@ -27,7 +27,7 @@ import {
     TRENDLINE_PIVOT_WINDOW,
 } from '@/domain/patterns/constants';
 
-/** @internal Shared by `patternGeometry.ts`'s trendline-value evaluator. */
+/** @internal An `(x, y)` sample for the least-squares fits below. */
 export interface Point {
     x: number;
     y: number;
@@ -37,11 +37,8 @@ export interface Point {
  * Ordinary least-squares slope of `y` over `x`. Returns `0` for fewer than 2
  * points or a degenerate (zero-variance) `x` series — a flat/undefined slope
  * is the conservative (non-triggering) default for the trendline family.
- *
- * @internal Exported so `patternGeometry.ts` can evaluate the same fitted
- * line at the current last bar without re-deriving the OLS math.
  */
-export function leastSquaresSlope(points: readonly Point[]): number {
+function leastSquaresSlope(points: readonly Point[]): number {
     const n = points.length;
     if (n < 2) return 0;
 
@@ -394,11 +391,13 @@ function solve3x3(
 }
 
 /**
+ * @internal
  * Least-squares quadratic fit `y = a*x^2 + b*x + c` via the normal
  * equations. `null` for fewer than 3 points or a singular system (e.g. all
- * points share the same `x`).
+ * points share the same `x`). Exported for the rounding qualifier
+ * (`qualify/curves.ts`), which fits the closes between two rims.
  */
-function fitQuadratic(
+export function fitQuadratic(
     points: readonly Point[]
 ): { a: number; b: number; c: number } | null {
     if (points.length < 3) return null;
@@ -537,7 +536,14 @@ function extremeIndex(
     return best;
 }
 
+/** @internal The two anchors of a high tight flag's pole. */
+export interface HighTightFlagAnchors {
+    base: PivotPoint;
+    top: PivotPoint;
+}
+
 /**
+ * @internal
  * High tight flag over the right edge of the chart, from bars alone (a
  * percentage rule — no pivots, no ATR).
  *
@@ -549,11 +555,14 @@ function extremeIndex(
  * every bar after the top, which may give back at most `HTF_FLAG_MAX_RETRACE`
  * of the top.
  *
- * The attached `pivots` are the two anchors the rule matched on — base
- * (`low`) and top (`high`) — so `patternGeometry.ts` reads the pole from them
- * instead of re-deriving it.
+ * Exported for the high-tight-flag qualifier (`qualify/flags.ts`), which applies
+ * the same rule and then requires the top to be a confirmed pivot.
+ *
+ * @returns The pole's base (`low`) and top (`high`), or `null`.
  */
-function detectHighTightFlag(bars: readonly Bar[]): PatternCandidate | null {
+export function detectHighTightFlagAnchors(
+    bars: readonly Bar[]
+): HighTightFlagAnchors | null {
     const lastIndex = bars.length - 1;
     const peakIndex = extremeIndex(
         bars,
@@ -586,13 +595,23 @@ function detectHighTightFlag(bars: readonly Bar[]): PatternCandidate | null {
     if ((peakHigh - flagLow) / peakHigh > HTF_FLAG_MAX_RETRACE) return null;
 
     return {
+        base: { index: baseIndex, price: baseLow, kind: 'low' },
+        top: { index: peakIndex, price: peakHigh, kind: 'high' },
+    };
+}
+
+/**
+ * {@link detectHighTightFlagAnchors} as a pre-screener candidate spanning
+ * base to the last bar; the attached `pivots` are the two anchors.
+ */
+function detectHighTightFlag(bars: readonly Bar[]): PatternCandidate | null {
+    const anchors = detectHighTightFlagAnchors(bars);
+    if (anchors === null) return null;
+    return {
         id: 'high_tight_flag',
-        startIndex: baseIndex,
-        endIndex: lastIndex,
-        pivots: [
-            { index: baseIndex, price: baseLow, kind: 'low' },
-            { index: peakIndex, price: peakHigh, kind: 'high' },
-        ],
+        startIndex: anchors.base.index,
+        endIndex: bars.length - 1,
+        pivots: [anchors.base, anchors.top],
     };
 }
 
@@ -720,12 +739,16 @@ function fitRounding(
  * `includeProvisional: true`).
  *
  * When >= 5 lows are available, first tries cup_and_handle: fit the cup on
- * all lows except the last (the handle's low), then require the pullback
- * from the cup's right-edge low down to the handle low to be shallow
- * (`<= CUP_HANDLE_MAX_DEPTH_RATIO * cup depth`) and downward. If that
- * succeeds, ONLY cup_and_handle is emitted — the cup doc already covers the
- * base, so re-emitting rounding_bottom would be redundant, not extra recall.
- * Otherwise falls back to a plain rounding_bottom fit over all the lows.
+ * all lows except the last (the handle's low), then require the handle low
+ * to stay in the cup's upper half — no deeper than
+ * `CUP_HANDLE_MAX_DEPTH_RATIO * cup depth` below the highest cup low (the
+ * cup-and-handle skill: the handle forms in the upper half of the cup). A
+ * handle usually sits ABOVE the cup's last low, so the earlier rule that
+ * required it to sit below that low rejected textbook cups (spec 2026-10-07
+ * §3.6). If that succeeds, ONLY cup_and_handle is emitted — the cup doc
+ * already covers the base, so re-emitting rounding_bottom would be redundant,
+ * not extra recall. Otherwise falls back to a plain rounding_bottom fit over
+ * all the lows.
  */
 function classifyRoundedBase(
     lows: readonly PivotPoint[],
@@ -738,11 +761,10 @@ function classifyRoundedBase(
         const handleLow = lows[lows.length - 1];
         const cup = fitRounding(cupLows, atr, 'bottom');
         if (cup) {
-            const rightEdgeLow = cupLows[cupLows.length - 1].price;
-            const handleDepth = rightEdgeLow - handleLow.price;
+            const cupTop = Math.max(...cupLows.map(p => p.price));
             if (
-                handleDepth > 0 &&
-                handleDepth <= CUP_HANDLE_MAX_DEPTH_RATIO * cup.depth
+                handleLow.price >=
+                cupTop - CUP_HANDLE_MAX_DEPTH_RATIO * cup.depth
             ) {
                 return [
                     {
