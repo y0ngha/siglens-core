@@ -13,3 +13,16 @@ Violation: core review found:
 - recommended: nested ternary for id selection; constant doc ("min 4") contradicting effective behavior (5); JSDoc duplicating a rule stated on another function
 
 Branch: fix/pattern-qualification
+
+## feat/agent-writing-style review rounds 1–2 + A/B
+
+Rule: FF.md predictability, CONVENTIONS.md change synchronization, TESTING.md (assert behavior)
+
+Violation: review + real-LLM A/B found:
+- recommended: shipped prompt text drifted from the A/B-tested text (a clause dropped while porting) — ship the measured text or re-measure the shipped text
+- recommended: an English-only example ("Source: …") inside a rule meant for all non-Korean languages read as a literal instruction for ja/zh
+- recommended: prompt-example test only restated the string; round-trip the example through the real parser instead
+- recommended: AGENT_PROMPT_VERSION bump without a PUBLIC_API changelog row
+- A/B: re-measuring the shipped text exposed a politeness-mixing regression (4/28 answers) and Korean follow-up chips in English answers — fixed with explicit ending examples and a "write follow-ups in the answer language" clause
+
+Branch: feat/agent-writing-style

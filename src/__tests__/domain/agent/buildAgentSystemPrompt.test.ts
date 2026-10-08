@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { AGENT_FOLLOW_UP_MARKER } from '@/domain/agent/agentFollowUps';
+import {
+    AGENT_FOLLOW_UP_MARKER,
+    splitAgentFollowUps,
+} from '@/domain/agent/agentFollowUps';
 import {
     AGENT_PROMPT_VERSION,
     buildAgentSystemPrompt,
@@ -351,7 +354,7 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-06.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-08.1');
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
@@ -580,6 +583,59 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'never add a figure for it at the Plain level, where the figure budget still applies'
         );
+    });
+
+    /**
+     * no-ai-slop 이중언어 갱신에서 옮긴 규칙(2026-10-08). 실LLM A/B에서 합니다체 혼용 2.64→0.04문장,
+     * 문장 전체 굵게 0.72→0.12, "정리하면" 23→3. 문구를 바꾸면 그 효과가 사라지므로 핵심 문장을 고정한다.
+     */
+    it('존댓말·서식·상투어·접속사·마무리·답변 언어 규칙을 담는다', () => {
+        expect(prompt).toContain(
+            'Korean politeness: write every sentence in 해요체 (합니다체 only when the user writes in 합니다체)'
+        );
+        expect(prompt).not.toContain('(해요체 or 합니다체)');
+        expect(prompt).toContain('Never bold a whole sentence');
+        expect(prompt).toContain('"결론:", "요약:"');
+        expect(prompt).toContain(
+            'do not put a sentence that announces what follows in its place'
+        );
+        expect(prompt).toContain(
+            'Do not call the current situation a "자리", "구간" or "국면"'
+        );
+        expect(prompt).toContain('Use "다만" at most once per answer');
+        expect(prompt).toContain(
+            'Start the closing summary line with its content (the confirmation level), never with a lead-in'
+        );
+        expect(prompt).toContain(
+            'The Korean rules and Korean examples in this prompt apply to Korean answers only.'
+        );
+        expect(prompt).toContain(
+            'the first sentence is the conclusion, and in English it answers the question outright'
+        );
+        expect(prompt).toContain(
+            'and the summary line is an ordinary sentence.'
+        );
+        // ja·zh 답변이 영어 "Source:" 줄을 쓰지 않게, 예시가 영어 형태임을 밝힌다.
+        expect(prompt).toContain('the source line (English: "Source: …")');
+        // 재측정 A/B: 한국 종목 영어 답변에 한국어 후속 질문 칩이 9/32건 남았다(이 문장 추가 후 0/32).
+        expect(prompt).toContain(
+            'never reuse the Korean follow-up example in a non-Korean answer, even when the symbol is Korean.'
+        );
+        // 재측정 A/B: "더 낫습니다"·"내렸습니다"가 해요체 답변에 섞였다(11/56 → 3/56).
+        expect(prompt).toContain(
+            '"더 낫습니다" → "더 나아요", "내렸습니다" → "내렸어요"'
+        );
+        // 영어 후속 질문 예시는 모델이 그대로 따라 쓴다 — 그 줄이 실제 파서에서 칩 세 개로 읽혀야 한다.
+        const example = /\(English example: "([^"]+)"\)/.exec(prompt)?.[1];
+        expect(example).toBeDefined();
+        expect(splitAgentFollowUps(`본문\n${example}`)).toEqual({
+            body: '본문',
+            followUps: [
+                'Show the indicator detail',
+                'What do options imply?',
+                'Earnings in numbers',
+            ],
+        });
     });
 
     it('눌림 판독이 none이면 언급하지 않게 한다', () => {
