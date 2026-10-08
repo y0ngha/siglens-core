@@ -46,9 +46,10 @@ import {
  * bars of flag. The flag channel is fitted on the flag bars' swing highs
  * and lows (a short flag rarely holds a 1.5-ATR pivot); the two edges must
  * overlap in time. Whether the channel reads as a flag or a pennant is
- * decided by `flagPatternId` (see its JSDoc). When the newest bars have already left the
- * channel, the fit is retried on a shorter flag (down to `FLAG_MIN_BARS`) so
- * the breakout leg reads as a break, not as the end of the pattern.
+ * decided by `flagPatternId` (see its JSDoc). When the newest bars have
+ * already left the channel, the fit is retried on a shorter flag (down to
+ * `FLAG_MIN_BARS`) so the breakout leg reads as a break, not as the end of
+ * the pattern.
  */
 export function qualifyFlags(ctx: QualifyContext): QualifiedPattern[] {
     for (let i = ctx.pivots.length - 1; i >= 1; i--) {

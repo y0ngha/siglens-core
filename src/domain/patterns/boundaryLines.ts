@@ -70,38 +70,43 @@ export function fitBoundaryLine(
 ): PatternLine | null {
     const slack = BOUNDARY_CONTAINMENT_ATR * atr;
     const touchTolerance = BOUNDARY_TOUCH_ATR * atr;
-    let best: ScoredLine | null = null;
 
-    for (let i = 0; i < points.length; i++) {
-        for (let j = i + 1; j < points.length; j++) {
-            const a = points[i];
-            const b = points[j];
-            if (a.index === b.index) continue;
-            const slope = (b.price - a.price) / (b.index - a.index);
-            const valueAt = (x: number): number =>
-                a.price + slope * (x - a.index);
-            if (!containsBars(bars, side, from, to, valueAt, slack)) continue;
+    const scoreLine = (a: PatternPoint, b: PatternPoint): ScoredLine | null => {
+        if (a.index === b.index) return null;
+        const slope = (b.price - a.price) / (b.index - a.index);
+        const valueAt = (x: number): number => a.price + slope * (x - a.index);
+        if (!containsBars(bars, side, from, to, valueAt, slack)) return null;
 
-            const touches = points.filter(
-                p => Math.abs(p.price - valueAt(p.index)) <= touchTolerance
-            );
-            const distance = points.reduce(
-                (sum, p) => sum + Math.abs(p.price - valueAt(p.index)),
-                0
-            );
-            const first = touches[0];
-            const last = touches[touches.length - 1];
-            const candidate: ScoredLine = {
-                line: {
-                    start: { index: first.index, price: valueAt(first.index) },
-                    end: { index: last.index, price: valueAt(last.index) },
-                    touches,
-                },
-                distance,
-            };
-            if (best === null || isBetter(candidate, best)) best = candidate;
-        }
-    }
+        const touches = points.filter(
+            p => Math.abs(p.price - valueAt(p.index)) <= touchTolerance
+        );
+        const distance = points.reduce(
+            (sum, p) => sum + Math.abs(p.price - valueAt(p.index)),
+            0
+        );
+        const first = touches[0];
+        const last = touches[touches.length - 1];
+        return {
+            line: {
+                start: { index: first.index, price: valueAt(first.index) },
+                end: { index: last.index, price: valueAt(last.index) },
+                touches,
+            },
+            distance,
+        };
+    };
+
+    const candidates = points.flatMap((a, i) =>
+        points.slice(i + 1).flatMap(b => {
+            const scored = scoreLine(a, b);
+            return scored === null ? [] : [scored];
+        })
+    );
+    const best = candidates.reduce<ScoredLine | null>(
+        (acc, candidate) =>
+            acc === null || isBetter(candidate, acc) ? candidate : acc,
+        null
+    );
     return best?.line ?? null;
 }
 

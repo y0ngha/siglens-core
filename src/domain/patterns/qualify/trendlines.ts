@@ -53,18 +53,22 @@ const FIXED_TRENDLINE_DIRECTION: Partial<
  * dragging the support line under every later low.
  */
 export function qualifyTrendlines(ctx: QualifyContext): QualifiedPattern[] {
-    let best: { pattern: QualifiedPattern; ratio: number } | null = null;
-    for (
-        let size = Math.min(TRENDLINE_PIVOT_WINDOW, ctx.pivots.length);
-        size >= TRENDLINE_MIN_WINDOW_PIVOTS;
-        size--
-    ) {
+    const largest = Math.min(TRENDLINE_PIVOT_WINDOW, ctx.pivots.length);
+    // 큰 창부터 작은 창 순서다 — 아래 `reduce`가 엄격한 `>`로 비교하므로 비율이 같으면
+    // 먼저 온(더 긴) 창이 남는다.
+    const sizes = Array.from(
+        { length: Math.max(0, largest - TRENDLINE_MIN_WINDOW_PIVOTS + 1) },
+        (_, k) => largest - k
+    );
+    const best = sizes.reduce<{
+        pattern: QualifiedPattern;
+        ratio: number;
+    } | null>((acc, size) => {
         const pattern = qualifyTrendlineWindow(ctx, ctx.pivots.slice(-size));
-        if (pattern === null) continue;
+        if (pattern === null) return acc;
         const ratio = pattern.touches / size;
-        // Sizes run longest first, so a strict `>` keeps the longer window on a tie.
-        if (best === null || ratio > best.ratio) best = { pattern, ratio };
-    }
+        return acc === null || ratio > acc.ratio ? { pattern, ratio } : acc;
+    }, null);
     return best ? [best.pattern] : [];
 }
 
