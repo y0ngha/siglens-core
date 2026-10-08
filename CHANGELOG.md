@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.15.1](https://github.com/y0ngha/siglens-core/compare/v2.15.0...v2.15.1) (2026-10-08)
+
+### Bug Fixes
+
+* 최종 A/B·독립 재검증 후속 — 무효화 지난 패턴 제외, 계산 섹션 서술 금지, 카드 정리, 라운딩 작도 보정 ([#267](https://github.com/y0ngha/siglens-core/issues/267)) ([bbf5374](https://github.com/y0ngha/siglens-core/commit/bbf537493520515f4571ef1daf5e1a4d87c2f242))
+
 # [2.15.0](https://github.com/y0ngha/siglens-core/compare/v2.14.1...v2.15.0) (2026-10-08)
 
 ### Bug Fixes
