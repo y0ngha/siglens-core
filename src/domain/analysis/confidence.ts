@@ -35,7 +35,11 @@ import {
     normalizeTrendline,
 } from '@/domain/analysis/normalize';
 import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
-import { STRATEGY_OVERLAY_KINDS } from '@/domain/overlays/constants';
+import {
+    OVERLAY_ID_PREFIX,
+    STRATEGY_OVERLAY_KINDS,
+    overlayKindOfId,
+} from '@/domain/overlays/constants';
 
 /**
  * @internal
@@ -168,6 +172,64 @@ function findStrategySkill(
     return declaring.length === 1 ? declaring[0] : undefined;
 }
 
+/**
+ * A skill of another declared type (indicator guide, strategy, candlestick,
+ * support/resistance) with no `pattern` id. An untyped skill is not counted:
+ * its kind is unknown.
+ */
+const isNonPatternSkill = (skill: Skill): boolean =>
+    skill.type !== undefined && skill.type !== 'pattern' && !skill.pattern;
+
+type NormalizedPatternCard = Omit<PatternSummary, 'confidenceWeight' | 'id'>;
+
+/**
+ * A pattern card as the UI may show it, or `null` when it is not a chart
+ * pattern at all (2026-10-08 A/B: a trendline reported as a card titled
+ * "Pattern Index Reference" with candidateId `tl:resistance:…`).
+ *
+ * - The card's skill (by `skillName`, then `patternName`) is a pattern (or
+ *   untyped) skill: kept as is. A wrong-kind id on it is rejected later by
+ *   `resolveChartOverlays` (logged in `unknownIds`), which leaves it undrawn
+ *   and target-free.
+ * - Its skill is a known NON-pattern skill (the always-on pattern index, an
+ *   indicator guide, a strategy) — repaired when its `patternName` names a
+ *   pattern skill (skillName 'Pattern Index Reference', patternName 'Cup and
+ *   Handle' → '컵앤핸들'), else when its candidateId is a pattern overlay id
+ *   whose pattern has a skill (`pattern:cup_and_handle:…` → that skill's
+ *   name). Without either it is dropped — its title would be the other
+ *   skill's name and there is no pattern to name it after.
+ * - Its skill is unknown (a pattern outside the catalog the model may add)
+ *   and its candidateId belongs to another overlay kind (`tl:`, `div:`,
+ *   `fib:`, `ew:`): dropped — it describes that drawing, not a pattern.
+ *
+ * Dropped rather than stripped: a card is only a title, a summary and key
+ * prices, and here the title itself is wrong.
+ */
+function patternCardOrNull(
+    p: NormalizedPatternCard,
+    lookup: SkillLookup
+): NormalizedPatternCard | null {
+    const skill = findSkill(lookup, p.skillName, p.patternName);
+    const idKind =
+        p.candidateId === undefined
+            ? undefined
+            : overlayKindOfId(p.candidateId);
+    if (skill === undefined)
+        return idKind === undefined || idKind === 'pattern' ? p : null;
+    if (!isNonPatternSkill(skill)) return p;
+    const patternId =
+        idKind === 'pattern' && p.candidateId !== undefined
+            ? p.candidateId
+                  .slice(OVERLAY_ID_PREFIX.pattern.length)
+                  .split(':')[0]
+            : undefined;
+    const named = [p.patternName, patternId]
+        .filter((name): name is string => name !== undefined)
+        .map(name => findSkill(lookup, name))
+        .find(s => s !== undefined && !isNonPatternSkill(s));
+    return named === undefined ? null : { ...p, skillName: named.name };
+}
+
 /** `${name}_${n}`, where `n` counts earlier occurrences of the same name in `names`. */
 function buildUniqueIds(names: readonly string[]): string[] {
     const ids: string[] = [];
@@ -189,6 +251,9 @@ function buildUniqueIds(names: readonly string[]): string[] {
  * 1. Each array field (`patternSummaries`, `strategyResults`,
  *    `candlePatterns`, `indicatorResults`, `trendlines`) is type-validated
  *    via the corresponding `normalize*` helpers; malformed entries are dropped.
+ *    A pattern card that is not a chart pattern (another skill's name, or an
+ *    unknown name citing another overlay kind's id) is repaired or dropped —
+ *    see {@link patternCardOrNull}.
  * 2. Pattern and strategy entries are looked up in the provided skills (by
  *    `name`, falling back to `pattern`; patterns try `skillName`, then
  *    `patternName`) — ignoring case, whitespace and `-`/`_`. The matching
@@ -225,7 +290,9 @@ export function enrichAnalysisWithConfidence(
     // 모든 배열 필드를 타입 검증하며 정규화한다.
     // 잘못된 항목(null 반환)은 탈락시킨다.
     const patternSummaries = compact(
-        asArray(raw.patternSummaries).map(normalizePatternSummary)
+        compact(asArray(raw.patternSummaries).map(normalizePatternSummary)).map(
+            p => patternCardOrNull(p, lookup)
+        )
     );
     const strategyResults = compact(
         asArray(raw.strategyResults).map(normalizeStrategyResult)
@@ -269,10 +336,7 @@ export function enrichAnalysisWithConfidence(
     );
 
     const enrichedPatterns: PatternResult[] = patternSummaries.map(
-        (
-            p: Omit<PatternSummary, 'confidenceWeight' | 'id'>,
-            index: number
-        ): PatternResult => {
+        (p: NormalizedPatternCard, index: number): PatternResult => {
             const skill = findSkill(lookup, p.skillName, p.patternName);
             return {
                 ...p,

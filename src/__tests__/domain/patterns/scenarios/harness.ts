@@ -59,7 +59,6 @@ export function runPipeline(
     const overlays = buildPatternOverlayCandidates(qualified, bars, atr, 2);
     const section = formatChartPatternCandidatesSection(
         qualified,
-        shapeHints,
         bars,
         atr,
         2,

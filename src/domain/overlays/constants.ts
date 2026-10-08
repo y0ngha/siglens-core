@@ -1,4 +1,8 @@
-import type { ElliottStructure, StrategyOverlayKind } from '@/domain/types';
+import type {
+    ElliottStructure,
+    OverlayKind,
+    StrategyOverlayKind,
+} from '@/domain/types';
 
 // ─── Strategy slots ─────────────────────────────────────────────────────────
 // Record<StrategyOverlayKind, true> makes the compiler reject a missing or an
@@ -37,6 +41,32 @@ export const STRATEGY_KIND_SOURCE_REF: Readonly<{
     fibonacci: 'kind:fibonacci',
     elliott: 'kind:elliott',
 };
+
+// ─── Candidate ids ──────────────────────────────────────────────────────────
+/**
+ * @internal
+ * The prefix each overlay kind's candidate id starts with (`pattern:…`,
+ * `tl:…`, `div:…`, `fib:…`, `ew:…`). The builders write these literals; the
+ * overlay tests pin that every built id starts with its kind's prefix. Read
+ * by {@link overlayKindOfId} — a pattern card citing a `tl:` id is citing a
+ * trendline, not a pattern.
+ */
+export const OVERLAY_ID_PREFIX: Readonly<Record<OverlayKind, string>> = {
+    pattern: 'pattern:',
+    trendline: 'tl:',
+    divergence: 'div:',
+    fibonacci: 'fib:',
+    elliott: 'ew:',
+};
+
+/** @internal The overlay kind a candidate id belongs to by its prefix, or `undefined` for any other string. */
+export function overlayKindOfId(id: string): OverlayKind | undefined {
+    // Keys of OVERLAY_ID_PREFIX are exactly OverlayKind (exhaustive Record);
+    // Object.keys erases that to string[].
+    return (Object.keys(OVERLAY_ID_PREFIX) as OverlayKind[]).find(kind =>
+        id.startsWith(OVERLAY_ID_PREFIX[kind])
+    );
+}
 
 // ─── Level labels ───────────────────────────────────────────────────────────
 /**

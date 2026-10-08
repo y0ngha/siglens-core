@@ -34,6 +34,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         overlayCandidates: [],
         overlayBuildFailures: [],
         patternScreenFailure: null,
+        patternArbitration: { kept: [], dropped: [] },
         patternGeometries: new Map(),
     })),
 }));

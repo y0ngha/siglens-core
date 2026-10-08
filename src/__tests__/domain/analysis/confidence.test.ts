@@ -6,6 +6,7 @@ import {
     EMPTY_ANALYSIS_FALLBACK_SUMMARY,
 } from '@/domain/analysis/confidence';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
+import { alignPatternGeometry } from '@/domain/overlays/resolveChartOverlays';
 import type {
     AnalysisResponse,
     CandlePatternSummary,
@@ -620,6 +621,157 @@ describe('confidence', () => {
                 expect(p?.confidenceWeight).toBe(
                     UNMATCHED_SKILL_CONFIDENCE_WEIGHT
                 );
+            });
+        });
+
+        // 2026-10-08 A/B (SOFI): a trendline came back as a pattern card
+        // titled "Pattern Index Reference" with candidateId `tl:resistance:…`.
+        describe('a pattern card that is not a chart pattern', () => {
+            const index = makeSkill({
+                name: 'Pattern Index Reference',
+                type: 'indicator_guide',
+            });
+            const cup = makeSkill({
+                name: '컵앤핸들',
+                type: 'pattern',
+                pattern: 'cup_and_handle',
+            });
+            const skills = [index, cup];
+            const cards = (...raw: RawPatternSummary[]) =>
+                enrichAnalysisWithConfidence(
+                    makeAnalysisResponse({ patternSummaries: raw }),
+                    skills
+                ).patternSummaries;
+
+            it('is dropped when its skill is the pattern index and it cites a trendline', () => {
+                const result = cards(
+                    makePatternSummary({
+                        patternName: '하락 저항 추세선',
+                        skillName: 'Pattern Index Reference',
+                        candidateId: 'tl:resistance:1783641600:1786924800',
+                    }),
+                    makePatternSummary({
+                        patternName: '컵앤핸들',
+                        skillName: '컵앤핸들',
+                    })
+                );
+                expect(result.map(p => p.skillName)).toEqual(['컵앤핸들']);
+                // Ids are built after the drop: no gap, no stray card id.
+                expect(result[0].id).toBe('컵앤핸들_0');
+            });
+
+            it('is dropped when its skill is another non-pattern skill and it cites no pattern', () => {
+                expect(
+                    cards(
+                        makePatternSummary({
+                            skillName: 'Pattern Index Reference',
+                        })
+                    )
+                ).toEqual([]);
+            });
+
+            it('is repaired when it cites a pattern overlay whose pattern has a skill', () => {
+                const [card] = cards(
+                    makePatternSummary({
+                        patternName: '컵앤핸들',
+                        skillName: 'Pattern Index Reference',
+                        candidateId: 'pattern:cup_and_handle:1778716800',
+                    })
+                );
+                expect(card.skillName).toBe('컵앤핸들');
+                expect(card.candidateId).toBe(
+                    'pattern:cup_and_handle:1778716800'
+                );
+                expect(card.confidenceWeight).toBe(cup.confidenceWeight);
+            });
+
+            it('is repaired from its patternName when that names a pattern skill, and as unlisted it loses its geometry', () => {
+                const enriched = enrichAnalysisWithConfidence(
+                    makeAnalysisResponse({
+                        patternSummaries: [
+                            makePatternSummary({
+                                patternName: 'Cup and Handle',
+                                skillName: 'Pattern Index Reference',
+                                geometry: {
+                                    breakoutLevel: 208.33,
+                                    extremeLevel: 139.11,
+                                    direction: 'up',
+                                },
+                            }),
+                        ],
+                    }),
+                    skills
+                );
+                const [card] = enriched.patternSummaries;
+                expect(card.skillName).toBe('컵앤핸들');
+                expect(card.candidateId).toBeUndefined();
+                // No pattern overlay resolves to it: alignPatternGeometry
+                // strips the model's geometry (no target for an undrawn card).
+                const [aligned] = alignPatternGeometry(
+                    enriched,
+                    [],
+                    new Map()
+                ).patternSummaries;
+                expect(aligned.skillName).toBe('컵앤핸들');
+                expect(aligned.geometry).toBeUndefined();
+            });
+
+            it('is dropped when it cites a pattern overlay with no skill', () => {
+                expect(
+                    cards(
+                        makePatternSummary({
+                            skillName: 'Pattern Index Reference',
+                            candidateId: 'pattern:rectangle:1778716800',
+                        })
+                    )
+                ).toEqual([]);
+            });
+
+            it.each([
+                'tl:support:1:2',
+                'fib:short:1',
+                'ew:up:1:5',
+                'div:rsi_bullish:1',
+            ])(
+                'an unknown name citing another overlay kind (%s) is dropped',
+                id => {
+                    expect(
+                        cards(
+                            makePatternSummary({
+                                patternName: 'Descending Resistance Trendline',
+                                skillName: 'Descending Resistance Trendline',
+                                candidateId: id,
+                            })
+                        )
+                    ).toEqual([]);
+                }
+            );
+
+            it('an unknown name with no id or a pattern id is kept (a pattern outside the catalog)', () => {
+                expect(
+                    cards(
+                        makePatternSummary({
+                            patternName: 'Diamond',
+                            skillName: 'Diamond',
+                        }),
+                        makePatternSummary({
+                            patternName: 'Diamond',
+                            skillName: 'Diamond',
+                            candidateId: 'pattern:diamond:1',
+                        })
+                    )
+                ).toHaveLength(2);
+            });
+
+            it('a pattern skill card citing another kind keeps its card (the resolver rejects the id)', () => {
+                const [card] = cards(
+                    makePatternSummary({
+                        patternName: '컵앤핸들',
+                        skillName: '컵앤핸들',
+                        candidateId: 'tl:support:1:2',
+                    })
+                );
+                expect(card.skillName).toBe('컵앤핸들');
             });
         });
 

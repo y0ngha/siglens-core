@@ -1,12 +1,16 @@
 import type { OverlayCandidate, OverlayKind } from '@/domain/types';
+import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 
 /** @internal Section header — referenced verbatim by the writing rules in prompt.ts. */
 export const CHART_OVERLAY_CANDIDATES_SECTION_HEADER =
     '## Chart Overlay Candidates (computed)';
 
-/** @internal */
-export const CHART_OVERLAY_CANDIDATES_SECTION_INTRO =
-    'Logic-computed drawings. When a result item relies on one, copy its id into that item (trendlineIds / strategyResults[].candidateIds). Never invent an id and never write coordinates — the app draws from these ids.';
+/**
+ * @internal Model-facing: says what the lines are, not how they were found —
+ * "Logic-computed" invited "계산된 후보가 없어 …" narration (2026-10-08 A/B).
+ * How to write about them is `COMPUTED_SECTIONS_RULES` in prompt.ts.
+ */
+export const CHART_OVERLAY_CANDIDATES_SECTION_INTRO = `Lines, legs and wave counts measured from the bars. When a result item relies on one, copy its id into that item (trendlineIds / strategyResults[].candidateIds). Never invent an id and never write coordinates — the app draws from these ids. Write about them as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says.`;
 
 const GROUPS: ReadonlyArray<[Exclude<OverlayKind, 'pattern'>, string]> = [
     ['trendline', '### Trendlines'],

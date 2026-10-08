@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { PivotPoint } from '@/domain/types';
 import type { QualifyContext } from '@/domain/patterns/qualify/context';
-import { qualifyCup } from '@/domain/patterns/qualify/curves';
+import { qualifyCup, qualifyRounding } from '@/domain/patterns/qualify/curves';
+import { fitQuadratic } from '@/domain/patterns/classifiers';
+import {
+    CURVATURE_VERTEX_MID_HI,
+    CURVATURE_VERTEX_MID_LO,
+} from '@/domain/patterns/constants';
 import { arbitrate } from '@/domain/patterns/qualify/arbitrate';
 import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
 
@@ -140,5 +145,100 @@ describe('qualifyCup — both sides deep enough', () => {
 
     it('does not when the left side is 3.0 deep, under the floor, although the right side is 3.7', () => {
         expect(qualifyCup(shallowCtx(103))).toEqual([]);
+    });
+});
+
+/**
+ * A saucer whose closes (= lows here) run 3 under the rim highs: rims 120
+ * (bar 10) and 119.5 (bar 70), lows on 100 + 17·((i − 40)/30)², bottom 100
+ * at bar 40. The quadratic fitted on the closes starts and ends near 117.
+ */
+function saucerCtx(bottomAt = 40): QualifyContext {
+    const U = (i: number): number => 100 + 17 * ((i - bottomAt) / 30) ** 2;
+    const bars = makeHLBars(
+        Array.from({ length: 76 }, (_, i): [number, number] => {
+            if (i < 10) return [111, 110];
+            if (i === 10) return [120, U(i)];
+            if (i === 70) return [119.5, U(i)];
+            if (i > 70) return [117.5, 117];
+            return [U(i) + 0.5, U(i)];
+        })
+    );
+    return {
+        bars,
+        pivots: [
+            piv(10, 120, 'high'),
+            piv(bottomAt, 100, 'low'),
+            piv(70, 119.5, 'high'),
+        ],
+        atr: 1,
+        lastIndex: 75,
+        minHeightPricePct: 0.03,
+    };
+}
+
+describe('qualifyRounding — the drawn arc runs through the printed points', () => {
+    const [rounding] = qualifyRounding(saucerCtx(), 'bottom');
+    const arc = rounding?.shape.kind === 'rounding' ? rounding.shape.arc : [];
+
+    it('qualifies', () => {
+        expect(rounding?.id).toBe('rounding_bottom');
+    });
+
+    it('starts on the left rim, ends on the right rim and bottoms at the extreme bar', () => {
+        expect(arc[0]).toEqual({ index: 10, price: 120 });
+        expect(arc.at(-1)).toEqual({ index: 70, price: 119.5 });
+        expect(arc).toContainEqual({ index: 40, price: 100 });
+        expect(Math.min(...arc.map(p => p.price))).toBe(100);
+    });
+
+    it('falls to the extreme and rises after it', () => {
+        const left = arc.filter(p => p.index <= 40);
+        const right = arc.filter(p => p.index >= 40);
+        left.slice(1).forEach((p, i) =>
+            expect(p.price).toBeLessThan(left[i].price)
+        );
+        right
+            .slice(1)
+            .forEach((p, i) => expect(p.price).toBeGreaterThan(right[i].price));
+    });
+});
+
+describe('qualifyRounding — the extreme bar sits in the middle half of the span', () => {
+    // Span 10..70: the middle half is bars 25..55.
+    it.each([
+        [25, true],
+        [55, true],
+        [24, false],
+        [56, false],
+    ])('bottom at bar %i → qualifies: %s', (bottomAt, ok) => {
+        const ctx = saucerCtx(40);
+        // Move only the extreme bar; the fit (closes) keeps its centred vertex.
+        const bars = ctx.bars.map((b, i) =>
+            i === bottomAt ? { ...b, low: 99, close: b.close } : b
+        );
+        const out = qualifyRounding(
+            {
+                ...ctx,
+                bars,
+                pivots: [
+                    piv(10, 120, 'high'),
+                    piv(bottomAt, 99, 'low'),
+                    piv(70, 119.5, 'high'),
+                ],
+            },
+            'bottom'
+        );
+        // Only the extreme bar moves: the closes the quadratic is fitted on
+        // are unchanged, so the fitted-vertex check passes in every case and
+        // the outcome is the extreme-bar check alone.
+        const fit = fitQuadratic(
+            bars.slice(10, 71).map((b, x) => ({ x, y: b.close }))
+        );
+        if (fit === null) throw new Error('no fit');
+        const vertex = -fit.b / (2 * fit.a);
+        expect(vertex).toBeGreaterThanOrEqual(60 * CURVATURE_VERTEX_MID_LO);
+        expect(vertex).toBeLessThanOrEqual(60 * CURVATURE_VERTEX_MID_HI);
+        expect(out.length === 1).toBe(ok);
     });
 });

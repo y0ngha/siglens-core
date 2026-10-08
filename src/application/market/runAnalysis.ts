@@ -426,6 +426,7 @@ async function runAnalysisImpl(
         overlayCandidates,
         overlayBuildFailures,
         patternScreenFailure,
+        patternArbitration,
         patternGeometries,
     } = buildAnalysisPrompt(
         symbol,
@@ -450,6 +451,17 @@ async function runAnalysisImpl(
             symbol,
             timeframe,
             error: patternScreenFailure,
+        });
+    }
+    // Which drawings the overlap arbitration removed, and what each lost to
+    // (spec 2026-10-07 §8: one shared pivot now counts as an overlap, and its
+    // losers were never counted). Info, not a warning — dropping is the rule.
+    if (patternArbitration.dropped.length > 0) {
+        console.info('[ChartPatterns] arbitration dropped', {
+            symbol,
+            timeframe,
+            kept: patternArbitration.kept,
+            dropped: patternArbitration.dropped,
         });
     }
 

@@ -106,6 +106,7 @@ import {
     CHART_OVERLAY_CANDIDATES_SECTION_HEADER,
     formatChartOverlayCandidatesSection,
 } from '@/domain/analysis/chartOverlayCandidatesSection';
+import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     candidateGeometries,
@@ -1640,6 +1641,32 @@ const buildFieldGuidanceBody = (): string =>
     ].join('\n');
 
 /**
+ * @internal
+ * How to write about the computed pattern and overlay sections — one rule
+ * for all of them (patterns, trendlines, divergences, Fibonacci, Elliott).
+ * The 2026-10-08 real-model A/B found the process retold in user-facing text:
+ * the pattern list ("확정 경계 없는 모양 유사 수준으로만 잡혀 있어 …검출되지 않은 것으로
+ * 정리했습니다") and the Elliott candidates ("규칙 검증을 통과한 계산된 파동 후보가
+ * 없어", "계산된 후보의 목표가가 없습니다"). A per-section sentence only covered
+ * the pattern list. Scoped to those two sections on purpose, and it forbids
+ * narrating the sections, not stating a gap — other rules REQUIRE saying
+ * when something is missing (`src/domain/CLAUDE.md#DOM-9` — rules never
+ * contradict): ## Deterministic Metrics says when its tally could not be
+ * measured, the anti-fabrication line says when a level is not present
+ * (`ANTI_FABRICATION_GUARDRAIL`), and the action plan states a missing
+ * entry trigger, exit reference or price as a gap. Those gaps are stated in
+ * plain terms; only "the computed list has no X" is out.
+ *
+ * The second line covers the raw status codes the pattern blocks print — a
+ * card read "형성 중 (forming)" — the same way the Deterministic Metrics
+ * rule keeps engine labels out of the answer.
+ */
+export const COMPUTED_SECTIONS_RULES: readonly string[] = [
+    `- ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} and ${CHART_OVERLAY_CANDIDATES_SECTION_HEADER} (trendlines, divergences, Fibonacci legs, Elliott waves) are measurements to use, not findings to report. In every output field describe only what the price did — its swings, touches, levels, legs and waves. Do not narrate the sections themselves: never mention candidates, screening, validation, rule checks, scores or a computed list, and never say why something is or is not listed or that a computed list lacks something. When a field needs a level, target or entry the data does not hold, state that gap in plain terms (e.g. there is no clear support below the price) rather than as a missing computed item. When you give your own read (an Elliott count, a level you identified), present it simply as your reading of the bars.`,
+    "- A listed pattern's status (`forming`, `broken`, `failed breakout`) and direction (`up`, `down`) are internal codes: state what they mean in the answer language and never print the English code itself, not even in parentheses.",
+];
+
+/**
  * 분석 가이드라인. **세 줄이 출력 언어에 묶여 있다** — keyPrices 라벨 언어와
  * Step 3의 산문 언어 지시다. 프롬프트 말미 리마인더는 "필드 설명"을 덮으려고
  * 만든 것이라, 이렇게 과업 규칙으로 적힌 지시까지 뒤집는다고 볼 수 없다
@@ -1651,7 +1678,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '',
         '### Name Field Matching',
         '- strategyName and indicatorName MUST exactly match a skill name from Writing Rules below. Copy verbatim — never translate, abbreviate, or use empty strings. Omit the entry if no matching skill exists.',
-        "- skillName follows the same exact-match rule for every listed Skills pattern entry. The one exception is an unlisted chart pattern you add yourself (see the patternSummaries section below) — for those, skillName is the pattern's standard English name instead.",
+        "- skillName follows the same exact-match rule for every listed Skills pattern entry. The one exception is an unlisted chart pattern you add yourself (see the patternSummaries section below) — for those, skillName is the pattern's catalog id as the Pattern Index lists it (e.g. cup_and_handle), or its standard English name when it is outside the catalog — never the name of the Pattern Index or of any other skill.",
         '',
         '### Skills Are Guidance, Not a Boundary',
         '- The injected skills are not an exhaustive catalog of every valid technical concept. You may use other well-established technical concepts in the summary and other prose fields when the provided data actually supports them — never invent data to justify one.',
@@ -1660,6 +1687,9 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Computed figures in this prompt (## Indicator State, ## Market Reference distances and tables, ## Chart Pattern Candidates, ## Deterministic Metrics, and the app-computed pattern targets and risk:reward line) must be quoted as given, never recomputed.',
         '- In prose you may do simple arithmetic from numbers that appear in this prompt when no computed figure covers it (e.g. the distance to a level you identified yourself); keep percentages to one decimal place.',
         "- Structured price fields (keyLevels, priceTargets, entryPrices, stopLoss, takeProfitPrices, geometry) take only prices that appear in the data — never a price you derived arithmetically. Far Fibonacci and pivot levels are in the `Fib table:`, `Fib ABC table:` and `Pivot table:` lines of ## Market Reference. The one permitted derivation: geometry.extremeLevel may be the average of the pattern's own peaks/troughs when the pattern's definition calls for it (double/triple tops and bottoms) — every other structured price must appear in the data.",
+        '',
+        COMPUTED_SECTIONS_HEADING,
+        ...COMPUTED_SECTIONS_RULES,
         '',
         '### Regular Skills Usage',
         '- Skills shown in ## Active Skills are context-only regular skills without a dedicated structured output field.',
@@ -1850,10 +1880,10 @@ const buildAnalysisRequest = (
                   '- patternSummaries must include detection results for **every** Skills pattern listed below.',
                   '- For each Skills pattern, assess whether it is detected in the current chart data and set the detected value accordingly.',
                   '- Patterns that are not detected must still be included with detected: false.',
-                  `- In summary and every other text field, describe a pattern only by what the price did (its swings, touches and levels). Never describe how ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} was produced, what it lists or leaves out, or why — the reader sees the chart, not this prompt.`,
-                  "- You may also add any other chart pattern you can clearly see in the bars — one from the Pattern Index that was not listed here, or a well-established pattern outside the catalog (e.g. broadening formation, diamond, island reversal) — as a detected: true entry. For such an entry set skillName to the pattern's standard English name (the Pattern Index name when it is in the catalog), ground every key price in the bars, and set candidateId and geometry to null. Do not add detected: false entries for unlisted patterns.",
+                  `- In summary and every other text field, write about patterns as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says — the reader sees the chart, not this prompt.`,
+                  "- You may also add any other chart pattern you can clearly see in the bars — one from the Pattern Index that was not listed here, or a well-established pattern outside the catalog (e.g. broadening formation, diamond, island reversal) — as a detected: true entry. For such an entry set skillName to the pattern's catalog id as the Pattern Index lists it (e.g. cup_and_handle) — or its standard English name when it is outside the catalog, never the name of the Pattern Index or of any other skill — ground every key price in the bars, and set candidateId and geometry to null. Do not add detected: false entries for unlisted patterns.",
                   '- **Do not include candle patterns (single/multi candle) in patternSummaries** — e.g. tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns, even when you add patterns beyond the listed ones. Candle patterns belong only in candlePatterns.',
-                  '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. For a listed Skills pattern it MUST exactly match its pattern skill name from the list below; for an additional pattern you add, use its standard English name as described above.',
+                  '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. For a listed Skills pattern it MUST exactly match its pattern skill name from the list below; for an additional pattern you add, use its catalog id or standard English name as described above.',
                   // Schema §3.5 dedup: the response schema's `required`
                   // list only API-enforces this for the forced-tool providers
                   // (Gemini/OpenAI/haiku). The thinking-Claude path (sonnet/opus,
@@ -1867,7 +1897,7 @@ const buildAnalysisRequest = (
                   `- Never compute a measured or conservative target yourself — the app derives both from geometry, and only for a pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}.`,
                   `- Only a detected: true pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} carries geometry: { breakoutLevel, extremeLevel, direction, invalidationLevel? }. breakoutLevel = the neckline/boundary/rim/handle resistance/flag channel edge the pattern breaks through; extremeLevel = the textbook measured-move anchor (head, peak/trough average, cup/saucer bottom, flagpole start, or the opposite boundary); direction = the expected breakout direction ("up" or "down"); invalidationLevel = the right-shoulder high / second peak / opposite boundary / handle low, when you can name one.`,
                   '- Copy its breakout level / extreme level / direction / invalidation level from that section verbatim rather than re-reading the chart.',
-                  `- Every other pattern — detected: false, an unconfirmed shape resemblance, or one you read from the bars that has no Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} — sets geometry to null; describe its structure with keyPrices instead.`,
+                  `- Every other pattern — detected: false, or one you read from the bars that has no Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} — sets geometry to null; describe its structure with keyPrices instead.`,
                   '',
                   '### candidateId Writing Rules',
                   `- For a detected: true pattern that matches a candidate in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}, set candidateId to that candidate's "Candidate id" verbatim.`,
@@ -2075,6 +2105,7 @@ interface ChartPatternScreen extends PatternQualification {
 const NO_CHART_PATTERNS: ChartPatternScreen = {
     qualified: [],
     shapeHints: [],
+    arbitrationDropped: [],
     selectionIds: [],
     failure: null,
 };
@@ -2091,7 +2122,8 @@ function describeThrown(error: unknown): string {
  * selection, `## Chart Pattern Candidates (computed)` and the pattern
  * overlays (spec 2026-09-18: the screener used to run twice per prompt
  * build). The loose pre-screener (`screenChartPatterns`) only feeds skill
- * selection and the shape hints; `qualifyPatterns` decides what is drawn,
+ * selection (its unqualified hits are the shape hints, which never reach the
+ * model-facing text); `qualifyPatterns` decides what is drawn,
  * printed with numbers and offered as a Candidate id, and has already
  * dropped hits the price failed or fulfilled (spec 2026-10-07). Skill
  * selection sees the qualified ids and the shape hints, so a drawn pattern's
@@ -2114,7 +2146,7 @@ const screenPatternCandidatesSafely = (
 ): ChartPatternScreen => {
     if (atr === null || atr <= 0) return NO_CHART_PATTERNS;
     try {
-        const { qualified, shapeHints } = qualifyPatterns(
+        const { qualified, shapeHints, arbitrationDropped } = qualifyPatterns(
             screenChartPatterns(bars, atr, atrSeries),
             bars,
             atr,
@@ -2124,6 +2156,7 @@ const screenPatternCandidatesSafely = (
         return {
             qualified,
             shapeHints,
+            arbitrationDropped,
             selectionIds: [
                 ...new Set([...qualified.map(q => q.id), ...shapeHints]),
             ],
@@ -2341,7 +2374,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   market profile (see {@link CurrencyCode} — core never derives it from the
  *   symbol). Drives the listing framing sentence and price precision (`KRW` →
  *   whole won). Defaults to `'USD'`.
- * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2594,7 +2627,6 @@ export function buildAnalysisPrompt(
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatChartPatternCandidatesSection(
             patternCandidates,
-            chartPatterns.shapeHints,
             bars,
             atrForPatternGeometry,
             priceDp,
@@ -2648,6 +2680,15 @@ export function buildAnalysisPrompt(
         overlayCandidates,
         overlayBuildFailures,
         patternScreenFailure: chartPatterns.failure,
+        patternArbitration: {
+            kept: patternCandidates.map(q => q.id),
+            dropped: chartPatterns.arbitrationDropped.map(d => ({
+                id: d.id,
+                startTime: bars[d.startIndex].time,
+                endTime: bars[d.endIndex].time,
+                lostTo: d.lostTo,
+            })),
+        },
         patternGeometries: printedPatternGeometriesByOverlayId(
             patternCandidates,
             bars,

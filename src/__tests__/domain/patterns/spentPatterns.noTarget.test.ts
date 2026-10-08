@@ -44,8 +44,12 @@ describe('isSpentPattern — a measured target at or below zero', () => {
         expect(
             isSpentPattern(pattern, geometry, bars([12, 12, 12, 7.5]), 1)
         ).toBe(true);
+        // Any close under it fails it, even one that came back above.
         expect(
-            isSpentPattern(pattern, geometry, bars([12, 12, 12, 7.9]), 1)
+            isSpentPattern(pattern, geometry, bars([12, 12, 7.9, 12]), 1)
+        ).toBe(true);
+        expect(
+            isSpentPattern(pattern, geometry, bars([12, 12, 8, 12]), 1)
         ).toBe(false);
     });
 });

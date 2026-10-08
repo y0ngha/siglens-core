@@ -3,7 +3,6 @@ import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     CHART_PATTERN_CANDIDATES_SECTION_INTRO,
     NO_CHART_PATTERNS_LINE,
-    SHAPE_RESEMBLANCES_LABEL,
     formatChartPatternCandidatesSection,
     isFailedBreakout,
     printedPatternGeometriesByOverlayId,
@@ -19,10 +18,10 @@ import {
     buildPatternOverlayCandidates,
     patternOverlayId,
 } from '@/domain/overlays/patternOverlays';
+import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 import { makeBars } from '@/__tests__/domain/patterns/helpers';
 import type {
     Bar,
-    ChartPatternId,
     PatternGeometry,
     PivotPoint,
     QualifiedPattern,
@@ -66,13 +65,11 @@ const render = (
     atr: number | null,
     opts: {
         priceDp?: number;
-        hints?: readonly ChartPatternId[];
         offered?: ReadonlySet<string>;
     } = {}
 ): string =>
     formatChartPatternCandidatesSection(
         candidates,
-        opts.hints ?? [],
         bars,
         atr,
         opts.priceDp ?? 2,
@@ -145,45 +142,34 @@ const undirectedRectangle: QualifiedPattern = {
 };
 
 describe('formatChartPatternCandidatesSection', () => {
-    it('renders the no-pattern line when nothing qualified and nothing was hinted', () => {
+    it('renders the no-pattern line when nothing qualified', () => {
         expect(render([], makeBars([1]), null)).toBe(
             `${CHART_PATTERN_CANDIDATES_SECTION_HEADER}\n${CHART_PATTERN_CANDIDATES_SECTION_INTRO}\n${NO_CHART_PATTERNS_LINE}`
         );
     });
 
-    it('names every pre-screener hit that did not qualify on one shape-resemblance line, with no id and no numbers', () => {
-        const section = render([], makeBars([1, 2, 3]), 1, {
-            hints: ['ascending_triangle', 'double_top'],
-        });
-        expect(section).toBe(
-            [
-                CHART_PATTERN_CANDIDATES_SECTION_HEADER,
-                CHART_PATTERN_CANDIDATES_SECTION_INTRO,
-                `- ${SHAPE_RESEMBLANCES_LABEL}: ascending_triangle, double_top`,
-            ].join('\n')
-        );
-    });
-
-    it('the intro tells the model a shape resemblance is reported as not detected, with no levels', () => {
-        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
-            '"Unconfirmed shape resemblances"'
-        );
-        expect(
-            SHAPE_RESEMBLANCES_LABEL.startsWith(
-                'Unconfirmed shape resemblances'
-            )
-        ).toBe(true);
-        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
-            'report it as detected: false and give no levels'
-        );
+    it('the intro tells the model to leave candidateId empty for an unlisted pattern', () => {
         expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
             'leave candidateId empty'
         );
     });
 
-    it('the intro forbids describing how the section was produced', () => {
+    // 2026-10-08 A/B: 4 of 18 summaries retold the one-line list of
+    // unconfirmed shape resemblances. The section names no pattern beyond
+    // the listed ones and the intro does not mention such a list.
+    it('names no shape resemblance — neither a line nor the intro', () => {
+        expect(
+            CHART_PATTERN_CANDIDATES_SECTION_INTRO.toLowerCase()
+        ).not.toContain('resemblance');
+        const f = ascendingTriangle as Fixture;
+        const section = render(qualifiedOf(f), f.bars, f.atr);
+        expect(section.toLowerCase()).not.toContain('resemblance');
+        expect(section.split('\n').at(-1)).toMatch(/^- Invalidation level: /);
+    });
+
+    it('the intro points to the general rule on writing about computed sections', () => {
         expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
-            'never describe how this section was produced or why a pattern is or is not in it'
+            `${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines`
         );
     });
 
@@ -194,19 +180,17 @@ describe('formatChartPatternCandidatesSection', () => {
         'no rendered line of the section says "%s"',
         word => {
             const f = ascendingTriangle as Fixture;
-            const section = render(qualifiedOf(f), f.bars, f.atr, {
-                hints: ['triple_top'],
-            });
+            const section = render(qualifiedOf(f), f.bars, f.atr);
             const none = render([], makeBars([1]), null);
             expect(section.toLowerCase()).not.toContain(word);
             expect(none.toLowerCase()).not.toContain(word);
         }
     );
 
-    it('renders a qualified pattern with its computed numbers, % distances and Candidate id, hints after it', () => {
+    it('renders a qualified pattern with its computed numbers, % distances and Candidate id', () => {
         const f = ascendingTriangle as Fixture;
         const q = qualifiedOf(f);
-        const section = render(q, f.bars, f.atr, { hints: ['triple_top'] });
+        const section = render(q, f.bars, f.atr);
         const tri = block(section, 'ascending_triangle');
         const g = computeCandidateGeometry(q[0], f.bars, f.atr);
         if (g === null || g.direction === null) throw new Error('undirected');
@@ -224,9 +208,6 @@ describe('formatChartPatternCandidatesSection', () => {
             `- Invalidation level: ${p.invalidationLevel!.toFixed(2)}`
         );
         expect(tri).toMatch(/- Key points: resistance touch 1 /);
-        expect(
-            section.endsWith(`- ${SHAPE_RESEMBLANCES_LABEL}: triple_top`)
-        ).toBe(true);
     });
 
     it('prints the Spacing line right after Key points for a double top', () => {

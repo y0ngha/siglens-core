@@ -964,7 +964,9 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // p25 (2026-10-08 A/B 후속): 차트 패턴 섹션이 목록을 만드는 과정을 말하지 않고
         // (모델이 "사전 스크리너"·"그리기 검증"을 사용자 문장에 옮겨 적었다), 형태만 닮은
         // 패턴은 "Unconfirmed shape resemblances" 한 줄로 묶는다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p25');
+        // p26 (2026-10-08 최종 A/B 후속): 형태 유사 줄 제거, 계산 섹션 서술의
+        // 일반 규칙·상태 코드 규칙, 무효화를 넘은 종가(슬랙 없음)가 있는 패턴 제외, 라운딩 극값 위치·곡선 재고정.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p26');
     });
 });
 

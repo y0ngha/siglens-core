@@ -354,7 +354,15 @@ describe('buildAgentSystemPrompt', () => {
             'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-08.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-08.2');
+    });
+
+    // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
+    // the time, so a copied example could not be told from a real answer.
+    it('예시 가격은 실제 종목과 겹치지 않는 합성 숫자다', () => {
+        expect(prompt).toContain('위로는 123,400원을 거래량과 함께 넘기면');
+        expect(prompt).toContain('위로 123,400원, 아래로 118,700원을 기준으로');
+        expect(prompt).not.toMatch(/279,000|265,000/);
     });
 
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */

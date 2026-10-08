@@ -459,7 +459,8 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     },
                     // Id of the `## Chart Pattern Candidates (computed)` block
                     // this pattern was confirmed from (spec 2026-09-28 §2.3);
-                    // `null` for a pattern the pre-screener did not list.
+                    // `null` for a pattern that section does not list (the
+                    // qualified patterns only — not the loose pre-screener).
                     candidateId: { type: ['string', 'null'] },
                     confidenceWeight: { type: 'number' },
                     renderConfig: {

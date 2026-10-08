@@ -62,6 +62,25 @@ export interface Contender {
  * wins, then more touches, then the more recent end.
  */
 export function arbitrate(contenders: readonly Contender[]): Contender[] {
+    return arbitrateWithLosers(contenders).kept;
+}
+
+/** @internal A hit {@link arbitrate} dropped, and the kept hit it lost to. */
+export interface ArbitrationLoss {
+    loser: Contender;
+    winner: Contender;
+}
+
+/**
+ * @internal
+ * {@link arbitrate}, also returning each dropped hit with the first kept hit
+ * that overlapped it — for logging which drawings the one-pivot overlap rule
+ * removes (spec 2026-10-07 §8: that rule's losers were never counted).
+ */
+export function arbitrateWithLosers(contenders: readonly Contender[]): {
+    kept: Contender[];
+    dropped: ArbitrationLoss[];
+} {
     const ordered = contenders.toSorted(
         (a, b) =>
             ARBITRATION_RANK[a.pattern.id] - ARBITRATION_RANK[b.pattern.id] ||
@@ -69,10 +88,13 @@ export function arbitrate(contenders: readonly Contender[]): Contender[] {
             b.pattern.endIndex - a.pattern.endIndex
     );
     const kept: Contender[] = [];
+    const dropped: ArbitrationLoss[] = [];
     for (const contender of ordered) {
-        if (!kept.some(k => overlaps(k, contender))) kept.push(contender);
+        const winner = kept.find(k => overlaps(k, contender));
+        if (winner === undefined) kept.push(contender);
+        else dropped.push({ loser: contender, winner });
     }
-    return kept;
+    return { kept, dropped };
 }
 
 function overlaps(a: Contender, b: Contender): boolean {

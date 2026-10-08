@@ -690,6 +690,9 @@ the test proves nothing:
 Verify by reverting the guard (or flipping the sign): the test must fail. When a value is
 set per builder, pin it per builder.
 
+A guard added to block a specific false positive gets a near-miss fixture of that case,
+and mirrored branches (left/right edge, bullish/bearish) each get their own.
+
 <a id="TE-6"></a>
 #### TE-6 — Test inclusive and exclusive boundaries on the boundary
 
@@ -717,6 +720,11 @@ Do not wrap assertions in `if (row)`: assert the row exists, then its value. A l
 may `continue` asserts a count showing it checked something. Cover both signs or
 directions of a rule, and mutation-check wiring tests so they fail when the wiring is
 removed.
+
+Numeric assertions must fail on `NaN`: `toBe(Math.min(a, b))` passes for `NaN` (`Object.is`),
+so assert `Number.isFinite(x)` plus a bound. Every advertised gate constant has a near-miss
+row on each side of the threshold; a constant that can be mutated with all tests green is
+untested.
 
 <a id="TE-11"></a>
 #### TE-11 — Mock time for date-dependent code
