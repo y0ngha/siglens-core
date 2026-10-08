@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.14.1](https://github.com/y0ngha/siglens-core/compare/v2.14.0...v2.14.1) (2026-10-08)
+
+### Bug Fixes
+
+* 차트 패턴 작도를 엄격한 자격 판정으로 분리해 교과서 정의를 지키게 한다 ([#264](https://github.com/y0ngha/siglens-core/issues/264)) ([7e18e4c](https://github.com/y0ngha/siglens-core/commit/7e18e4c9fecb8c955fe40a70c2d465c9c454243b))
+
 # [2.14.0](https://github.com/y0ngha/siglens-core/compare/v2.13.1...v2.14.0) (2026-10-06)
 
 ### Performance Improvements
