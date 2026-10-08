@@ -17,10 +17,10 @@ import { AGENT_FOLLOW_UP_MARKER } from './agentFollowUps';
  * must not interpolate anything that varies per request (the follow-up marker is
  * a module constant, so interpolating it keeps the text static).
  *
- * 2026-10-08: politeness, formatting, placeholder-noun, connector, closing-line
- * and answer-language rules ported from the no-ai-slop bilingual update after a
- * real-LLM A/B (blind readers preferred the new answers 22:6-7 of 32 pairs;
- * required-tool calls unchanged).
+ * The politeness, formatting, placeholder-noun, connector, closing-line and
+ * answer-language rules each fixed a pattern measured in real answers; reword
+ * them only with a fresh real-LLM A/B, since small wording changes moved the
+ * measured rates (see the PUBLIC_API changelog).
  *
  * Wording only: it must never override a Depth or Output rule (the Plain
  * closing lines, the one-line caveat, the source line). The first bullet says
