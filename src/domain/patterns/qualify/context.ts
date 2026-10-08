@@ -3,11 +3,18 @@
  * 2026-10-07). Each family lives in its own file next to this one; the facade
  * is `qualifyPatterns.ts`.
  */
-import type { Bar, PatternPoint, PivotPoint } from '@/domain/types';
+import type {
+    Bar,
+    PatternBreakoutDirection,
+    PatternPoint,
+    PivotPoint,
+} from '@/domain/types';
 import {
     PATTERN_MAX_AGE_MIN_BARS,
     PATTERN_MAX_AGE_SPAN_SHARE,
     PATTERN_MIN_HEIGHT_ATR,
+    PRIOR_TREND_BARS,
+    PRIOR_TREND_MIN_ATR,
 } from '@/domain/patterns/constants';
 
 /**
@@ -80,16 +87,43 @@ export function lowestConfirmedLowAfter(
 
 /**
  * @internal
+ * Most bars a pattern spanning `span` bars may end before the last bar and
+ * still be current — see `PATTERN_MAX_AGE_MIN_BARS`.
+ */
+export function maxAgeBars(span: number): number {
+    return Math.max(
+        PATTERN_MAX_AGE_MIN_BARS,
+        PATTERN_MAX_AGE_SPAN_SHARE * span
+    );
+}
+
+/**
+ * @internal
  * Whether a pattern spanning `span` bars and ending at `lastIndex` is still
- * current — see `PATTERN_MAX_AGE_MIN_BARS`.
+ * current ({@link maxAgeBars}).
  */
 export function isRecent(
     ctx: QualifyContext,
     lastIndex: number,
     span: number
 ): boolean {
-    return (
-        ctx.lastIndex - lastIndex <=
-        Math.max(PATTERN_MAX_AGE_MIN_BARS, PATTERN_MAX_AGE_SPAN_SHARE * span)
-    );
+    return ctx.lastIndex - lastIndex <= maxAgeBars(span);
+}
+
+/**
+ * @internal
+ * §3.2: the close change over the `PRIOR_TREND_BARS` bars before `start`
+ * sets the direction once it reaches `PRIOR_TREND_MIN_ATR`·ATR; otherwise
+ * the direction stays undetermined (`null`). Boundary pairs read it for
+ * their breakout side, head & shoulders for the advance (decline) into the
+ * left shoulder.
+ */
+export function priorTrend(
+    ctx: QualifyContext,
+    start: number
+): PatternBreakoutDirection | null {
+    const from = Math.max(0, start - PRIOR_TREND_BARS);
+    const change = ctx.bars[start].close - ctx.bars[from].close;
+    if (Math.abs(change) < PRIOR_TREND_MIN_ATR * ctx.atr) return null;
+    return change > 0 ? 'up' : 'down';
 }

@@ -961,7 +961,10 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 추가하고 "rule engine"/"washout"을 이름으로 인용하라던 두 지시를 고쳤다.
         // p24 (spec 2026-10-07): 차트 패턴은 엄격한 작도 자격을 얻은 것만 숫자·Candidate id와
         // 함께 싣고, 나머지 프리스크리너 hit은 "shape hint — not drawable" 한 줄로만 남긴다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p24');
+        // p25 (2026-10-08 A/B 후속): 차트 패턴 섹션이 목록을 만드는 과정을 말하지 않고
+        // (모델이 "사전 스크리너"·"그리기 검증"을 사용자 문장에 옮겨 적었다), 형태만 닮은
+        // 패턴은 "Unconfirmed shape resemblances" 한 줄로 묶는다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p25');
     });
 });
 

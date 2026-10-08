@@ -33,6 +33,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         dynamic: 'dynamic',
         overlayCandidates: [],
         overlayBuildFailures: [],
+        patternScreenFailure: null,
         patternGeometries: new Map(),
     })),
 }));

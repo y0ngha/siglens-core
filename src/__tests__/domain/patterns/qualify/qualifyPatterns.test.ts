@@ -158,3 +158,19 @@ describe('qualifyPatterns', () => {
         expect(f.bars).toEqual(copy);
     });
 });
+
+describe('qualifyPatterns — pivot thresholds read the per-bar ATR series', () => {
+    const f = doubleTop as Fixture;
+    const ids = (series: readonly number[]): ChartPatternId[] =>
+        qualifyPatterns([], f.bars, f.atr, '1Day', series).qualified.map(
+            q => q.id
+        );
+
+    it('draws the double top with the fixture ATR at every bar', () => {
+        expect(ids(f.bars.map(() => f.atr))).toContain('double_top');
+    });
+
+    it('confirms none of its swings when the series reads ten times that ATR, whatever the latest ATR', () => {
+        expect(ids(f.bars.map(() => 10 * f.atr))).not.toContain('double_top');
+    });
+});

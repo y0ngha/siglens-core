@@ -1850,7 +1850,8 @@ const buildAnalysisRequest = (
                   '- patternSummaries must include detection results for **every** Skills pattern listed below.',
                   '- For each Skills pattern, assess whether it is detected in the current chart data and set the detected value accordingly.',
                   '- Patterns that are not detected must still be included with detected: false.',
-                  "- You may also add any other chart pattern you can clearly see in the bars — one from the Pattern Index that was not listed here, or a well-established pattern outside the catalog (e.g. broadening formation, diamond, island reversal) — as a detected: true entry. For such an entry set skillName to the pattern's standard English name (the Pattern Index name when it is in the catalog), fill geometry, and ground every level in the bars. Do not add detected: false entries for unlisted patterns.",
+                  `- In summary and every other text field, describe a pattern only by what the price did (its swings, touches and levels). Never describe how ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} was produced, what it lists or leaves out, or why — the reader sees the chart, not this prompt.`,
+                  "- You may also add any other chart pattern you can clearly see in the bars — one from the Pattern Index that was not listed here, or a well-established pattern outside the catalog (e.g. broadening formation, diamond, island reversal) — as a detected: true entry. For such an entry set skillName to the pattern's standard English name (the Pattern Index name when it is in the catalog), ground every key price in the bars, and set candidateId and geometry to null. Do not add detected: false entries for unlisted patterns.",
                   '- **Do not include candle patterns (single/multi candle) in patternSummaries** — e.g. tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns, even when you add patterns beyond the listed ones. Candle patterns belong only in candlePatterns.',
                   '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. For a listed Skills pattern it MUST exactly match its pattern skill name from the list below; for an additional pattern you add, use its standard English name as described above.',
                   // Schema §3.5 dedup: the response schema's `required`
@@ -1863,12 +1864,10 @@ const buildAnalysisRequest = (
                   '- For not-detected patterns, set trend to the pattern\'s inherent directional bias (e.g., head-and-shoulders → bearish, inverse head-and-shoulders → bullish, ascending wedge → bearish, descending wedge → bullish, double top → bearish, double bottom → bullish); use "neutral" only when the pattern has no inherent bias.',
                   '',
                   '### geometry Writing Rules',
-                  '- Never compute a measured or conservative target yourself — the app derives both from geometry.',
-                  '- For every detected: true pattern, fill geometry: { breakoutLevel, extremeLevel, direction, invalidationLevel? }. breakoutLevel = the neckline/boundary/rim/handle resistance/flag channel edge the pattern breaks through; extremeLevel = the textbook measured-move anchor (head, peak/trough average, cup/saucer bottom, flagpole start, or the opposite boundary); direction = the expected breakout direction ("up" or "down"); invalidationLevel = the right-shoulder high / second peak / opposite boundary / handle low, when you can name one.',
-                  "- extremeLevel is the one structured price field you may derive by simple averaging: for a double/triple top or bottom, average the pattern's own peak/trough prices (all of them appear in the data). Every other geometry field must be a price that already appears in the data — never another derived number.",
-                  `- When the pattern appears in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}, copy its breakout level / extreme level / direction / invalidation level from that section verbatim rather than re-reading the chart.`,
-                  '- When the pattern does NOT appear there, read the chart yourself and fill geometry from what you see — but still never compute the target number itself.',
-                  '- Omit geometry entirely (do not guess) when you cannot identify a usable breakout level and extreme level.',
+                  `- Never compute a measured or conservative target yourself — the app derives both from geometry, and only for a pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}.`,
+                  `- Only a detected: true pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} carries geometry: { breakoutLevel, extremeLevel, direction, invalidationLevel? }. breakoutLevel = the neckline/boundary/rim/handle resistance/flag channel edge the pattern breaks through; extremeLevel = the textbook measured-move anchor (head, peak/trough average, cup/saucer bottom, flagpole start, or the opposite boundary); direction = the expected breakout direction ("up" or "down"); invalidationLevel = the right-shoulder high / second peak / opposite boundary / handle low, when you can name one.`,
+                  '- Copy its breakout level / extreme level / direction / invalidation level from that section verbatim rather than re-reading the chart.',
+                  `- Every other pattern — detected: false, an unconfirmed shape resemblance, or one you read from the bars that has no Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} — sets geometry to null; describe its structure with keyPrices instead.`,
                   '',
                   '### candidateId Writing Rules',
                   `- For a detected: true pattern that matches a candidate in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}, set candidateId to that candidate's "Candidate id" verbatim.`,
@@ -2069,13 +2068,23 @@ const collectDetectedCandleNames = (
 interface ChartPatternScreen extends PatternQualification {
     /** Ids that drive skill selection: every qualified id plus every shape hint. */
     selectionIds: ChartPatternId[];
+    /** What the screener or qualifier threw, or `null` — see {@link TechnicalAssembledPrompt.patternScreenFailure}. */
+    failure: string | null;
 }
 
 const NO_CHART_PATTERNS: ChartPatternScreen = {
     qualified: [],
     shapeHints: [],
     selectionIds: [],
+    failure: null,
 };
+
+/** A thrown value as one log-friendly string (the stack when there is one). */
+function describeThrown(error: unknown): string {
+    return error instanceof Error
+        ? (error.stack ?? `${error.name}: ${error.message}`)
+        : String(error);
+}
 
 /**
  * The chart patterns for this chart, computed once and shared by skill
@@ -2090,25 +2099,27 @@ const NO_CHART_PATTERNS: ChartPatternScreen = {
  *
  * Guards `atr` unavailable/non-positive the same way {@link
  * screenChartPatterns} itself does, and additionally wraps the calls
- * defensively: a screener/classifier bug must degrade to "no candidates"
- * rather than take down prompt building, mirroring `observePatternCandidates`
- * in `submitAnalysis.ts`. Unlike that application-layer call, this domain
- * function cannot `console.error` (domain is zero-I/O per `domain/CLAUDE.md`)
- * — the application-layer observe-only log already surfaces screener
- * failures, so no telemetry is duplicated here.
+ * defensively: a screener/classifier/qualifier bug must degrade to "no
+ * patterns" rather than take down prompt building. The domain cannot log
+ * (zero-I/O per `domain/CLAUDE.md`), so the thrown value travels back as
+ * `failure` and `buildAnalysisPrompt` returns it as
+ * `patternScreenFailure` for the application layer to report — otherwise a
+ * broken qualifier would look exactly like a chart with no patterns.
  */
 const screenPatternCandidatesSafely = (
     bars: readonly Bar[],
     atr: number | null,
+    atrSeries: readonly (number | null)[],
     timeframe: Timeframe
 ): ChartPatternScreen => {
     if (atr === null || atr <= 0) return NO_CHART_PATTERNS;
     try {
         const { qualified, shapeHints } = qualifyPatterns(
-            screenChartPatterns(bars, atr),
+            screenChartPatterns(bars, atr, atrSeries),
             bars,
             atr,
-            timeframe
+            timeframe,
+            atrSeries
         );
         return {
             qualified,
@@ -2116,9 +2127,10 @@ const screenPatternCandidatesSafely = (
             selectionIds: [
                 ...new Set([...qualified.map(q => q.id), ...shapeHints]),
             ],
+            failure: null,
         };
-    } catch {
-        return NO_CHART_PATTERNS;
+    } catch (error) {
+        return { ...NO_CHART_PATTERNS, failure: describeThrown(error) };
     }
 };
 
@@ -2329,7 +2341,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   market profile (see {@link CurrencyCode} — core never derives it from the
  *   symbol). Drives the listing framing sentence and price precision (`KRW` →
  *   whole won). Defaults to `'USD'`.
- * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2363,6 +2375,9 @@ export function buildAnalysisPrompt(
     const chartPatterns = screenPatternCandidatesSafely(
         bars,
         atrForPatternGeometry,
+        // The per-bar series the latest ATR above came from: pivots read the
+        // ATR at each confirming bar, so they never move as ATR drifts.
+        indicators.atr,
         timeframe
     );
     const patternCandidates = chartPatterns.qualified;
@@ -2632,6 +2647,7 @@ export function buildAnalysisPrompt(
         dynamic: dynamicSections.join('\n\n'),
         overlayCandidates,
         overlayBuildFailures,
+        patternScreenFailure: chartPatterns.failure,
         patternGeometries: printedPatternGeometriesByOverlayId(
             patternCandidates,
             bars,

@@ -1977,6 +1977,11 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
     /** Overlay builders that threw during this prompt build (their kinds offered nothing). */
     overlayBuildFailures: readonly OverlayKind[];
     /**
+     * What the chart-pattern screener or qualifier threw during this prompt build (the stack when it was an `Error`), or `null`.
+     * On a throw the prompt carries no patterns, exactly like a chart without any — this field is how the caller tells the two apart and logs it.
+     */
+    patternScreenFailure: string | null;
+    /**
      * Printed `## Chart Pattern Candidates` geometry per offered pattern overlay id — what a card resolved to that overlay carries as its `geometry`.
      * `null` for an undirected pattern (no prior trend): the block printed only its two boundaries, so a card resolved to it carries no geometry and no target.
      * In-process only: a `Map` serialises to `{}` with `JSON.stringify`, so do not put this on a cache entry or queue payload — convert to entries first.
@@ -4202,9 +4207,9 @@ export interface PatternPoint {
  * @internal
  * A straight pattern boundary through its touches (spec 2026-10-07 §2.2) —
  * never a regression line. `start`/`end` are the line's values at its first
- * and last touch, which is also the drawn extent (no extension to the right
- * edge). The line's value at any other bar is the straight-line extension
- * through those two points.
+ * and last touch — the solid drawn extent; the overlay continues it dashed
+ * only to the bar its printed value is read at. The line's value at any
+ * other bar is the straight-line extension through those two points.
  */
 export interface PatternLine {
     start: PatternPoint;
@@ -4322,8 +4327,8 @@ export interface PatternQualification {
     qualified: QualifiedPattern[];
     /**
      * Ids of pre-screener hits with no qualified pattern of the same id (and
-     * not already spent) — listed in the prompt as "shape hint — not
-     * drawable", without a Candidate id or numbers.
+     * not already spent) — named in the prompt's one "Unconfirmed shape
+     * resemblances" line, without a Candidate id or numbers.
      */
     shapeHints: ChartPatternId[];
 }

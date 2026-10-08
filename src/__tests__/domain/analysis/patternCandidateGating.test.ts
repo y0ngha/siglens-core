@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { buildAnalysisPrompt as buildAnalysisPromptRaw } from '@/domain/analysis/prompt';
+import { NO_CHART_PATTERNS_LINE } from '@/domain/analysis/chartPatternCandidatesSection';
 import { calculateIndicators } from '@/domain/indicators';
 import type { AssembledPrompt, Bar, Skill, SkillGating } from '@/domain/types';
 import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
@@ -223,12 +224,8 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         // Document (not silently drop) the new, intentional difference: the
         // candidates section itself does react to the screener's findings.
         expect(withCandidates).not.toBe(withNoCandidates);
-        expect(withNoCandidates).toContain(
-            '- None detected by the pre-screener'
-        );
-        expect(withCandidates).not.toContain(
-            '- None detected by the pre-screener'
-        );
+        expect(withNoCandidates).toContain(NO_CHART_PATTERNS_LINE);
+        expect(withCandidates).not.toContain(NO_CHART_PATTERNS_LINE);
     });
 });
 
@@ -279,5 +276,44 @@ describe('buildAnalysisPrompt — skill selection sees qualified patterns the sc
             )
         );
         expect(out).toContain('Bull Flag Guide');
+    });
+});
+
+describe('buildAnalysisPrompt — a throwing pattern qualifier', () => {
+    it('degrades to no patterns and returns what it threw as patternScreenFailure', async () => {
+        vi.resetModules();
+        vi.doMock('@/domain/patterns/qualify/qualifyPatterns', () => ({
+            qualifyPatterns: () => {
+                throw new Error('qualifier exploded');
+            },
+        }));
+        const { buildAnalysisPrompt: build } =
+            await import('@/domain/analysis/prompt');
+        const fixture = doubleTop as Fixture;
+        const result = build(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            fixture.bars,
+            calculateIndicators(fixture.bars),
+            [],
+            '1Day'
+        );
+        expect(result.patternScreenFailure).toContain(
+            'Error: qualifier exploded'
+        );
+        expect(result.dynamic).toContain(NO_CHART_PATTERNS_LINE);
+    });
+
+    it('patternScreenFailure is null when screening succeeds', () => {
+        const fixture = doubleTop as Fixture;
+        const result = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            fixture.bars,
+            calculateIndicators(fixture.bars),
+            [],
+            '1Day'
+        );
+        expect(result.patternScreenFailure).toBeNull();
     });
 });

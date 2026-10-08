@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     LEVEL_TOLERANCE,
+    MATURING_TRIANGLE_BARS,
     SCENARIOS,
     STABILITY_CASES,
     type LevelExpectation,
@@ -136,4 +137,42 @@ describe('provisional invariance (spec §2.1): extending the current leg moves n
             }
         }
     );
+});
+
+describe('a newly confirmed touch keeps the levels fixed (spec §3.1)', () => {
+    // Eight pivots (4 + 4 touches); the two appended closes confirm the
+    // fifth resistance touch as the ninth pivot.
+    const before = runPipeline(MATURING_TRIANGLE_BARS, 1);
+    const confirmed = appendCloses(MATURING_TRIANGLE_BARS, [108.6, 108]);
+    const after = runPipeline(confirmed, 1);
+    const p0 = before.qualified.find(q => q.id === 'ascending_triangle')!;
+    const p1 = after.qualified.find(q => q.id === 'ascending_triangle')!;
+
+    it('the appended bars confirm exactly one more pivot, a resistance touch', () => {
+        const pivots0 = extractPivots(MATURING_TRIANGLE_BARS, 1);
+        const pivots1 = extractPivots(confirmed, 1);
+        expect(pivots0).toHaveLength(8);
+        expect(pivots1.slice(0, 8)).toEqual(pivots0);
+        expect(pivots1).toHaveLength(9);
+        expect(pivots1[8].kind).toBe('high');
+        expect(p1.touches).toBe(p0.touches + 1);
+    });
+
+    it('keeps the first touch, so the start and the overlay id stay', () => {
+        expect(p1.startIndex).toBe(p0.startIndex);
+        expect(patternOverlayId(p1, confirmed)).toBe(
+            patternOverlayId(p0, MATURING_TRIANGLE_BARS)
+        );
+    });
+
+    it('keeps the height, target and invalidation', () => {
+        const g0 = geometryOf(before, p0);
+        const g1 = geometryOf(after, p1);
+        if (g0.direction === null || g1.direction === null)
+            throw new Error('ascending triangle is directed');
+        expect(g1.height).toBe(g0.height);
+        expect(g1.measuredTarget).toBe(g0.measuredTarget);
+        expect(g1.invalidationLevel).toBe(g0.invalidationLevel);
+        expect(g1.invalidationIndex).toBe(g0.invalidationIndex);
+    });
 });

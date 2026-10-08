@@ -282,20 +282,56 @@ export const BROADENING_MIN_WIDTH_RATIO = 1.3;
  */
 export const TRENDLINE_MIN_WINDOW_PIVOTS = 5;
 
+/**
+ * @internal
+ * Most confirmed pivots a boundary-pair window grows back to once a window
+ * of at most `TRENDLINE_PIVOT_WINDOW` pivots qualifies. A maturing pattern
+ * keeps its first touches as newer pivots confirm; the cap bounds the extra
+ * fits (each O(k²·n)).
+ */
+export const TRENDLINE_MAX_WINDOW_PIVOTS = 16;
+
 /** @internal Triangles, wedges, rectangles, channels, broadening formations: fewest bars spanned. */
 export const LINE_PATTERN_MIN_BARS = 15;
 
-/** @internal Head & shoulders and triple tops/bottoms: fewest bars spanned. */
-export const LONG_REVERSAL_MIN_BARS = 20;
+/**
+ * @internal
+ * Head & shoulders: fewest bars from the left to the right shoulder. Fifteen,
+ * not the spec's twenty: real daily H&S with clean, level shoulders span
+ * 15–19 bars (a 17-bar inverse H&S in the 2026-10-08 recall diagnosis), and
+ * the shoulder-match, shoulder-clearance, head-clearance, prior-trend and
+ * height rules already keep a short noise cluster out. A triple top/bottom needs no span rule of its
+ * own: two gaps of `EXTREME_MIN_GAP_BARS` make it at least 21 bars.
+ */
+export const HS_MIN_BARS = 15;
 
 /** @internal Double/triple tops and bottoms: fewest bars between consecutive extremes. */
 export const EXTREME_MIN_GAP_BARS = 10;
+
+/**
+ * @internal
+ * Double top/bottom: the trough (peak) between the two extremes sits within
+ * this share of the span from either extreme — in the middle half. A trough
+ * two bars after the first peak followed by a slow climb to the second is a
+ * rising leg, not two tops (2026-10-08 sweep, judged on real charts).
+ */
+export const DOUBLE_NECKLINE_EDGE_SHARE = 0.25;
 
 /** @internal Double/triple: repeated extremes match within `min(EXTREME_MATCH_ATR_MULT·ATR, this·price)`. */
 export const EXTREME_MATCH_MAX_PRICE_PCT = 0.03;
 
 /** @internal Head & shoulders: the shoulders match within this share of price. */
 export const HS_SHOULDER_MAX_PRICE_PCT = 0.05;
+
+/**
+ * @internal
+ * Head & shoulders: each shoulder stands at least this many ATR on the
+ * pattern's side of the neckline (above it for a top). A right "shoulder"
+ * at or through the neckline is the breakdown already under way (2026-10-08
+ * sweep: an H&S drawn with its right shoulder under the neckline), and a
+ * left one a hair above its trough is a pause in the leg to the head.
+ */
+export const HS_SHOULDER_MIN_CLEARANCE_ATR = 1;
 
 /**
  * @internal
@@ -351,14 +387,76 @@ export const FLAG_POLE_MAX_BARS = 20;
 /** @internal Flag/pennant: fewest bars after the pole top. */
 export const FLAG_MIN_BARS = 5;
 
-/** @internal Flag/pennant: most bars after the pole top. */
+/**
+ * @internal
+ * Flag/pennant: most bars from the pole top to the flag's last bar (the end
+ * of the fitted channel — not the chart's last bar, so a flag that just
+ * broke out is still drawn until it is spent or no longer recent).
+ */
 export const FLAG_MAX_BARS = 20;
+
+/**
+ * @internal
+ * Flag/pennant: no flag bar goes beyond the pole's end (above a bull pole's
+ * top, below a bear pole's bottom) by more than this many ATR. A
+ * consolidation that rises over the pole top is a new leg, not a flag
+ * (2026-10-08 sweep: a daily "pennant" whose channel ran past its pole).
+ */
+export const FLAG_MAX_BEYOND_POLE_ATR = 0.5;
+
+/**
+ * @internal
+ * Flag/pennant: the channel is at most this share of the pole tall where
+ * it starts. A flag is a tight pause after the pole; a channel half the
+ * pole wide is a range of its own.
+ */
+export const FLAG_MAX_START_WIDTH_POLE_SHARE = 0.5;
+
+/**
+ * @internal
+ * Flag/pennant: counted touches on one channel line are at least this many
+ * bars apart. Two adjacent bars resting on one line are one test of it, not
+ * two (2026-10-08 sweep: an intraday pennant whose "touches" were
+ * neighbouring bars).
+ */
+export const FLAG_MIN_TOUCH_SPACING_BARS = 2;
 
 /** @internal Flag/pennant: deepest pullback from the pole top, as a share of the pole. */
 export const FLAG_MAX_RETRACE = 0.5;
 
-/** @internal Cup & handle and rounding: rims match within this share of price. */
+/** @internal Rounding bottom / top: rims match within this share of price. */
 export const RIM_MATCH_MAX_PRICE_PCT = 0.05;
+
+/**
+ * @internal
+ * Cup & handle: rims match within this share of price — looser than
+ * {@link RIM_MATCH_MAX_PRICE_PCT}. A cup's right rim often recovers short of
+ * the left one before the handle forms; on a deep cup a 6% gap is still a
+ * small share of the depth, and `CUP_RIM_MAX_DEPTH_SHARE` keeps a shallow
+ * base with that gap out. The handle rules bound the rest. Rounding bases stay at 5%: there the
+ * looser match turned a W-shaped base into a "rounding bottom".
+ */
+export const CUP_RIM_MATCH_MAX_PRICE_PCT = 0.07;
+
+/**
+ * @internal
+ * Cup & handle and rounding: the two rims differ by at most this share of
+ * the base's depth (the lower rim's height over the extreme), on top of the
+ * price-share match. A staircase of rising highs — each one 5% over the
+ * last on a shallow dip — passed the price-share rule alone and drew as a
+ * "cup" (2026-10-08 real-chart sweep: 8 of 16 drawn cups and rounding bases
+ * judged false). A cup's rims stand at about the same level relative to
+ * its own depth.
+ */
+export const CUP_RIM_MAX_DEPTH_SHARE = 0.25;
+
+/**
+ * @internal
+ * Cup & handle: the left rim must be the highest high of the bars before it,
+ * over this share of the rim-to-rim span — a cup forms after an advance into
+ * the left rim. Without it, a dip inside a falling market read as a cup.
+ */
+export const CUP_PRIOR_ADVANCE_SPAN_SHARE = 0.5;
 
 /** @internal Cup & handle and rounding: fewest bars from rim to rim. */
 export const CUP_MIN_BARS = 30;
@@ -387,8 +485,15 @@ export const ROUNDING_MIN_R2 = 0.6;
 /** @internal Rounding: points sampled from the fitted curve for the drawing. */
 export const ROUNDING_ARC_SAMPLES = 10;
 
-/** @internal Arbitration: two qualified hits sharing at least this many pivots overlap. */
-export const ARBITRATION_MIN_SHARED_PIVOTS = 3;
+/**
+ * @internal
+ * Arbitration: two qualified hits sharing at least this many confirmed pivots
+ * overlap. One, not the spec's three: a swing that plays a role in two
+ * patterns is counted twice when both are drawn — a head & shoulders' right
+ * shoulder reused as a later double top's first peak touches the H&S span at
+ * that one bar only, so neither the span rule nor a three-pivot rule caught it.
+ */
+export const ARBITRATION_MIN_SHARED_PIVOTS = 1;
 
 /** @internal Arbitration: two qualified hits whose spans overlap by more than this share of the shorter one overlap. */
 export const ARBITRATION_MAX_SPAN_OVERLAP = 0.5;

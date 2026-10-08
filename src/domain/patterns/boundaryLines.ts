@@ -110,6 +110,66 @@ export function fitBoundaryLine(
     return best?.line ?? null;
 }
 
+/**
+ * @internal
+ * The boundary parallel to `guide` on the `side` it does not bound — a
+ * channel's second line drawn from its better-touched one (2026-10-08
+ * real-chart recall diagnosis: a falling channel with four touches on its
+ * upper line had no lower line through two lows that held every bar,
+ * because its three lows do not sit on one straight line).
+ *
+ * The line has `guide`'s slope and passes through the point of `points`
+ * farthest from `guide` on `side` — so no point lies beyond it — and is kept
+ * only when it contains every bar in `[from, to]` by the same
+ * `BOUNDARY_CONTAINMENT_ATR`·ATR slack as {@link fitBoundaryLine}. Touches use
+ * the same `BOUNDARY_TOUCH_ATR`·ATR tolerance. Neither bound is loosened:
+ * a wider slack or a band around the parallel re-admits channels a candle
+ * really pierces.
+ *
+ * @returns The parallel, drawn from its first to its last touch, or `null`
+ *   when `points` is empty or a bar pokes through it.
+ */
+export function parallelBoundaryLine(
+    guide: PatternLine,
+    points: readonly PatternPoint[],
+    bars: readonly Bar[],
+    side: BoundarySide,
+    from: number,
+    to: number,
+    atr: number
+): PatternLine | null {
+    if (points.length === 0) return null;
+    const sign = side === 'upper' ? 1 : -1;
+    // How far beyond `guide`, on `side`, each point sits; the parallel runs
+    // through the farthest one.
+    const beyond = (p: PatternPoint): number =>
+        sign * (p.price - lineValueAt(guide, p.index));
+    const anchor = points.reduce((a, b) => (beyond(b) > beyond(a) ? b : a));
+    const offset = anchor.price - lineValueAt(guide, anchor.index);
+    const valueAt = (x: number): number => lineValueAt(guide, x) + offset;
+    if (
+        !containsBars(
+            bars,
+            side,
+            from,
+            to,
+            valueAt,
+            BOUNDARY_CONTAINMENT_ATR * atr
+        )
+    )
+        return null;
+    const touches = points.filter(
+        p => Math.abs(p.price - valueAt(p.index)) <= BOUNDARY_TOUCH_ATR * atr
+    );
+    const first = touches[0];
+    const last = touches[touches.length - 1];
+    return {
+        start: { index: first.index, price: valueAt(first.index) },
+        end: { index: last.index, price: valueAt(last.index) },
+        touches,
+    };
+}
+
 function isBetter(candidate: ScoredLine, best: ScoredLine): boolean {
     const touchDiff = candidate.line.touches.length - best.line.touches.length;
     if (touchDiff !== 0) return touchDiff > 0;
