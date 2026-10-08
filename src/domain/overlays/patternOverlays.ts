@@ -4,12 +4,14 @@ import type {
     OverlayLabel,
     OverlayLevel,
     OverlaySegment,
+    PatternBreakoutDirection,
     PatternCandidate,
     PatternGeometry,
     PatternLine,
     PatternPoint,
     PivotPoint,
     QualifiedPattern,
+    QualifiedPatternGeometry,
 } from '@/domain/types';
 import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
 import { lineValueAt } from '@/domain/patterns/boundaryLines';
@@ -63,7 +65,7 @@ function seg(
     };
 }
 
-/** A boundary drawn from its first to its last touch (spec 2026-10-07 §2.2 — no extension). */
+/** A boundary drawn solid from its first to its last confirmed touch (spec 2026-10-07 §2.2). */
 function lineSegment(
     bars: readonly Bar[],
     line: PatternLine,
@@ -80,24 +82,45 @@ function lineSegment(
 }
 
 /**
- * A head & shoulders neckline from the left trough to the bar the breakout
- * is read at (the break bar, or the last bar before a break), so the drawn
- * line ends exactly at the printed breakout.
+ * The dashed continuation of `line` from its last touch to bar `toIndex` —
+ * the bar its printed value is read at (the last bar for a breakout or an
+ * undirected boundary, the break bar for a neckline). Without it the chart
+ * stopped at the last touch while the prompt quoted the line further right,
+ * so the printed level sat on nothing drawn. Empty when the line already
+ * ends there.
  */
-function necklineSegment(
+function extensionSegments(
     bars: readonly Bar[],
-    neckline: PatternLine,
-    breakoutIndex: number
-): OverlaySegment {
-    return seg(
-        bars,
-        neckline.start.index,
-        neckline.start.price,
-        breakoutIndex,
-        lineValueAt(neckline, breakoutIndex),
-        'neckline',
-        'dashed'
-    );
+    line: PatternLine,
+    toIndex: number,
+    role: string
+): OverlaySegment[] {
+    return toIndex > line.end.index
+        ? [
+              seg(
+                  bars,
+                  line.end.index,
+                  line.end.price,
+                  toIndex,
+                  lineValueAt(line, toIndex),
+                  role,
+                  'dashed'
+              ),
+          ]
+        : [];
+}
+
+/** A boundary solid between its touches, then dashed to `toIndex` (see {@link extensionSegments}). */
+function extendedLine(
+    bars: readonly Bar[],
+    line: PatternLine,
+    toIndex: number,
+    role: string
+): OverlaySegment[] {
+    return [
+        lineSegment(bars, line, role),
+        ...extensionSegments(bars, line, toIndex, role),
+    ];
 }
 
 /**
@@ -197,23 +220,53 @@ interface PatternDrawing {
  * rectangle, broadening), a pole plus two channel lines (flags), the five
  * pivots plus a sloped neckline (head & shoulders), the fitted arc
  * (rounding), and the structural points as a polyline otherwise.
+ *
+ * Every line is solid between its touches and continues dashed to the bar
+ * its printed value is read at, so each boundary value the prompt block
+ * prints lies on a drawn line: the breakout side of a directed boundary pair
+ * and of a flag to the last bar, both boundaries of an undirected pair to
+ * the last bar, a flag's other channel line to the flag's last bar (its key
+ * point) and the neckline to the break bar.
  */
 function drawingOf(
     pattern: QualifiedPattern,
+    direction: QualifiedPatternGeometry['direction'],
     bars: readonly Bar[]
 ): PatternDrawing {
     const { shape } = pattern;
+    const lastIndex = bars.length - 1;
     switch (shape.kind) {
-        case 'trendline':
+        case 'trendline': {
+            // A side is read at the last bar when it is the breakout side or
+            // the pair is undirected; otherwise only its touches are drawn.
+            const readAt = (
+                line: PatternLine,
+                side: PatternBreakoutDirection
+            ): number =>
+                direction === null || direction === side
+                    ? lastIndex
+                    : line.end.index;
             return {
                 segments: [
-                    lineSegment(bars, shape.upper, 'boundary_upper'),
-                    lineSegment(bars, shape.lower, 'boundary_lower'),
+                    ...extendedLine(
+                        bars,
+                        shape.upper,
+                        readAt(shape.upper, 'up'),
+                        'boundary_upper'
+                    ),
+                    ...extendedLine(
+                        bars,
+                        shape.lower,
+                        readAt(shape.lower, 'down'),
+                        'boundary_lower'
+                    ),
                 ],
                 labels: [],
                 breakoutLevel: false,
             };
-        case 'flag':
+        }
+        case 'flag': {
+            const up = shape.direction === 'up';
             return {
                 segments: [
                     seg(
@@ -224,17 +277,33 @@ function drawingOf(
                         shape.poleTop.price,
                         'pole'
                     ),
-                    lineSegment(bars, shape.upper, 'channel_upper'),
-                    lineSegment(bars, shape.lower, 'channel_lower'),
+                    ...extendedLine(
+                        bars,
+                        shape.upper,
+                        up ? lastIndex : pattern.endIndex,
+                        'channel_upper'
+                    ),
+                    ...extendedLine(
+                        bars,
+                        shape.lower,
+                        up ? pattern.endIndex : lastIndex,
+                        'channel_lower'
+                    ),
                 ],
                 labels: [],
                 breakoutLevel: false,
             };
+        }
         case 'head_and_shoulders':
             return {
                 segments: [
                     ...polyline(bars, pattern.pivots),
-                    necklineSegment(bars, shape.neckline, shape.breakoutIndex),
+                    ...extendedLine(
+                        bars,
+                        shape.neckline,
+                        shape.breakoutIndex,
+                        'neckline'
+                    ),
                 ],
                 labels: hsLabels(bars, pattern.pivots),
                 breakoutLevel: false,
@@ -293,7 +362,7 @@ export function buildPatternOverlayCandidates(
     return patterns.flatMap(pattern => {
         const g = computeCandidateGeometry(pattern, bars, atr);
         if (g === null) return [];
-        const drawing = drawingOf(pattern, bars);
+        const drawing = drawingOf(pattern, g.direction, bars);
         return [
             {
                 id: patternOverlayId(pattern, bars),

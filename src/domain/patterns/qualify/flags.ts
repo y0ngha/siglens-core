@@ -13,10 +13,14 @@ import {
     lineValueAt,
 } from '@/domain/patterns/boundaryLines';
 import {
+    BOUNDARY_CONTAINMENT_ATR,
     BOUNDARY_MIN_TOUCHES,
     CONVERGING_MAX_WIDTH_RATIO,
     FLAG_MAX_BARS,
+    FLAG_MAX_BEYOND_POLE_ATR,
     FLAG_MAX_RETRACE,
+    FLAG_MAX_START_WIDTH_POLE_SHARE,
+    FLAG_MIN_TOUCH_SPACING_BARS,
     FLAG_MIN_BARS,
     FLAG_POLE_MAX_BARS,
     FLAG_POLE_MIN_ATR,
@@ -34,9 +38,14 @@ import {
     barLow,
     barHigh,
     lowestConfirmedLowAfter,
+    isRecent,
+    maxAgeBars,
 } from '@/domain/patterns/qualify/context';
 
 // ─── Flags and pennants (§3.4) ──────────────────────────────────────────────
+
+/** Age window of the longest possible pole-plus-flag span (loop cutoff in `qualifyFlags`). */
+const LONGEST_FLAG_MAX_AGE = maxAgeBars(FLAG_POLE_MAX_BARS + FLAG_MAX_BARS);
 
 /**
  * @internal
@@ -49,14 +58,21 @@ import {
  * decided by `flagPatternId` (see its JSDoc). When the newest bars have
  * already left the channel, the fit is retried on a shorter flag (down to
  * `FLAG_MIN_BARS`) so the breakout leg reads as a break, not as the end of
- * the pattern.
+ * the pattern. The flag's age is counted to the fitted end, so a flag stays
+ * drawn after its breakout while it is recent (`isRecent`) and not spent.
+ * The flag bars stay within `FLAG_MAX_BEYOND_POLE_ATR`·ATR of the pole's end
+ * and the channel starts at most `FLAG_MAX_START_WIDTH_POLE_SHARE` of the
+ * pole wide.
  */
 export function qualifyFlags(ctx: QualifyContext): QualifiedPattern[] {
     for (let i = ctx.pivots.length - 1; i >= 1; i--) {
         const top = ctx.pivots[i];
-        const flagBars = ctx.lastIndex - top.index;
-        if (flagBars > FLAG_MAX_BARS) break;
-        if (flagBars < FLAG_MIN_BARS) continue;
+        const sinceTop = ctx.lastIndex - top.index;
+        // No flag of an older top can still be recent: it ends within
+        // FLAG_MAX_BARS of the top, and its age window is that of the longest
+        // pole-plus-flag span.
+        if (sinceTop > FLAG_MAX_BARS + LONGEST_FLAG_MAX_AGE) break;
+        if (sinceTop < FLAG_MIN_BARS) continue;
         const q = qualifyFlagFromPole(ctx, ctx.pivots[i - 1], top);
         if (q) return [q];
     }
@@ -87,19 +103,34 @@ function localExtremes(
 
 /**
  * A flag consolidates: each channel line keeps at least
- * `BOUNDARY_MIN_TOUCHES` bars that touch it and not the other line. Not in
- * the spec — a straight pullback leg fits two "parallel" lines one bar range
- * apart that every bar touches at once, which read as a flag after any
- * pole-sized swing.
+ * `BOUNDARY_MIN_TOUCHES` bars that touch it and not the other line, at
+ * least `FLAG_MIN_TOUCH_SPACING_BARS` apart. Not in the spec — a straight
+ * pullback leg fits two "parallel" lines one bar range apart that every bar
+ * touches at once, which read as a flag after any pole-sized swing; and two
+ * neighbouring bars on one line are one test of it.
  */
 function touchesOneSideOnly(upper: PatternLine, lower: PatternLine): boolean {
     const onlyOn = (line: PatternLine, other: PatternLine): number =>
-        line.touches.filter(t => !other.touches.some(o => o.index === t.index))
-            .length;
+        spacedCount(
+            line.touches.filter(
+                t => !other.touches.some(o => o.index === t.index)
+            )
+        );
     return (
         onlyOn(upper, lower) >= BOUNDARY_MIN_TOUCHES &&
         onlyOn(lower, upper) >= BOUNDARY_MIN_TOUCHES
     );
+}
+
+/** Touches counted left to right, skipping any closer than `FLAG_MIN_TOUCH_SPACING_BARS` to the last counted one. */
+function spacedCount(touches: readonly PatternPoint[]): number {
+    return touches.reduce<{ count: number; last: number }>(
+        (acc, t) =>
+            t.index - acc.last >= FLAG_MIN_TOUCH_SPACING_BARS
+                ? { count: acc.count + 1, last: t.index }
+                : acc,
+        { count: 0, last: -Infinity }
+    ).count;
 }
 
 function qualifyFlagFromPole(
@@ -111,9 +142,41 @@ function qualifyFlagFromPole(
     if (top.index - base.index > FLAG_POLE_MAX_BARS) return null;
     if (pole < Math.max(FLAG_POLE_MIN_ATR * ctx.atr, minHeight(ctx, top.price)))
         return null;
-    for (let end = ctx.lastIndex; end - top.index >= FLAG_MIN_BARS; end--) {
-        const q = fitFlag(ctx, base, top, end, pole);
-        if (q) return q;
+    const latestEnd = Math.min(ctx.lastIndex, top.index + FLAG_MAX_BARS);
+    const first = firstFit(ctx, base, top, pole, latestEnd);
+    if (first === null) return null;
+    for (let end = latestEnd; end - top.index >= FLAG_MIN_BARS; end--) {
+        const latest = fitFlag(ctx, base, top, end, pole, true);
+        if (latest === null) continue;
+        // Flag or pennant stays as first read (see firstFit); the drawing
+        // is the newest fit only while it reads the same way, so the label
+        // and the drawn channel never disagree.
+        const chosen = latest.id === first.id ? latest : first;
+        return isRecent(ctx, chosen.endIndex, chosen.endIndex - base.index)
+            ? chosen
+            : null;
+    }
+    return null;
+}
+
+/**
+ * The flag as first read: the shortest fit (`FLAG_MIN_BARS` on), whether or
+ * not price has left it yet. Those bars never change, so its flag-or-pennant
+ * label is fixed once the flag first qualifies; reading the label from every
+ * newer, longer fit flipped it between consecutive bars as a new touch
+ * tilted the lines (2026-10-08 replay sweep: pennant → bear flag → pennant
+ * on three bars).
+ */
+function firstFit(
+    ctx: QualifyContext,
+    base: PivotPoint,
+    top: PivotPoint,
+    pole: number,
+    latestEnd: number
+): QualifiedPattern | null {
+    for (let end = top.index + FLAG_MIN_BARS; end <= latestEnd; end++) {
+        const q = fitFlag(ctx, base, top, end, pole, false);
+        if (q !== null) return q;
     }
     return null;
 }
@@ -123,7 +186,8 @@ function fitFlag(
     base: PivotPoint,
     top: PivotPoint,
     end: number,
-    pole: number
+    pole: number,
+    requireExit: boolean
 ): QualifiedPattern | null {
     const direction: PatternBreakoutDirection =
         top.kind === 'high' ? 'up' : 'down';
@@ -137,6 +201,12 @@ function fitFlag(
             : extremePoint(highs, isHigher);
     if (sign * (top.price - flagExtreme.price) > FLAG_MAX_RETRACE * pole)
         return null;
+    // No flag bar runs past the pole's end (FLAG_MAX_BEYOND_POLE_ATR).
+    const beyondPole =
+        direction === 'up'
+            ? Math.max(...highs.map(p => p.price)) - top.price
+            : top.price - Math.min(...lows.map(p => p.price));
+    if (beyondPole > FLAG_MAX_BEYOND_POLE_ATR * ctx.atr) return null;
 
     const upper = fitBoundaryLine(
         localExtremes(highs, isHigher),
@@ -165,13 +235,32 @@ function fitFlag(
     const startWidth = lineValueAt(upper, from) - lineValueAt(lower, from);
     const endWidth = lineValueAt(upper, end) - lineValueAt(lower, end);
     if (!(startWidth > 0 && endWidth > 0)) return null;
+    if (startWidth > FLAG_MAX_START_WIDTH_POLE_SHARE * pole) return null;
+    // A flag that ends before the last bar ends because price left it: the
+    // next bar is outside the channel. One still inside means the range
+    // simply went on — past FLAG_MAX_BARS that is a box, not a flag.
+    if (
+        requireExit &&
+        end < ctx.lastIndex &&
+        staysInside(ctx, upper, lower, end + 1)
+    )
+        return null;
 
+    // Flag vs pennant is read over the channel's own touches (first to last
+    // touch of either line), which only move when a new touch confirms —
+    // read from the flag's first bar to its last, the label flipped between
+    // consecutive bars as the end crept along (2026-10-08 replay sweep).
+    const a = Math.min(upper.start.index, lower.start.index);
+    const b = Math.max(upper.end.index, lower.end.index);
+    const touchStartWidth = lineValueAt(upper, a) - lineValueAt(lower, a);
+    const touchEndWidth = lineValueAt(upper, b) - lineValueAt(lower, b);
+    if (!(touchStartWidth > 0 && touchEndWidth > 0)) return null;
     const id = flagPatternId(
         ctx,
         direction,
-        endWidth / startWidth,
-        lineValueAt(upper, end) - lineValueAt(upper, from),
-        lineValueAt(lower, end) - lineValueAt(lower, from),
+        touchEndWidth / touchStartWidth,
+        lineValueAt(upper, b) - lineValueAt(upper, a),
+        lineValueAt(lower, b) - lineValueAt(lower, a),
         ctx.bars[end].close
     );
     if (id === null) return null;
@@ -192,6 +281,21 @@ function fitFlag(
         },
         touches: upper.touches.length + lower.touches.length,
     };
+}
+
+/** Whether bar `i` lies within both channel lines (by the containment slack). */
+function staysInside(
+    ctx: QualifyContext,
+    upper: PatternLine,
+    lower: PatternLine,
+    i: number
+): boolean {
+    const slack = BOUNDARY_CONTAINMENT_ATR * ctx.atr;
+    const bar = ctx.bars[i];
+    return (
+        bar.high <= lineValueAt(upper, i) + slack &&
+        bar.low >= lineValueAt(lower, i) - slack
+    );
 }
 
 /**

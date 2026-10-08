@@ -36,9 +36,15 @@ import { type Contender, arbitrate } from '@/domain/patterns/qualify/arbitrate';
  * that do not qualify come back as `shapeHints`.
  *
  * Runs every family's strict detector over the CONFIRMED pivots of the last
- * `SCREEN_LOOKBACK_BARS` bars (extracted over the whole series, so a pivot
- * never shifts when the window slides), independently of the loose hits —
- * the pre-screener misses textbook flags and cups the strict rules accept.
+ * `SCREEN_LOOKBACK_BARS` bars. It does not start from the loose hits: the
+ * pre-screener misses textbook flags and cups the strict rules accept.
+ *
+ * Pivots are extracted over the whole series with the per-bar ATR
+ * (`atrSeries`), one per bar, so each is fixed by the bars up to the bar that
+ * confirmed it: neither a sliding window nor a drifting latest ATR moves,
+ * adds or removes an earlier pivot (see `extractPivots`). Only the strict
+ * tolerances (containment, touches, heights) use the latest `atr`.
+ *
  * Hits the price has already failed or fulfilled (`isSpentPattern`) are
  * dropped before the §2.5 arbitration, so a spent hit cannot knock out a
  * live one.
@@ -49,6 +55,10 @@ import { type Contender, arbitrate } from '@/domain/patterns/qualify/arbitrate';
  * @param bars - The full bar series, oldest-first.
  * @param atr - Average True Range for `bars`.
  * @param timeframe - Bar resolution; sets the minimum height's price share.
+ * @param atrSeries - Per-bar ATR aligned with `bars` — the same series the
+ *   prompt's indicators carry (`calculateATR`). Pivot thresholds read it; a
+ *   caller that omits it gets one threshold from `atr` for the whole series,
+ *   which is not causal (tests pin ATR this way).
  * @returns The qualified patterns and the loose ids left as shape hints.
  *   Nothing qualifies when `bars` is empty or `atr` is not a positive
  *   number; every loose id is then a shape hint.
@@ -57,7 +67,8 @@ export function qualifyPatterns(
     candidates: readonly PatternCandidate[],
     bars: readonly Bar[],
     atr: number,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    atrSeries?: readonly (number | null)[]
 ): PatternQualification {
     const looseIds = [...new Set(candidates.map(c => c.id))];
     if (bars.length === 0 || !Number.isFinite(atr) || atr <= 0)
@@ -66,7 +77,9 @@ export function qualifyPatterns(
     const windowStart = Math.max(0, bars.length - SCREEN_LOOKBACK_BARS);
     const ctx: QualifyContext = {
         bars,
-        pivots: extractPivots(bars, atr).filter(p => p.index >= windowStart),
+        pivots: extractPivots(bars, atrSeries ?? atr, {
+            onePivotPerBar: true,
+        }).filter(p => p.index >= windowStart),
         atr,
         lastIndex: bars.length - 1,
         minHeightPricePct: PATTERN_MIN_HEIGHT_PRICE_PCT[timeframe],

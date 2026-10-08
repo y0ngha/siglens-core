@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import type { Bar } from '@/domain/types';
 import { extractPivots } from '@/domain/patterns/pivots';
 import { PIVOT_REVERSAL_ATR_MULT } from '@/domain/patterns/constants';
 import { makeBars, makeHLBars } from '@/__tests__/domain/patterns/helpers';
@@ -121,6 +122,40 @@ describe('extractPivots', () => {
         expect(pivots).toEqual([{ index: 2, price: 2, kind: 'low' }]);
     });
 
+    it('onePivotPerBar: 넓은 bar 하나가 고점·저점 피벗 둘이 되지 않는다 (자기 저점을 확정하면 고점은 다음 bar부터)', () => {
+        const bars = makeHLBars([
+            [10, 10], // idx0: seed
+            [
+                10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+                10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+            ], // idx1: 'down'
+            [20, 2], // idx2: confirms its own low; its high 20 is not a swing
+            [19, 19], // idx3
+            [18, 17], // idx4: 19 − 17 ≥ 1.5 confirms the high at idx3
+        ]);
+        expect(extractPivots(bars, ATR, { onePivotPerBar: true })).toEqual([
+            { index: 2, price: 2, kind: 'low' },
+            { index: 3, price: 19, kind: 'high' },
+        ]);
+    });
+
+    it('기본(원래 zigzag)은 같은 넓은 bar를 고점·저점 피벗 둘로 둔다 — 오버레이 빌더가 측정된 동작', () => {
+        const bars = makeHLBars([
+            [10, 10],
+            [
+                10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+                10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+            ],
+            [20, 2],
+            [19, 19],
+            [18, 17],
+        ]);
+        expect(extractPivots(bars, ATR)).toEqual([
+            { index: 2, price: 2, kind: 'low' },
+            { index: 2, price: 20, kind: 'high' },
+        ]);
+    });
+
     it('동률 고점은 먼저 나온 인덱스를 유지한다', () => {
         // atr=ATR(1) → threshold=PIVOT_REVERSAL_ATR_MULT(1.5). idx1 and idx2
         // both have high=13; the strict `>` comparison means idx2 does NOT
@@ -136,7 +171,65 @@ describe('extractPivots', () => {
         expect(pivots).toEqual([{ index: 1, price: 13, kind: 'high' }]);
     });
 
+    describe('per-bar ATR series', () => {
+        // A rise to 12 (idx1), then a 2-point drop at idx2: confirms the
+        // high only if the ATR AT idx2 makes the threshold ≤ 2.
+        const bars = makeHLBars([
+            [10, 10],
+            [12, 12],
+            [10, 10],
+            [11, 11],
+        ]);
+
+        it('confirms with the ATR at the confirming bar', () => {
+            expect(extractPivots(bars, [1, 1, 1, 9])).toEqual([
+                { index: 1, price: 12, kind: 'high' },
+            ]);
+        });
+
+        it('does not confirm when the ATR at that bar makes the reversal too small, whatever the ATR later', () => {
+            expect(extractPivots(bars, [1, 1, 2, 1])).toEqual([]);
+        });
+
+        it('warm-up bars (null) use the first ATR in the series', () => {
+            expect(extractPivots(bars, [null, null, null, 1])).toEqual([
+                { index: 1, price: 12, kind: 'high' },
+            ]);
+            expect(extractPivots(bars, [null, null, null, 2])).toEqual([]);
+        });
+
+        it("a gap mid-series (null) reuses the previous bar's ATR, not the first one", () => {
+            // First value 2 (threshold 3) would not confirm the 2-point drop
+            // at idx2; the previous bar's 1 (threshold 1.5) does.
+            expect(extractPivots(bars, [2, 1, null, 2])).toEqual([
+                { index: 1, price: 12, kind: 'high' },
+            ]);
+        });
+
+        it('a series with no ATR at all confirms nothing', () => {
+            expect(extractPivots(bars, [null, null, null, null])).toEqual([]);
+        });
+    });
+
     describe('includeProvisional', () => {
+        it('마지막 확정 피벗과 동일 인덱스면 추가하지 않는다 (원래 zigzag)', () => {
+            // idx2 confirms its own low and becomes the running high (20)
+            // in the same iteration; idx3 only ties it, so the provisional
+            // high would sit on the confirmed low's own bar.
+            const bars = makeHLBars([
+                [10, 10],
+                [
+                    10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+                    10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+                ],
+                [20, 2],
+                [20, 20],
+            ]);
+            expect(
+                extractPivots(bars, ATR, { includeProvisional: true })
+            ).toEqual([{ index: 2, price: 2, kind: 'low' }]);
+        });
+
         it('진행 중인 극값을 마지막 피벗으로 추가한다 (V자 → 마지막 인덱스의 고점)', () => {
             const bars = makeBars([10, 9, 8, 7, 8, 9, 10, 11]);
 
@@ -161,27 +254,84 @@ describe('extractPivots', () => {
             );
         });
 
-        it('마지막 확정 피벗과 동일 인덱스면 추가하지 않는다', () => {
+        it('onePivotPerBar: 자기 저점을 확정한 넓은 bar의 고점은 잠정 피벗이 되지 않는다 — 다음 bar부터 센다', () => {
             // atr=ATR(1) → threshold=PIVOT_REVERSAL_ATR_MULT(1.5). idx2 is
-            // the gap bar from the earlier test: it confirms the low pivot
-            // AND becomes the new running high in the same iteration
-            // (direction flips to 'up' with runningHighIndex=2). idx3 only
-            // ties that running high (20), so runningHighIndex never moves
-            // past 2 — the provisional high would duplicate the confirmed
-            // low pivot's own index and must be omitted.
+            // the gap bar from the earlier test: it confirms its own low.
+            // The up leg starts on idx3, so the provisional high is idx3's,
+            // never idx2's own high (one pivot per bar).
             const bars = makeHLBars([
                 [10, 10], // idx0: seed
                 [
                     10 - PIVOT_REVERSAL_ATR_MULT * ATR,
                     10 - PIVOT_REVERSAL_ATR_MULT * ATR,
                 ], // idx1: establishes 'down' direction
-                [20, 2], // idx2: gap bar → confirms low pivot at idx2, flips up, runningHigh=20@idx2
-                [20, 20], // idx3: ties running high (not >) — index stays 2
+                [20, 2], // idx2: gap bar → confirms its own low
+                [19, 19], // idx3: first bar of the up leg
             ]);
-            const pivots = extractPivots(bars, ATR, {
-                includeProvisional: true,
-            });
-            expect(pivots).toEqual([{ index: 2, price: 2, kind: 'low' }]);
+            expect(
+                extractPivots(bars, ATR, {
+                    includeProvisional: true,
+                    onePivotPerBar: true,
+                })
+            ).toEqual([
+                { index: 2, price: 2, kind: 'low' },
+                { index: 3, price: 19, kind: 'high' },
+            ]);
+        });
+
+        it('onePivotPerBar: 마지막 bar가 자기 극값을 확정했으면 잠정 피벗이 없다', () => {
+            const bars = makeHLBars([
+                [10, 10],
+                [
+                    10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+                    10 - PIVOT_REVERSAL_ATR_MULT * ATR,
+                ],
+                [20, 2],
+            ]);
+            expect(
+                extractPivots(bars, ATR, {
+                    includeProvisional: true,
+                    onePivotPerBar: true,
+                })
+            ).toEqual([{ index: 2, price: 2, kind: 'low' }]);
+        });
+    });
+
+    describe('onePivotPerBar: an outside reversal bar', () => {
+        const bar = (
+            open: number,
+            high: number,
+            low: number,
+            close: number
+        ): Bar => ({ time: 0, open, high, low, close, volume: 1000 });
+        const series = (bars: Bar[]): Bar[] =>
+            bars.map((b, i) => ({ ...b, time: i }));
+        const opts = { onePivotPerBar: true };
+        // h1 13, a down leg to 11 (idx2), then a green bar that dips under 11
+        // and rallies over 13 — the leg's low (idx2) is the swing low and the
+        // bar's high the next swing high.
+        const withDip = (dip: number): Bar[] =>
+            series([
+                bar(10, 10, 10, 10),
+                bar(13, 13, 13, 13),
+                bar(11, 11, 11, 11),
+                bar(10.9, 13.5, dip, 13.4),
+                bar(12, 12, 12, 12),
+            ]);
+
+        it('keeps the earlier low and takes the bar high as the swing high when the dip stays within the containment slack', () => {
+            expect(extractPivots(withDip(10.8), ATR, opts)).toEqual([
+                { index: 1, price: 13, kind: 'high' },
+                { index: 2, price: 11, kind: 'low' },
+                { index: 3, price: 13.5, kind: 'high' },
+            ]);
+        });
+
+        it('lets the bar confirm its own deeper low when the dip goes past the slack', () => {
+            expect(extractPivots(withDip(10.6), ATR, opts)).toEqual([
+                { index: 1, price: 13, kind: 'high' },
+                { index: 3, price: 10.6, kind: 'low' },
+            ]);
         });
     });
 });

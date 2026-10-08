@@ -986,9 +986,28 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * gains one sentence about shape hints. Bytes change on any chart with a
  * pattern hit.
  *
+ * **`p25`** — chart-pattern follow-up (2026-10-08 real-model A/B). The model
+ * copied the pipeline wording of `p24` into user-facing text ("사전
+ * 스크리너", "그리기 검증", "작도 불가"), so the `## Chart Pattern Candidates
+ * (computed)` intro no longer names how the list is made and forbids
+ * describing it; the per-id "shape hint — not drawable" lines become one
+ * `- Unconfirmed shape resemblances (…): <ids>` line (report as not
+ * detected, no levels); the empty section reads `- No pattern listed`. The
+ * patternSummaries rules gain the same do-not-describe rule, and the
+ * geometry rules now say only a pattern listed with a Candidate id carries
+ * geometry (every other one sets it to null) and targets are derived only
+ * for those. A boundary pair or flag whose breakout failed prints the
+ * status `failed breakout`. Which patterns and numbers are printed also changes:
+ * overlap arbitration on one shared pivot, a boundary-pair window that grows
+ * back to its first touches, a 15-bar H&S floor with shoulders off their
+ * trough bars, cup rims within 7%, and a channel whose second line is drawn
+ * parallel to the first; then (validation sweep) causal pivots read off the
+ * per-bar ATR, stricter cup/rounding, flag, H&S and double/triple rules.
+ * Bytes change on every request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p24' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p25' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     CHART_PATTERN_CANDIDATES_SECTION_INTRO,
-    SHAPE_HINT_MARKER,
+    NO_CHART_PATTERNS_LINE,
+    SHAPE_RESEMBLANCES_LABEL,
     formatChartPatternCandidatesSection,
+    isFailedBreakout,
     printedPatternGeometriesByOverlayId,
     spacingLine,
 } from '@/domain/analysis/chartPatternCandidatesSection';
@@ -143,13 +145,13 @@ const undirectedRectangle: QualifiedPattern = {
 };
 
 describe('formatChartPatternCandidatesSection', () => {
-    it('renders "None detected" when nothing qualified and nothing was hinted', () => {
+    it('renders the no-pattern line when nothing qualified and nothing was hinted', () => {
         expect(render([], makeBars([1]), null)).toBe(
-            `${CHART_PATTERN_CANDIDATES_SECTION_HEADER}\n${CHART_PATTERN_CANDIDATES_SECTION_INTRO}\n- None detected by the pre-screener`
+            `${CHART_PATTERN_CANDIDATES_SECTION_HEADER}\n${CHART_PATTERN_CANDIDATES_SECTION_INTRO}\n${NO_CHART_PATTERNS_LINE}`
         );
     });
 
-    it('lists a pre-screener hit that did not qualify as one "shape hint — not drawable" line with no id and no numbers', () => {
+    it('names every pre-screener hit that did not qualify on one shape-resemblance line, with no id and no numbers', () => {
         const section = render([], makeBars([1, 2, 3]), 1, {
             hints: ['ascending_triangle', 'double_top'],
         });
@@ -157,20 +159,49 @@ describe('formatChartPatternCandidatesSection', () => {
             [
                 CHART_PATTERN_CANDIDATES_SECTION_HEADER,
                 CHART_PATTERN_CANDIDATES_SECTION_INTRO,
-                `### ascending_triangle — ${SHAPE_HINT_MARKER}`,
-                `### double_top — ${SHAPE_HINT_MARKER}`,
+                `- ${SHAPE_RESEMBLANCES_LABEL}: ascending_triangle, double_top`,
             ].join('\n')
         );
     });
 
-    it('the intro tells the model a shape hint has no Candidate id', () => {
+    it('the intro tells the model a shape resemblance is reported as not detected, with no levels', () => {
         expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
-            `"${SHAPE_HINT_MARKER}"`
+            '"Unconfirmed shape resemblances"'
+        );
+        expect(
+            SHAPE_RESEMBLANCES_LABEL.startsWith(
+                'Unconfirmed shape resemblances'
+            )
+        ).toBe(true);
+        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
+            'report it as detected: false and give no levels'
         );
         expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
             'leave candidateId empty'
         );
     });
+
+    it('the intro forbids describing how the section was produced', () => {
+        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
+            'never describe how this section was produced or why a pattern is or is not in it'
+        );
+    });
+
+    // The 2026-10-08 A/B: these words in the section were copied into
+    // user-facing text ("사전 스크리너", "그리기 검증", "작도 불가"). Removed
+    // on purpose; a revert must fail here (CONVENTIONS.md#TE-12 exception).
+    it.each(['screen', 'drawable', 'drawing', 'shape hint', 'qualif', 'check'])(
+        'no rendered line of the section says "%s"',
+        word => {
+            const f = ascendingTriangle as Fixture;
+            const section = render(qualifiedOf(f), f.bars, f.atr, {
+                hints: ['triple_top'],
+            });
+            const none = render([], makeBars([1]), null);
+            expect(section.toLowerCase()).not.toContain(word);
+            expect(none.toLowerCase()).not.toContain(word);
+        }
+    );
 
     it('renders a qualified pattern with its computed numbers, % distances and Candidate id, hints after it', () => {
         const f = ascendingTriangle as Fixture;
@@ -193,9 +224,9 @@ describe('formatChartPatternCandidatesSection', () => {
             `- Invalidation level: ${p.invalidationLevel!.toFixed(2)}`
         );
         expect(tri).toMatch(/- Key points: resistance touch 1 /);
-        expect(section.endsWith(`### triple_top — ${SHAPE_HINT_MARKER}`)).toBe(
-            true
-        );
+        expect(
+            section.endsWith(`- ${SHAPE_RESEMBLANCES_LABEL}: triple_top`)
+        ).toBe(true);
     });
 
     it('prints the Spacing line right after Key points for a double top', () => {
@@ -482,5 +513,44 @@ describe('printedPatternGeometry', () => {
                 2
             ).invalidationLevel
         ).toBe(61.46);
+    });
+});
+
+describe('isFailedBreakout', () => {
+    // undirectedRectangle: upper 20 touched at bars 1 and 3, lower 10 at 2 and 4.
+    const closes = (tail: number[]): Bar[] =>
+        makeBars([15, 15, 15, 15, 15, 15, ...tail]);
+
+    it('an undirected pair: a close over the upper boundary after its last touch, then back inside, failed', () => {
+        expect(
+            isFailedBreakout(undirectedRectangle, null, closes([21, 15]), 1)
+        ).toBe(true);
+    });
+
+    it('is not failed while the last close is itself outside (that is broken)', () => {
+        expect(
+            isFailedBreakout(undirectedRectangle, null, closes([15, 21]), 1)
+        ).toBe(false);
+    });
+
+    it('a close beyond by no more than the containment slack is not a breakout', () => {
+        expect(
+            isFailedBreakout(undirectedRectangle, null, closes([20.25, 15]), 1)
+        ).toBe(false);
+    });
+
+    it('a directed pair only watches its breakout side', () => {
+        expect(
+            isFailedBreakout(undirectedRectangle, 'up', closes([9, 15]), 1)
+        ).toBe(false);
+        expect(
+            isFailedBreakout(undirectedRectangle, 'down', closes([9, 15]), 1)
+        ).toBe(true);
+    });
+
+    it('never applies to families without a dashed boundary (a double top)', () => {
+        expect(
+            isFailedBreakout(tallDoubleTop, 'down', closes([0, 15]), 1)
+        ).toBe(false);
     });
 });

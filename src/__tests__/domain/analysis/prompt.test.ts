@@ -20,6 +20,7 @@ import {
     distanceFromExtreme,
 } from '@/domain/analysis/prompt';
 import { INDICATOR_STATE_SECTION_HEADER } from '@/domain/analysis/indicatorState';
+import { CHART_PATTERN_CANDIDATES_SECTION_HEADER } from '@/domain/analysis/chartPatternCandidatesSection';
 import { calculateIndicators } from '@/domain/indicators/index';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
 import doubleTopFixture from '@/__tests__/domain/patterns/fixtures/double-top.json';
@@ -2988,7 +2989,7 @@ describe('prompt', () => {
             );
         });
 
-        it('Chart Pattern Candidates 섹션에 pre-screener는 힌트일 뿐이라는 인트로가 포함된다', () => {
+        it('Chart Pattern Candidates 섹션 인트로는 목록이 경계가 아니라고 말한다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -2997,11 +2998,93 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain(
-                'They are hints, not an exhaustive list and not a verdict'
+                'The list is not exhaustive and not a verdict'
             );
             expect(result).toContain(
-                'report any other pattern you can clearly see even if it is not listed here'
+                'you may also report a pattern this section does not name if you can clearly see it in the bars'
             );
+            // 목록 밖 패턴은 서술만 — 앱이 그 geometry를 버리므로(alignPatternGeometry) 채우게 하지 않는다.
+            expect(result).toContain(
+                'leave candidateId empty and set geometry to null'
+            );
+        });
+
+        it('patternSummaries 규칙은 패턴 목록이 어떻게 만들어졌는지 쓰지 말라고 한다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
+            );
+            expect(result).toContain(
+                `Never describe how ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} was produced, what it lists or leaves out, or why`
+            );
+        });
+
+        describe('geometry는 Candidate id가 있는 패턴만 싣는다 (인트로와 Writing Rules 일치)', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
+            );
+
+            it('Candidate id가 있는 패턴만 geometry를 싣는다고 말한다', () => {
+                expect(result).toContain(
+                    `- Only a detected: true pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} carries geometry:`
+                );
+            });
+
+            it('나머지 패턴은 geometry를 null로 둔다고 말한다', () => {
+                expect(result).toContain(
+                    `has no Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} — sets geometry to null; describe its structure with keyPrices instead.`
+                );
+                expect(result).toContain(
+                    'ground every key price in the bars, and set candidateId and geometry to null.'
+                );
+            });
+
+            // The old rules told the model to fill geometry for unlisted
+            // patterns, contradicting the section intro (CONVENTIONS.md#TE-12).
+            it.each(['fill geometry', 'For every detected: true pattern'])(
+                '어떤 규칙도 "%s"라고 말하지 않는다',
+                phrase => {
+                    expect(result).not.toContain(phrase);
+                }
+            );
+        });
+
+        it('geometry 규칙은 목표가가 Candidate id가 있는 패턴에만 계산된다고 말한다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
+            );
+            expect(result).toContain(
+                `the app derives both from geometry, and only for a pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}.`
+            );
+        });
+
+        // Pipeline wording the 2026-10-08 A/B saw copied into user-facing
+        // text — removed from the prompt on purpose (CONVENTIONS.md#TE-12).
+        it.each([
+            'pre-screener',
+            'shape hint',
+            'not drawable',
+            'drawing checks',
+        ])('프롬프트 어디에도 "%s"가 없다', phrase => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
+            );
+            expect(result).not.toContain(phrase);
         });
     });
 

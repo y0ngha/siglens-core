@@ -19,9 +19,12 @@ import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
  * Pipeline:
  * 1. Slice `bars` down to the last `SCREEN_LOOKBACK_BARS` (or fewer, if
  *    `bars` is shorter — the whole input is used).
- * 2. Extract pivots over that window with `includeProvisional: true`, so
- *    classifiers can see the still-forming extreme at the right edge of the
- *    chart — patterns must be recognizable in what is on the chart *now*.
+ * 2. Extract pivots over the whole series (with `atrSeries` when given, the
+ *    causal per-bar thresholds `qualifyPatterns` uses too) and keep those in
+ *    that window, with `includeProvisional: true` so classifiers can see the
+ *    still-forming extreme at the right edge of the chart — patterns must be
+ *    recognizable in what is on the chart *now*. Extracting over the whole
+ *    series keeps a pivot from shifting as the window slides.
  * 3. Run every classifier in `CLASSIFIERS` and flatten the results.
  * 4. Dedupe by `id` (first occurrence wins) and sort by
  *    `id.localeCompare(..., 'en')` for a deterministic, order-independent
@@ -36,19 +39,27 @@ import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
  * @param bars - OHLCV bars sorted oldest-first. The full available history —
  * this function does its own windowing.
  * @param atr - Average True Range for the same bars (scale reference).
+ * @param atrSeries - Per-bar ATR aligned with `bars` for the pivot
+ *   thresholds (see `extractPivots`); omitted, `atr` is used for all bars.
  * @returns Deduped, deterministically sorted pattern candidates; `[]` when
  * `bars` is empty, `atr <= 0`, or no classifier matches.
  */
 export function screenChartPatterns(
     bars: readonly Bar[],
-    atr: number
+    atr: number,
+    atrSeries?: readonly (number | null)[]
 ): PatternCandidate[] {
     if (bars.length === 0 || atr <= 0) return [];
 
     const offset = Math.max(0, bars.length - SCREEN_LOOKBACK_BARS);
     const windowBars = bars.slice(offset);
 
-    const pivots = extractPivots(windowBars, atr, { includeProvisional: true });
+    const pivots = extractPivots(bars, atrSeries ?? atr, {
+        includeProvisional: true,
+        onePivotPerBar: true,
+    })
+        .filter(p => p.index >= offset)
+        .map(p => ({ ...p, index: p.index - offset }));
     const raw = CLASSIFIERS.flatMap(classify =>
         classify(pivots, windowBars, atr)
     );

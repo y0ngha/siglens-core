@@ -425,6 +425,7 @@ async function runAnalysisImpl(
         dynamic,
         overlayCandidates,
         overlayBuildFailures,
+        patternScreenFailure,
         patternGeometries,
     } = buildAnalysisPrompt(
         symbol,
@@ -441,6 +442,16 @@ async function runAnalysisImpl(
         marketEventCandidates,
         options.currency
     );
+    // Logged here, before the model call, so a failure is reported even when
+    // the generation itself fails: without it a throwing qualifier reads as
+    // "this chart has no patterns".
+    if (patternScreenFailure !== null) {
+        console.warn('[ChartPatterns] pattern screening failed', {
+            symbol,
+            timeframe,
+            error: patternScreenFailure,
+        });
+    }
 
     // `stable` (Analysis Intent + Guidelines, then the always-on skill digests)
     // folds into SYSTEM so the cross-symbol-identical head becomes the
@@ -516,8 +527,7 @@ async function runAnalysisImpl(
         alignPatternGeometry(
             enriched,
             resolvedOverlays.chartOverlays,
-            patternGeometries,
-            skills
+            patternGeometries
         ),
         lastClose,
         atr,

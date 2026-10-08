@@ -10,6 +10,9 @@ import {
     BOUNDARY_CONTAINMENT_ATR,
     CUP_HANDLE_MAX_DEPTH_RATIO,
     CUP_MIN_BARS,
+    CUP_PRIOR_ADVANCE_SPAN_SHARE,
+    CUP_RIM_MATCH_MAX_PRICE_PCT,
+    CUP_RIM_MAX_DEPTH_SHARE,
     CURVATURE_VERTEX_MID_HI,
     CURVATURE_VERTEX_MID_LO,
     HANDLE_MAX_BARS,
@@ -47,31 +50,35 @@ interface RimSpan {
 
 /**
  * The checks a cup and a rounding base share: rims (confirmed pivots of the
- * rim kind) at least `CUP_MIN_BARS` apart and within
- * `RIM_MATCH_MAX_PRICE_PCT` of each other, no bar between them beyond the
- * higher (lower, top) rim by more than the containment slack, a depth past
- * the height floor, and a U rather than a V (`isUShaped`).
+ * rim kind) at least `CUP_MIN_BARS` apart, within `rimMatchPct` of each
+ * other (`RIM_MATCH_MAX_PRICE_PCT` for a rounding base,
+ * `CUP_RIM_MATCH_MAX_PRICE_PCT` for a cup) AND within
+ * `CUP_RIM_MAX_DEPTH_SHARE` of the depth; no bar inside the bowl beyond
+ * the LOWER rim (the upper one, for a top) by more than the containment
+ * slack (`breaksInnerRim`);
+ * a depth past the height floor on BOTH sides — measured from the lower rim
+ * — and a U rather than a V (`isUShaped`).
  */
 function measureRimSpan(
     ctx: QualifyContext,
     left: PivotPoint,
     right: PivotPoint,
-    shape: CurveShape
+    shape: CurveShape,
+    rimMatchPct: number
 ): RimSpan | null {
     if (right.index - left.index + 1 < CUP_MIN_BARS) return null;
-    if (
-        Math.abs(left.price - right.price) >
-        RIM_MATCH_MAX_PRICE_PCT * Math.max(left.price, right.price)
-    )
-        return null;
+    const rimGap = Math.abs(left.price - right.price);
+    if (rimGap > rimMatchPct * Math.max(left.price, right.price)) return null;
     const sign = shape === 'bottom' ? 1 : -1;
-    const lip = sign * Math.max(sign * left.price, sign * right.price);
+    // The rim nearer the extreme: the lower of a bottom's, the higher of a top's.
+    const innerRim = sign * Math.min(sign * left.price, sign * right.price);
     const slack = BOUNDARY_CONTAINMENT_ATR * ctx.atr;
-    const interior = ctx.bars.slice(left.index + 1, right.index);
-    const breaksLip = interior.some(bar =>
-        shape === 'bottom' ? bar.high > lip + slack : bar.low < lip - slack
-    );
-    if (breaksLip) return null;
+    const beyondRim = (bar: Bar): boolean =>
+        shape === 'bottom'
+            ? bar.high > innerRim + slack
+            : bar.low < innerRim - slack;
+    if (breaksInnerRim(ctx.bars, left.index, right.index, beyondRim))
+        return null;
     const extreme =
         shape === 'bottom'
             ? extremePoint(
@@ -83,7 +90,9 @@ function measureRimSpan(
                   isHigher
               );
     const depth = sign * (right.price - extreme.price);
-    if (depth < minHeight(ctx, right.price)) return null;
+    const innerDepth = sign * (innerRim - extreme.price);
+    if (innerDepth < minHeight(ctx, innerRim)) return null;
+    if (rimGap > CUP_RIM_MAX_DEPTH_SHARE * innerDepth) return null;
     if (
         !isUShaped(
             ctx.bars,
@@ -96,6 +105,48 @@ function measureRimSpan(
     )
         return null;
     return { extreme, depth };
+}
+
+/**
+ * Whether a bar between the rims pokes beyond the inner rim (`beyondRim`)
+ * once price has left the rims: the bars of the higher rim's own leg —
+ * before price first gets back inside the inner rim from the left, after it
+ * last was inside on the right — sit above the lower rim by construction
+ * and are not counted. Anywhere else such a bar means the base is not one
+ * bowl (a staircase of rising highs, a second peak in the middle).
+ */
+function breaksInnerRim(
+    bars: readonly Bar[],
+    left: number,
+    right: number,
+    beyondRim: (bar: Bar) => boolean
+): boolean {
+    // The rims' own legs may sit beyond the lower rim — skip the bars beyond it at
+    // both ends, then any bar beyond it in between breaks the cup.
+    const interior = bars.slice(left + 1, right);
+    const first = interior.findIndex(bar => !beyondRim(bar));
+    if (first === -1) return false;
+    const last = interior.findLastIndex(bar => !beyondRim(bar));
+    return interior.slice(first, last + 1).some(beyondRim);
+}
+
+/**
+ * Whether the left rim tops the bars before it over
+ * `CUP_PRIOR_ADVANCE_SPAN_SHARE` of the cup's span — price advanced into
+ * it (by the containment slack). As much history as exists counts.
+ */
+function hasPriorAdvance(
+    ctx: QualifyContext,
+    left: PivotPoint,
+    right: PivotPoint
+): boolean {
+    const lookback = Math.ceil(
+        CUP_PRIOR_ADVANCE_SPAN_SHARE * (right.index - left.index)
+    );
+    const slack = BOUNDARY_CONTAINMENT_ATR * ctx.atr;
+    return ctx.bars
+        .slice(Math.max(0, left.index - lookback), left.index)
+        .every(bar => bar.high <= left.price + slack);
 }
 
 /**
@@ -125,17 +176,26 @@ function isUShaped(
  * `HANDLE_MAX_BARS` bars back; the handle low — the lowest confirmed swing
  * low after the right rim, so it does not follow a falling current leg —
  * sits at or above the cup's midpoint: no deeper than
- * `CUP_HANDLE_MAX_DEPTH_RATIO` of the cup below the right rim. The earliest
- * left rim that passes wins.
+ * `CUP_HANDLE_MAX_DEPTH_RATIO` of the cup below the right rim. The left rim
+ * tops the bars before it (`hasPriorAdvance`) and the bottom sits in the
+ * middle half of the span by time. The earliest right rim in
+ * the handle window, then the earliest left rim, that passes wins.
  */
 export function qualifyCup(ctx: QualifyContext): QualifiedPattern[] {
     const rims = ctx.pivots.filter(p => p.kind === 'high');
-    for (let r = rims.length - 1; r >= 1; r--) {
-        const right = rims[r];
-        const handleBars = ctx.lastIndex - right.index;
-        if (handleBars > HANDLE_MAX_BARS) break;
-        if (handleBars < HANDLE_MIN_BARS) continue;
-        for (const left of rims.slice(0, r)) {
+    // Right rims oldest first: once a cup qualifies on a right rim, a later
+    // high entering the handle window does not re-select it (the cup stays
+    // the same drawing until it is spent or ages out).
+    const rights = rims.filter((p, r) => {
+        const handleBars = ctx.lastIndex - p.index;
+        return (
+            r >= 1 &&
+            handleBars >= HANDLE_MIN_BARS &&
+            handleBars <= HANDLE_MAX_BARS
+        );
+    });
+    for (const right of rights) {
+        for (const left of rims.filter(p => p.index < right.index)) {
             const q = qualifyCupAt(ctx, left, right);
             if (q) return [q];
         }
@@ -148,16 +208,34 @@ function qualifyCupAt(
     left: PivotPoint,
     right: PivotPoint
 ): QualifiedPattern | null {
-    const span = measureRimSpan(ctx, left, right, 'bottom');
+    if (!hasPriorAdvance(ctx, left, right)) return null;
+    const span = measureRimSpan(
+        ctx,
+        left,
+        right,
+        'bottom',
+        CUP_RIM_MATCH_MAX_PRICE_PCT
+    );
     const handleLow = lowestConfirmedLowAfter(ctx, right.index);
     if (span === null || handleLow === null) return null;
+    // The cup's bottom sits in the middle half of the rim-to-rim span, by
+    // time: a crash off the left rim followed by a long climb back is a V on
+    // its side, not a bowl. (A rounding base checks its fitted vertex.)
+    const at = (span.extreme.index - left.index) / (right.index - left.index);
+    if (at < CURVATURE_VERTEX_MID_LO || at > CURVATURE_VERTEX_MID_HI)
+        return null;
     if (right.price - handleLow.price > CUP_HANDLE_MAX_DEPTH_RATIO * span.depth)
         return null;
     return {
         id: 'cup_and_handle',
         startIndex: left.index,
         endIndex: handleLow.index,
-        pivots: ctx.pivots.filter(p => p.index >= left.index),
+        // Only the cup's own structure, left rim to handle low: a swing after
+        // the handle belongs to whatever forms next, and arbitration treats
+        // one shared pivot as overlap.
+        pivots: ctx.pivots.filter(
+            p => p.index >= left.index && p.index <= handleLow.index
+        ),
         shape: {
             kind: 'cup',
             leftRim: left,
@@ -199,7 +277,13 @@ function qualifyRoundingAt(
     right: PivotPoint,
     shape: CurveShape
 ): QualifiedPattern | null {
-    const span = measureRimSpan(ctx, left, right, shape);
+    const span = measureRimSpan(
+        ctx,
+        left,
+        right,
+        shape,
+        RIM_MATCH_MAX_PRICE_PCT
+    );
     if (span === null || !isRecent(ctx, right.index, right.index - left.index))
         return null;
     const closes = ctx.bars

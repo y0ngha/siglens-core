@@ -829,7 +829,7 @@ describe('resolveChartOverlays', () => {
                 [],
                 SKILLS
             );
-            return alignPatternGeometry(a, chartOverlays, geometries, SKILLS)
+            return alignPatternGeometry(a, chartOverlays, geometries)
                 .patternSummaries;
         };
 
@@ -872,73 +872,95 @@ describe('resolveChartOverlays', () => {
             expect(p?.geometry).toEqual(PRINTED);
         });
 
-        it('only the card that drew the candidate gets its geometry, not a later card citing the same id', () => {
-            const model: PatternTargetGeometry = {
-                breakoutLevel: 110,
-                extremeLevel: 101,
-                direction: 'up',
-            };
-            const [, second] = align([
+        it('only the card that drew the candidate gets its geometry: a later card citing the same id draws nothing and keeps none', () => {
+            const [first, second] = align([
                 card({ candidateId: 'pattern:double_bottom:1' }),
                 card({
                     id: 'double_bottom_1',
                     candidateId: 'pattern:double_bottom:1',
-                    geometry: model,
-                }),
-            ]);
-            expect(second?.geometry).toEqual(model);
-        });
-
-        it('leaves an unresolved card without geometry as it is', () => {
-            const [p] = align([
-                card({
-                    id: 'double_top_0',
-                    patternName: 'double_top',
-                    skillName: '이중천장',
-                }),
-            ]);
-            expect(p).not.toHaveProperty('geometry');
-        });
-
-        it('drops the geometry of an unresolved card when its direction contradicts the skill category', () => {
-            const [p] = align([
-                card({
-                    id: 'double_top_0',
-                    patternName: 'double_top',
-                    skillName: '이중천장',
                     geometry: {
-                        breakoutLevel: 90,
-                        extremeLevel: 80,
+                        breakoutLevel: 110,
+                        extremeLevel: 101,
                         direction: 'up',
                     },
                 }),
             ]);
-            expect(p).not.toHaveProperty('geometry');
+            expect(first?.geometry).toEqual(PRINTED);
+            expect(second).not.toHaveProperty('geometry');
         });
 
-        it.each([
-            [
-                'a direction matching the category',
-                '이중천장',
-                'double_top',
-                'down',
-            ],
-            ['a neutral category', '대칭삼각형', 'symmetrical_triangle', 'up'],
-            ['an unknown skill', '모름', '모름', 'up'],
-        ] as const)(
-            'keeps the geometry of an unresolved card for %s',
-            (_, skillName, patternName, direction) => {
-                const geometry: PatternTargetGeometry = {
-                    breakoutLevel: 90,
-                    extremeLevel: direction === 'up' ? 80 : 100,
-                    direction,
-                };
-                const [p] = align([
-                    card({ id: 'x_0', skillName, patternName, geometry }),
+        it('leaves an unresolved card without geometry as it is', () => {
+            const unresolved = card({
+                id: 'double_top_0',
+                patternName: 'double_top',
+                skillName: '이중천장',
+            });
+            expect(align([unresolved])).toEqual([unresolved]);
+        });
+
+        describe('a card that resolved to no pattern overlay (nothing drawn)', () => {
+            // A model-read channel with its own geometry and the target
+            // keyPrices it copied — IONQ 1Hour, where the app showed two
+            // targets for a card with nothing on the chart.
+            const shapeOnly = card({
+                id: 'descending_channel_0',
+                patternName: 'descending_channel',
+                skillName: '하락 채널',
+                trend: 'bearish',
+                summary: '채널 하단 41.27',
+                geometry: {
+                    breakoutLevel: 41.27,
+                    extremeLevel: 44.63,
+                    direction: 'down',
+                    invalidationLevel: 44.63,
+                },
+                keyPrices: [
+                    { label: '상단 추세선', price: 44.63 },
+                    { label: '측정 목표가', price: 37.91 },
+                    { label: '보수 목표가(50%)', price: 39.59 },
+                ],
+            });
+
+            it('drops its geometry and target-labelled keyPrices, keeping the card text and its other key prices', () => {
+                const [p] = align([shapeOnly]);
+                expect(p).not.toHaveProperty('geometry');
+                expect(p?.keyPrices).toEqual([
+                    { label: '상단 추세선', price: 44.63 },
                 ]);
-                expect(p?.geometry).toEqual(geometry);
-            }
-        );
+                expect(p?.detected).toBe(true);
+                expect(p?.summary).toBe('채널 하단 41.27');
+            });
+
+            it('no target is derived for it in post-processing', () => {
+                const a = analysis({ patternSummaries: [shapeOnly] });
+                const processed = postProcessAnalysisWithReconcile(
+                    alignPatternGeometry(a, [], GEOMETRIES),
+                    41.35,
+                    1
+                );
+                expect(
+                    (processed.patternSummaries[0]?.keyPrices ?? []).map(
+                        kp => kp.label
+                    )
+                ).toEqual(['상단 추세선']);
+            });
+
+            it('also drops a geometry whose direction matches the skill category', () => {
+                const [p] = align([
+                    card({
+                        id: 'double_top_0',
+                        patternName: 'double_top',
+                        skillName: '이중천장',
+                        geometry: {
+                            breakoutLevel: 90,
+                            extremeLevel: 100,
+                            direction: 'down',
+                        },
+                    }),
+                ]);
+                expect(p).not.toHaveProperty('geometry');
+            });
+        });
 
         describe('a card resolved to an undirected pattern (null entry: no prior trend, no target)', () => {
             const UNDIRECTED = new Map([['pattern:double_bottom:1', null]]);
@@ -986,7 +1008,7 @@ describe('resolveChartOverlays', () => {
                     SKILLS
                 );
                 const processed = postProcessAnalysisWithReconcile(
-                    alignPatternGeometry(a, chartOverlays, UNDIRECTED, SKILLS),
+                    alignPatternGeometry(a, chartOverlays, UNDIRECTED),
                     100,
                     1
                 );

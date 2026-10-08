@@ -1079,6 +1079,18 @@ then documents the wrong thing and the target is left bare. Splitting a function
 JSDoc: each piece gets its own comment describing that piece. After any change that adds
 declarations, re-check adjacency.
 
+```ts
+// ❌ the new constant lands between the doc and its function
+/** Detects a bull flag. */
+const FLAG_MAX_AGE = 20;
+function detectFlag() {}
+
+// ✅ the doc stays attached; the constant gets its own line above the block
+const FLAG_MAX_AGE = 20;
+/** Detects a bull flag. */
+function detectFlag() {}
+```
+
 <a id="JD-3"></a>
 #### JD-3 — Tag syntax
 
@@ -1153,6 +1165,11 @@ Update every doc on the changed type (interface block, field docs, record types,
 `PUBLIC_API.md` entry) and every line that restates a rule that gained an exception.
 Examples follow the rules: an example that shows what a rule forbids, or a time zone the
 new rule replaced, makes the reader guess which is right.
+
+This includes prose inside one prompt: a section intro and the "Writing Rules" below it
+state the same behavior, so changing one without the other leaves contradicting
+instructions (the intro says unlisted patterns get `geometry: null`, the rules still say
+to fill the geometry). After editing either, re-read the other.
 
 <a id="DS-6"></a>
 #### DS-6 — No process residue in code

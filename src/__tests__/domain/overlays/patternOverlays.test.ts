@@ -47,16 +47,25 @@ describe('buildPatternOverlayCandidates', () => {
         const hs = find(f, 'head_and_shoulders');
         expect(hs.kind).toBe('pattern');
         expect(hs.skill).toBe('head-and-shoulders');
-        expect(hs.segments).toHaveLength(5);
-        const neckline = hs.segments.find(s => s.role === 'neckline')!;
-        expect(neckline.style).toBe('dashed');
-        // Not broken yet → the breakout is read (and the neckline ends) at the last bar.
-        expect(neckline.to.time).toBe(f.bars[f.bars.length - 1].time);
+        expect(hs.segments).toHaveLength(6);
         const [q] = qualified(f);
+        if (q.shape.kind !== 'head_and_shoulders') throw new Error('not H&S');
+        // Solid between the two troughs, then dashed to the breakout bar.
+        const [solid, extension] = hs.segments.filter(
+            s => s.role === 'neckline'
+        );
+        expect([solid.style, extension.style]).toEqual(['solid', 'dashed']);
+        expect([solid.from.time, solid.to.time]).toEqual([
+            f.bars[q.pivots[1].index].time,
+            f.bars[q.pivots[3].index].time,
+        ]);
+        expect(extension.from).toEqual(solid.to);
+        // Not broken yet → the breakout is read (and the neckline ends) at the last bar.
+        expect(extension.to.time).toBe(f.bars[f.bars.length - 1].time);
         const g = computeCandidateGeometry(q, f.bars, f.atr)!;
         expect(g.direction).toBe('down');
         // The drawn neckline ends exactly at the printed breakout level.
-        expect(neckline.to.price).toBeCloseTo(
+        expect(extension.to.price).toBeCloseTo(
             g.direction === null ? NaN : g.breakoutLevel,
             10
         );
@@ -70,15 +79,16 @@ describe('buildPatternOverlayCandidates', () => {
         expect(dt.levels[0].label).toBe('breakout');
     });
 
-    it('triangle: an upper and a lower boundary drawn touch to touch, no candle beyond either by more than ε', () => {
+    it('triangle: an upper and a lower boundary drawn solid touch to touch, no candle beyond either by more than ε', () => {
         const f = ascendingTriangle as Fixture;
         const tri = find(f, 'ascending_triangle');
-        expect(tri.segments.map(s => s.role).toSorted()).toEqual([
+        const solid = tri.segments.filter(s => s.style === 'solid');
+        expect(solid.map(s => s.role).toSorted()).toEqual([
             'boundary_lower',
             'boundary_upper',
         ]);
         let checked = 0;
-        for (const s of tri.segments) {
+        for (const s of solid) {
             const from = f.bars.findIndex(b => b.time === s.from.time);
             const to = f.bars.findIndex(b => b.time === s.to.time);
             for (let i = from; i <= to; i++) {
@@ -98,13 +108,42 @@ describe('buildPatternOverlayCandidates', () => {
         expect(checked).toBeGreaterThan(20);
     });
 
+    it('triangle: only the breakout boundary continues dashed, to the printed breakout at the last bar', () => {
+        const f = ascendingTriangle as Fixture;
+        const tri = find(f, 'ascending_triangle');
+        const [q] = qualified(f);
+        const g = computeCandidateGeometry(q, f.bars, f.atr)!;
+        if (g.direction === null) throw new Error('directed triangle');
+        const dashed = tri.segments.filter(s => s.style === 'dashed');
+        expect(dashed.map(s => s.role)).toEqual(['boundary_upper']);
+        expect(dashed[0].to.time).toBe(f.bars[f.bars.length - 1].time);
+        expect(dashed[0].to.price).toBeCloseTo(g.breakoutLevel, 10);
+        const solidUpper = tri.segments.find(
+            s => s.role === 'boundary_upper' && s.style === 'solid'
+        )!;
+        expect(dashed[0].from).toEqual(solidUpper.to);
+    });
+
+    it('flag: the breakout channel line continues dashed to the printed breakout at the last bar', () => {
+        const f = bullFlag as Fixture;
+        const flag = find(f, 'bull_flag');
+        const q = qualified(f).find(p => p.id === 'bull_flag')!;
+        const g = computeCandidateGeometry(q, f.bars, f.atr)!;
+        if (g.direction === null) throw new Error('directed flag');
+        const upper = flag.segments.filter(s => s.role === 'channel_upper');
+        const last = upper[upper.length - 1];
+        expect(last.to.time).toBe(f.bars[f.bars.length - 1].time);
+        expect(last.to.price).toBeCloseTo(g.breakoutLevel, 10);
+    });
+
     it('flag: pole plus two channel LINES (not a horizontal box)', () => {
         const flag = find(bullFlag as Fixture, 'bull_flag');
-        expect(flag.segments.map(s => s.role).toSorted()).toEqual([
-            'channel_lower',
-            'channel_upper',
-            'pole',
-        ]);
+        expect(
+            flag.segments
+                .filter(s => s.style === 'solid')
+                .map(s => s.role)
+                .toSorted()
+        ).toEqual(['channel_lower', 'channel_upper', 'pole']);
         expect(flag.levels.map(l => l.label)).toEqual([
             'invalidation',
             'target',
@@ -234,11 +273,53 @@ describe('buildPatternOverlayCandidates', () => {
             1,
             DP
         );
-        expect(c.segments.map(s => s.role)).toEqual([
-            'boundary_upper',
-            'boundary_lower',
+        expect(c.segments.map(s => [s.role, s.style])).toEqual([
+            ['boundary_upper', 'solid'],
+            ['boundary_upper', 'dashed'],
+            ['boundary_lower', 'solid'],
+            ['boundary_lower', 'dashed'],
         ]);
         expect(c.levels).toEqual([]);
+    });
+
+    it('an undirected pair continues both boundaries dashed to the last bar, where its printed levels are read', () => {
+        const bars = makeBars(Array.from({ length: 10 }, () => 15));
+        const [c] = buildPatternOverlayCandidates(
+            [
+                {
+                    id: 'rectangle',
+                    startIndex: 1,
+                    endIndex: 6,
+                    pivots: [],
+                    shape: {
+                        kind: 'trendline',
+                        upper: {
+                            start: { index: 1, price: 20 },
+                            end: { index: 5, price: 20.4 },
+                            touches: [],
+                        },
+                        lower: {
+                            start: { index: 2, price: 10 },
+                            end: { index: 6, price: 10.4 },
+                            touches: [],
+                        },
+                        direction: null,
+                    },
+                    touches: 4,
+                },
+            ],
+            bars,
+            1,
+            DP
+        );
+        const dashed = c.segments.filter(s => s.style === 'dashed');
+        // Upper 20 + 0.1/bar and lower 10 + 0.1/bar, read at bar 9.
+        expect(dashed.map(s => [s.role, s.from.time, s.to.time])).toEqual([
+            ['boundary_upper', bars[5].time, bars[9].time],
+            ['boundary_lower', bars[6].time, bars[9].time],
+        ]);
+        expect(dashed[0].to.price).toBeCloseTo(20.8, 10);
+        expect(dashed[1].to.price).toBeCloseTo(10.7, 10);
     });
 
     it('rounding: the drawing is the sampled arc, one leg per pair of samples', () => {

@@ -48,7 +48,7 @@ export type Expectation =
           drawn: ChartPatternId;
           direction?: PatternBreakoutDirection | null;
           levels?: LevelExpectation;
-          status?: 'forming' | 'broken';
+          status?: 'forming' | 'broken' | 'failed breakout';
           /** The full set of drawn ids, when the case pins it. */
           only?: readonly ChartPatternId[];
       }
@@ -182,6 +182,39 @@ export const ASC_TRIANGLE: Anchor[] = [
     [54, 108.6],
 ];
 
+/** Support of a maturing triangle: 96 + 0.08 per bar. */
+const maturingSupport = (i: number): number => 96 + 0.08 * i;
+
+/**
+ * Four flat highs over four rising lows — eight confirmed pivots — with a
+ * fifth high at 107 still unconfirmed (the last close is within 1.5 ATR of
+ * it). See `MATURING_TRIANGLE_BARS`.
+ */
+const MATURING_TRIANGLE: Anchor[] = [
+    [0, 101],
+    [10, 110],
+    [22, maturingSupport(22)],
+    [35, 110],
+    [47, maturingSupport(47)],
+    [60, 110],
+    [72, maturingSupport(72)],
+    [85, 110],
+    [97, maturingSupport(97)],
+    [107, 110],
+    [109, 109.2],
+];
+
+/**
+ * `MATURING_TRIANGLE` with every peak bar's high set to exactly 110.3, so any
+ * line through two resistance touches is the same flat line and the breakout
+ * read at the last bar cannot move with a refit.
+ */
+export const MATURING_TRIANGLE_BARS: Bar[] = buildSeries(MATURING_TRIANGLE, {
+    wick: 0.15,
+}).map((bar, i) =>
+    [10, 35, 60, 85, 107].includes(i) ? { ...bar, high: 110.3 } : bar
+);
+
 /** Height 2.8 at price ~103 (ATR 0.5): fails only the 1Day 3%-of-price floor. */
 export const SMALL_TRIANGLE: Anchor[] = [
     [0, 101.5],
@@ -269,6 +302,28 @@ export const ASC_CHANNEL: Anchor[] = [
     [54, 114.6],
 ];
 
+/** Upper line of `OFFSET_LOW_CHANNEL`: 101.5 at bar 8, +0.25 per bar. */
+const offsetChannelUpper = (i: number): number => 101.5 + 0.25 * (i - 8);
+
+/**
+ * A rising channel 4 wide whose first and last lows sit 0.3 above the
+ * parallel through the middle (lowest) one: every line through two lows
+ * either cuts a low or diverges from the upper line, so only the parallel
+ * construction finds the channel.
+ */
+const OFFSET_LOW_CHANNEL: Anchor[] = [
+    [0, 94],
+    [8, offsetChannelUpper(8)],
+    [16, offsetChannelUpper(16) - 4 + 0.3],
+    [24, offsetChannelUpper(24)],
+    [32, offsetChannelUpper(32) - 4],
+    [40, offsetChannelUpper(40)],
+    [48, offsetChannelUpper(48) - 4 + 0.3],
+    [56, offsetChannelUpper(56)],
+    [58, offsetChannelUpper(58) - 1.6],
+    [60, offsetChannelUpper(60) - 1.3],
+];
+
 /** Lows rising 0.25/bar, highs 0.15/bar — converging, three touches each. */
 export const ASC_WEDGE: Anchor[] = [
     [0, 93],
@@ -305,6 +360,50 @@ export const HEAD_AND_SHOULDERS: Anchor[] = [
     [55, 111],
     [58, 108.4],
     [62, 108.6],
+];
+
+/**
+ * H&S h27 / l36 / h45 / l55 / h63, then l75 and h87 at the right shoulder's
+ * level: the last two peaks also make a double top (63–87) built on the
+ * right shoulder.
+ */
+export const HS_THEN_DOUBLE_TOP: Anchor[] = [
+    [0, 98],
+    [27, 110],
+    [35, 104],
+    [45, 115],
+    [55, 105],
+    [63, 110],
+    [75, 103],
+    [87, 110],
+    [91, 107.5],
+];
+
+/**
+ * A compact H&S (ATR 1.5): a rise into the left shoulder 108 (bar 30), head
+ * 110.2, right shoulder 108.2 at bar 46 — 17 bars shoulder to shoulder —
+ * over a neckline at 104 / 104.2.
+ */
+export const SHORT_HEAD_AND_SHOULDERS: Anchor[] = [
+    [0, 92],
+    [30, 108],
+    [34, 104],
+    [38, 110.2],
+    [42, 104.2],
+    [46, 108.2],
+    [48, 105.6],
+    [49, 105.8],
+];
+
+/** Neckline rising gently: troughs 104 → 105.3 (1.3 ATR, under the sloped class); the last bar closes under it. */
+export const HS_GENTLE_SLOPE: Anchor[] = [
+    [0, 98],
+    [20, 110],
+    [27, 104],
+    [38, 116.5],
+    [48, 105.3],
+    [55, 111],
+    [60, 105.4],
 ];
 
 /** Neckline rising steeply: troughs 104 → 109; the last bar closes under it. */
@@ -402,6 +501,25 @@ export const CUP_AND_HANDLE: Anchor[] = [
     [83, 115],
     [87, 118],
     [89, 117],
+];
+
+/** Closes on y = 80 + 40·((x − 60)/50)² from the left rim (bar 10, 120) every 8 bars. */
+const deepCupBase = (x: number): number => 80 + 40 * ((x - 60) / 50) ** 2;
+
+/**
+ * A deep cup (ATR 2): rims 120 and 113 (5.8% apart, 21% of the 33 depth),
+ * then a handle to 108.
+ */
+export const DEEP_CUP: Anchor[] = [
+    [0, 105],
+    ...Array.from({ length: 12 }, (_, k): Anchor => [
+        10 + 8 * k,
+        deepCupBase(10 + 8 * k),
+    ]),
+    [105, 113],
+    [111, 108],
+    [115, 111],
+    [117, 110.5],
 ];
 
 /** Closes on y = 100 + 20·((x − 46)/40)² from rim (6) to rim (86), then a sharp pullback. */
@@ -537,6 +655,13 @@ const jiggleLastTouch = (delta: number): Anchor[] =>
     ASC_TRIANGLE.map(([i, p]): Anchor => [i, i >= 50 ? p + delta : p]);
 
 const triangleScenarios: Scenario[] = [
+    scenario(
+        'ascending_triangle',
+        'e failure',
+        'a close 0.9 over resistance, then back under it: still drawn, printed as a failed breakout',
+        extend(ascTriangle, [109.6, 110.4, 111, 110.3, 109.85]),
+        { drawn: 'ascending_triangle', status: 'failed breakout' }
+    ),
     scenario(
         'ascending_triangle',
         'a textbook',
@@ -722,9 +847,9 @@ const triangleScenarios: Scenario[] = [
     scenario(
         'ascending_triangle',
         'c near-miss',
-        'last resistance touch +0.7: the span drift leaves the flat class — read as the triple top it also is, not a triangle',
+        'last resistance touch +0.7: the span drift leaves the flat class — not a triangle, and not a triple top either (its troughs clearly rise)',
         calm(jiggleLastTouch(0.7)),
-        { notDrawn: 'ascending_triangle', instead: ['triple_top'] }
+        { notDrawn: 'ascending_triangle', instead: [] }
     ),
 ];
 
@@ -752,11 +877,14 @@ const symmetricalScenarios: Scenario[] = [
     scenario(
         'symmetrical_triangle',
         'b pierce',
-        'two bars poke under support: the deeper one is a swing, and support is re-fit through it (never crossed)',
+        'two bars poke under support: the first is one wide bar that confirms its own high, the second becomes the swing low and support is re-fit through it (never crossed)',
+        // Bar 44 (low 101.2, high 104.3) reverses 1.5 ATR within itself, so it
+        // confirms its high only; the swing low it starts is bar 45's 101.3.
+        // A bar is never both a swing high and a swing low.
         patchBar(patchBar(symTriangle, 44, { low: 101.2 }), 45, {
             low: 101.3,
         }),
-        { drawn: 'symmetrical_triangle', levels: { invalidation: 101.2 } }
+        { drawn: 'symmetrical_triangle', levels: { invalidation: 101.3 } }
     ),
     scenario(
         'symmetrical_triangle',
@@ -879,6 +1007,29 @@ const channelScenarios: Scenario[] = [
         'one bar 0.8 under the lower line',
         patchBar(ascChannel, 30, { low: 104.2 }),
         { notDrawn: 'ascending_channel' }
+    ),
+    scenario(
+        'ascending_channel',
+        'b pierce',
+        'lows 0.3 off one line, the middle one lowest: drawn with the lower line parallel to the upper one through that low',
+        calm(OFFSET_LOW_CHANNEL),
+        {
+            drawn: 'ascending_channel',
+            direction: 'up',
+            only: ['ascending_channel'],
+        }
+    ),
+    scenario(
+        'ascending_channel',
+        'b pierce',
+        'the same channel with one non-swing bar 0.28 under that parallel: not drawn (the slack is not widened for the parallel)',
+        // Bar 34 is on the leg up from the middle low; its low 103.55 sits
+        // 0.28 under the parallel there (103.83) and above the swing low, so
+        // it stays a pierce, not a new extreme. 103.58 (0.25) would pass.
+        patchBar(buildSeries(OFFSET_LOW_CHANNEL, { wick: 0.15 }), 34, {
+            low: 103.55,
+        }),
+        { notDrawn: 'ascending_channel', instead: [] }
     ),
     scenario(
         'ascending_channel',
@@ -1040,20 +1191,43 @@ const hsScenarios: Scenario[] = [
     scenario(
         'head_and_shoulders',
         'e breakout',
-        'sloped neckline (104 → 109): the close under it reads broken at the sloped value',
-        calm(HS_SLOPED),
+        'gently sloped neckline (104 → 105.3): the close under it reads broken at the sloped value',
+        calm(HS_GENTLE_SLOPE),
         {
             drawn: 'head_and_shoulders',
             status: 'broken',
-            levels: { breakout: 111.1, invalidation: 113.1 },
+            levels: { breakout: 105.9, invalidation: 111.1 },
         }
     ),
     scenario(
         'head_and_shoulders',
+        'c near-miss',
+        'neckline climbing with the prior rise (troughs 104 → 109, 5 ATR): not an H&S',
+        // The neckline rises by the boundaries' sloped class in the direction
+        // of the prior trend, so the troughs are the trend's rising lows and
+        // the "head" its latest high. This shape used to be drawn (it tested
+        // the sloped-neckline breakout, now tested by the gentle slope above).
+        calm(HS_SLOPED),
+        { notDrawn: 'head_and_shoulders' }
+    ),
+    scenario(
+        'head_and_shoulders',
         'b pierce',
-        'a bar in the head leg dips 1 under the neckline: it becomes a swing and the pattern is re-read from it (never crossed)',
+        '17 bars shoulder to shoulder (ATR 1.5): drawn — the span floor is 15 bars',
+        calm(SHORT_HEAD_AND_SHOULDERS, 0.15, 1.5),
+        { drawn: 'head_and_shoulders', direction: 'down' },
+        1.5
+    ),
+    scenario(
+        'head_and_shoulders',
+        'b pierce',
+        'a bar in the head leg dips 1 under the neckline: not drawn (the only five-swing window left has a "left shoulder" a hair over its trough)',
         patchBar(hs, 30, { low: 103 }),
-        { drawn: 'head_and_shoulders' }
+        // The dip turns bar 30 into a swing, so the only five-pivot window
+        // left is [h30, l31, h38, l49, h55]: its left shoulder 107.4 stands
+        // 0.26 over the l31 trough, a pause in the leg to the head rather
+        // than a shoulder (HS_SHOULDER_MIN_CLEARANCE_ATR).
+        { notDrawn: 'head_and_shoulders' }
     ),
     scenario(
         'head_and_shoulders',
@@ -1095,6 +1269,13 @@ const hsScenarios: Scenario[] = [
         'f arbitration',
         'the troughs also make a double bottom: only the H&S is drawn',
         hs,
+        { drawn: 'head_and_shoulders', only: ['head_and_shoulders'] }
+    ),
+    scenario(
+        'head_and_shoulders',
+        'f arbitration',
+        'a later double top whose first peak is the right shoulder (spans touch at that one bar): only the H&S is drawn',
+        calm(HS_THEN_DOUBLE_TOP),
         { drawn: 'head_and_shoulders', only: ['head_and_shoulders'] }
     ),
     scenario(
@@ -1424,6 +1605,17 @@ const flagScenarios: Scenario[] = [
     ),
     scenario(
         'bull_flag',
+        'e breakout',
+        'the breakout rally runs 23 bars past the pole top without reaching the target: still drawn, broken (age counts to the flag end)',
+        extend(
+            bullFlag,
+            Array.from({ length: 11 }, (_, k) => 107.4 + 0.5 * k),
+            0.05
+        ),
+        { drawn: 'bull_flag', status: 'broken' }
+    ),
+    scenario(
+        'bull_flag',
         'e failure',
         'close under the flag low fails it',
         extend(bullFlag, [107, 105.9], 0.05),
@@ -1591,7 +1783,20 @@ const cupScenarios: Scenario[] = [
     scenario(
         'cup_and_handle',
         'c near-miss',
-        'right rim 6% under the left (smooth base, no other rim)',
+        'right rim 8% under the left (smooth base, no other rim)',
+        calm([
+            ...ROUNDING_BOTTOM.slice(0, 10),
+            [78, 110.2],
+            [84, 107],
+            [88, 109],
+            [90, 108.6],
+        ]),
+        { notDrawn: 'cup_and_handle' }
+    ),
+    scenario(
+        'cup_and_handle',
+        'c near-miss',
+        'right rim 6% under the left on a 12.6-deep base: not a cup (the rims differ by over a quarter of the depth)',
         calm([
             ...ROUNDING_BOTTOM.slice(0, 10),
             [78, 112.6],
@@ -1600,6 +1805,14 @@ const cupScenarios: Scenario[] = [
             [90, 110.5],
         ]),
         { notDrawn: 'cup_and_handle' }
+    ),
+    scenario(
+        'cup_and_handle',
+        'b pierce',
+        'right rim 5.8% under the left on a 33-deep base: a cup (rims within 7% and within a quarter of the depth)',
+        calm(DEEP_CUP, 0.3, 2),
+        { drawn: 'cup_and_handle' },
+        2
     ),
     scenario(
         'cup_and_handle',
@@ -1638,9 +1851,13 @@ const cupScenarios: Scenario[] = [
     scenario(
         'cup_and_handle',
         'b pierce',
-        'one bar inside the cup spikes 1 over the rims: the spike is a swing high, so the cup is re-read from it (left rim moves, nothing crossed)',
+        'one bar inside the cup spikes 1 over the rims: not a cup (an interior bar above the rims)',
+        // The spike bar's own low is the running low, so it confirms no
+        // swing of its own; it stays inside the cup and pokes 1.2 ATR over
+        // the lower rim. (The old zigzag made it a swing high and low at
+        // once and re-read the cup from it.)
         patchBar(cup, 40, { high: 121.2 }),
-        { drawn: 'cup_and_handle' }
+        { notDrawn: 'cup_and_handle' }
     ),
 ];
 

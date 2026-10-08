@@ -55,7 +55,8 @@ export interface Contender {
 /**
  * @internal
  * Keeps one hit per overlapping group: two hits overlap when they share
- * `ARBITRATION_MIN_SHARED_PIVOTS` pivots, when their spans overlap by more
+ * `ARBITRATION_MIN_SHARED_PIVOTS` confirmed pivot (one swing never plays a
+ * role in two drawn patterns), when their spans overlap by more
  * than `ARBITRATION_MAX_SPAN_OVERLAP` of the shorter span, or when their
  * spans overlap at all and their directions are opposite. The better rank
  * wins, then more touches, then the more recent end.

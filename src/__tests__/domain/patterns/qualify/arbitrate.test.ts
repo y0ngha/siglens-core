@@ -66,20 +66,42 @@ describe('arbitrate (spec 2026-10-07 §2.5)', () => {
         ).toEqual(['ascending_triangle', 'rectangle']);
     });
 
-    it('hits sharing three pivots overlap even when their spans barely do', () => {
-        const shared: PivotPoint[] = [
-            { index: 18, price: 1, kind: 'high' },
-            { index: 19, price: 1, kind: 'low' },
-            { index: 20, price: 1, kind: 'high' },
-        ];
+    it('a later hit that reuses one pivot of an earlier one overlaps it even though their spans only touch at that bar', () => {
+        // H&S [h27, l35, h45, l55, h63] and a double top whose first peak is
+        // the H&S right shoulder (h63): spans 27–63 and 63–87 share one bar.
+        const rightShoulder: PivotPoint = {
+            index: 63,
+            price: 110,
+            kind: 'high',
+        };
+        const hs = contender('head_and_shoulders', 27, 63, 'down', [
+            { index: 27, price: 110, kind: 'high' },
+            { index: 35, price: 104, kind: 'low' },
+            { index: 45, price: 115, kind: 'high' },
+            { index: 55, price: 105, kind: 'low' },
+            rightShoulder,
+        ]);
+        const doubleTop = contender('double_top', 63, 87, 'down', [
+            rightShoulder,
+            { index: 75, price: 103, kind: 'low' },
+            { index: 87, price: 110, kind: 'high' },
+        ]);
+        expect(ids(arbitrate([doubleTop, hs]))).toEqual(['head_and_shoulders']);
+    });
+
+    it('keeps both when spans only touch at one bar and no pivot is shared', () => {
         expect(
             ids(
                 arbitrate([
-                    contender('ascending_triangle', 0, 20, 'up', shared),
-                    contender('double_bottom', 18, 60, 'up', shared),
+                    contender('ascending_triangle', 0, 20, 'up', [
+                        { index: 20, price: 1, kind: 'high' },
+                    ]),
+                    contender('double_bottom', 20, 60, 'up', [
+                        { index: 20, price: 1, kind: 'low' },
+                    ]),
                 ])
             )
-        ).toEqual(['ascending_triangle']);
+        ).toEqual(['ascending_triangle', 'double_bottom']);
     });
 
     it('within one rank, more touches win, then the more recent end', () => {

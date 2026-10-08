@@ -11,7 +11,7 @@ function trueRange(bar: Bar, prev: Bar): number {
 
 /** @internal Average True Range — volatility measure consumed by the indicator suite. */
 export function calculateATR(
-    bars: Bar[],
+    bars: readonly Bar[],
     period = ATR_DEFAULT_PERIOD
 ): (number | null)[] {
     if (bars.length === 0) return [];

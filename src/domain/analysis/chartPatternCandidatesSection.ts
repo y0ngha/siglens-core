@@ -1,4 +1,6 @@
 import { computeCandidateGeometry } from '@/domain/patterns';
+import { lineValueAt } from '@/domain/patterns/boundaryLines';
+import { BOUNDARY_CONTAINMENT_ATR } from '@/domain/patterns/constants';
 import {
     computePatternTargets,
     decimalPlacesOf,
@@ -14,6 +16,7 @@ import type {
     Bar,
     ChartPatternId,
     PatternGeometry,
+    PatternLine,
     PatternTargetGeometry,
     QualifiedPattern,
     QualifiedPatternGeometry,
@@ -27,15 +30,32 @@ export const CHART_PATTERN_CANDIDATES_SECTION_HEADER =
 
 /**
  * @internal Section intro (spec 2026-09-18 addendum, "hints not a verdict";
- * spec 2026-10-07 for the drawable / shape-hint split). The listing must
- * never read as a cap on what the model may report. Exported so the test can
- * assert the exact hint/no-restriction wording survives edits.
+ * spec 2026-10-07 for the measured / shape-resemblance split). The listing
+ * must never read as a cap on what the model may report. Exported so the
+ * test can assert the exact wording survives edits.
+ *
+ * Model-facing wording only: it never names how the list is produced
+ * (screening, qualification, drawing checks). The 2026-10-08 real-model A/B
+ * found that wording copied into user-facing text in 8 of 18 runs ("사전
+ * 스크리너가 … 후보로 제시했지만 … 그리기 검증을 통과하지 못해") — the closing
+ * sentence forbids describing it at all.
  */
 export const CHART_PATTERN_CANDIDATES_SECTION_INTRO =
-    'These candidates come from a heuristic pre-screener. They are hints, not an exhaustive list and not a verdict: confirm or reject each by the actual shape, and report any other pattern you can clearly see even if it is not listed here — an approximate textbook shape is enough. For a listed candidate you confirm, copy its geometry; for any other pattern you report, fill geometry from the bars yourself. For a candidate you confirm, set that pattern\'s candidateId to its Candidate id. A line marked "shape hint — not drawable" is a loose shape match that failed the drawing checks (confirmed swings, boundary touches, slope, size): it has no Candidate id and no computed levels, so leave candidateId empty if you report that pattern.';
+    'Each pattern below is measured from confirmed swing points. The list is not exhaustive and not a verdict: confirm or reject each by the actual shape, and you may also report a pattern this section does not name if you can clearly see it in the bars. For a listed pattern you confirm, copy its geometry and set its candidateId to its Candidate id; for any other pattern you report, leave candidateId empty and set geometry to null — only listed patterns carry levels and targets. A pattern named only in the "Unconfirmed shape resemblances" line resembles that shape without confirmed boundaries: report it as detected: false and give no levels for it. In every output field describe a pattern only by what the price did (its swings, touches and levels) — never describe how this section was produced or why a pattern is or is not in it.';
 
-/** @internal The one-line marker of a pre-screener hit that did not qualify for drawing (spec 2026-10-07 §1). */
-export const SHAPE_HINT_MARKER = 'shape hint — not drawable';
+/**
+ * @internal Label of the one line naming the shape resemblances — loose
+ * shape matches with no measured pattern (spec 2026-10-07 §1). Neutral on
+ * purpose: see {@link CHART_PATTERN_CANDIDATES_SECTION_INTRO}.
+ */
+export const SHAPE_RESEMBLANCES_LABEL =
+    'Unconfirmed shape resemblances (no confirmed boundaries — do not report as detected, give no levels)';
+
+/** @internal Block status of a pattern whose breakout failed (see {@link isFailedBreakout}). */
+export const FAILED_BREAKOUT_STATUS = 'failed breakout';
+
+/** @internal The line printed when the section lists nothing. */
+export const NO_CHART_PATTERNS_LINE = '- No pattern listed';
 
 /**
  * `<price> (from ±x.xx% distance line)` — this file's shared "level + %
@@ -67,6 +87,50 @@ function isBroken(
     return direction === 'up'
         ? lastClose > breakoutLevel
         : lastClose < breakoutLevel;
+}
+
+/**
+ * @internal
+ * Whether a boundary pair or flag already broke out and failed: after the
+ * breakout line's last touch, a close went beyond it by more than the
+ * containment slack (either boundary, for an undirected pair), and the last
+ * close is back inside. The chart shows that line continued dashed to the
+ * last bar; printing such a pattern as plainly `forming` hid that price
+ * already broke it once and came back (2026-10-08 sweep). The pattern stays
+ * listed and drawn — its structure is intact — and prints `failed breakout`.
+ * `false` for every other family and when the last close is itself outside
+ * (that is `broken`).
+ */
+export function isFailedBreakout(
+    candidate: QualifiedPattern,
+    direction: PatternGeometry['direction'] | null,
+    bars: readonly Bar[],
+    atr: number | null
+): boolean {
+    const { shape } = candidate;
+    if (shape.kind !== 'trendline' && shape.kind !== 'flag') return false;
+    if (atr === null || !(atr > 0) || bars.length === 0) return false;
+    const slack = BOUNDARY_CONTAINMENT_ATR * atr;
+    const lastIndex = bars.length - 1;
+    const sides: { line: PatternLine; sign: number }[] = [
+        ...(direction !== 'down' ? [{ line: shape.upper, sign: 1 }] : []),
+        ...(direction !== 'up' ? [{ line: shape.lower, sign: -1 }] : []),
+    ];
+    const beyond = (
+        line: PatternLine,
+        sign: number,
+        bar: Bar,
+        i: number
+    ): boolean => sign * (bar.close - lineValueAt(line, i)) > slack;
+    return sides.some(({ line, sign }) => {
+        const start = line.end.index + 1;
+        return (
+            !beyond(line, sign, bars[lastIndex], lastIndex) &&
+            bars
+                .slice(start, lastIndex)
+                .some((bar, k) => beyond(line, sign, bar, start + k))
+        );
+    });
 }
 
 /** Key points whose spacing the pattern skills gate on (double/triple tops and bottoms, head and shoulders). */
@@ -122,12 +186,17 @@ function formatUndirectedCandidate(
     candidateIdLine: string,
     lastClose: number,
     priceDp: number,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    failed: boolean
 ): string {
     const upper = Number(geometry.upperLevel.toFixed(priceDp));
     const lower = Number(geometry.lowerLevel.toFixed(priceDp));
     const status =
-        lastClose > upper || lastClose < lower ? 'broken' : 'forming';
+        lastClose > upper || lastClose < lower
+            ? 'broken'
+            : failed
+              ? FAILED_BREAKOUT_STATUS
+              : 'forming';
     return [
         `### ${candidate.id} (${status})${candidateIdLine}`,
         keyPointsLine(geometry.keyPoints, priceDp, timeframe),
@@ -145,7 +214,8 @@ function formatCandidate(
     offeredOverlayIds: ReadonlySet<string>,
     lastClose: number,
     priceDp: number,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    failed: boolean
 ): string {
     if (geometry === null) {
         return `### ${candidate.id} — geometry unavailable`;
@@ -167,7 +237,8 @@ function formatCandidate(
             candidateIdLine,
             lastClose,
             priceDp,
-            timeframe
+            timeframe,
+            failed
         );
     }
     const spacing = spacingLine(geometry.keyPoints);
@@ -191,7 +262,9 @@ function formatCandidate(
     // to the printed level never reads "broken".
     const status = isBroken(geometry.direction, breakoutLevel, lastClose)
         ? 'broken'
-        : 'forming';
+        : failed
+          ? FAILED_BREAKOUT_STATUS
+          : 'forming';
     // The conservative target (a halved height) can need one more decimal
     // than `priceDp` carries — print it at whichever precision is wider so
     // the listed number is the exact one `ai-levels.ts` would also produce.
@@ -301,11 +374,11 @@ export function printedPatternGeometriesByOverlayId(
  * with deterministic measured-move geometry (spec 2026-09-18 §A1, spec
  * 2026-10-07), so the siglens pattern skills can cite a computed target
  * instead of asking the model to work one out, followed by one
- * `### <id> — shape hint — not drawable` line per pre-screener hit that did
- * not qualify (no Candidate id, no numbers). `- None detected by the
- * pre-screener` when there is neither; a qualified pattern whose geometry is
- * unavailable (boundaries crossed by the last bar) still gets a one-line
- * block rather than being dropped.
+ * {@link SHAPE_RESEMBLANCES_LABEL} line naming every pre-screener hit that
+ * did not qualify (no Candidate id, no numbers). {@link NO_CHART_PATTERNS_LINE}
+ * when there is neither; a qualified pattern whose geometry is unavailable
+ * (boundaries crossed by the last bar) still gets a one-line block rather
+ * than being dropped.
  *
  * @param candidates - Qualified patterns (`qualifyPatterns`), computed once
  *   by the caller and shared with the overlay builder.
@@ -345,7 +418,7 @@ export function formatChartPatternCandidatesSection(
         return [
             CHART_PATTERN_CANDIDATES_SECTION_HEADER,
             CHART_PATTERN_CANDIDATES_SECTION_INTRO,
-            '- None detected by the pre-screener',
+            NO_CHART_PATTERNS_LINE,
         ].join('\n');
     }
 
@@ -359,7 +432,9 @@ export function formatChartPatternCandidatesSection(
             offeredOverlayIds,
             lastClose,
             priceDp,
-            timeframe
+            timeframe,
+            geometry !== null &&
+                isFailedBreakout(candidate, geometry.direction, bars, atr)
         );
     });
 
@@ -367,6 +442,8 @@ export function formatChartPatternCandidatesSection(
         CHART_PATTERN_CANDIDATES_SECTION_HEADER,
         CHART_PATTERN_CANDIDATES_SECTION_INTRO,
         ...blocks,
-        ...shapeHints.map(id => `### ${id} — ${SHAPE_HINT_MARKER}`),
+        ...(shapeHints.length > 0
+            ? [`- ${SHAPE_RESEMBLANCES_LABEL}: ${shapeHints.join(', ')}`]
+            : []),
     ].join('\n');
 }

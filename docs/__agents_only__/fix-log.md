@@ -14,15 +14,16 @@ Violation: core review found:
 
 Branch: fix/pattern-qualification
 
-## feat/agent-writing-style review rounds 1–2 + A/B
+## fix/pattern-qualification-followups review rounds 1–3 + sweep
 
-Rule: FF.md predictability, CONVENTIONS.md change synchronization, TESTING.md (assert behavior)
+Rule: TESTING.md#TE-5 #TE-9, CONVENTIONS.md comments, FF.md predictability/coupling
 
-Violation: review + real-LLM A/B found:
-- recommended: shipped prompt text drifted from the A/B-tested text (a clause dropped while porting) — ship the measured text or re-measure the shipped text
-- recommended: an English-only example ("Source: …") inside a rule meant for all non-Korean languages read as a literal instruction for ja/zh
-- recommended: prompt-example test only restated the string; round-trip the example through the real parser instead
-- recommended: AGENT_PROMPT_VERSION bump without a PUBLIC_API changelog row
-- A/B: re-measuring the shipped text exposed a politeness-mixing regression (4/28 answers) and Korean follow-up chips in English answers — fixed with explicit ending examples and a "write follow-ups in the answer language" clause
+Violation: review + validation sweep found:
+- required: prompt Writing Rules contradicted the section intro (fill geometry vs geometry null for unlisted patterns) — restated rules must change together
+- required (×2): inserting a declaration between a JSDoc block and its function detached the doc (pivots.ts, flags.ts)
+- required: new guards / mirrored branches without a test that fails when only that guard is removed (flag age, double neckline right edge, flag-vs-pennant touch extent)
+- recommended: one rule expressed in two places (flag loop cutoff vs isRecent); round-tripping a value through a multiplier
+- recommended: committing real vendor bar data with tickers/real timestamps — anonymize (price scale + time shift), compact, dedupe by mutation-kill
+- sweep: pivots computed with the last-bar ATR re-zigzagged history (levels flickered under the same id) — use causal per-bar thresholds
 
-Branch: feat/agent-writing-style
+Branch: fix/pattern-qualification-followups

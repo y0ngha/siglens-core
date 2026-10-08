@@ -22,6 +22,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         dynamic: 'mock-dynamic',
         overlayCandidates: [],
         overlayBuildFailures: [],
+        patternScreenFailure: null,
         patternGeometries: new Map(),
     })),
 }));
@@ -1554,6 +1555,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [],
                 overlayBuildFailures: [],
+                patternScreenFailure: null,
                 patternGeometries: new Map(),
             });
 
@@ -1597,6 +1599,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
+                patternScreenFailure: null,
                 patternGeometries: new Map(),
             });
             const reconciledWithCandidate: AnalysisResponse = {
@@ -1664,6 +1667,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
+                patternScreenFailure: null,
                 patternGeometries: new Map([[overlayCandidate.id, printed]]),
             });
             const enrichedWithMiscopy: AnalysisResponse = {
@@ -1716,6 +1720,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
+                patternScreenFailure: null,
                 patternGeometries: new Map(),
             });
             const reconciledWithUnknownId: AnalysisResponse = {
@@ -1781,6 +1786,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 dynamic: 'mock-dynamic',
                 overlayCandidates: [],
                 overlayBuildFailures: ['elliott'],
+                patternScreenFailure: null,
                 patternGeometries: new Map(),
             });
             const warnSpy = vi
@@ -1801,6 +1807,96 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 expect.objectContaining({ kinds: ['elliott'] })
             );
             warnSpy.mockRestore();
+        });
+
+        describe('차트 패턴 선별이 던지면', () => {
+            const failedScreen = {
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: [],
+                patternScreenFailure: 'Error: qualifier exploded',
+                patternGeometries: new Map(),
+            };
+
+            it('pattern screening failed 경고에 symbol·timeframe·error를 남긴다', async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(failedScreen);
+                const warnSpy = vi
+                    .spyOn(console, 'warn')
+                    .mockImplementation(() => undefined);
+
+                await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                );
+
+                const calls = warnSpy.mock.calls.filter(
+                    call =>
+                        call[0] === '[ChartPatterns] pattern screening failed'
+                );
+                warnSpy.mockRestore();
+                expect(calls).toEqual([
+                    [
+                        '[ChartPatterns] pattern screening failed',
+                        {
+                            symbol: mockSymbol,
+                            timeframe: mockTimeframe,
+                            error: 'Error: qualifier exploded',
+                        },
+                    ],
+                ]);
+            });
+
+            it('모델 호출이 실패해도 그 전에 경고를 남긴다', async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(failedScreen);
+                mockCallAnalysisAi.mockRejectedValueOnce(new Error('ai down'));
+                const warnSpy = vi
+                    .spyOn(console, 'warn')
+                    .mockImplementation(() => undefined);
+
+                await expect(
+                    runAnalysis(
+                        mockSymbol,
+                        mockCompanyName,
+                        mockTimeframe,
+                        false,
+                        undefined,
+                        { marketDataProvider: fakeProvider }
+                    )
+                ).rejects.toThrow('ai down');
+
+                const messages = warnSpy.mock.calls.map(call => call[0]);
+                warnSpy.mockRestore();
+                expect(messages).toContain(
+                    '[ChartPatterns] pattern screening failed'
+                );
+            });
+        });
+
+        it('차트 패턴 선별이 성공했으면 pattern screening failed 경고를 남기지 않는다', async () => {
+            // Module-level mock returns `patternScreenFailure: null`.
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            const messages = warnSpy.mock.calls.map(call => call[0]);
+            warnSpy.mockRestore();
+            expect(messages).not.toContain(
+                '[ChartPatterns] pattern screening failed'
+            );
         });
 
         it('후보가 하나도 제시되지 않았으면 no candidate referenced 경고를 남기지 않는다', async () => {
