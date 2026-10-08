@@ -4,8 +4,10 @@ import {
     invariantViolations,
     runPipeline,
     runProductionPipeline,
+    statusOf,
 } from '@/__tests__/domain/patterns/scenarios/harness';
 import { calculateATR } from '@/domain/indicators/atr';
+import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
 import { lineValueAt } from '@/domain/patterns/boundaryLines';
 import { CONVERGING_MAX_WIDTH_RATIO } from '@/domain/patterns/constants';
 import {
@@ -122,9 +124,11 @@ describe('an outside reversal bar keeps the swing it takes out', () => {
     // The left-rim bar also made a new low inside a pullback; it takes out
     // the swing high before it, so it is the swing high and the pullback's
     // earlier low is the swing low.
+    // One bar short of the fixture's end: its last bar closes under the
+    // handle low and fails the cup (see the next block).
     it('the daily cup keeps that bar as its left rim (222.35 / 208.33 before scaling)', () => {
         const run = runProductionPipeline(
-            cupOutsideBarRim.bars,
+            cupOutsideBarRim.bars.slice(0, -1),
             cupOutsideBarRim.timeframe
         );
         const cup = run.qualified.find(q => q.id === 'cup_and_handle');
@@ -132,5 +136,37 @@ describe('an outside reversal bar keeps the swing it takes out', () => {
             throw new Error('no cup');
         expect(cup.shape.leftRim.price).toBeCloseTo(222.35 * SCALE, 3);
         expect(cup.shape.rightRim.price).toBeCloseTo(208.33 * SCALE, 3);
+    });
+});
+
+describe('a pattern whose last close is already past its invalidation level is not offered', () => {
+    // 2026-10-08 A/B: this cup was listed and drawn as `forming` with the
+    // last close (178.45 before scaling) under its handle low (180.81), the
+    // printed invalidation level — 0.22 ATR under, inside the 0.25 ATR slack
+    // the spent check used to allow.
+    const c = cupOutsideBarRim;
+    const cupOf = (bars: typeof c.bars) =>
+        runProductionPipeline(bars, c.timeframe);
+
+    it('one bar earlier (last close above the handle low) the cup is listed as forming', () => {
+        const run = cupOf(c.bars.slice(0, -1));
+        const cup = run.qualified.find(q => q.id === 'cup_and_handle');
+        if (cup === undefined) throw new Error('no cup');
+        const g = computeCandidateGeometry(cup, run.bars, run.atr);
+        if (g === null || g.direction !== 'up') throw new Error('not up');
+        expect(g.invalidationLevel).toBeCloseTo(180.81 * SCALE, 3);
+        expect(statusOf(run, 'cup_and_handle')).toBe('forming');
+    });
+
+    it('on the last bar the cup is neither listed nor drawn, and no other card or overlay breaks an invariant', () => {
+        const run = cupOf(c.bars);
+        const last = c.bars[c.bars.length - 1].close;
+        expect(last).toBeLessThan(180.81 * SCALE);
+        expect(run.qualified.map(q => q.id)).not.toContain('cup_and_handle');
+        expect(run.overlays.some(o => o.id.includes('cup_and_handle'))).toBe(
+            false
+        );
+        expect(run.section).not.toContain('cup_and_handle');
+        expect(invariantViolations(run)).toEqual([]);
     });
 });

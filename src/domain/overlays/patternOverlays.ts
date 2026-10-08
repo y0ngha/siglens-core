@@ -15,7 +15,10 @@ import type {
 } from '@/domain/types';
 import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
 import { lineValueAt } from '@/domain/patterns/boundaryLines';
-import { OVERLAY_LEVEL_LABELS } from '@/domain/overlays/constants';
+import {
+    OVERLAY_ID_PREFIX,
+    OVERLAY_LEVEL_LABELS,
+} from '@/domain/overlays/constants';
 import {
     computePatternTargets,
     printedPatternGeometry,
@@ -39,7 +42,7 @@ export function patternOverlayId(
     candidate: PatternCandidate,
     bars: readonly Bar[]
 ): string {
-    return `pattern:${candidate.id}:${bars[candidate.startIndex].time}`;
+    return `${OVERLAY_ID_PREFIX.pattern}${candidate.id}:${bars[candidate.startIndex].time}`;
 }
 
 const at = (bars: readonly Bar[], index: number, price: number) => ({

@@ -57,10 +57,11 @@ describe('isSpentPattern', () => {
         expect(spent(dt, f.bars, f.atr)).toBe(false);
     });
 
-    it('a close past the fixed invalidation by more than the slack fails it; within the slack does not', () => {
-        // ATR 1 → slack 0.25 above 110.73.
-        expect(spent(dt, withTail(f.bars, [110.9]), f.atr)).toBe(false);
-        expect(spent(dt, withTail(f.bars, [111.1]), f.atr)).toBe(true);
+    it('any close past the fixed invalidation fails it with no slack — even one that came back', () => {
+        // Invalidation 110.73; the last close (106) is back under it.
+        expect(spent(dt, withTail(f.bars, [110.7, 106]), f.atr)).toBe(false);
+        expect(spent(dt, withTail(f.bars, [110.73, 106]), f.atr)).toBe(false);
+        expect(spent(dt, withTail(f.bars, [110.8, 106]), f.atr)).toBe(true);
     });
 
     it('a bar reaching the measured target within the slack fulfils it', () => {
@@ -90,8 +91,10 @@ describe('isSpentPattern', () => {
                 )
             );
         expect(spent(db, base, f.atr)).toBe(false);
-        expect(spent(db, tail([109.1]), f.atr)).toBe(false);
-        expect(spent(db, tail([108.9]), f.atr)).toBe(true);
+        expect(spent(db, tail([109.3, 114]), f.atr)).toBe(false);
+        expect(spent(db, tail([109.2, 114]), f.atr)).toBe(true);
+        expect(spent(db, tail([109.3]), f.atr)).toBe(false);
+        expect(spent(db, tail([109.2]), f.atr)).toBe(true);
         expect(spent(db, tail([124]), f.atr)).toBe(false);
         expect(spent(db, tail([124.4]), f.atr)).toBe(true);
     });

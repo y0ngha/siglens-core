@@ -66,6 +66,7 @@ describe('qualifyPatterns', () => {
                 ).toEqual({
                     qualified: [],
                     shapeHints: ['double_top', 'pennant'],
+                    arbitrationDropped: [],
                 });
             }
         );
@@ -172,5 +173,31 @@ describe('qualifyPatterns — pivot thresholds read the per-bar ATR series', () 
 
     it('confirms none of its swings when the series reads ten times that ATR, whatever the latest ATR', () => {
         expect(ids(f.bars.map(() => 10 * f.atr))).not.toContain('double_top');
+    });
+});
+
+describe('qualifyPatterns — arbitration losers are reported for logging', () => {
+    it('the cup fixture’s base also qualifies as a rounding bottom; it is dropped and reported as lost to the cup', () => {
+        const f = cupAndHandle as Fixture;
+        const result = qualifyPatterns([], f.bars, f.atr, '1Day');
+        expect(result.qualified.map(q => q.id)).toEqual(['cup_and_handle']);
+        expect(result.arbitrationDropped).toHaveLength(1);
+        expect(result.arbitrationDropped[0]).toMatchObject({
+            id: 'rounding_bottom',
+            lostTo: 'cup_and_handle',
+        });
+        const { startIndex, endIndex } = result.arbitrationDropped[0];
+        expect(endIndex).toBeGreaterThan(startIndex);
+    });
+
+    it('nothing is reported when nothing overlaps, or when nothing can qualify', () => {
+        const f = doubleTop as Fixture;
+        expect(
+            qualifyPatterns([], f.bars, f.atr, '1Day').arbitrationDropped
+        ).toEqual([]);
+        expect(
+            qualifyPatterns([hit('double_top')], [], 1, '1Day')
+                .arbitrationDropped
+        ).toEqual([]);
     });
 });

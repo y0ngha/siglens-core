@@ -24,7 +24,10 @@ import {
     qualifyHighTightFlag,
 } from '@/domain/patterns/qualify/flags';
 import { qualifyCup, qualifyRounding } from '@/domain/patterns/qualify/curves';
-import { type Contender, arbitrate } from '@/domain/patterns/qualify/arbitrate';
+import {
+    type Contender,
+    arbitrateWithLosers,
+} from '@/domain/patterns/qualify/arbitrate';
 
 // ─── Facade ─────────────────────────────────────────────────────────────────
 
@@ -59,7 +62,8 @@ import { type Contender, arbitrate } from '@/domain/patterns/qualify/arbitrate';
  *   prompt's indicators carry (`calculateATR`). Pivot thresholds read it; a
  *   caller that omits it gets one threshold from `atr` for the whole series,
  *   which is not causal (tests pin ATR this way).
- * @returns The qualified patterns and the loose ids left as shape hints.
+ * @returns The qualified patterns, the loose ids left as shape hints and the
+ *   live hits the arbitration dropped (for logging).
  *   Nothing qualifies when `bars` is empty or `atr` is not a positive
  *   number; every loose id is then a shape hint.
  */
@@ -72,7 +76,11 @@ export function qualifyPatterns(
 ): PatternQualification {
     const looseIds = [...new Set(candidates.map(c => c.id))];
     if (bars.length === 0 || !Number.isFinite(atr) || atr <= 0)
-        return { qualified: [], shapeHints: sortIds(looseIds) };
+        return {
+            qualified: [],
+            shapeHints: sortIds(looseIds),
+            arbitrationDropped: [],
+        };
 
     const windowStart = Math.max(0, bars.length - SCREEN_LOOKBACK_BARS);
     const ctx: QualifyContext = {
@@ -108,7 +116,8 @@ export function qualifyPatterns(
         else live.push({ pattern, direction: geometry.direction });
     }
 
-    const qualified = arbitrate(live)
+    const { kept, dropped } = arbitrateWithLosers(live);
+    const qualified = kept
         .map(c => c.pattern)
         .toSorted(
             (a, b) =>
@@ -120,6 +129,12 @@ export function qualifyPatterns(
         shapeHints: sortIds(
             looseIds.filter(id => !qualifiedIds.has(id) && !spentIds.has(id))
         ),
+        arbitrationDropped: dropped.map(({ loser, winner }) => ({
+            id: loser.pattern.id,
+            startIndex: loser.pattern.startIndex,
+            endIndex: loser.pattern.endIndex,
+            lostTo: winner.pattern.id,
+        })),
     };
 }
 

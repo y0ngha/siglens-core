@@ -190,10 +190,11 @@ export const SINGULAR_MATRIX_DET_EPSILON = 1e-9;
 
 /**
  * @internal
- * Slack of the spent-pattern check (`isSpentPattern`), in ATR: a close past
- * the invalidation level by more than this fails the pattern, and a bar
- * within it of the measured target has fulfilled it. Price reacts in a zone,
- * not at the exact computed level — the same scale as the Elliott spent check.
+ * Slack of the spent-pattern check (`isSpentPattern`), in ATR: a bar within
+ * it of the measured target has fulfilled the pattern (and an undirected one
+ * is spent a full height minus this beyond a boundary). Price reacts in a
+ * zone, not at the exact computed level — the same scale as the Elliott spent
+ * check. The invalidation level gets no slack (see `isSpentPattern`).
  */
 export const PATTERN_SPENT_SLACK_ATR = 0.25;
 
@@ -482,7 +483,7 @@ export const U_EXTREME_MIN_SHARE = 0.4;
 /** @internal Rounding: the quadratic fitted on the closes between the rims explains at least this share of their variance. */
 export const ROUNDING_MIN_R2 = 0.6;
 
-/** @internal Rounding: points sampled from the fitted curve for the drawing. */
+/** @internal Rounding: evenly spaced points of the drawn arc (the extreme's bar is added to them). */
 export const ROUNDING_ARC_SAMPLES = 10;
 
 /**

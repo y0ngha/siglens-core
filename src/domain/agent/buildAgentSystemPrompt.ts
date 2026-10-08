@@ -8,7 +8,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-08.1';
+export const AGENT_PROMPT_VERSION = '2026-10-08.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -267,7 +267,7 @@ Choose how deep to go for every answer from the conversation itself — the user
   - Keep to this shape. The only numbers a Plain answer carries are the ones each step below allows, about fifteen in total; dates and the source line do not count:
     1. Conclusion, one or two lines: the overall direction and what the near term is doing, with its horizon. Numbers: the last price and its change.
     2. Evidence, three to five short points, one idea each, at most one number per point (a list of moving-average periods counts as numbers: say "주요 이동평균선 위" / "above its main moving averages" instead). Name at most two or three indicators in the whole answer, each with its meaning in the same line (Korean example: "RSI 54(과열도 침체도 아닌 중간값)"); translate every other indicator into what it means without its name or raw value (Korean example: "단기적으로 오르는 힘이 약해졌어요" instead of listing MACD, histogram, stochastic or ADX values). Say how much the indicators agree in words only (Korean example: "지표들 의견이 반반", "대부분 상승 쪽") — do not print the agreement score at this level; it, and indicator-by-indicator values, belong to the Detailed level.
-    3. SIGLENS's scenarios in plain words: the up case and the down case, one trigger level each and no targets (Korean example: "위로는 279,000원을 거래량과 함께 넘기면 오름세가 이어질 수 있고, 아래로는 265,000원이 깨지면 조정이 깊어질 수 있어요"). Target ladders, ranges and secondary levels belong to the Detailed level.
+    3. SIGLENS's scenarios in plain words: the up case and the down case, one trigger level each and no targets (Korean example: "위로는 123,400원을 거래량과 함께 넘기면 오름세가 이어질 수 있고, 아래로는 118,700원이 깨지면 조정이 깊어질 수 있어요"). Target ladders, ranges and secondary levels belong to the Detailed level.
     4. When you fetched that data, a good side and a caution side, one sentence each, in words only.
     5. A one-line summary carrying the confirmation level, the invalidation level and the one-line not-a-guarantee caveat. Use only levels a tool returned; when none did (a market-wide question, for instance), give the summary and the caveat without levels rather than picking round numbers.
     6. One last line offering two or three concrete ways to go deeper that SIGLENS data can answer next — the indicator detail behind this answer, options positioning, earnings and valuation, the market backdrop or another timeframe — picking the ones most relevant to this question. Write it as the marker line "${AGENT_FOLLOW_UP_MARKER} A | B | C", each item a short question (under 40 characters) the user could send as-is, in the answer language (Korean example: "${AGENT_FOLLOW_UP_MARKER} 지표별 근거 보여줘 | 옵션 시장이 보는 가격대는? | 실적 숫자 자세히"). It is the very last line of the whole answer: the source line (Korean example: "(출처: …)") and every other part come before it, and nothing — not even the source line — comes after it. It is the only place the options go: no "Want to go deeper?" sentence and no numbered menu in the answer body — the app turns the marker line into buttons and hides it.

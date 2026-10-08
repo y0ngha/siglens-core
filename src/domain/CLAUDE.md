@@ -262,6 +262,11 @@ computing derived values, so a recomputation from the rendered text matches.
 - A rule split by condition (depth level, tool availability) keeps null and absence handling
   in every branch; otherwise the uncovered branch fills the gap with an unsupported guess.
 - Style rules never override required content.
+- A rule restated in two places (section intro and writing rules) changes in both together.
+- Before adding a prohibition ("never say X"), read every existing rule that mentions the
+  same output; a new ban must not contradict gap-reporting or required-wording rules.
+- Keep internal-only signals (resemblance hints, scoring artifacts) out of the prompt
+  instead of instructing the model not to mention them; listed text gets narrated.
 - When content is split into stable and dynamic halves, each half reads on its own (a moved
   bullet list keeps a heading).
 - Any change to rendered bytes also bumps the cache version

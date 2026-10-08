@@ -23,6 +23,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         overlayCandidates: [],
         overlayBuildFailures: [],
         patternScreenFailure: null,
+        patternArbitration: { kept: [], dropped: [] },
         patternGeometries: new Map(),
     })),
 }));
@@ -1556,6 +1557,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 overlayCandidates: [],
                 overlayBuildFailures: [],
                 patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
             });
 
@@ -1600,6 +1602,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
                 patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
             });
             const reconciledWithCandidate: AnalysisResponse = {
@@ -1668,6 +1671,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
                 patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map([[overlayCandidate.id, printed]]),
             });
             const enrichedWithMiscopy: AnalysisResponse = {
@@ -1721,6 +1725,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 overlayCandidates: [overlayCandidate],
                 overlayBuildFailures: [],
                 patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
             });
             const reconciledWithUnknownId: AnalysisResponse = {
@@ -1787,6 +1792,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 overlayCandidates: [],
                 overlayBuildFailures: ['elliott'],
                 patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
             });
             const warnSpy = vi
@@ -1816,6 +1822,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 overlayCandidates: [],
                 overlayBuildFailures: [],
                 patternScreenFailure: 'Error: qualifier exploded',
+                patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
             };
 
@@ -1873,6 +1880,79 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 warnSpy.mockRestore();
                 expect(messages).toContain(
                     '[ChartPatterns] pattern screening failed'
+                );
+            });
+        });
+
+        describe('차트 패턴 겹침 중재가 패턴을 떨어뜨리면', () => {
+            const dropped = {
+                id: 'double_top' as const,
+                startTime: 1_000,
+                endTime: 2_000,
+                lostTo: 'head_and_shoulders' as const,
+            };
+
+            it('arbitration dropped 로그에 symbol·timeframe·kept·dropped를 남긴다', async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce({
+                    stable: 'mock-stable',
+                    dynamic: 'mock-dynamic',
+                    overlayCandidates: [],
+                    overlayBuildFailures: [],
+                    patternScreenFailure: null,
+                    patternArbitration: {
+                        kept: ['head_and_shoulders'],
+                        dropped: [dropped],
+                    },
+                    patternGeometries: new Map(),
+                });
+                const infoSpy = vi
+                    .spyOn(console, 'info')
+                    .mockImplementation(() => undefined);
+
+                await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                );
+
+                const calls = infoSpy.mock.calls.filter(
+                    call => call[0] === '[ChartPatterns] arbitration dropped'
+                );
+                infoSpy.mockRestore();
+                expect(calls).toEqual([
+                    [
+                        '[ChartPatterns] arbitration dropped',
+                        {
+                            symbol: mockSymbol,
+                            timeframe: mockTimeframe,
+                            kept: ['head_and_shoulders'],
+                            dropped: [dropped],
+                        },
+                    ],
+                ]);
+            });
+
+            it('떨어뜨린 패턴이 없으면 남기지 않는다', async () => {
+                const infoSpy = vi
+                    .spyOn(console, 'info')
+                    .mockImplementation(() => undefined);
+
+                await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                );
+
+                const messages = infoSpy.mock.calls.map(call => call[0]);
+                infoSpy.mockRestore();
+                expect(messages).not.toContain(
+                    '[ChartPatterns] arbitration dropped'
                 );
             });
         });

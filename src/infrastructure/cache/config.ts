@@ -1005,9 +1005,22 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * per-bar ATR, stricter cup/rounding, flag, H&S and double/triple rules.
  * Bytes change on every request.
  *
+ * **`p26`** — final real-model A/B follow-up (2026-10-08). The `Unconfirmed
+ * shape resemblances` line is gone (4 of 18 summaries retold it); loose hits
+ * still pick skill docs. One general rule in ## Analysis Guidelines
+ * (`### Writing About Computed Sections`) covers every computed pattern and
+ * overlay section — never narrate candidates, screening, validation or why
+ * something is or is not listed, and say what a pattern status means instead
+ * of printing the raw code — and both section intros point to it (the
+ * overlay intro no longer says "Logic-computed"). A pattern any close has
+ * taken past its invalidation level (no slack) is no longer listed, a
+ * rounding base needs its extreme bar in the middle half of the span, and the
+ * rounding arc runs through the printed rims and bottom. Bytes change on
+ * every request.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p25' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p26' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

@@ -1952,9 +1952,9 @@ const roundingScenarios: Scenario[] = [
     scenario(
         'rounding_bottom',
         'c near-miss',
-        'J-shaped base (fitted vertex at ~38% of the span): still drawn',
+        'J-shaped base (fitted vertex at ~38% of the span, but the low 9 bars after the left rim): the extreme-bar middle-half check',
         calm(J_BASE),
-        { drawn: 'rounding_bottom' }
+        { notDrawn: 'rounding_bottom' }
     ),
     scenario(
         'rounding_bottom',

@@ -1982,6 +1982,16 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      */
     patternScreenFailure: string | null;
     /**
+     * The chart-pattern overlap arbitration of this build: the ids drawn and
+     * the patterns it dropped (with the id each lost to). For the caller to
+     * log — a drawing that vanishes from a chart can be traced to this rule
+     * (spec 2026-10-07 §8).
+     */
+    patternArbitration: {
+        kept: readonly ChartPatternId[];
+        dropped: readonly PatternArbitrationDrop[];
+    };
+    /**
      * Printed `## Chart Pattern Candidates` geometry per offered pattern overlay id — what a card resolved to that overlay carries as its `geometry`.
      * `null` for an undirected pattern (no prior trend): the block printed only its two boundaries, so a card resolved to it carries no geometry and no target.
      * In-process only: a `Map` serialises to `{}` with `JSON.stringify`, so do not put this on a cache entry or queue payload — convert to entries first.
@@ -4288,7 +4298,7 @@ export interface RoundingPatternShape {
     extreme: PatternPoint;
     /** The most recent confirmed opposite-side swing after the extreme, else the extreme itself. */
     invalidation: PatternPoint;
-    /** Points sampled from the fitted curve, rim to rim, ascending by index. */
+    /** The drawn arc, rim to rim through the extreme (it passes the printed rims and extreme), ascending by index. */
     arc: readonly PatternPoint[];
 }
 
@@ -4327,10 +4337,34 @@ export interface PatternQualification {
     qualified: QualifiedPattern[];
     /**
      * Ids of pre-screener hits with no qualified pattern of the same id (and
-     * not already spent) — named in the prompt's one "Unconfirmed shape
-     * resemblances" line, without a Candidate id or numbers.
+     * not already spent). They only pick skill docs; the prompt does not name
+     * them (a named resemblance list was retold in user-facing text).
      */
     shapeHints: ChartPatternId[];
+    /**
+     * Live (not spent) hits the §2.5 overlap arbitration dropped, each with
+     * the kept pattern it lost to — for logging only, never drawn or printed.
+     */
+    arbitrationDropped: PatternArbitrationLoss[];
+}
+
+/** @internal One pattern the overlap arbitration dropped, and the pattern it lost to. */
+export interface PatternArbitrationLoss {
+    id: ChartPatternId;
+    startIndex: number;
+    endIndex: number;
+    lostTo: ChartPatternId;
+}
+
+/**
+ * @internal {@link PatternArbitrationLoss} as the prompt build reports it:
+ * bar times instead of indices, so a log line names the bars.
+ */
+export interface PatternArbitrationDrop {
+    id: ChartPatternId;
+    startTime: number;
+    endTime: number;
+    lostTo: ChartPatternId;
 }
 
 // ─────────────────────────────────────────

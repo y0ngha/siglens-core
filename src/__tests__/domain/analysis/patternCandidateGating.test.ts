@@ -4,6 +4,7 @@ import { NO_CHART_PATTERNS_LINE } from '@/domain/analysis/chartPatternCandidates
 import { calculateIndicators } from '@/domain/indicators';
 import type { AssembledPrompt, Bar, Skill, SkillGating } from '@/domain/types';
 import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
+import cupAndHandle from '@/__tests__/domain/patterns/fixtures/cup-and-handle.json';
 
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
 // return with a flattening wrapper (spec §3.4 assembly split). `flat` is
@@ -63,6 +64,7 @@ const mockNothingQualifies = (): void => {
         qualifyPatterns: (candidates: readonly { id: string }[]) => ({
             qualified: [],
             shapeHints: candidates.map(c => c.id),
+            arbitrationDropped: [],
         }),
     }));
 };
@@ -209,23 +211,47 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         // The active-skill catalog (and everything selection derives — the
         // stable prefix, patternSummaries Writing Rules skill list, etc.) is
         // unaffected: `patternCandidates` only reaches `selectSkills` for
-        // `gated`/`event` skills, and every skill here is `always_on`. Scope
-        // the equality check to that portion — everything up to the first
-        // per-call value (`Symbol:`) — rather than the whole prompt, since
-        // `## Chart Pattern Candidates (computed)` now legitimately renders
-        // the screener's findings (as shape hints, spec 2026-10-07) and is
-        // expected to differ.
-        const skillPortion = (s: string): string =>
-            s.slice(0, s.indexOf('Symbol:'));
-        expect(skillPortion(withCandidates)).toBe(
-            skillPortion(withNoCandidates)
-        );
+        // `gated`/`event` skills, and every skill here is `always_on`. Hits
+        // that do not qualify are shape hints, and the prompt never names
+        // them (2026-10-08: a named resemblance list was retold in the
+        // summaries) — so with nothing qualified the whole prompt is the
+        // same as with no hits at all.
+        expect(withCandidates).toBe(withNoCandidates);
+        expect(withCandidates).toContain(NO_CHART_PATTERNS_LINE);
+        expect(withCandidates.toLowerCase()).not.toContain('resemblance');
+    });
 
-        // Document (not silently drop) the new, intentional difference: the
-        // candidates section itself does react to the screener's findings.
-        expect(withCandidates).not.toBe(withNoCandidates);
-        expect(withNoCandidates).toContain(NO_CHART_PATTERNS_LINE);
-        expect(withCandidates).not.toContain(NO_CHART_PATTERNS_LINE);
+    it('a shape hint still injects its gated pattern skill, and the prompt names no hint id', async () => {
+        vi.resetModules();
+        mockNothingQualifies();
+        vi.doMock('@/domain/patterns', () => ({
+            screenChartPatterns: () => [
+                { id: 'double_top', startIndex: 0, endIndex: 1 },
+            ],
+            computeCandidateGeometry: () => null,
+        }));
+        const { buildAnalysisPrompt: build } =
+            await import('@/domain/analysis/prompt');
+        const fixture = doubleTop as Fixture;
+        const out = flat(
+            build(
+                TEST_SYMBOL,
+                TEST_COMPANY,
+                fixture.bars,
+                calculateIndicators(fixture.bars),
+                [
+                    makeSkill({
+                        name: 'Double Top Guide',
+                        type: 'pattern',
+                        gating: eventGated(['double_top']),
+                    }),
+                ],
+                '1Day'
+            )
+        );
+        expect(out).toContain('Double Top Guide');
+        expect(out).not.toContain('double_top');
+        expect(out).toContain(NO_CHART_PATTERNS_LINE);
     });
 });
 
@@ -254,6 +280,7 @@ describe('buildAnalysisPrompt — skill selection sees qualified patterns the sc
                     },
                 ],
                 shapeHints: [],
+                arbitrationDropped: [],
             }),
         }));
         const { buildAnalysisPrompt: build } =
@@ -315,5 +342,40 @@ describe('buildAnalysisPrompt — a throwing pattern qualifier', () => {
             '1Day'
         );
         expect(result.patternScreenFailure).toBeNull();
+    });
+});
+
+describe('buildAnalysisPrompt — patternArbitration', () => {
+    it('reports the kept ids and each dropped pattern with its bar times and the id it lost to', () => {
+        const f = cupAndHandle as Fixture;
+        const result = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            f.bars,
+            calculateIndicators(f.bars),
+            [],
+            '1Day'
+        );
+        expect(result.patternArbitration.kept).toEqual(['cup_and_handle']);
+        expect(result.patternArbitration.dropped).toHaveLength(1);
+        const [drop] = result.patternArbitration.dropped;
+        expect(drop.id).toBe('rounding_bottom');
+        expect(drop.lostTo).toBe('cup_and_handle');
+        const times = f.bars.map(b => b.time);
+        expect(times).toContain(drop.startTime);
+        expect(times).toContain(drop.endTime);
+        expect(drop.endTime).toBeGreaterThan(drop.startTime);
+    });
+
+    it('is empty when no pattern was screened', () => {
+        const result = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            [],
+            calculateIndicators([]),
+            [],
+            '1Day'
+        );
+        expect(result.patternArbitration).toEqual({ kept: [], dropped: [] });
     });
 });

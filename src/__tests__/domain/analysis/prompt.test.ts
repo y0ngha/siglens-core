@@ -18,9 +18,15 @@ import {
     REGIME_CONTEXT_SECTION_HEADER,
     retracementDepthSuffix,
     distanceFromExtreme,
+    COMPUTED_SECTIONS_RULES,
 } from '@/domain/analysis/prompt';
 import { INDICATOR_STATE_SECTION_HEADER } from '@/domain/analysis/indicatorState';
 import { CHART_PATTERN_CANDIDATES_SECTION_HEADER } from '@/domain/analysis/chartPatternCandidatesSection';
+import {
+    CHART_OVERLAY_CANDIDATES_SECTION_HEADER,
+    CHART_OVERLAY_CANDIDATES_SECTION_INTRO,
+} from '@/domain/analysis/chartOverlayCandidatesSection';
+import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 import { calculateIndicators } from '@/domain/indicators/index';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
 import doubleTopFixture from '@/__tests__/domain/patterns/fixtures/double-top.json';
@@ -3009,7 +3015,7 @@ describe('prompt', () => {
             );
         });
 
-        it('patternSummaries 규칙은 패턴 목록이 어떻게 만들어졌는지 쓰지 말라고 한다', () => {
+        it('patternSummaries 규칙은 계산 섹션 서술의 일반 규칙을 가리킨다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3018,8 +3024,23 @@ describe('prompt', () => {
                 [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
             );
             expect(result).toContain(
-                `Never describe how ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} was produced, what it lists or leaves out, or why`
+                `- In summary and every other text field, write about patterns as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says`
             );
+            // The pattern-only sentence it replaced is gone — one rule, one place.
+            expect(result).not.toContain(
+                `Never describe how ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} was produced`
+            );
+        });
+
+        it('geometry 규칙에 형태 유사 목록이 더는 나오지 않는다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
+            );
+            expect(result.toLowerCase()).not.toContain('resemblance');
         });
 
         describe('geometry는 Candidate id가 있는 패턴만 싣는다 (인트로와 Writing Rules 일치)', () => {
@@ -6481,5 +6502,98 @@ describe('distanceFromExtreme', () => {
     it('is N/A when the extreme is not a positive number', () => {
         expect(distanceFromExtreme(10, 0, 'low')).toBe('N/A');
         expect(distanceFromExtreme(10, Number.NaN, 'high')).toBe('N/A');
+    });
+});
+
+// 2026-10-08 A/B: summaries retold how the computed sections were made —
+// the pattern list ("확정 경계 없는 모양 유사 수준으로만 잡혀 있어 …") and the
+// Elliott candidates ("규칙 검증을 통과한 계산된 파동 후보가 없어") — and copied a
+// raw status code ("형성 중 (forming)"). One rule in ## Analysis Guidelines
+// covers every computed pattern and overlay section.
+describe('### Writing About Computed Sections', () => {
+    const result = buildAnalysisPrompt(
+        TEST_SYMBOL,
+        TEST_COMPANY_NAME,
+        [],
+        makeIndicators(),
+        []
+    );
+    const [narration, codes] = COMPUTED_SECTIONS_RULES;
+
+    it('renders under ## Analysis Guidelines whatever skills are active, every rule verbatim', () => {
+        const guidelines = result.slice(
+            result.indexOf('## Analysis Guidelines'),
+            result.indexOf('### Summary Writing Checklist')
+        );
+        expect(guidelines).toContain(
+            [COMPUTED_SECTIONS_HEADING, ...COMPUTED_SECTIONS_RULES].join('\n')
+        );
+    });
+
+    it('covers the pattern section and every overlay group (trendlines, divergences, Fibonacci, Elliott)', () => {
+        expect(narration).toContain(CHART_PATTERN_CANDIDATES_SECTION_HEADER);
+        expect(narration).toContain(CHART_OVERLAY_CANDIDATES_SECTION_HEADER);
+        for (const group of [
+            'trendlines',
+            'divergences',
+            'Fibonacci',
+            'Elliott waves',
+        ])
+            expect(narration).toContain(group);
+    });
+
+    it('forbids narrating the sections and saying why something is or is not listed', () => {
+        expect(narration).toContain(
+            'never mention candidates, screening, validation, rule checks, scores or a computed list'
+        );
+        expect(narration).toContain(
+            'never say why something is or is not listed or that a computed list lacks something'
+        );
+        expect(narration).toContain(
+            'present it simply as your reading of the bars'
+        );
+    });
+
+    // The gap rules elsewhere REQUIRE saying when a level, trigger or price
+    // is missing (DOM-9: rules never contradict). The computed-sections rule
+    // only forbids narrating the sections, and says how a gap is stated.
+    it('coexists with the rules that require stating a missing level, trigger or price', () => {
+        const withPlan = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            [],
+            makeIndicators(),
+            []
+        );
+        for (const gapRule of [
+            'if a level is not present, say so rather than fabricating one',
+            'if none exists, say so instead of inventing one',
+            'state that gap rather than guessing a number',
+        ])
+            expect(withPlan).toContain(gapRule);
+        expect(narration).toContain(
+            'When a field needs a level, target or entry the data does not hold, state that gap in plain terms'
+        );
+        expect(narration).not.toMatch(/never say[^.]*\bno\b[^.]*exists/);
+    });
+
+    it('keeps raw pattern status and direction codes out of the answer', () => {
+        for (const code of ['`forming`', '`broken`', '`failed breakout`'])
+            expect(codes).toContain(code);
+        expect(codes).toContain(
+            'state what they mean in the answer language and never print the English code itself, not even in parentheses'
+        );
+    });
+
+    it('the overlay section intro says what the lines are, not that logic computed them, and points to the rule', () => {
+        expect(CHART_OVERLAY_CANDIDATES_SECTION_INTRO).not.toMatch(/logic/i);
+        expect(
+            CHART_OVERLAY_CANDIDATES_SECTION_INTRO.startsWith(
+                'Lines, legs and wave counts measured from the bars.'
+            )
+        ).toBe(true);
+        expect(CHART_OVERLAY_CANDIDATES_SECTION_INTRO).toContain(
+            `${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines`
+        );
     });
 });

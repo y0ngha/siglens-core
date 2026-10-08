@@ -218,12 +218,7 @@ function qualifyCupAt(
     );
     const handleLow = lowestConfirmedLowAfter(ctx, right.index);
     if (span === null || handleLow === null) return null;
-    // The cup's bottom sits in the middle half of the rim-to-rim span, by
-    // time: a crash off the left rim followed by a long climb back is a V on
-    // its side, not a bowl. (A rounding base checks its fitted vertex.)
-    const at = (span.extreme.index - left.index) / (right.index - left.index);
-    if (at < CURVATURE_VERTEX_MID_LO || at > CURVATURE_VERTEX_MID_HI)
-        return null;
+    if (!extremeInMiddleHalf(left, right, span.extreme)) return null;
     if (right.price - handleLow.price > CUP_HANDLE_MAX_DEPTH_RATIO * span.depth)
         return null;
     return {
@@ -252,9 +247,10 @@ function qualifyCupAt(
  * §3.7: the most recent rim pivot is the right rim; the earliest earlier rim
  * that passes is the left one. A quadratic fitted on the closes between the
  * rims must open the right way, put its vertex in the middle half of the
- * span and explain at least `ROUNDING_MIN_R2` of the variance. The drawing
- * is the fitted curve sampled at `ROUNDING_ARC_SAMPLES` points, not the
- * zigzag of lows.
+ * span and explain at least `ROUNDING_MIN_R2` of the variance, and the
+ * extreme bar itself must lie in the middle half too (as for cups). The drawing
+ * is a curve, not the zigzag of lows — see {@link sampleArc} for why it is
+ * not the fitted curve itself.
  */
 export function qualifyRounding(
     ctx: QualifyContext,
@@ -293,10 +289,13 @@ function qualifyRoundingAt(
     if (fit === null || (shape === 'bottom' ? fit.a <= 0 : fit.a >= 0))
         return null;
     const width = right.index - left.index;
-    const vertex = -fit.b / (2 * fit.a);
+    // Both the fitted vertex and the printed extreme bar: the fit can centre
+    // its vertex while the actual low is a gap-down two bars after the left
+    // rim (AAPL daily, 2026-10-08) — drawn through the printed points, that is
+    // a crash and a slow climb, not a saucer.
     if (
-        vertex < width * CURVATURE_VERTEX_MID_LO ||
-        vertex > width * CURVATURE_VERTEX_MID_HI
+        !inMiddleHalf(-fit.b / (2 * fit.a), width) ||
+        !extremeInMiddleHalf(left, right, span.extreme)
     )
         return null;
     const curve = (x: number): number => fit.a * x * x + fit.b * x + fit.c;
@@ -326,10 +325,32 @@ function qualifyRoundingAt(
                 index: invalidation.index,
                 price: invalidation.price,
             },
-            arc: sampleArc(left.index, width, curve),
+            arc: sampleArc(left, right, span.extreme),
         },
         touches: 2,
     };
+}
+
+/** Whether `offset` bars into a `width`-bar span lies in its middle half (`CURVATURE_VERTEX_MID_LO`–`_HI`). */
+function inMiddleHalf(offset: number, width: number): boolean {
+    return (
+        offset >= width * CURVATURE_VERTEX_MID_LO &&
+        offset <= width * CURVATURE_VERTEX_MID_HI
+    );
+}
+
+/**
+ * Whether a curved base's extreme bar (the cup or saucer bottom, the dome
+ * top) sits in the middle half of the rim-to-rim span, by time: a crash off
+ * the left rim followed by a long climb back is a V on its side, not a bowl.
+ * Shared by cups and rounding bases.
+ */
+function extremeInMiddleHalf(
+    left: PivotPoint,
+    right: PivotPoint,
+    extreme: PatternPoint
+): boolean {
+    return inMiddleHalf(extreme.index - left.index, right.index - left.index);
 }
 
 /** Coefficient of determination of `curve` over `points`; 0 for a flat series. */
@@ -347,17 +368,40 @@ function rSquared(
     return 1 - residual / total;
 }
 
-/** `ROUNDING_ARC_SAMPLES` evenly spaced bar indices from rim to rim, priced on the fitted curve. */
+/**
+ * The drawn arc: about `ROUNDING_ARC_SAMPLES` bar indices from rim to rim,
+ * plus the extreme's own bar, on a curve through the three printed points —
+ * the left rim, the bottom (top) and the right rim.
+ *
+ * Not the fitted curve: it is fitted on closes, so it starts and ends off the
+ * rims and does not reach the extreme low (high). AAPL daily, 2026-10-08 A/B:
+ * the fit began 3.8 ATR under the printed left rim (319.7 vs 344.57) and
+ * bottomed at 309.8 against a printed bottom of 300.00, so the chart and the
+ * card disagreed. The fit's shape re-anchored to those points is, on each
+ * side of the extreme, the parabola with its vertex at the extreme through
+ * that side's rim (a parabola scaled to two anchors is still a parabola), so
+ * each side is that half-parabola. It never passes the extreme or the rims —
+ * monotone on each side, flat at the extreme where the two halves meet.
+ */
 function sampleArc(
-    start: number,
-    width: number,
-    curve: (x: number) => number
+    left: PivotPoint,
+    right: PivotPoint,
+    extreme: PatternPoint
 ): PatternPoint[] {
+    const width = right.index - left.index;
     const offsets = Array.from({ length: ROUNDING_ARC_SAMPLES }, (_, k) =>
         Math.round((width * k) / (ROUNDING_ARC_SAMPLES - 1))
     );
-    return [...new Set(offsets)].map(x => ({
-        index: start + x,
-        price: curve(x),
-    }));
+    const indices = [
+        ...new Set([...offsets.map(x => left.index + x), extreme.index]),
+    ].toSorted((a, b) => a - b);
+    return indices.map(index => {
+        const rim = index <= extreme.index ? left : right;
+        const side = Math.abs(rim.index - extreme.index);
+        const t = side === 0 ? 0 : (index - extreme.index) / side;
+        return {
+            index,
+            price: extreme.price + (rim.price - extreme.price) * t * t,
+        };
+    });
 }

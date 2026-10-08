@@ -12,9 +12,9 @@ import {
     formatSignedPercent,
 } from '@/domain/analysis/promptFormat';
 import { patternOverlayId } from '@/domain/overlays/patternOverlays';
+import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 import type {
     Bar,
-    ChartPatternId,
     PatternGeometry,
     PatternLine,
     PatternTargetGeometry,
@@ -30,26 +30,21 @@ export const CHART_PATTERN_CANDIDATES_SECTION_HEADER =
 
 /**
  * @internal Section intro (spec 2026-09-18 addendum, "hints not a verdict";
- * spec 2026-10-07 for the measured / shape-resemblance split). The listing
- * must never read as a cap on what the model may report. Exported so the
- * test can assert the exact wording survives edits.
+ * spec 2026-10-07 for the measured patterns). The listing must never read as
+ * a cap on what the model may report. Exported so the test can assert the
+ * exact wording survives edits.
  *
  * Model-facing wording only: it never names how the list is produced
- * (screening, qualification, drawing checks). The 2026-10-08 real-model A/B
- * found that wording copied into user-facing text in 8 of 18 runs ("사전
- * 스크리너가 … 후보로 제시했지만 … 그리기 검증을 통과하지 못해") — the closing
- * sentence forbids describing it at all.
+ * (screening, qualification, drawing checks), and how to write about it is
+ * the general rule in ## Analysis Guidelines (`COMPUTED_SECTIONS_RULES` in
+ * prompt.ts) — one rule for every computed section. The 2026-10-08 A/B found
+ * process wording copied into user-facing text (8 of 18 runs: "사전 스크리너가
+ * … 그리기 검증을 통과하지 못해"), and a later run retold the one-line list of
+ * unconfirmed shape resemblances that used to close this section (4 of 18:
+ * "확정 경계 없는 모양 유사 수준으로만 잡혀 있어 …"). Those loose hits still pick
+ * skill docs (`selectionIds` in prompt.ts); they are no longer named here.
  */
-export const CHART_PATTERN_CANDIDATES_SECTION_INTRO =
-    'Each pattern below is measured from confirmed swing points. The list is not exhaustive and not a verdict: confirm or reject each by the actual shape, and you may also report a pattern this section does not name if you can clearly see it in the bars. For a listed pattern you confirm, copy its geometry and set its candidateId to its Candidate id; for any other pattern you report, leave candidateId empty and set geometry to null — only listed patterns carry levels and targets. A pattern named only in the "Unconfirmed shape resemblances" line resembles that shape without confirmed boundaries: report it as detected: false and give no levels for it. In every output field describe a pattern only by what the price did (its swings, touches and levels) — never describe how this section was produced or why a pattern is or is not in it.';
-
-/**
- * @internal Label of the one line naming the shape resemblances — loose
- * shape matches with no measured pattern (spec 2026-10-07 §1). Neutral on
- * purpose: see {@link CHART_PATTERN_CANDIDATES_SECTION_INTRO}.
- */
-export const SHAPE_RESEMBLANCES_LABEL =
-    'Unconfirmed shape resemblances (no confirmed boundaries — do not report as detected, give no levels)';
+export const CHART_PATTERN_CANDIDATES_SECTION_INTRO = `Each pattern below is measured from confirmed swing points. The list is not exhaustive and not a verdict: confirm or reject each by the actual shape, and you may also report a pattern this section does not name if you can clearly see it in the bars. For a listed pattern you confirm, copy its geometry and set its candidateId to its Candidate id; for any other pattern you report, leave candidateId empty and set geometry to null — only listed patterns carry levels and targets. Write about them as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says.`;
 
 /** @internal Block status of a pattern whose breakout failed (see {@link isFailedBreakout}). */
 export const FAILED_BREAKOUT_STATUS = 'failed breakout';
@@ -373,17 +368,14 @@ export function printedPatternGeometriesByOverlayId(
  * Renders `## Chart Pattern Candidates (computed)` — the qualified patterns
  * with deterministic measured-move geometry (spec 2026-09-18 §A1, spec
  * 2026-10-07), so the siglens pattern skills can cite a computed target
- * instead of asking the model to work one out, followed by one
- * {@link SHAPE_RESEMBLANCES_LABEL} line naming every pre-screener hit that
- * did not qualify (no Candidate id, no numbers). {@link NO_CHART_PATTERNS_LINE}
- * when there is neither; a qualified pattern whose geometry is unavailable
+ * instead of asking the model to work one out. Pre-screener hits that did not
+ * qualify are not named (see {@link CHART_PATTERN_CANDIDATES_SECTION_INTRO}).
+ * {@link NO_CHART_PATTERNS_LINE} when nothing qualified; a qualified pattern whose geometry is unavailable
  * (boundaries crossed by the last bar) still gets a one-line block rather
  * than being dropped.
  *
  * @param candidates - Qualified patterns (`qualifyPatterns`), computed once
  *   by the caller and shared with the overlay builder.
- * @param shapeHints - Pre-screener ids with no qualified pattern
- *   (`qualifyPatterns`' `shapeHints`).
  * @param bars - Full bar series, oldest-first (same series the technical
  *   prompt's indicators were computed from).
  * @param atr - Average True Range for `bars`; `null`/non-positive degrades
@@ -402,7 +394,6 @@ export function printedPatternGeometriesByOverlayId(
  */
 export function formatChartPatternCandidatesSection(
     candidates: readonly QualifiedPattern[],
-    shapeHints: readonly ChartPatternId[],
     bars: readonly Bar[],
     atr: number | null,
     priceDp: number,
@@ -414,7 +405,7 @@ export function formatChartPatternCandidatesSection(
         atr
     )
 ): string {
-    if (candidates.length === 0 && shapeHints.length === 0) {
+    if (candidates.length === 0) {
         return [
             CHART_PATTERN_CANDIDATES_SECTION_HEADER,
             CHART_PATTERN_CANDIDATES_SECTION_INTRO,
@@ -442,8 +433,5 @@ export function formatChartPatternCandidatesSection(
         CHART_PATTERN_CANDIDATES_SECTION_HEADER,
         CHART_PATTERN_CANDIDATES_SECTION_INTRO,
         ...blocks,
-        ...(shapeHints.length > 0
-            ? [`- ${SHAPE_RESEMBLANCES_LABEL}: ${shapeHints.join(', ')}`]
-            : []),
     ].join('\n');
 }
