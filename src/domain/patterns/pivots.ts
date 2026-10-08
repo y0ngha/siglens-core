@@ -55,16 +55,15 @@ function effectiveAtrSeries(
     atr: readonly (number | null)[],
     length: number
 ): (number | null)[] {
+    // One pass that carries the last usable value forward (CP-5: single-pass
+    // state); bars before the first usable value borrow it.
     const first = atr.find(usableAtr) ?? null;
-    let previous: number | null = null;
-    return Array.from({ length }, (_, i) => {
+    const out: (number | null)[] = [];
+    for (let i = 0; i < length; i++) {
         const value = atr[i];
-        if (usableAtr(value)) {
-            previous = value;
-            return value;
-        }
-        return previous ?? first;
-    });
+        out.push(usableAtr(value) ? value : (out[i - 1] ?? first));
+    }
+    return out;
 }
 
 /**

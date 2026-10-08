@@ -121,13 +121,13 @@ function breaksInnerRim(
     right: number,
     beyondRim: (bar: Bar) => boolean
 ): boolean {
-    const inside = (k: number): boolean => !beyondRim(bars[k]);
-    let first = left + 1;
-    while (first < right && !inside(first)) first++;
-    let last = right - 1;
-    while (last > first && !inside(last)) last--;
-    for (let k = first; k <= last; k++) if (!inside(k)) return true;
-    return false;
+    // The rims' own legs may sit beyond the lower rim — skip the bars beyond it at
+    // both ends, then any bar beyond it in between breaks the cup.
+    const interior = bars.slice(left + 1, right);
+    const first = interior.findIndex(bar => !beyondRim(bar));
+    if (first === -1) return false;
+    const last = interior.findLastIndex(bar => !beyondRim(bar));
+    return interior.slice(first, last + 1).some(beyondRim);
 }
 
 /**

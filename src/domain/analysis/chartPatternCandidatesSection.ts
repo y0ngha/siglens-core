@@ -116,15 +116,21 @@ export function isFailedBreakout(
         ...(direction !== 'down' ? [{ line: shape.upper, sign: 1 }] : []),
         ...(direction !== 'up' ? [{ line: shape.lower, sign: -1 }] : []),
     ];
-    const beyond = (line: PatternLine, sign: number, i: number): boolean =>
-        sign * (bars[i].close - lineValueAt(line, i)) > slack;
-    return sides.some(
-        ({ line, sign }) =>
-            !beyond(line, sign, lastIndex) &&
+    const beyond = (
+        line: PatternLine,
+        sign: number,
+        bar: Bar,
+        i: number
+    ): boolean => sign * (bar.close - lineValueAt(line, i)) > slack;
+    return sides.some(({ line, sign }) => {
+        const start = line.end.index + 1;
+        return (
+            !beyond(line, sign, bars[lastIndex], lastIndex) &&
             bars
-                .slice(line.end.index + 1, lastIndex)
-                .some((_, k) => beyond(line, sign, line.end.index + 1 + k))
-    );
+                .slice(start, lastIndex)
+                .some((bar, k) => beyond(line, sign, bar, start + k))
+        );
+    });
 }
 
 /** Key points whose spacing the pattern skills gate on (double/triple tops and bottoms, head and shoulders). */
