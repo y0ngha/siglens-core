@@ -959,7 +959,9 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 시스템 메시지(stable) 머리로 옮긴다(문구 변경 없음, 심볼 간 공통 접두사 확대).
         // p23 (UX audit 2026-10-05 §C6): Confluence Assessment에 내부 라벨 비노출 규칙을
         // 추가하고 "rule engine"/"washout"을 이름으로 인용하라던 두 지시를 고쳤다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p23');
+        // p24 (spec 2026-10-07): 차트 패턴은 엄격한 작도 자격을 얻은 것만 숫자·Candidate id와
+        // 함께 싣고, 나머지 프리스크리너 hit은 "shape hint — not drawable" 한 줄로만 남긴다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p24');
     });
 });
 

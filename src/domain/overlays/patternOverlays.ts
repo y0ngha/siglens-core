@@ -6,31 +6,19 @@ import type {
     OverlaySegment,
     PatternCandidate,
     PatternGeometry,
+    PatternLine,
+    PatternPoint,
     PivotPoint,
+    QualifiedPattern,
 } from '@/domain/types';
-import {
-    computeCandidateGeometry,
-    evaluateTrendlineAt,
-} from '@/domain/patterns/patternGeometry';
+import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
+import { lineValueAt } from '@/domain/patterns/boundaryLines';
 import { OVERLAY_LEVEL_LABELS } from '@/domain/overlays/constants';
 import {
     computePatternTargets,
     printedPatternGeometry,
 } from '@/domain/analysis/patternTargets';
 
-const TRENDLINE_FAMILY = new Set([
-    'ascending_triangle',
-    'descending_triangle',
-    'symmetrical_triangle',
-    'ascending_wedge',
-    'descending_wedge',
-    'ascending_channel',
-    'descending_channel',
-    'broadening_formation',
-    'rectangle',
-]);
-const FLAG_FAMILY = new Set(['bull_flag', 'bear_flag', 'pennant']);
-const HS_FAMILY = new Set(['head_and_shoulders', 'inverse_head_and_shoulders']);
 const HS_LABELS = ['LS', 'H', 'RS'] as const;
 const HS_LABEL_PIVOT_INDICES = [0, 2, 4] as const;
 
@@ -44,7 +32,7 @@ export function patternSkillStem(patternId: string): string {
     return patternId.replace(/_/g, '-');
 }
 
-/** @internal Deterministic overlay id for one screener hit. */
+/** @internal Deterministic overlay id for one pattern: its id and the time of its first bar. */
 export function patternOverlayId(
     candidate: PatternCandidate,
     bars: readonly Bar[]
@@ -75,34 +63,45 @@ function seg(
     };
 }
 
+/** A boundary drawn from its first to its last touch (spec 2026-10-07 §2.2 — no extension). */
+function lineSegment(
+    bars: readonly Bar[],
+    line: PatternLine,
+    role: string
+): OverlaySegment {
+    return seg(
+        bars,
+        line.start.index,
+        line.start.price,
+        line.end.index,
+        line.end.price,
+        role
+    );
+}
+
 /**
- * Neckline as a SEGMENT (not a horizontal level) through the two troughs of a
- * 5-pivot head & shoulders (`pivots[1]`/`pivots[3]`), extended linearly to the
- * chart's right edge — a real neckline slopes, so a horizontal breakout level
- * misdraws it for anything but a perfectly flat one.
+ * A head & shoulders neckline from the left trough to the bar the breakout
+ * is read at (the break bar, or the last bar before a break), so the drawn
+ * line ends exactly at the printed breakout.
  */
 function necklineSegment(
     bars: readonly Bar[],
-    pivots: readonly PivotPoint[]
+    neckline: PatternLine,
+    breakoutIndex: number
 ): OverlaySegment {
-    const p1 = pivots[1];
-    const p3 = pivots[3];
-    const lastIndex = bars.length - 1;
-    const slope = (p3.price - p1.price) / (p3.index - p1.index);
-    const extendedPrice = p3.price + slope * (lastIndex - p3.index);
     return seg(
         bars,
-        p1.index,
-        p1.price,
-        lastIndex,
-        extendedPrice,
+        neckline.start.index,
+        neckline.start.price,
+        breakoutIndex,
+        lineValueAt(neckline, breakoutIndex),
         'neckline',
         'dashed'
     );
 }
 
 /**
- * Legs between consecutive pivots. A leg between two pivots on the same bar
+ * Legs between consecutive points. A leg between two points on the same bar
  * (a wide bar whose high and low both pivot) has no length and cannot be
  * drawn — it is left out instead of costing the whole pattern its drawing
  * (`runsForward` drops a candidate with any non-forward segment; 165 of
@@ -110,17 +109,17 @@ function necklineSegment(
  */
 function polyline(
     bars: readonly Bar[],
-    pivots: readonly PivotPoint[]
+    points: readonly PatternPoint[]
 ): OverlaySegment[] {
-    return pivots
+    return points
         .slice(1)
         .flatMap((p, i) =>
-            p.index > pivots[i].index
+            p.index > points[i].index
                 ? [
                       seg(
                           bars,
-                          pivots[i].index,
-                          pivots[i].price,
+                          points[i].index,
+                          points[i].price,
                           p.index,
                           p.price,
                           'pattern'
@@ -128,61 +127,6 @@ function polyline(
                   ]
                 : []
         );
-}
-
-function trendlineSegments(
-    bars: readonly Bar[],
-    pivots: readonly PivotPoint[]
-): OverlaySegment[] {
-    const highs = pivots.filter(p => p.kind === 'high');
-    const lows = pivots.filter(p => p.kind === 'low');
-    const start = Math.min(...pivots.map(p => p.index));
-    const end = Math.max(...pivots.map(p => p.index));
-    return [
-        seg(
-            bars,
-            start,
-            evaluateTrendlineAt(highs, start),
-            end,
-            evaluateTrendlineAt(highs, end),
-            'boundary_upper'
-        ),
-        seg(
-            bars,
-            start,
-            evaluateTrendlineAt(lows, start),
-            end,
-            evaluateTrendlineAt(lows, end),
-            'boundary_lower'
-        ),
-    ];
-}
-
-function flagSegments(
-    bars: readonly Bar[],
-    c: PatternCandidate,
-    g: PatternGeometry
-): OverlaySegment[] {
-    const [base, top, upper, lower] = g.keyPoints;
-    return [
-        seg(bars, base.index, base.price, top.index, top.price, 'pole'),
-        seg(
-            bars,
-            c.startIndex,
-            upper.price,
-            c.endIndex,
-            upper.price,
-            'channel_upper'
-        ),
-        seg(
-            bars,
-            c.startIndex,
-            lower.price,
-            c.endIndex,
-            lower.price,
-            'channel_lower'
-        ),
-    ];
 }
 
 function hsLabels(
@@ -200,17 +144,16 @@ function hsLabels(
  * The pattern's breakout, invalidation and measured-move target at the exact
  * numbers its prompt block prints (`printedPatternGeometry`), so a line's
  * axis label matches the analysis card. Every level is drawn from the
- * pattern's first pivot (its start without pivots), across the whole pattern:
- * a line starting at the last leg sits a few bars from the right edge and
- * hides behind its own axis label (2026-10-02 live render). Like the prompt
- * block, a level at or below zero (a down pattern taller than its breakout)
- * is not a price and is left out.
+ * pattern's first point, across the whole pattern: a line starting at the
+ * last leg sits a few bars from the right edge and hides behind its own axis
+ * label (2026-10-02 live render). Like the prompt block, a level at or below
+ * zero (a down pattern taller than its breakout) is not a price and is left
+ * out.
  */
 function patternLevels(
-    c: PatternCandidate,
+    pattern: QualifiedPattern,
     g: PatternGeometry,
     bars: readonly Bar[],
-    inRange: readonly PivotPoint[],
     priceDp: number,
     withBreakout: boolean
 ): OverlayLevel[] {
@@ -220,8 +163,7 @@ function patternLevels(
         p.extremeLevel,
         p.direction
     );
-    const fromTime =
-        bars[inRange.length > 0 ? inRange[0].index : c.startIndex].time;
+    const fromTime = bars[pattern.startIndex].time;
     const outcome = [
         {
             price: p.invalidationLevel ?? 0,
@@ -231,7 +173,7 @@ function patternLevels(
     ]
         .filter(l => Number.isFinite(l.price) && l.price > 0)
         .map(l => ({ ...l, fromTime }));
-    return withBreakout && inRange.length > 0
+    return withBreakout
         ? [
               {
                   price: p.breakoutLevel,
@@ -243,70 +185,135 @@ function patternLevels(
         : outcome;
 }
 
-function toOverlay(
-    c: PatternCandidate,
-    g: PatternGeometry,
-    bars: readonly Bar[],
-    priceDp: number
-): OverlayCandidate | null {
-    const inRange = (c.pivots ?? []).filter(
-        p => p.index >= c.startIndex && p.index <= c.endIndex
-    );
-    // `skill` is the skill file stem (`skills/patterns/<skill>.md`).
-    const base = {
-        id: patternOverlayId(c, bars),
-        kind: 'pattern' as const,
-        skill: patternSkillStem(c.id),
-        promptLine: '',
-    };
+interface PatternDrawing {
+    segments: OverlaySegment[];
+    labels: OverlayLabel[];
+    /** Whether the breakout gets a horizontal level (no drawn line already marks it). */
+    breakoutLevel: boolean;
+}
 
-    if (FLAG_FAMILY.has(c.id)) {
-        if (c.endIndex <= c.startIndex) return null;
-        return {
-            ...base,
-            segments: flagSegments(bars, c, g),
-            levels: patternLevels(c, g, bars, inRange, priceDp, false),
-            labels: [],
-        };
+/**
+ * Segments per shape: boundaries as two lines (triangles, wedges, channels,
+ * rectangle, broadening), a pole plus two channel lines (flags), the five
+ * pivots plus a sloped neckline (head & shoulders), the fitted arc
+ * (rounding), and the structural points as a polyline otherwise.
+ */
+function drawingOf(
+    pattern: QualifiedPattern,
+    bars: readonly Bar[]
+): PatternDrawing {
+    const { shape } = pattern;
+    switch (shape.kind) {
+        case 'trendline':
+            return {
+                segments: [
+                    lineSegment(bars, shape.upper, 'boundary_upper'),
+                    lineSegment(bars, shape.lower, 'boundary_lower'),
+                ],
+                labels: [],
+                breakoutLevel: false,
+            };
+        case 'flag':
+            return {
+                segments: [
+                    seg(
+                        bars,
+                        shape.poleBase.index,
+                        shape.poleBase.price,
+                        shape.poleTop.index,
+                        shape.poleTop.price,
+                        'pole'
+                    ),
+                    lineSegment(bars, shape.upper, 'channel_upper'),
+                    lineSegment(bars, shape.lower, 'channel_lower'),
+                ],
+                labels: [],
+                breakoutLevel: false,
+            };
+        case 'head_and_shoulders':
+            return {
+                segments: [
+                    ...polyline(bars, pattern.pivots),
+                    necklineSegment(bars, shape.neckline, shape.breakoutIndex),
+                ],
+                labels: hsLabels(bars, pattern.pivots),
+                breakoutLevel: false,
+            };
+        case 'cup':
+            return {
+                segments: polyline(bars, [
+                    shape.leftRim,
+                    shape.bottom,
+                    shape.rightRim,
+                    shape.handleLow,
+                ]),
+                labels: [],
+                breakoutLevel: true,
+            };
+        case 'rounding':
+            return {
+                segments: polyline(bars, shape.arc),
+                labels: [],
+                breakoutLevel: true,
+            };
+        case 'high_tight_flag':
+            return {
+                segments: polyline(bars, [
+                    shape.poleBase,
+                    shape.poleTop,
+                    shape.flagLow,
+                ]),
+                labels: [],
+                breakoutLevel: true,
+            };
+        case 'extreme':
+            return {
+                segments: polyline(bars, pattern.pivots),
+                labels: [],
+                breakoutLevel: true,
+            };
     }
-    if (TRENDLINE_FAMILY.has(c.id)) {
-        return {
-            ...base,
-            segments: trendlineSegments(bars, inRange),
-            levels: patternLevels(c, g, bars, inRange, priceDp, false),
-            labels: [],
-        };
-    }
-    if (inRange.length < 2) return null;
-    const isHs = HS_FAMILY.has(c.id) && inRange.length === 5;
-    return {
-        ...base,
-        // Head & shoulders draws its neckline as a sloped segment through the
-        // two troughs instead of a horizontal breakout level (real necklines
-        // slope); every other family keeps the horizontal breakout level.
-        segments: isHs
-            ? [...polyline(bars, inRange), necklineSegment(bars, inRange)]
-            : polyline(bars, inRange),
-        levels: patternLevels(c, g, bars, inRange, priceDp, !isHs),
-        labels: isHs ? hsLabels(bars, inRange) : [],
-    };
 }
 
 /**
  * @internal
- * Screener hits → drawable pattern candidates (spec 2026-09-28 §3.1). A hit
- * with no geometry is skipped — the prompt section still lists it, but there
- * is nothing trustworthy to draw.
+ * Qualified patterns → drawable pattern candidates (spec 2026-09-28 §3.1,
+ * spec 2026-10-07). Levels: invalidation and measured target for every
+ * directed pattern, plus a horizontal breakout where no drawn line already
+ * marks it. An undirected boundary pair (no prior trend) draws its two
+ * boundaries and no level — it has no target. A pattern without geometry is
+ * skipped.
  */
 export function buildPatternOverlayCandidates(
-    candidates: readonly PatternCandidate[],
+    patterns: readonly QualifiedPattern[],
     bars: readonly Bar[],
     atr: number,
     priceDp: number
 ): OverlayCandidate[] {
-    return candidates.flatMap(c => {
-        const g = computeCandidateGeometry(c, bars, atr);
-        const overlay = g ? toOverlay(c, g, bars, priceDp) : null;
-        return overlay ? [overlay] : [];
+    return patterns.flatMap(pattern => {
+        const g = computeCandidateGeometry(pattern, bars, atr);
+        if (g === null) return [];
+        const drawing = drawingOf(pattern, bars);
+        return [
+            {
+                id: patternOverlayId(pattern, bars),
+                kind: 'pattern' as const,
+                // The skill file stem (`skills/patterns/<skill>.md`).
+                skill: patternSkillStem(pattern.id),
+                promptLine: '',
+                segments: drawing.segments,
+                levels:
+                    g.direction === null
+                        ? []
+                        : patternLevels(
+                              pattern,
+                              g,
+                              bars,
+                              priceDp,
+                              drawing.breakoutLevel
+                          ),
+                labels: drawing.labels,
+            },
+        ];
     });
 }

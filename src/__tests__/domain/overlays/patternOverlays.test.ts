@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
-import type { Bar } from '@/domain/types';
-import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
+import type { Bar, QualifiedPattern } from '@/domain/types';
+import { qualifyPatterns } from '@/domain/patterns/qualify/qualifyPatterns';
 import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
+import { BOUNDARY_CONTAINMENT_ATR } from '@/domain/patterns/constants';
 import {
     computePatternTargets,
     printedPatternGeometry,
@@ -11,6 +11,7 @@ import {
     buildPatternOverlayCandidates,
     patternOverlayId,
 } from '@/domain/overlays/patternOverlays';
+import { makeBars } from '@/__tests__/domain/patterns/helpers';
 import hsTextbook from '@/__tests__/domain/patterns/fixtures/hs-textbook.json';
 import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
 import ascendingTriangle from '@/__tests__/domain/patterns/fixtures/ascending-triangle.json';
@@ -21,112 +22,133 @@ interface Fixture {
     atr: number;
     bars: Bar[];
 }
-const build = (f: Fixture) =>
-    buildPatternOverlayCandidates(
-        screenChartPatterns(f.bars, f.atr),
-        f.bars,
-        f.atr,
-        DP
-    );
 /** Prompt price precision the fixtures are printed at. */
 const DP = 2;
-const barTimes = (f: Fixture) => new Set(f.bars.map(b => b.time));
+const FIXTURES = [
+    hsTextbook,
+    doubleTop,
+    ascendingTriangle,
+    bullFlag,
+    cupAndHandle,
+] as Fixture[];
+const qualified = (f: Fixture): QualifiedPattern[] =>
+    qualifyPatterns([], f.bars, f.atr, '1Day').qualified;
+const build = (f: Fixture) =>
+    buildPatternOverlayCandidates(qualified(f), f.bars, f.atr, DP);
+const find = (f: Fixture, id: string) => {
+    const c = build(f).find(o => o.id.startsWith(`pattern:${id}:`));
+    if (!c) throw new Error(`no ${id} overlay`);
+    return c;
+};
 
 describe('buildPatternOverlayCandidates', () => {
-    it('head & shoulders: 5-pivot polyline + a sloped neckline segment, no breakout level, LS/H/RS labels', () => {
+    it('head & shoulders: 5-pivot polyline + a sloped neckline ending at the breakout bar, no breakout level, LS/H/RS labels', () => {
         const f = hsTextbook as Fixture;
-        const hs = build(f).find(c =>
-            c.id.startsWith('pattern:head_and_shoulders:')
-        )!;
+        const hs = find(f, 'head_and_shoulders');
         expect(hs.kind).toBe('pattern');
         expect(hs.skill).toBe('head-and-shoulders');
-        // 4 polyline legs through the 5 pivots + 1 neckline segment.
         expect(hs.segments).toHaveLength(5);
         const neckline = hs.segments.find(s => s.role === 'neckline')!;
-        expect(neckline).toBeDefined();
         expect(neckline.style).toBe('dashed');
-        expect(neckline.pane).toBe('price');
-        // Extended to the chart's right edge.
+        // Not broken yet → the breakout is read (and the neckline ends) at the last bar.
         expect(neckline.to.time).toBe(f.bars[f.bars.length - 1].time);
-        // No horizontal breakout level for H&S — the neckline segment replaces
-        // it; only the invalidation and target levels are horizontal.
+        const [q] = qualified(f);
+        const g = computeCandidateGeometry(q, f.bars, f.atr)!;
+        expect(g.direction).toBe('down');
+        // The drawn neckline ends exactly at the printed breakout level.
+        expect(neckline.to.price).toBeCloseTo(
+            g.direction === null ? NaN : g.breakoutLevel,
+            10
+        );
         expect(hs.levels.map(l => l.label)).toEqual(['invalidation', 'target']);
         expect(hs.labels.map(l => l.text)).toEqual(['LS', 'H', 'RS']);
     });
 
-    it('double top: polyline through the matched window and a neckline level', () => {
-        const dt = build(doubleTop as Fixture).find(c =>
-            c.id.startsWith('pattern:double_top:')
-        )!;
+    it('double top: polyline through the matched window and a breakout level first', () => {
+        const dt = find(doubleTop as Fixture, 'double_top');
         expect(dt.segments.length).toBeGreaterThanOrEqual(2);
         expect(dt.levels[0].label).toBe('breakout');
     });
 
-    it('triangle: exactly an upper and a lower boundary', () => {
-        const tri = build(ascendingTriangle as Fixture).find(c =>
-            c.id.includes('ascending_triangle')
-        )!;
+    it('triangle: an upper and a lower boundary drawn touch to touch, no candle beyond either by more than ε', () => {
+        const f = ascendingTriangle as Fixture;
+        const tri = find(f, 'ascending_triangle');
         expect(tri.segments.map(s => s.role).toSorted()).toEqual([
             'boundary_lower',
             'boundary_upper',
         ]);
+        let checked = 0;
+        for (const s of tri.segments) {
+            const from = f.bars.findIndex(b => b.time === s.from.time);
+            const to = f.bars.findIndex(b => b.time === s.to.time);
+            for (let i = from; i <= to; i++) {
+                const v =
+                    s.from.price +
+                    ((s.to.price - s.from.price) * (i - from)) / (to - from);
+                const poke =
+                    s.role === 'boundary_upper'
+                        ? f.bars[i].high - v
+                        : v - f.bars[i].low;
+                expect(poke).toBeLessThanOrEqual(
+                    BOUNDARY_CONTAINMENT_ATR * f.atr + 1e-9
+                );
+                checked++;
+            }
+        }
+        expect(checked).toBeGreaterThan(20);
     });
 
-    it('flag: pole plus two channel edges from geometry', () => {
-        const flag = build(bullFlag as Fixture).find(c =>
-            c.id.includes('bull_flag')
-        )!;
+    it('flag: pole plus two channel LINES (not a horizontal box)', () => {
+        const flag = find(bullFlag as Fixture, 'bull_flag');
         expect(flag.segments.map(s => s.role).toSorted()).toEqual([
             'channel_lower',
             'channel_upper',
             'pole',
         ]);
+        expect(flag.levels.map(l => l.label)).toEqual([
+            'invalidation',
+            'target',
+        ]);
+    });
+
+    it('cup & handle: left rim → bottom → right rim → handle low, with a breakout level', () => {
+        const cup = find(cupAndHandle as Fixture, 'cup_and_handle');
+        expect(cup.segments).toHaveLength(3);
+        expect(cup.levels[0].label).toBe('breakout');
     });
 
     it('every point sits on a real bar time and segments run forward in time', () => {
-        for (const f of [
-            hsTextbook,
-            doubleTop,
-            ascendingTriangle,
-            bullFlag,
-            cupAndHandle,
-        ] as Fixture[]) {
-            const times = barTimes(f);
+        let checked = 0;
+        for (const f of FIXTURES) {
+            const times = new Set(f.bars.map(b => b.time));
             for (const c of build(f)) {
                 for (const s of c.segments) {
                     expect(times.has(s.from.time)).toBe(true);
                     expect(times.has(s.to.time)).toBe(true);
                     expect(s.to.time).toBeGreaterThan(s.from.time);
+                    checked++;
                 }
                 for (const l of c.levels)
                     expect(times.has(l.fromTime)).toBe(true);
             }
         }
+        expect(checked).toBeGreaterThan(10);
     });
 
-    it('every family draws its printed invalidation and measured target, from before the last bar', () => {
+    it('every family draws its printed invalidation and measured target, from the pattern start', () => {
         let checked = 0;
-        for (const f of [
-            hsTextbook,
-            doubleTop,
-            ascendingTriangle,
-            bullFlag,
-            cupAndHandle,
-        ] as Fixture[]) {
-            const screened = screenChartPatterns(f.bars, f.atr);
-            const lastTime = f.bars[f.bars.length - 1].time;
-            for (const s of screened) {
-                const g = computeCandidateGeometry(s, f.bars, f.atr);
+        for (const f of FIXTURES) {
+            for (const q of qualified(f)) {
+                const g = computeCandidateGeometry(q, f.bars, f.atr);
                 const c = buildPatternOverlayCandidates(
-                    [s],
+                    [q],
                     f.bars,
                     f.atr,
                     DP
                 )[0];
-                if (!g || !c) continue;
+                if (g === null || g.direction === null) continue;
                 checked++;
                 const byLabel = new Map(c.levels.map(l => [l.label, l]));
-                // The exact numbers the prompt block prints.
                 const p = printedPatternGeometry(g, DP);
                 expect(byLabel.get('invalidation')?.price).toBe(
                     p.invalidationLevel
@@ -139,94 +161,121 @@ describe('buildPatternOverlayCandidates', () => {
                     ).measuredTarget
                 );
                 for (const l of c.levels)
-                    expect(l.fromTime).toBeLessThan(lastTime);
+                    expect(l.fromTime).toBe(f.bars[q.startIndex].time);
             }
         }
-        // One per fixture family at least — never a pass with zero checks.
-        expect(checked).toBeGreaterThanOrEqual(5);
+        // One per fixture family — never a pass with zero checks.
+        expect(checked).toBe(5);
     });
 
     it('id is deterministic and matches patternOverlayId', () => {
         const f = doubleTop as Fixture;
-        const screened = screenChartPatterns(f.bars, f.atr);
-        const out = buildPatternOverlayCandidates(screened, f.bars, f.atr, DP);
-        expect(out.map(c => c.id)).toEqual(
-            screened
-                .filter(s =>
-                    out.some(o => o.id === patternOverlayId(s, f.bars))
-                )
-                .map(s => patternOverlayId(s, f.bars))
-        );
-    });
-
-    it('skips a candidate with no geometry (hand-built, no pivots)', () => {
-        const f = doubleTop as Fixture;
+        const q = qualified(f);
         expect(
-            buildPatternOverlayCandidates(
-                [{ id: 'double_top', startIndex: 1, endIndex: 5 }],
-                f.bars,
-                f.atr,
-                DP
-            )
-        ).toEqual([]);
+            buildPatternOverlayCandidates(q, f.bars, f.atr, DP).map(c => c.id)
+        ).toEqual(q.map(p => patternOverlayId(p, f.bars)));
     });
 
-    it('channels and broadening formations draw two regression boundaries', () => {
-        // Rising parallel channel: highs 104/108/112, lows 100/104/108.
-        const bars = makeHLBars([
-            [102, 100],
-            [104, 102],
-            [102, 100.5],
-            [106, 104],
-            [108, 106],
-            [106, 104.5],
-            [110, 108],
-            [112, 110],
-            [110, 108.5],
-            [111, 109],
-        ]).map((b, i) => ({ ...b, time: 1000 + i }));
-        const pivots = [
-            { index: 1, price: 104, kind: 'high' as const },
-            { index: 2, price: 100.5, kind: 'low' as const },
-            { index: 4, price: 108, kind: 'high' as const },
-            { index: 5, price: 104.5, kind: 'low' as const },
-            { index: 7, price: 112, kind: 'high' as const },
-            { index: 8, price: 108.5, kind: 'low' as const },
-        ];
-        for (const id of [
-            'ascending_channel',
-            'broadening_formation',
-        ] as const) {
-            const [c] = buildPatternOverlayCandidates(
-                [{ id, startIndex: 1, endIndex: 8, pivots }],
-                bars,
-                1,
-                DP
-            );
-            expect(c?.segments.map(s => s.role).toSorted()).toEqual([
-                'boundary_lower',
-                'boundary_upper',
-            ]);
-        }
-    });
-
-    it('skips a candidate whose geometry exists but has fewer than 2 pivots inside its range', () => {
-        const f = doubleTop as Fixture;
-        const [hit] = screenChartPatterns(f.bars, f.atr).filter(
-            c => c.id === 'double_top'
-        );
-        // Same pivots (geometry still computes), but the range now covers one pivot.
-        const firstPivot = hit.pivots![0].index;
-        const narrowed = {
-            ...hit,
-            startIndex: firstPivot,
-            endIndex: firstPivot,
+    it('skips a pattern without geometry (boundaries crossed by the last bar)', () => {
+        const bars = makeBars(Array.from({ length: 10 }, () => 100));
+        const crossed: QualifiedPattern = {
+            id: 'symmetrical_triangle',
+            startIndex: 1,
+            endIndex: 4,
+            pivots: [],
+            shape: {
+                kind: 'trendline',
+                upper: {
+                    start: { index: 1, price: 20 },
+                    end: { index: 3, price: 18 },
+                    touches: [],
+                },
+                lower: {
+                    start: { index: 2, price: 10 },
+                    end: { index: 4, price: 12 },
+                    touches: [],
+                },
+                direction: 'up',
+            },
+            touches: 4,
         };
-        expect(
-            computeCandidateGeometry(narrowed, f.bars, f.atr)
-        ).not.toBeNull();
-        expect(
-            buildPatternOverlayCandidates([narrowed], f.bars, f.atr, DP)
-        ).toEqual([]);
+        expect(buildPatternOverlayCandidates([crossed], bars, 1, DP)).toEqual(
+            []
+        );
+    });
+
+    it('an undirected rectangle draws its two boundaries and no level', () => {
+        const bars = makeBars(Array.from({ length: 10 }, () => 15));
+        const [c] = buildPatternOverlayCandidates(
+            [
+                {
+                    id: 'rectangle',
+                    startIndex: 1,
+                    endIndex: 6,
+                    pivots: [],
+                    shape: {
+                        kind: 'trendline',
+                        upper: {
+                            start: { index: 1, price: 20 },
+                            end: { index: 5, price: 20 },
+                            touches: [],
+                        },
+                        lower: {
+                            start: { index: 2, price: 10 },
+                            end: { index: 6, price: 10 },
+                            touches: [],
+                        },
+                        direction: null,
+                    },
+                    touches: 4,
+                },
+            ],
+            bars,
+            1,
+            DP
+        );
+        expect(c.segments.map(s => s.role)).toEqual([
+            'boundary_upper',
+            'boundary_lower',
+        ]);
+        expect(c.levels).toEqual([]);
+    });
+
+    it('rounding: the drawing is the sampled arc, one leg per pair of samples', () => {
+        const bars = makeBars(Array.from({ length: 10 }, () => 15));
+        const arc = [0, 3, 6, 9].map(index => ({
+            index,
+            price: 10 + (index - 4.5) ** 2 / 4,
+        }));
+        const [c] = buildPatternOverlayCandidates(
+            [
+                {
+                    id: 'rounding_bottom',
+                    startIndex: 0,
+                    endIndex: 9,
+                    pivots: [],
+                    shape: {
+                        kind: 'rounding',
+                        leftRim: { index: 0, price: 16, kind: 'high' },
+                        rightRim: { index: 9, price: 16, kind: 'high' },
+                        extreme: { index: 4, price: 10 },
+                        invalidation: { index: 4, price: 10 },
+                        arc,
+                    },
+                    touches: 2,
+                },
+            ],
+            bars,
+            1,
+            DP
+        );
+        expect(c.segments.map(s => [s.from.price, s.to.price])).toEqual(
+            arc.slice(1).map((p, i) => [arc[i].price, p.price])
+        );
+        expect(c.levels.map(l => l.label)).toEqual([
+            'breakout',
+            'invalidation',
+            'target',
+        ]);
     });
 });

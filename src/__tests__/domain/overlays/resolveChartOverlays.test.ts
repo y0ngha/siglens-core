@@ -7,6 +7,7 @@ import type {
     Skill,
 } from '@/domain/types';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
+import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import { STRATEGY_KIND_SOURCE_REF } from '@/domain/overlays/constants';
 import {
     alignPatternGeometry,
@@ -811,7 +812,10 @@ describe('resolveChartOverlays', () => {
         });
         const align = (
             patternSummaries: PatternSummary[],
-            geometries: ReadonlyMap<string, PatternTargetGeometry> = GEOMETRIES
+            geometries: ReadonlyMap<
+                string,
+                PatternTargetGeometry | null
+            > = GEOMETRIES
         ) => {
             const a = analysis({ patternSummaries });
             const { chartOverlays } = resolveChartOverlays(
@@ -935,6 +939,63 @@ describe('resolveChartOverlays', () => {
                 expect(p?.geometry).toEqual(geometry);
             }
         );
+
+        describe('a card resolved to an undirected pattern (null entry: no prior trend, no target)', () => {
+            const UNDIRECTED = new Map([['pattern:double_bottom:1', null]]);
+            const modelCard = card({
+                candidateId: 'pattern:double_bottom:1',
+                geometry: {
+                    breakoutLevel: 105,
+                    extremeLevel: 100,
+                    direction: 'up',
+                },
+                keyPrices: [
+                    { label: '측정 목표가', price: 110 },
+                    { label: 'Measured target', price: 110 },
+                    { label: '보수 목표가(50%)', price: 107.5 },
+                    { label: '상단 경계', price: 105 },
+                ],
+            });
+
+            it('drops the model geometry and every target-labelled keyPrice, keeping the rest', () => {
+                const [p] = align([modelCard], UNDIRECTED);
+                expect(p).not.toHaveProperty('geometry');
+                expect(p?.keyPrices).toEqual([
+                    { label: '상단 경계', price: 105 },
+                ]);
+            });
+
+            it('leaves a card without keyPrices without keyPrices', () => {
+                const { keyPrices: _kp, ...bare } = modelCard;
+                const [p] = align([bare], UNDIRECTED);
+                expect(p).not.toHaveProperty('keyPrices');
+                expect(p).not.toHaveProperty('geometry');
+            });
+
+            it('no target survives post-processing (the app derives none either)', () => {
+                const a = analysis({ patternSummaries: [modelCard] });
+                const { chartOverlays } = resolveChartOverlays(
+                    [
+                        {
+                            ...cand('pattern:double_bottom:1', 'pattern'),
+                            skill: 'double-bottom',
+                        },
+                    ],
+                    a,
+                    [],
+                    SKILLS
+                );
+                const processed = postProcessAnalysisWithReconcile(
+                    alignPatternGeometry(a, chartOverlays, UNDIRECTED, SKILLS),
+                    100,
+                    1
+                );
+                const labels = (
+                    processed.patternSummaries[0]?.keyPrices ?? []
+                ).map(kp => kp.label);
+                expect(labels).toEqual(['상단 경계']);
+            });
+        });
 
         it('leaves a detected:false card untouched', () => {
             const unresolved = card({

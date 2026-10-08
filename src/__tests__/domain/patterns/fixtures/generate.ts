@@ -109,63 +109,72 @@ const doubleTop = buildBars(100, [
 ]);
 
 // ─── ascending_triangle ─────────────────────────────────────────────────────
-// Flat resistance (~120) touched 3x, rising support (100 -> 106 -> 111 ->
-// 115). classifyTrendlinePatterns fits the last TRENDLINE_PIVOT_WINDOW
-// pivots: highs near-flat, lows rising.
-const ascendingTriangle = buildBars(100, [
-    { to: 94, bars: 8 },
-    { to: 101, bars: 6 },
-    { to: 100, bars: 6 }, // low 1 (~100)
-    { to: 120, bars: 10 }, // high 1 (resistance)
-    { to: 106, bars: 8 }, // low 2 (rising)
-    { to: 120.3, bars: 8 }, // high 2 (resistance)
-    { to: 111, bars: 8 }, // low 3 (rising)
-    { to: 119.8, bars: 8 }, // high 3 (resistance)
-    { to: 115, bars: 6 }, // low 4 (rising, provisional)
+// A textbook ascending triangle (spec 2026-10-07): flat resistance at 120
+// touched three times, support rising through 100 -> 106 -> 111, then a
+// pullback to 115 that confirms the third resistance touch and stays inside
+// the triangle. The series opens with a decline into the first support low
+// so that low is the first zigzag pivot (the seed extreme is never emitted)
+// — no earlier high sits among the pre-screener's last 8 pivots to tilt its
+// regression of the highs. Every structural point is a confirmed pivot, and
+// the pattern is neither failed nor fulfilled at the last bar.
+const ascendingTriangle = buildBars(108, [
+    { to: 100, bars: 8 }, // support touch 1
+    { to: 120, bars: 10 }, // resistance touch 1
+    { to: 106, bars: 8 }, // support touch 2
+    { to: 120, bars: 8 }, // resistance touch 2
+    { to: 111, bars: 8 }, // support touch 3
+    { to: 120, bars: 8 }, // resistance touch 3
+    { to: 115, bars: 5 }, // pullback (confirms touch 3, stays inside)
+    { to: 116, bars: 3 }, // tail
 ]);
 
 // ─── bull_flag ───────────────────────────────────────────────────────────────
-// A sharp pole rally (100 -> 118, well over FLAG_POLE_MIN_ATR) immediately
-// followed by a tight sideways consolidation channel. The consolidation
-// needs >= TRENDLINE_PIVOT_WINDOW (8) of its OWN pivots — buildFlagContext
-// takes the last 8 pivots verbatim as the consolidation window, so if the
-// pole's own peak (or anything before it) were still among the last 8, the
-// inferred "consolidation" would stretch all the way back through the pole
-// and blow past FLAG_CONSOLIDATION_MAX_BARS. 9 oscillation legs guarantee
-// the last 8 pivots are entirely post-pole.
-const bullFlagConsolidationLegs: Segment[] = [];
-for (let i = 0; i < 9; i++) {
-    bullFlagConsolidationLegs.push(
-        i % 2 === 0 ? { to: 116.4, bars: 4 } : { to: 118, bars: 4 }
-    );
-}
-const bullFlag = buildBars(100, [
-    { to: 96, bars: 8 },
-    { to: 101, bars: 6 },
-    { to: 100, bars: 6 },
-    { to: 118, bars: 14 }, // pole
-    ...bullFlagConsolidationLegs,
-]);
+// A textbook bull flag (spec 2026-10-07): a confirmed swing low at 98, a
+// 10-bar pole to 118 (20 ATR), then an 18-bar flag oscillating 116 <-> 118
+// in a flat channel — nine 2-bar legs, so the flag's own swings are pivots
+// the pre-screener's 8-pivot consolidation window can see (each leg clears
+// PIVOT_REVERSAL_ATR_MULT). The flag is too short and too low for a
+// rectangle or a double top/bottom to qualify alongside it. The earlier
+// fixture's 36-bar sideways box after the pole was a rectangle, not a flag.
+// Quieter noise than the other fixtures: on a 2-point channel the default
+// ±0.15 wobble alone tilts the fitted edges into a pennant.
+const bullFlagLegs: Segment[] = Array.from({ length: 9 }, (_, i) =>
+    i % 2 === 0 ? { to: 116, bars: 2 } : { to: 118, bars: 2 }
+);
+const bullFlag = buildBars(
+    100,
+    [
+        { to: 104, bars: 6 },
+        { to: 98, bars: 6 }, // pole base (confirmed swing low)
+        { to: 118, bars: 10 }, // pole
+        ...bullFlagLegs,
+    ],
+    { noiseAmp: 0.02 }
+);
 
 // ─── cup_and_handle ──────────────────────────────────────────────────────────
-// A rounded cup (convex quadratic fit through 4 low pivots: 96 -> 91 -> 87
-// (vertex) -> 90) traced entirely by LOW pivots per classifyCurvaturePatterns
-// (highs in between are just the alternating zigzag bounces, not part of the
-// fit), then a shallow pullback (handle, 88) below the cup's last/right-edge
-// low (90) — shallow relative to the cup's own depth (9), so it reads as a
-// handle rather than a fresh breakdown.
-const cupAndHandle = buildBars(100, [
-    { to: 100, bars: 8 }, // lead-in noise (no net move, no spurious pivot)
-    { to: 96, bars: 8 }, // cup low 1
-    { to: 99, bars: 5 },
-    { to: 91, bars: 7 }, // cup low 2
-    { to: 95, bars: 5 },
-    { to: 87, bars: 7 }, // cup low 3 (vertex)
-    { to: 93, bars: 5 },
-    { to: 90, bars: 6 }, // cup low 4 (right edge, near-rim recovery)
-    { to: 94, bars: 5 },
-    { to: 88, bars: 5 }, // handle low
-    { to: 88, bars: 10 }, // flat tail
+// A textbook cup & handle (spec 2026-10-07 §3.6): rims at 120 and 119.5
+// (confirmed swing highs 64 bars apart, within 5%), a rounded base whose
+// swings bottom at 100 and spend a good share of the cup in its lower third
+// (a U, not a V), then a 6-bar handle pulling back to 115 — in the cup's
+// upper half — and recovering to 117. The base's intermediate swings are
+// pivots, so the pre-screener's quadratic fit over the cup's low pivots
+// still recalls it.
+const cupAndHandle = buildBars(110, [
+    { to: 120, bars: 10 }, // left rim
+    { to: 112, bars: 8 },
+    { to: 114, bars: 4 },
+    { to: 104, bars: 8 },
+    { to: 107, bars: 4 },
+    { to: 100, bars: 8 }, // cup bottom
+    { to: 104, bars: 6 },
+    { to: 102, bars: 6 },
+    { to: 110, bars: 8 },
+    { to: 108, bars: 4 },
+    { to: 119.5, bars: 8 }, // right rim
+    { to: 115, bars: 6 }, // handle low
+    { to: 118, bars: 4 },
+    { to: 117, bars: 2 },
 ]);
 
 export interface Fixture {

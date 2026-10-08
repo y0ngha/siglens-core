@@ -480,6 +480,18 @@ const PATTERN_TARGET_LABELS: Record<
 
 /**
  * @internal
+ * Whether `label` is one of the measured/conservative target labels this
+ * module appends, in any locale — so a caller can strip targets a card must
+ * not carry (an undirected pattern, spec 2026-10-07 §3.2).
+ */
+export function isPatternTargetLabel(label: string): boolean {
+    return Object.values(PATTERN_TARGET_LABELS).some(
+        l => l.measured === label || l.conservative === label
+    );
+}
+
+/**
+ * @internal
  * Derives `측정 목표가`/`보수 목표가(50%)` from one pattern's model-authored
  * `geometry` and appends them to its `keyPrices` — never trust a
  * model-computed target string. Any existing entries carrying these exact

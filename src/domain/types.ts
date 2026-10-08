@@ -946,11 +946,12 @@ export interface SkillSelectionContext {
     /** Candle pattern names detected on the analyzed bars. */
     detectedCandles: readonly string[];
     /**
-     * Chart-pattern IDs surfaced by the pre-screener ({@link screenChartPatterns})
-     * for the analyzed bars — a third event-trigger source alongside `signals`
-     * and `detectedCandles` (see {@link ChartPatternId}). `[]` for chartless
-     * prompts (no bars in scope), when the screener finds nothing, or when ATR
-     * is unavailable/non-positive.
+     * Chart-pattern IDs surfaced for the analyzed bars — the qualified
+     * patterns plus the pre-screener's ({@link screenChartPatterns}) loose
+     * shape hints, minus hits the price has already spent — a third
+     * event-trigger source alongside `signals` and `detectedCandles` (see
+     * {@link ChartPatternId}). `[]` for chartless prompts (no bars in scope),
+     * when nothing is found, or when ATR is unavailable/non-positive.
      */
     patternCandidates: readonly ChartPatternId[];
     /**
@@ -1977,9 +1978,10 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
     overlayBuildFailures: readonly OverlayKind[];
     /**
      * Printed `## Chart Pattern Candidates` geometry per offered pattern overlay id — what a card resolved to that overlay carries as its `geometry`.
+     * `null` for an undirected pattern (no prior trend): the block printed only its two boundaries, so a card resolved to it carries no geometry and no target.
      * In-process only: a `Map` serialises to `{}` with `JSON.stringify`, so do not put this on a cache entry or queue payload — convert to entries first.
      */
-    patternGeometries: ReadonlyMap<string, PatternTargetGeometry>;
+    patternGeometries: ReadonlyMap<string, PatternTargetGeometry | null>;
 }
 
 /**
@@ -4055,11 +4057,11 @@ export type {
 } from './economy/types';
 
 // =============================================================================
-// Chart-pattern screener types. Only 3 cohesive types, well under the 10+
-// threshold that justifies a feature-local `domain/patterns/types.ts` (see
-// domain/CLAUDE.md § "Subdirectory `types.ts` exception"), so — unlike
-// economy/options/fearGreed above — these are defined directly here rather
-// than in a subfolder file re-exported from this module.
+// Chart-pattern screener and qualification types. Defined directly here rather
+// than in a feature-local `domain/patterns/types.ts` (domain/CLAUDE.md §
+// "Subdirectory `types.ts` exception" permits but does not require one): the
+// public screener types (`ChartPatternId`, `PatternCandidate`, `PivotPoint`)
+// have always lived here, and the internal qualification types extend them.
 // =============================================================================
 
 /** 스크리너가 식별 가능한 차트 패턴 ID — skills/patterns/*.md 파일명과 1:1. */
@@ -4108,11 +4110,11 @@ export interface PatternCandidate {
      * The exact pivots the classifier matched on, ascending by index —
      * present whenever a `classifiers.ts` shape matcher produced this
      * candidate (for `high_tight_flag`, the pole's base low and top high,
-     * which are bar extremes rather than zigzag pivots). `patternGeometry.ts` computes geometry directly from these
-     * (never by re-extracting pivots over `[startIndex, endIndex]`, which
-     * could reconstruct a different pivot set than the one actually
-     * matched). Absent only for a hand-built candidate (e.g. a test
-     * fixture) — `computeCandidateGeometry` returns `null` in that case.
+     * which are bar extremes rather than zigzag pivots). A pre-screener hit
+     * may include the still-forming (provisional) extreme; computed geometry
+     * is no longer derived from these but from a qualified pattern's
+     * confirmed pivots (spec 2026-10-07). Absent for a hand-built candidate
+     * (e.g. a test fixture).
      */
     pivots?: readonly PivotPoint[];
 }
@@ -4155,9 +4157,175 @@ export interface PatternGeometry {
     measuredTarget: number;
     /** `breakoutLevel ± height / 2` — the 50% partial target. */
     conservativeTarget: number;
-    /** Right-shoulder high / second peak / opposite boundary / handle low, per pattern. */
+    /** Right-shoulder high / highest peak / opposite boundary's last touch / handle low, per pattern. */
     invalidationLevel: number;
+    /**
+     * Bar index of the anchor that set {@link invalidationLevel} (the right
+     * shoulder, the highest peak, the last opposite-boundary touch, …). A close
+     * only counts against the invalidation from this bar on — earlier bars of
+     * the pattern legitimately sit beyond it (a rising support's earlier lows).
+     */
+    invalidationIndex: number;
     direction: PatternBreakoutDirection;
+}
+
+/**
+ * @internal
+ * Geometry of a qualified pattern whose breakout side is not known yet — a
+ * rectangle, channel, broadening formation or symmetrical triangle with no
+ * prior trend (spec 2026-10-07 §3.2). Both boundaries are reported as they
+ * stand and no target is derived: picking "the side price is closer to"
+ * flipped the direction from one day to the next.
+ */
+export interface UndirectedPatternGeometry {
+    keyPoints: PatternKeyPoint[];
+    /** Boundary width the measured move would use once a side breaks. Always > 0. */
+    height: number;
+    /** Upper boundary read at the last bar. */
+    upperLevel: number;
+    /** Lower boundary read at the last bar. */
+    lowerLevel: number;
+    direction: null;
+}
+
+/** @internal What `computeCandidateGeometry` returns for a qualified pattern. */
+export type QualifiedPatternGeometry =
+    PatternGeometry | UndirectedPatternGeometry;
+
+/** @internal A bar-index / price pair on a pattern's drawing (a boundary touch, an arc sample). */
+export interface PatternPoint {
+    index: number;
+    price: number;
+}
+
+/**
+ * @internal
+ * A straight pattern boundary through its touches (spec 2026-10-07 §2.2) —
+ * never a regression line. `start`/`end` are the line's values at its first
+ * and last touch, which is also the drawn extent (no extension to the right
+ * edge). The line's value at any other bar is the straight-line extension
+ * through those two points.
+ */
+export interface PatternLine {
+    start: PatternPoint;
+    end: PatternPoint;
+    /** The points within the touch tolerance of the line, ascending by index (at least 2). */
+    touches: readonly PatternPoint[];
+}
+
+/** @internal Double/triple top or bottom: the extremes are the candidate's same-kind pivots. */
+export interface ExtremePatternShape {
+    kind: 'extreme';
+    /** The trough (tops) or peak (bottoms) between the extremes that the neckline sits on. */
+    neckline: PivotPoint;
+}
+
+/** @internal Head & shoulders (regular or inverse): the five pivots are the candidate's `pivots`. */
+export interface HeadAndShouldersPatternShape {
+    kind: 'head_and_shoulders';
+    /** Boundary through the two troughs (peaks, inverse). */
+    neckline: PatternLine;
+    /** First bar after the right shoulder that closed through the neckline, else the last bar. */
+    breakoutIndex: number;
+}
+
+/** @internal Triangle, wedge, channel, broadening formation or rectangle. */
+export interface TrendlinePatternShape {
+    kind: 'trendline';
+    upper: PatternLine;
+    lower: PatternLine;
+    /** `null` when the breakout side is undetermined (§3.2 — no prior trend). */
+    direction: PatternBreakoutDirection | null;
+}
+
+/** @internal Bull/bear flag or pennant: a pole of two confirmed pivots, then a channel fitted on bar highs/lows. */
+export interface FlagPatternShape {
+    kind: 'flag';
+    direction: PatternBreakoutDirection;
+    poleBase: PivotPoint;
+    poleTop: PivotPoint;
+    upper: PatternLine;
+    lower: PatternLine;
+    /**
+     * Lowest low (bull) / highest high (bear) of the flag bars up to the
+     * fitted end — the invalidation anchor. The one per-family level that is
+     * not fixed by confirmed pivots: a flag is read from its own bars (spec
+     * §3.4), so this extreme follows the flag down (up) until the channel no
+     * longer fits, and a close beyond it then reads as a failure only once
+     * the flag has stopped extending.
+     */
+    flagExtreme: PatternPoint;
+}
+
+/** @internal High tight flag: pole base/top and the lowest low after the top. */
+export interface HighTightFlagPatternShape {
+    kind: 'high_tight_flag';
+    poleBase: PivotPoint;
+    poleTop: PivotPoint;
+    flagLow: PatternPoint;
+}
+
+/** @internal Cup & handle: two confirmed rim highs, the cup bottom and the handle low. */
+export interface CupPatternShape {
+    kind: 'cup';
+    leftRim: PivotPoint;
+    rightRim: PivotPoint;
+    bottom: PatternPoint;
+    handleLow: PatternPoint;
+}
+
+/** @internal Rounding bottom/top: two rims and a quadratic fitted on the closes between them. */
+export interface RoundingPatternShape {
+    kind: 'rounding';
+    leftRim: PivotPoint;
+    rightRim: PivotPoint;
+    /** Lowest low (bottom) / highest high (top) between the rims. */
+    extreme: PatternPoint;
+    /** The most recent confirmed opposite-side swing after the extreme, else the extreme itself. */
+    invalidation: PatternPoint;
+    /** Points sampled from the fitted curve, rim to rim, ascending by index. */
+    arc: readonly PatternPoint[];
+}
+
+/** @internal The fixed geometry inputs a qualified pattern carries. */
+export type PatternShape =
+    | ExtremePatternShape
+    | HeadAndShouldersPatternShape
+    | TrendlinePatternShape
+    | FlagPatternShape
+    | HighTightFlagPatternShape
+    | CupPatternShape
+    | RoundingPatternShape;
+
+/**
+ * @internal
+ * A pattern that passed the strict drawing checks of `qualifyPatterns` (spec
+ * 2026-10-07): confirmed pivots only, boundaries through touches, a slope dead
+ * band, minimum size and duration, per-family levels fixed by confirmed
+ * pivots (flags excepted — see {@link FlagPatternShape.flagExtreme}) and
+ * overlap arbitration. The only input to computed geometry, the prompt's Candidate id
+ * lines, the pattern overlays and the spent check. `startIndex` is the
+ * pattern's first structural point, so the overlay id stays the same until a
+ * new pivot is confirmed.
+ */
+export interface QualifiedPattern extends PatternCandidate {
+    /** The structural pivots (confirmed only), ascending by index. */
+    pivots: readonly PivotPoint[];
+    shape: PatternShape;
+    /** Boundary touches (line families) or structural points — the arbitration tie-break. */
+    touches: number;
+}
+
+/** @internal `qualifyPatterns` output. */
+export interface PatternQualification {
+    /** Patterns that may be drawn and printed with numbers, sorted by id then start. */
+    qualified: QualifiedPattern[];
+    /**
+     * Ids of pre-screener hits with no qualified pattern of the same id (and
+     * not already spent) — listed in the prompt as "shape hint — not
+     * drawable", without a Candidate id or numbers.
+     */
+    shapeHints: ChartPatternId[];
 }
 
 // ─────────────────────────────────────────
@@ -4347,7 +4515,7 @@ export interface OverlayCandidateInput {
     bars: readonly Bar[];
     atr: number | null;
     rsi: readonly (number | null)[];
-    patternCandidates: readonly PatternCandidate[];
+    patternCandidates: readonly QualifiedPattern[];
     marketReference: MarketReference;
     fmt: OverlayFormat;
 }

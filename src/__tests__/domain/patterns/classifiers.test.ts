@@ -724,8 +724,8 @@ describe('classifyCurvaturePatterns', () => {
 
     it('cup_and_handle: 컵(저점 4개) 뒤에 얕은 되돌림 저점이 하나 더 있으면 cup_and_handle만 감지한다', () => {
         // Same cup as the rounding_bottom case, plus a 5th (provisional)
-        // low at 7 — a shallow pullback from the cup's right-edge low (9):
-        // handleDepth=2 <= CUP_HANDLE_MAX_DEPTH_RATIO(0.5) * cup depth(8)=4.
+        // low at 7 — in the cup's upper half: 7 >= cup lows' top (10) −
+        // CUP_HANDLE_MAX_DEPTH_RATIO(0.5) * cup depth(8) = 6.
         // Only cup_and_handle should be emitted, not a redundant
         // rounding_bottom.
         const bars = makeHLBars(
@@ -856,13 +856,12 @@ describe('classifyCurvaturePatterns', () => {
         expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
     });
 
-    it('마지막 저점이 컵의 우측 가장자리보다 낮지 않으면(핸들 없음, handleDepth <= 0) rounding_bottom으로 폴백한다', () => {
+    it('핸들 저점이 컵의 마지막 저점보다 높아도 컵 상단 절반에 있으면 cup_and_handle이다 (spec 2026-10-07 §3.6 규칙 반전 수정)', () => {
         // Same cup as the textbook rounding_bottom case (lows at
-        // (2,10),(4,4),(6,2),(8,9)), plus a 5th low that continues UP past
-        // the cup's right-edge low (9) instead of pulling back down — there
-        // is no real handle (handleDepth = 9 - 15 = -6 <= 0), so the
-        // cup_and_handle branch is skipped and the classifier falls back to
-        // fitting a plain rounding_bottom over all 5 lows.
+        // (2,10),(4,4),(6,2),(8,9)), plus a 5th low at 15 — ABOVE the cup's
+        // right-edge low (9). A real handle forms in the cup's upper half,
+        // which usually puts it above the cup's last low; the old rule
+        // required it below that low and rejected exactly this shape.
         const bars = makeHLBars(
             [15, 20, 10, 20, 4, 20, 2, 20, 9, 20, 15].map(v => [v, v])
         );
@@ -873,16 +872,38 @@ describe('classifyCurvaturePatterns', () => {
         const candidates = classifyCurvaturePatterns(pivots, bars, ATR);
 
         expect(stripPivots(candidates)).toEqual([
-            { id: 'rounding_bottom', startIndex: 2, endIndex: 10 },
+            { id: 'cup_and_handle', startIndex: 2, endIndex: 10 },
         ]);
     });
 
-    it('핸들 되돌림이 CUP_HANDLE_MAX_DEPTH_RATIO * cup depth보다 깊으면 cup_and_handle 대신 rounding_bottom으로 폴백한다', () => {
-        // Same cup as the textbook case (depth=8, right-edge low=9), but the
-        // 5th low pulls back to 3: handleDepth = 9 - 3 = 6, past
-        // CUP_HANDLE_MAX_DEPTH_RATIO(0.5) * cup depth(8) = 4 — too deep to be
-        // a handle. Falls back to a plain rounding_bottom fit over all 5
-        // lows instead of cup_and_handle.
+    it('핸들 저점이 정확히 컵 중간값이면 cup_and_handle이다 (포함 경계)', () => {
+        // Cup lows 10, 4, 2, 9: top 10, depth 8 → midpoint 10 − 0.5·8 = 6.
+        const bars = makeHLBars(
+            [15, 20, 10, 20, 4, 20, 2, 20, 9, 20, 6].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(
+            classifyCurvaturePatterns(pivots, bars, ATR).map(c => c.id)
+        ).toContain('cup_and_handle');
+    });
+
+    it('핸들 저점이 컵 중간값보다 조금이라도 낮으면 cup_and_handle이 아니다', () => {
+        const bars = makeHLBars(
+            [15, 20, 10, 20, 4, 20, 2, 20, 9, 20, 5.9].map(v => [v, v])
+        );
+        const pivots = extractPivots(bars, ATR, { includeProvisional: true });
+
+        expect(
+            classifyCurvaturePatterns(pivots, bars, ATR).map(c => c.id)
+        ).not.toContain('cup_and_handle');
+    });
+
+    it('핸들 저점이 컵 중간값(CUP_HANDLE_MAX_DEPTH_RATIO)보다 깊으면 cup_and_handle 대신 rounding_bottom으로 폴백한다', () => {
+        // Same cup as the textbook case (cup lows' top 10, depth 8 → midpoint
+        // 6), but the 5th low pulls back to 3 — below the midpoint, too deep
+        // to be a handle. Falls back to a plain rounding_bottom fit over all
+        // 5 lows instead of cup_and_handle.
         const bars = makeHLBars(
             [15, 20, 10, 20, 4, 20, 2, 20, 9, 20, 3].map(v => [v, v])
         );
