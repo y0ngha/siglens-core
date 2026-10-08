@@ -1,5 +1,15 @@
 # Changelog
 
+# [2.15.0](https://github.com/y0ngha/siglens-core/compare/v2.14.1...v2.15.0) (2026-10-08)
+
+### Bug Fixes
+
+* 패턴 작도의 레벨 흔들림·오탐을 줄이고 리뷰·A/B 후속을 반영한다 ([#266](https://github.com/y0ngha/siglens-core/issues/266)) ([2b778f0](https://github.com/y0ngha/siglens-core/commit/2b778f00a1692961066078fd9e32544105c5314a))
+
+### Features
+
+* 에이전트 문체 규칙에 no-ai-slop 이중언어 갱신을 반영한다 ([#265](https://github.com/y0ngha/siglens-core/issues/265)) ([6ae8c78](https://github.com/y0ngha/siglens-core/commit/6ae8c781d0ce8c19a4136cb0b7fab48ffb54a1c4))
+
 ## [2.14.1](https://github.com/y0ngha/siglens-core/compare/v2.14.0...v2.14.1) (2026-10-08)
 
 ### Bug Fixes
