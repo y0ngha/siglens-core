@@ -47,7 +47,7 @@ export function mapExpirationsToSlots(
     const dated = expirations
         .map(d => ({ date: d, days: daysBetween(now, d) }))
         .filter(e => e.days >= 0)
-        .toSorted((a, b) => a.days - b.days);
+        .sort((a, b) => a.days - b.days);
 
     // `used` is a function-local Set — no external observer sees it mid-
     // build. Using a for-of with pre-allocated result keeps the mutation

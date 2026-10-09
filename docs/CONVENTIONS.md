@@ -78,6 +78,12 @@ function calculateRSI(closes: number[], period: number): (number | null)[] { ...
 // ❌ arr.reverse()           ✅ arr.toReversed()
 // ❌ [...arr].reverse().find(fn)  ✅ arr.findLast(fn)   (no copy; target is ES2023)
 // ❌ arr.sort()              ✅ arr.toSorted()
+//    ⚠️ Browser-reachable code (anything `src/index.client.ts` reaches) must stay ES2022 —
+//    the consumer does not polyfill ES2023 and Chrome 109 crashed on `toSorted`. There:
+//    arr.toSorted(fn) → arr.slice().sort(fn)   (or .sort(fn) on a fresh map/filter/Array.from result)
+//    arr.toReversed() → arr.slice().reverse()
+//    arr.findLast(fn) / findLastIndex(fn) → findLast(arr, fn) / findLastIndex(arr, fn) from @/domain/arrayCompat
+//    `yarn typecheck` enforces this via tsconfig.client.json (lib ES2022). Server-only code keeps ES2023.
 // ❌ arr.splice(i, 1)        ✅ arr.filter((_, idx) => idx !== i)
 // Applies to: push, pop, shift, unshift, splice, reverse, sort
 
@@ -303,6 +309,18 @@ or two clients for the same thing diverge.
 // ✅ const writer = new Redis(config); const reader = altConfig ? new Redis(altConfig) : writer;
 ```
 
+<a id="CP-15"></a>
+#### CP-15 — No defensive copy of an array you just created
+
+When rewriting `toSorted`/`toReversed` for ES2022, `.slice()` is only needed when the source
+may be shared. A fresh `map`/`filter`/`Array.from`/function-result array can take
+`.sort()`/`.reverse()` directly. Keep the copy when the source's type is `readonly`
+(typecheck requires it).
+
+```typescript
+// ❌ clusterLevels(levels).slice().reverse()   // clusterLevels already returns a fresh array
+// ✅ clusterLevels(levels).reverse()
+```
 
 ---
 

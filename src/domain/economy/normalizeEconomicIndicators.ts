@@ -39,7 +39,7 @@ export function normalizeEconomicIndicatorSeries(
             return { date, value } satisfies EconomicIndicatorPoint;
         })
         .filter((p): p is EconomicIndicatorPoint => p !== null)
-        .toSorted((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+        .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
 
     return {
         name,

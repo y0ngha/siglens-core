@@ -1,3 +1,5 @@
+import { findLastIndex } from '@/domain/arrayCompat';
+
 /**
  * Marker that opens the agent's last line when it offers follow-up questions:
  * `[[followups]] A | B | C`. The system prompt asks for exactly this shape;
@@ -76,7 +78,7 @@ function isIncompleteMarkerLine(line: string): boolean {
  */
 export function splitAgentFollowUps(text: string): SplitAgentFollowUps {
     const lines = text.split('\n');
-    const lastIndex = lines.findLastIndex(line => line.trim() !== '');
+    const lastIndex = findLastIndex(lines, line => line.trim() !== '');
     if (lastIndex === -1) return { body: text, followUps: [] };
 
     const lastLine = lines[lastIndex].trim();

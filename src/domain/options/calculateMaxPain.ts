@@ -21,7 +21,7 @@ export function calculateMaxPain(chain: OptionsChain): number | null {
             ...chain.calls.map(c => c.strike),
             ...chain.puts.map(p => p.strike),
         ])
-    ).toSorted((a, b) => a - b);
+    ).sort((a, b) => a - b);
 
     if (strikes.length === 0) return null;
 

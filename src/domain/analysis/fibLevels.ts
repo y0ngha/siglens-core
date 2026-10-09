@@ -90,7 +90,7 @@ export const computeAbcExtension = (
     const merged: TypedSwingPoint[] = [
         ...smc.swingHighs.map(s => ({ ...s, type: 'high' as const })),
         ...smc.swingLows.map(s => ({ ...s, type: 'low' as const })),
-    ].toSorted((x, y) => x.index - y.index);
+    ].sort((x, y) => x.index - y.index);
 
     if (merged.length < 3) return null;
     const [a, b, c] = merged.slice(-3);

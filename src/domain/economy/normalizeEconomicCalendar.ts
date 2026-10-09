@@ -45,5 +45,5 @@ export function normalizeEconomicCalendar(
             } satisfies EconomicCalendarEvent;
         })
         .filter((e): e is EconomicCalendarEvent => e !== null)
-        .toSorted((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+        .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
 }

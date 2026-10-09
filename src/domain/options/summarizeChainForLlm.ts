@@ -130,7 +130,8 @@ export function summarizeChainForLlm(
     const atmIv = pickAtmIv(chain, underlyingPrice);
     const oiByStrike = aggregateOpenInterest(chain);
     const top = oiByStrike
-        .toSorted(
+        .slice()
+        .sort(
             (a, b) =>
                 b.callOpenInterest +
                 b.putOpenInterest -
@@ -144,7 +145,8 @@ export function summarizeChainForLlm(
 
     const volumeByStrike = aggregateVolume(chain);
     const topVolume = volumeByStrike
-        .toSorted(
+        .slice()
+        .sort(
             (a, b) => b.callVolume + b.putVolume - (a.callVolume + a.putVolume)
         )
         .slice(0, TOP_STRIKES_COUNT);
@@ -253,6 +255,6 @@ function medianStrike(
     contracts: ReadonlyArray<OptionsContract>
 ): number | undefined {
     if (contracts.length === 0) return undefined;
-    const strikes = contracts.map(c => c.strike).toSorted((a, b) => a - b);
+    const strikes = contracts.map(c => c.strike).sort((a, b) => a - b);
     return strikes[Math.floor(strikes.length / 2)];
 }

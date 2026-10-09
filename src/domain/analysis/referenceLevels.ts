@@ -303,9 +303,9 @@ export function splitBySide(
     };
     const support = levels
         .filter(l => l.price < currentPrice)
-        .toSorted((a, b) => b.price - a.price);
+        .sort((a, b) => b.price - a.price);
     const resistance = levels
         .filter(l => l.price > currentPrice)
-        .toSorted((a, b) => a.price - b.price);
+        .sort((a, b) => a.price - b.price);
     return { support: side(support), resistance: side(resistance) };
 }

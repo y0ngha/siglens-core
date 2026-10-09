@@ -90,7 +90,7 @@ export function computeLabelTransitions(
             return [{ date: point.date, from: prev, to: point.label }];
         }
     );
-    return transitions.toReversed().slice(0, limit);
+    return transitions.reverse().slice(0, limit);
 }
 
 /**
@@ -322,7 +322,7 @@ export function summarizeExtremeZoneEpisodes(
                 episodes.length === 0
                     ? null
                     : median(episodes.map(e => e.sessionsInZone)),
-            episodes: episodes.toReversed(),
+            episodes: episodes.slice().reverse(),
         };
     });
 }

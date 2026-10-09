@@ -8,6 +8,7 @@ import {
     detectMultiCandlePattern,
 } from '@/domain/analysis/candle';
 import { EXCLUDED_SINGLE_PATTERNS } from '@/domain/analysis/candle-trend';
+import { findLast } from '@/domain/arrayCompat';
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -221,10 +222,10 @@ export function selectLastCandlePatternEntries(
 ): CandlePatternEntry[] {
     if (entries.length === 0) return [];
 
-    const lastMultiEntry = entries.findLast(e => e.patternType === 'multi');
-    const lastSingleEntry = entries.findLast(e => e.patternType === 'single');
+    const lastMultiEntry = findLast(entries, e => e.patternType === 'multi');
+    const lastSingleEntry = findLast(entries, e => e.patternType === 'single');
 
     return [lastMultiEntry, lastSingleEntry]
         .filter((e): e is CandlePatternEntry => e !== undefined)
-        .toSorted((a, b) => a.barIndex - b.barIndex);
+        .sort((a, b) => a.barIndex - b.barIndex);
 }

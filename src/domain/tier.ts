@@ -279,8 +279,8 @@ export function getAllowedModels(
     config: TierConfig = TIER_CONFIG
 ): ModelId[] {
     return config.featureFlags.enableTierRestrictions
-        ? [...config.models[tier]].toSorted()
-        : Array.from(new Set(Object.values(config.models).flat())).toSorted();
+        ? [...config.models[tier]].sort()
+        : Array.from(new Set(Object.values(config.models).flat())).sort();
 }
 
 /**
