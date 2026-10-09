@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.16.0](https://github.com/y0ngha/siglens-core/compare/v2.15.2...v2.16.0) (2026-10-09)
+
+### Features
+
+* 미터형 하루 전체 공개 정책과 get_guide 에이전트 툴을 추가한다 ([#269](https://github.com/y0ngha/siglens-core/issues/269)) ([265c65c](https://github.com/y0ngha/siglens-core/commit/265c65c9d52970d05610ced32826839be1208477))
+
 ## [2.15.2](https://github.com/y0ngha/siglens-core/compare/v2.15.1...v2.15.2) (2026-10-09)
 
 ### Bug Fixes
