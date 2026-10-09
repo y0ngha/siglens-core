@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.15.2](https://github.com/y0ngha/siglens-core/compare/v2.15.1...v2.15.2) (2026-10-09)
+
+### Bug Fixes
+
+* 브라우저 번들에서 ES2023 배열 메서드를 빼 Chrome 109에서 앱이 깨지지 않게 한다 ([#268](https://github.com/y0ngha/siglens-core/issues/268)) ([703c5c4](https://github.com/y0ngha/siglens-core/commit/703c5c4d34a1d4596088beac133dd047541dcbb9))
+
 ## [2.15.1](https://github.com/y0ngha/siglens-core/compare/v2.15.0...v2.15.1) (2026-10-08)
 
 ### Bug Fixes
