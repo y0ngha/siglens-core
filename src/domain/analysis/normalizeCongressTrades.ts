@@ -86,7 +86,7 @@ export function normalizeCongressTrades(
         ...senate.map(r => toTrade(r, 'senate')),
         ...house.map(r => toTrade(r, 'house')),
     ];
-    return merged.toSorted((a, b) =>
+    return merged.sort((a, b) =>
         b.transactionDate.localeCompare(a.transactionDate)
     );
 }

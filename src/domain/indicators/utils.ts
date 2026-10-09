@@ -1,3 +1,5 @@
+import { findLast } from '@/domain/arrayCompat';
+
 /** @internal Simple moving average of the last `period` values. */
 export function sma(values: number[], period: number): number | null {
     if (values.length < period) return null;
@@ -73,7 +75,7 @@ export function slidingMin(
 
 /** @internal Last non-null value in the array, or null if none. */
 export function lastNonNull(arr: readonly (number | null)[]): number | null {
-    return arr.findLast((v): v is number => v !== null) ?? null;
+    return findLast(arr, (v): v is number => v !== null) ?? null;
 }
 
 /** @internal Linear-regression endpoint value over the last `period` values. */
@@ -100,7 +102,7 @@ export function linreg(values: number[], period: number): number | null {
 export function median(values: readonly number[]): number | null {
     const n = values.length;
     if (n === 0) return null;
-    const sorted = values.toSorted((a, b) => a - b);
+    const sorted = values.slice().sort((a, b) => a - b);
     const mid = Math.floor(n / 2);
     return n % 2 === 1 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }

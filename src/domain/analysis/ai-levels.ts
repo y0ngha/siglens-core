@@ -376,7 +376,7 @@ export function reconcileBullishActionRecommendation(
                   ...(rec.takeProfitPrices?.slice(1) ?? []).filter(
                       tp => Number.isFinite(tp) && tp > entryPrice
                   ),
-              ].toSorted((a, b) => a - b)
+              ].sort((a, b) => a - b)
             : rec.takeProfitPrices;
 
     const reconciledSl = slWasReconciled ? slResolved.value : rec.stopLoss;

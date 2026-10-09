@@ -30,7 +30,7 @@ function clusterLevels(
     if (levels.length === 0) return [];
 
     // levels is non-empty after the guard above
-    const sorted = levels.toSorted((a, b) => a.price - b.price);
+    const sorted = levels.slice().sort((a, b) => a.price - b.price);
 
     // Sliding window clustering: for-loop avoids O(N²) spread inside reduce
     const clusters: KeyLevel[][] = [[sorted[0]!]];
@@ -65,7 +65,7 @@ export function clusterKeyLevels(
     const epsilon = epsilonPercent * currentPrice;
 
     return {
-        support: clusterLevels(keyLevels.support, epsilon).toReversed(),
+        support: clusterLevels(keyLevels.support, epsilon).slice().reverse(),
         resistance: clusterLevels(keyLevels.resistance, epsilon),
         poc: keyLevels.poc,
     };

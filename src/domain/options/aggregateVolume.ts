@@ -33,5 +33,5 @@ export function aggregateVolume(
             putVolume: (prev?.putVolume ?? 0) + p.volume,
         });
     }
-    return Array.from(map.values()).toSorted((a, b) => a.strike - b.strike);
+    return Array.from(map.values()).sort((a, b) => a.strike - b.strike);
 }

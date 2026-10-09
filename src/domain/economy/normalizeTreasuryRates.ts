@@ -22,11 +22,13 @@ import type { TreasuryRateSnapshot } from './types';
 export function normalizeTreasuryRates(
     raw: unknown
 ): TreasuryRateSnapshot | null {
-    const sorted = asArray(raw).toSorted((a, b) => {
-        const da = asString(asObject(a)?.date);
-        const db = asString(asObject(b)?.date);
-        return da < db ? 1 : da > db ? -1 : 0;
-    });
+    const sorted = asArray(raw)
+        .slice()
+        .sort((a, b) => {
+            const da = asString(asObject(a)?.date);
+            const db = asString(asObject(b)?.date);
+            return da < db ? 1 : da > db ? -1 : 0;
+        });
     const first = asObject(sorted[0]);
     if (first === null) return null;
     const date = asString(first.date);

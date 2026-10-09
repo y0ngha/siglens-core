@@ -32,5 +32,5 @@ export function aggregateOpenInterest(
             putOpenInterest: (prev?.putOpenInterest ?? 0) + p.openInterest,
         });
     }
-    return Array.from(map.values()).toSorted((a, b) => a.strike - b.strike);
+    return Array.from(map.values()).sort((a, b) => a.strike - b.strike);
 }

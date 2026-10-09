@@ -335,10 +335,7 @@ export function getThinkingLevelSequence(
     if (initialIndex <= floorIndex) {
         return [initial];
     }
-    return THINKING_LEVEL_ORDER.slice(
-        floorIndex,
-        initialIndex + 1
-    ).toReversed();
+    return THINKING_LEVEL_ORDER.slice(floorIndex, initialIndex + 1).reverse();
 }
 
 /**

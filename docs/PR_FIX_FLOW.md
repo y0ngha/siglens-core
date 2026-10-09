@@ -124,7 +124,7 @@ After applying, verify against the checklist matching each modified file type:
 - [ ] Initial period values must be null (never 0 or NaN)
 - [ ] Prefer map, filter, flatMap, reduce; for-loop + push allowed when functional equivalent increases complexity or readability
   (see CONVENTIONS.md#CP-5)
-- [ ] Maintain immutability (no push, reverse, sort — use spread, toReversed)
+- [ ] Maintain immutability (no push, reverse, sort — use spread, toReversed; in browser-reachable code use `.slice().sort()`/`.slice().reverse()`/`arrayCompat` instead — CONVENTIONS.md "Functional Programming")
 - [ ] Path aliases (@/domain/... format)
 - [ ] No hardcoded literals → extract to constants
 

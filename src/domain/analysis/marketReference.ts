@@ -62,6 +62,7 @@ import {
     SECONDS_PER_HOUR,
 } from '@/domain/constants/time';
 import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
+import { findLastIndex } from '@/domain/arrayCompat';
 
 const EFFICIENCY_PERIOD = 20;
 
@@ -127,11 +128,12 @@ function pivotSourceBar(
     }
 
     const lastDay = sessionKey(bars[bars.length - 1]);
-    const priorEnd = bars.findLastIndex(b => sessionKey(b) !== lastDay);
+    const priorEnd = findLastIndex(bars, b => sessionKey(b) !== lastDay);
     if (priorEnd < 0) return null;
     const priorDay = sessionKey(bars[priorEnd]);
     const priorStart =
-        bars.findLastIndex(
+        findLastIndex(
+            bars,
             (b, i) => i < priorEnd && sessionKey(b) !== priorDay
         ) + 1;
     const session = bars
