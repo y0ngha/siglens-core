@@ -309,6 +309,18 @@ or two clients for the same thing diverge.
 // ✅ const writer = new Redis(config); const reader = altConfig ? new Redis(altConfig) : writer;
 ```
 
+<a id="CP-15"></a>
+#### CP-15 — No defensive copy of an array you just created
+
+When rewriting `toSorted`/`toReversed` for ES2022, `.slice()` is only needed when the source
+may be shared. A fresh `map`/`filter`/`Array.from`/function-result array can take
+`.sort()`/`.reverse()` directly. Keep the copy when the source's type is `readonly`
+(typecheck requires it).
+
+```typescript
+// ❌ clusterLevels(levels).slice().reverse()   // clusterLevels already returns a fresh array
+// ✅ clusterLevels(levels).reverse()
+```
 
 ---
 

@@ -21,6 +21,8 @@ export function findLastIndex<T>(
     arr: readonly T[],
     predicate: (value: T, index: number) => boolean
 ): number {
+    // 뒤에서부터 찾다 처음 맞으면 바로 멈춘다 — 복사·뒤집기 없이 조기 반환이 필요해 for 루프를
+    // 쓴다(CONVENTIONS.md#CP-5의 루프 허용 사유).
     for (let i = arr.length - 1; i >= 0; i -= 1) {
         if (predicate(arr[i], i)) return i;
     }

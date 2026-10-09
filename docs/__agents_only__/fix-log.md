@@ -14,3 +14,13 @@
 - Violation: Redundant `.slice()` copies left on provably fresh arrays after mechanically rewriting toSorted/toReversed.
 - Rule: CONVENTIONS.md no-redundant-copy-on-fresh-array
 - Fix: Removed the redundant copies.
+
+## [2026-10-09] fix/client-bundle-es2022-safe round 2 (recommended)
+- Violation: Redundant `.slice()` before `.reverse()` on a fresh `clusterLevels` result.
+- Rule: CONVENTIONS.md no-redundant-copy-on-fresh-array
+- Fix: Dropped the copy. (aggregateOpenInterest/aggregateVolume keep `.slice()`: readonly return type requires it.)
+
+## [2026-10-09] fix/client-bundle-es2022-safe round 2 (recommended)
+- Violation: `for` loop in `findLastIndex` lacked a one-line rationale for the CP-5 exception.
+- Rule: CONVENTIONS.md#CP-5
+- Fix: Added a one-line rationale comment.
