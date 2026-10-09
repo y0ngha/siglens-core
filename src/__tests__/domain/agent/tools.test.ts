@@ -9,9 +9,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('13개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(13);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(13);
+    it('14개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(14);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(14);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -34,6 +34,7 @@ describe('AGENT_TOOL_SPECS', () => {
             get_market_overview: { market: 'us' },
             get_economy: {},
             get_congress_trades: { symbol: 'AAPL' },
+            get_guide: { query: '이중바닥' },
             run_fresh_analysis: { symbol: 'AAPL', kind: 'technical' },
             web_search: { query: 'Apple earnings', freshness: 'week' },
             get_my_portfolio: {},
@@ -66,6 +67,13 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_cached_analysis')?.description).toContain(
             'chart patterns'
         );
+    });
+
+    it('get_guide는 DB 조회라 free이고 query 하나만 받는다', () => {
+        const spec = findToolSpec('get_guide');
+        expect(spec?.costClass).toBe('free');
+        expect(spec?.inputSchema.required).toEqual(['query']);
+        expect(spec?.description).toContain('url');
     });
 
     it('신규 데이터 툴 4종이 등록되어 있다', () => {

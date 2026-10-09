@@ -2724,6 +2724,24 @@ export interface TierFeatureFlags {
     enableTimeframeRestrictions?: boolean;
     /** Enables tier-specific report information depth. Falls back to the legacy global flag when omitted. */
     enableInfoDepthRestrictions?: boolean;
+    /** Enables the daily metered full reveal ({@link TierConfig.meteredReveal}). Treated as `false` when omitted. */
+    enableMeteredReveal?: boolean;
+}
+
+/**
+ * Daily metered reveal policy for one tier: the first `dailySymbols` distinct
+ * symbols a visitor opens in a day are shown at the `revealAs` tier's
+ * information depth. Timeframe and model gates are not affected.
+ *
+ * The policy only says *how much* is revealed; counting which symbols a
+ * visitor has already opened is the consumer's job (request identity and
+ * storage are I/O concerns).
+ */
+export interface MeteredRevealPolicy {
+    /** Distinct symbols per day that are fully revealed. `0` or less disables the policy. */
+    readonly dailySymbols: number;
+    /** Tier whose information depth a revealed analysis receives. */
+    readonly revealAs: Tier;
 }
 
 /**
@@ -2735,6 +2753,8 @@ export interface TierConfig {
     infoDepth: Record<Tier, readonly TierInfoDepth[]>;
     models: Record<Tier, readonly TierModel[]>;
     featureFlags: TierFeatureFlags;
+    /** Per-tier daily metered reveal policy. Omitted tiers have no meter. */
+    meteredReveal?: Readonly<Partial<Record<Tier, MeteredRevealPolicy>>>;
 }
 
 /** Request-scoped user tier data for server middleware and handlers. */

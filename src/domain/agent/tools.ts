@@ -241,6 +241,24 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
         },
     },
     {
+        name: 'get_guide',
+        description:
+            "SIGLENS's own explainer for a technical-analysis concept: a candlestick pattern, chart pattern, indicator or strategy/theory (e.g. 망치형, double bottom, RSI, 엘리어트 파동). Returns the best match's article (how it looks or is calculated, what it means, how SIGLENS detects it, caveats) plus up to two other matches, each with a page url. Call when the user asks what a concept is or how to read it, without needing a symbol. Link the url in your answer.",
+        costClass: 'free',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                query: {
+                    type: 'string',
+                    description:
+                        'Concept name in any language (e.g. "이중바닥", "MACD", "hammer")',
+                },
+            },
+            required: ['query'],
+            additionalProperties: false,
+        },
+    },
+    {
         name: 'run_fresh_analysis',
         description: `Run a NEW SIGLENS AI analysis now (30–250 seconds). Call only after get_cached_analysis returned found:false or stale:true, at most ${AGENT_TURN_CAPS.maxFreshAnalysis} per turn. The result is the same structure as get_cached_analysis.`,
         costClass: 'expensive',

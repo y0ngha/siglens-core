@@ -7,7 +7,9 @@ import {
     DEFAULT_TIER,
     EMA_DEFAULT_PERIODS,
     GEMINI_FLASH_LITE_MODEL,
+    buildRevealedTierConfig,
     getAllowedModels,
+    getMeteredRevealPolicy,
     getAllowedTimeframes,
     getTierLimit,
     HIGH_CONFIDENCE_WEIGHT,
@@ -57,6 +59,8 @@ describe('browser public API exports', () => {
         expect(isDeepSeekModel('gemini-3.6-flash')).toBe(false);
         expect(DEFAULT_TIER).toBe('free');
         expect(getAllowedModels('free')).toContain('claude-opus-5');
+        expect(getMeteredRevealPolicy('free')?.revealAs).toBe('member');
+        expect(typeof buildRevealedTierConfig).toBe('function');
         expect(getAllowedTimeframes('free')).toEqual(['1Day']);
         expect(isTimeframeAllowed('free', '5Min')).toBe(false);
         expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);

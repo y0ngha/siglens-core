@@ -310,8 +310,10 @@ export { getProviderForModel } from './domain/llm/providers';
 
 // Tier gating
 export {
+    buildRevealedTierConfig,
     getAllowedModels,
     getAllowedTimeframes,
+    getMeteredRevealPolicy,
     getModelAccess,
     getTierLimit,
     isAllowed,
@@ -988,6 +990,7 @@ export type {
     SubmitBriefingResult,
     SupertrendResult,
     Tier,
+    MeteredRevealPolicy,
     TierConfig,
     TierFeatureFlags,
     TierFeatureLimits,
