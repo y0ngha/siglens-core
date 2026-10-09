@@ -39,7 +39,9 @@ import {
     extractReconciledActionLines,
     FEAR_GREED_LABEL_CUTOFFS,
     GEMINI_FLASH_LITE_MODEL,
+    buildRevealedTierConfig,
     getAllowedModels,
+    getMeteredRevealPolicy,
     getAllowedTimeframes,
     getTierLimit,
     hashUsageIp,
@@ -237,6 +239,10 @@ describe('public API exports', () => {
         expect(isModelAllowed('free', 'claude-opus-5')).toBe(true);
         expect(getAllowedModels('free')).toContain('claude-opus-5');
         expect(isTier('member')).toBe(true);
+        expect(getMeteredRevealPolicy('free')?.dailySymbols).toBe(1);
+        expect(buildRevealedTierConfig('free').infoDepth.free).toEqual(
+            TIER_CONFIG.infoDepth.member
+        );
         expect(typeof checkAnalysisLimit).toBe('function');
         expect(typeof checkChatbotLimit).toBe('function');
     });

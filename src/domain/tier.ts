@@ -1,4 +1,5 @@
 import type {
+    MeteredRevealPolicy,
     ModelAccess,
     Tier,
     TierConfig,
@@ -145,6 +146,10 @@ export const TIER_CONFIG = {
         enableTierRestrictions: false,
         enableTimeframeRestrictions: true,
         enableInfoDepthRestrictions: true,
+        enableMeteredReveal: true,
+    },
+    meteredReveal: {
+        free: { dailySymbols: 1, revealAs: 'member' },
     },
 } as const satisfies TierConfig;
 
@@ -319,6 +324,64 @@ export function isInfoDepthAllowed(
     config: TierConfig = TIER_CONFIG
 ): boolean {
     return resolveAllowedInfoDepths(tier, config).includes(infoDepth);
+}
+
+/**
+ * Return the daily metered reveal policy for a tier, or `null` when the tier
+ * has no meter.
+ *
+ * Returns `null` when `config.featureFlags.enableMeteredReveal` is not `true`,
+ * when the tier has no policy, or when `dailySymbols` is not a positive number.
+ *
+ * @param tier - The visitor's tier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns The policy, or `null`.
+ * @example
+ * ```typescript
+ * getMeteredRevealPolicy('free'); // { dailySymbols: 1, revealAs: 'member' }
+ * ```
+ */
+export function getMeteredRevealPolicy(
+    tier: Tier,
+    config: TierConfig = TIER_CONFIG
+): MeteredRevealPolicy | null {
+    if (config.featureFlags.enableMeteredReveal !== true) return null;
+    const policy = config.meteredReveal?.[tier];
+    if (policy === undefined || !(policy.dailySymbols > 0)) return null;
+    return policy;
+}
+
+/**
+ * Build the tier config to use for a revealed (metered) analysis.
+ *
+ * Returns a copy whose `infoDepth[tier]` is the `revealAs` tier's depth.
+ * Timeframes, models, limits and flags are unchanged, so a revealed analysis
+ * never unlocks a timeframe or model. Returns `config` itself when the tier
+ * has no meter ({@link getMeteredRevealPolicy}).
+ *
+ * `runAnalysis` never folds `tierConfig` into the analysis cache key: the
+ * tier reaches the key only through the skill sampling plan
+ * (`createSkillSamplingPlan(skills, tier, …)`), which reads the tier, not the
+ * config. A revealed request therefore reuses the tier's cached generation
+ * and only the masking (`filterAnalysisResult`) changes.
+ *
+ * @param tier - The visitor's tier.
+ * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.
+ * @returns The config to pass as `tierConfig` for a revealed analysis.
+ */
+export function buildRevealedTierConfig(
+    tier: Tier,
+    config: TierConfig = TIER_CONFIG
+): TierConfig {
+    const policy = getMeteredRevealPolicy(tier, config);
+    if (policy === null) return config;
+    return {
+        ...config,
+        infoDepth: {
+            ...config.infoDepth,
+            [tier]: config.infoDepth[policy.revealAs],
+        },
+    };
 }
 
 /**

@@ -8,7 +8,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-08.2';
+export const AGENT_PROMPT_VERSION = '2026-10-10.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -112,6 +112,10 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     {
         requires: ['get_cached_analysis'],
         text: 'Named chart patterns (head and shoulders, wedge, double top) or "what does SIGLENS think / show SIGLENS analysis" → get_cached_analysis.',
+    },
+    {
+        requires: ['get_guide'],
+        text: 'What a pattern, candlestick, indicator or strategy is, or how to read it, with no symbol in question ("RSI가 뭐야", "what is a double bottom") → get_guide, and link the guide url it returns. When a symbol is also named, add the per-symbol rows for that symbol.',
     },
     {
         requires: ['get_quote'],
@@ -314,7 +318,7 @@ ${ruleLines(available, newsGapRule)}
 - Do not end every answer with a generic disclaimer; the app already shows one, and a directional read already carries its own one-line caveat. Never close with a second reminder that the decision is the user's or that markets are uncertain.
 - Plain, polite language; no slang.
 - Write the names exactly as SIGLENS (the service) and SIGLENS AI (you), in every language; never "siglens", "Siglens" or "SiglensAI".
-- Never write internal tool names (get_quote, get_news, run_fresh_analysis, …) or function-call syntax in the answer. Call them SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search, in the answer language.
+- Never write internal tool names (get_quote, get_news, run_fresh_analysis, …) or function-call syntax in the answer. Call them SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / guide / web search, in the answer language.
 - Internal labels: the data and these rules use the internal terms rule engine, confluence (컨플루언스), washout (워시아웃) and a score out of 100. Never write them, and never quote an "x/100" or "x / 100" agreement score. Say how many indicator groups agree (or that the indicators are split), and describe a pullback reading as a sharp short-term drop inside a longer-term uptrend.
 - Short paragraphs, bullets for lists, no tables wider than 4 columns. Do not emit markdown images.
 

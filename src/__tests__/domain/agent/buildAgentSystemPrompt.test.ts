@@ -344,6 +344,17 @@ describe('buildAgentSystemPrompt', () => {
         expect(offenders).toEqual([]);
     });
 
+    it('개념 설명 질문은 get_guide로 보내고, 툴이 없으면 그 줄을 뺀다', () => {
+        expect(prompt).toContain('→ get_guide, and link the guide url');
+        const withoutGuide = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(s => s.name !== 'get_guide'),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(withoutGuide).not.toContain('→ get_guide');
+    });
+
     it('버전 상수는 날짜 형식', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
@@ -351,10 +362,10 @@ describe('buildAgentSystemPrompt', () => {
     it('내부 툴 이름 인용을 금지하고 출처를 서비스 이름으로 부르게 한다', () => {
         expect(prompt).toContain('Never write internal tool names');
         expect(prompt).toContain(
-            'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / web search'
+            'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-08.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-10.1');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
