@@ -2,13 +2,18 @@ import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import type { EtSessionStatus } from '@/domain/types';
 import { AGENT_FOLLOW_UP_MARKER } from './agentFollowUps';
 import { AGENT_WRITING_STYLE } from './agentWritingStyle';
-import { LANGUAGE_NAME, formatNowLine, type AgentLocale } from './promptShared';
+import {
+    AGENT_BRAND,
+    LANGUAGE_NAME,
+    formatNowLine,
+    type AgentLocale,
+} from './promptShared';
 import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-10.1';
+export const AGENT_PROMPT_VERSION = '2026-10-10.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -247,6 +252,17 @@ export function buildAgentSystemPrompt(
     input: BuildAgentSystemPromptInput
 ): string {
     const language = LANGUAGE_NAME[input.locale];
+    const brand = AGENT_BRAND[input.locale];
+    // The subject rule's example follows the answer language so the model copies a
+    // sentence shape it will actually write.
+    const brandSubjectExample =
+        input.locale === 'ko'
+            ? `"${brand.service} 차트 분석에서는 두 저점이 비슷한 높이일 때만 표시해요"`
+            : `"In ${brand.service}'s chart analysis, it is shown only when the two lows sit at a similar level"`;
+    const brandHeadingExample =
+        input.locale === 'ko'
+            ? `"${brand.service} 분석의 판정 기준"`
+            : `"How ${brand.service}'s analysis spots it"`;
     const toolList = input.tools.map(t => `- ${t.name}`).join('\n');
     const available = new Set(input.tools.map(t => t.name));
     const hasSearch = available.has('web_search');
@@ -309,7 +325,7 @@ ${ruleLines(available, newsGapRule)}
 ## Output
 - Answer in ${language}.
 - Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
-- Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: SIGLENS 시세, 2026-09-12 21:57 KST 기준)").
+- Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: ${AGENT_BRAND.ko.service} 시세, 2026-09-12 21:57 KST 기준)").
 - Tool timestamps are already converted to the user's local time and labelled, in the same form as the "User's local time" line in the "Now" note of the latest user message. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory.
@@ -317,8 +333,9 @@ ${ruleLines(available, newsGapRule)}
 - Answer the user's question, not the plumbing. Do not describe SIGLENS internals (stores, indexes, coverage flags, field names, null values, result counts, bar counts). When data is missing or clearly out of date, say in one short sentence that it is not available right now.
 - Do not end every answer with a generic disclaimer; the app already shows one, and a directional read already carries its own one-line caveat. Never close with a second reminder that the decision is the user's or that markets are uncertain.
 - Plain, polite language; no slang.
-- Write the names exactly as SIGLENS (the service) and SIGLENS AI (you), in every language; never "siglens", "Siglens" or "SiglensAI".
-- Never write internal tool names (get_quote, get_news, run_fresh_analysis, …) or function-call syntax in the answer. Call them SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / guide / web search, in the answer language.
+- In the answer, call the service ${brand.service} and yourself ${brand.assistant}, written exactly like that; never any other spelling or transliteration of the name (such as "siglens", "Siglens" or "SiglensAI").
+- Do not make ${brand.service} the subject of a sentence or heading that explains how its analysis finds, draws, computes or interprets something, even when a tool result or guide is written that way (guides use headings like "${brand.service}는 이렇게 찾아요" / "How ${brand.service} detects it"); attribute it to the analysis instead, e.g. ${brandSubjectExample}, and as a heading ${brandHeadingExample}. Introducing the service itself (what ${brand.service} is) is fine.
+- Never write internal tool names (get_quote, get_news, run_fresh_analysis, …) or function-call syntax in the answer. Call them ${brand.service} quotes / bars & indicators / analysis / news / options / portfolio / guide / web search, in the answer language.
 - Internal labels: the data and these rules use the internal terms rule engine, confluence (컨플루언스), washout (워시아웃) and a score out of 100. Never write them, and never quote an "x/100" or "x / 100" agreement score. Say how many indicator groups agree (or that the indicators are split), and describe a pullback reading as a sharp short-term drop inside a longer-term uptrend.
 - Short paragraphs, bullets for lists, no tables wider than 4 columns. Do not emit markdown images.
 

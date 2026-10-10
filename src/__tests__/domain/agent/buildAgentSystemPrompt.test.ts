@@ -10,6 +10,7 @@ import {
     composeAgentUserMessage,
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
+import { AGENT_BRAND, type AgentLocale } from '@/domain/agent/promptShared';
 
 const NEW_TOOLS: readonly string[] = [
     'get_fundamentals',
@@ -79,13 +80,13 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('{"error":"login_required"}');
         expect(prompt).not.toMatch(/free[^.]*sign-in|free SIGLENS/);
         expect(prompt).toContain('You are SIGLENS AI');
-        expect(prompt).toContain('출처: SIGLENS 시세');
+        expect(prompt).toContain('출처: 시그렌즈 시세');
         // Tool descriptions are model input too — same casing rule.
         for (const spec of AGENT_TOOL_SPECS)
             expect(JSON.stringify(spec)).not.toMatch(/\bsiglens\b(?![-.])/);
         // Brand rule aside, no lowercase product name leaks into the prompt.
         expect(
-            prompt.replace(/never "siglens", "Siglens" or "SiglensAI"/, '')
+            prompt.replace(/such as "siglens", "Siglens" or "SiglensAI"/, '')
         ).not.toMatch(/\bsiglens\b(?!\.io)/);
     });
 
@@ -359,13 +360,73 @@ describe('buildAgentSystemPrompt', () => {
         expect(AGENT_PROMPT_VERSION).toMatch(/^\d{4}-\d{2}-\d{2}\.\d+$/);
     });
 
+    it('브랜드 표기는 답변 언어를 따른다 — ko는 시그렌즈, 그 외는 SIGLENS', () => {
+        expect(prompt).toContain(
+            'call the service 시그렌즈 and yourself 시그렌즈 AI'
+        );
+        const en = buildAgentSystemPrompt({
+            locale: 'en',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(en).toContain(
+            'call the service SIGLENS and yourself SIGLENS AI'
+        );
+        expect(en).toContain('SIGLENS quotes / bars & indicators');
+        expect(en).not.toContain('call the service 시그렌즈');
+    });
+
+    it.each(
+        Object.entries(AGENT_BRAND) as [
+            AgentLocale,
+            (typeof AGENT_BRAND)[AgentLocale],
+        ][]
+    )('%s 프롬프트는 그 로케일의 브랜드 이름을 주입한다', (locale, brand) => {
+        const p = buildAgentSystemPrompt({
+            locale,
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(p).toContain(
+            `call the service ${brand.service} and yourself ${brand.assistant}`
+        );
+        expect(p).toContain(`${brand.service} quotes / bars & indicators`);
+        expect(p).toContain(`Do not make ${brand.service} the subject`);
+    });
+
+    it('zh는 SIGLENS를 쓴다', () => {
+        expect(AGENT_BRAND.zh).toEqual({
+            service: 'SIGLENS',
+            assistant: 'SIGLENS AI',
+        });
+    });
+
+    it('분석 방식을 설명할 때 브랜드를 주어로 쓰지 않게 하고, 답변 언어의 예시를 준다', () => {
+        expect(prompt).toContain('Do not make 시그렌즈 the subject');
+        expect(prompt).toContain('"시그렌즈 차트 분석에서는');
+        const ja = buildAgentSystemPrompt({
+            locale: 'ja',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(ja).toContain('Do not make SIGLENS the subject');
+        expect(ja).toContain(`"In SIGLENS's chart analysis`);
+        // Guides carry headings written from the website's side — the rule covers them too.
+        expect(prompt).toContain('"시그렌즈 분석의 판정 기준"');
+        expect(ja).toContain(`"How SIGLENS's analysis spots it"`);
+        expect(prompt).toContain('Introducing the service itself');
+    });
+
     it('내부 툴 이름 인용을 금지하고 출처를 서비스 이름으로 부르게 한다', () => {
         expect(prompt).toContain('Never write internal tool names');
         expect(prompt).toContain(
-            'SIGLENS quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
+            '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-10.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-10.2');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
