@@ -9,6 +9,21 @@ export const LANGUAGE_NAME: Record<AgentLocale, string> = {
     zh: 'Chinese',
 };
 
+/**
+ * @internal Brand names the answer must use, per {@link AgentLocale}: Korean answers say
+ * 시그렌즈 / 시그렌즈 AI, every other language SIGLENS / SIGLENS AI (the site's brand rule).
+ * The prompt injects these instead of asking the model to pick a spelling.
+ */
+export const AGENT_BRAND: Record<
+    AgentLocale,
+    { readonly service: string; readonly assistant: string }
+> = {
+    ko: { service: '시그렌즈', assistant: '시그렌즈 AI' },
+    en: { service: 'SIGLENS', assistant: 'SIGLENS AI' },
+    ja: { service: 'SIGLENS', assistant: 'SIGLENS AI' },
+    zh: { service: 'SIGLENS', assistant: 'SIGLENS AI' },
+};
+
 /** @internal `YYYY-MM-DD` and `HH:MM` of one instant in one zone. */
 export interface ClockParts {
     date: string;

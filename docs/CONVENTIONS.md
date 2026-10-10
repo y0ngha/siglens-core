@@ -710,6 +710,8 @@ set per builder, pin it per builder.
 
 A guard added to block a specific false positive gets a near-miss fixture of that case,
 and mirrored branches (left/right edge, bullish/bearish) each get their own.
+A per-locale (or per-key) behaviour iterates the constant's keys so every member is pinned,
+not a hand-picked subset that silently omits one.
 
 <a id="TE-6"></a>
 #### TE-6 — Test inclusive and exclusive boundaries on the boundary
