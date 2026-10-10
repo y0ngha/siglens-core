@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.16.1](https://github.com/y0ngha/siglens-core/compare/v2.16.0...v2.16.1) (2026-10-10)
+
+### Features
+
+* 에이전트 답변의 브랜드 표기를 언어에 맞춘다 ([#270](https://github.com/y0ngha/siglens-core/issues/270)) ([f201439](https://github.com/y0ngha/siglens-core/commit/f201439f6f35009b5fb6e184496d1bdb478f50c1))
+
 # [2.16.0](https://github.com/y0ngha/siglens-core/compare/v2.15.2...v2.16.0) (2026-10-09)
 
 ### Features
