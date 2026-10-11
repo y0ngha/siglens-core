@@ -8,6 +8,10 @@ import type {
 /**
  * Default sampling temperature applied to models whose provider APIs accept it.
  *
+ * Gemini rows carry no temperature: Google pinned sampling to its own defaults
+ * from Gemini 3.6 Flash on (custom values had no effect) and announced that
+ * upcoming models reject `temperature` / `top_p` / `top_k` with a 400.
+ *
  * `as const` preserves the literal `0` type so that
  * supported `MODEL_SPECS[X].temperature` values infer as `0` rather than
  * widening to `number`.
@@ -71,7 +75,6 @@ export const MODEL_SPECS = {
         provider: 'gemini',
         apiModelId: 'gemini-3.5-flash-lite',
         maxOutputTokens: 65_536,
-        temperature: DEFAULT_TEMPERATURE,
         reasoning: {
             // Measured 2026-09-06: `minimal` yields thoughtsTokenCount === 0
             // even on a prompt that demands multi-step reasoning.
@@ -103,7 +106,6 @@ export const MODEL_SPECS = {
         provider: 'gemini',
         apiModelId: 'gemini-3.6-flash',
         maxOutputTokens: 65_536,
-        temperature: DEFAULT_TEMPERATURE,
         reasoning: {
             // Measured 2026-09-06: `minimal` yields thoughtsTokenCount === 0
             // (omitting the config entirely yields 418).
@@ -136,29 +138,13 @@ export const MODEL_SPECS = {
     },
 
     // -------------------------------------------------------------- member
-    'gemini-3.7-flash': {
-        provider: 'gemini',
-        apiModelId: 'gemini-3.7-flash',
-        maxOutputTokens: 65_536,
-        temperature: DEFAULT_TEMPERATURE,
-        reasoning: {
-            // Measured 2026-09-06: rejects `minimal` with a 400 and SILENTLY
-            // IGNORES `thinkingBudget: 0` (176 thought tokens on a hard
-            // prompt). `low` is the floor and still thinks (~158).
-            off: { level: 'low' },
-            on: { level: 'high' },
-            default: 'off',
-            hardOff: false,
-        },
-    },
     'gemini-3.8-flash': {
         provider: 'gemini',
         apiModelId: 'gemini-3.8-flash',
         maxOutputTokens: 65_536,
-        temperature: DEFAULT_TEMPERATURE,
         reasoning: {
-            // Measured 2026-09-06: same as 3.7-flash — `minimal` 400s and
-            // `thinkingBudget: 0` is ignored (200 thoughts). Floor `low` (~178).
+            // Measured 2026-09-06: rejects `minimal` with a 400 and SILENTLY
+            // IGNORES `thinkingBudget: 0` (200 thoughts). Floor `low` (~178).
             off: { level: 'low' },
             on: { level: 'high' },
             default: 'off',
@@ -220,7 +206,6 @@ export const MODEL_SPECS = {
         provider: 'gemini',
         apiModelId: 'gemini-3.1-pro-preview',
         maxOutputTokens: 65_536,
-        temperature: DEFAULT_TEMPERATURE,
         reasoning: {
             // Measured 2026-09-06: rejects both `thinkingBudget: 0`
             // ("This model only works in thinking mode") and `minimal`.
@@ -316,8 +301,8 @@ const THINKING_LEVEL_ORDER: readonly GeminiThinkingLevel[] = [
  * the output allowance, so the retry steps thinking down one level at a time.
  * The sequence starts at `initial` and descends to `floor` inclusive.
  *
- * `floor` exists because the weakest level is per-model: `gemini-3.7-flash`,
- * `gemini-3.8-flash`, and `gemini-3.1-pro-preview` reject `'minimal'` with a
+ * `floor` exists because the weakest level is per-model: `gemini-3.8-flash`
+ * and `gemini-3.1-pro-preview` reject `'minimal'` with a
  * 400, so their floor is `'low'`. Pass `MODEL_SPECS[model].reasoning.off.level`
  * — the spec already records each model's floor.
  *
@@ -384,8 +369,8 @@ export function isReasoningToggleable(model: ActiveModelId): boolean {
  *
  * Successor to the removed `supportsDisabledThinking`. That helper asked
  * "does a literal `thinkingBudget: 0` avoid a 400?", which measured the wrong
- * thing: `gemini-3.7-flash` and `gemini-3.8-flash` accept the zero without
- * error and then think anyway, so they passed a check they should have failed.
+ * thing: `gemini-3.8-flash` accepts the zero without error and then thinks
+ * anyway, so it passed a check it should have failed.
  * This helper reads the spec's measured `hardOff` instead, and covers every
  * provider rather than Gemini alone.
  *

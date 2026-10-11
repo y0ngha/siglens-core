@@ -279,21 +279,21 @@ describe('tier', () => {
             ).toBe(true);
         });
 
-        it('allows gpt-5.6-terra and gemini-3.7-flash for member tier', () => {
+        it('allows gpt-5.6-terra and gemini-3.8-flash for member tier', () => {
             expect(
                 isModelAllowed('member', 'gpt-5.6-terra', restrictedConfig)
             ).toBe(true);
             expect(
-                isModelAllowed('member', 'gemini-3.7-flash', restrictedConfig)
+                isModelAllowed('member', 'gemini-3.8-flash', restrictedConfig)
             ).toBe(true);
         });
 
-        it('restricts gpt-5.6-terra and gemini-3.7-flash from free tier', () => {
+        it('restricts gpt-5.6-terra and gemini-3.8-flash from free tier', () => {
             expect(
                 isModelAllowed('free', 'gpt-5.6-terra', restrictedConfig)
             ).toBe(false);
             expect(
-                isModelAllowed('free', 'gemini-3.7-flash', restrictedConfig)
+                isModelAllowed('free', 'gemini-3.8-flash', restrictedConfig)
             ).toBe(false);
         });
 
@@ -361,7 +361,6 @@ describe('tier', () => {
             for (const model of [
                 'claude-sonnet-5',
                 'gpt-5.6-terra',
-                'gemini-3.7-flash',
                 'gemini-3.8-flash',
                 'gemini-3.1-pro-preview',
                 'deepseek-v4.1-pro',
@@ -437,7 +436,6 @@ describe('tier', () => {
 
         it('classifies the member models', () => {
             for (const model of [
-                'gemini-3.7-flash',
                 'gemini-3.8-flash',
                 'deepseek-v4.1-pro',
                 'claude-sonnet-5',
