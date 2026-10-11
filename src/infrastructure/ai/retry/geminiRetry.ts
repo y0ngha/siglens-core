@@ -26,7 +26,7 @@ type ThinkingLevelRef = { current: GeminiThinkingLevel };
  * MAX_TOKENS 발생 시 thinking level을 한 단계씩 낮추며 같은 요청을 이어서 재시도한다.
  * `levelRef.current`는 매 시도마다 업데이트되어 5xx 재시도 시 낮아진 level에서 재개한다.
  *
- * 바닥은 모델마다 다르다 — `gemini-3.7-flash` / `gemini-3.8-flash` /
+ * 바닥은 모델마다 다르다 — `gemini-3.8-flash` /
  * `gemini-3.1-pro-preview`는 `'minimal'`을 400으로 거부하므로 `'low'`가 한계다.
  * 그래서 시퀀스의 floor를 스펙의 OFF level에서 가져온다.
  *

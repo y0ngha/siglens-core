@@ -40,7 +40,7 @@ const MODEL: GeminiModelId = 'gemini-3.5-flash-lite';
  * 바닥이 `'low'`인 모델 — `'minimal'`을 400으로 거부한다(2026-09-06 실측).
  * 축소 시퀀스가 모델별 바닥을 존중하는지 검증하는 데 쓴다.
  */
-const MODEL_FLOOR_LOW: GeminiModelId = 'gemini-3.7-flash';
+const MODEL_FLOOR_LOW: GeminiModelId = 'gemini-3.8-flash';
 
 describe('gemini-retry', () => {
     let MAX_TOKENS_ERROR: Error & { code: string };
@@ -127,7 +127,7 @@ describe('gemini-retry', () => {
         });
 
         it("stops at the model's own floor rather than a global minimum", async () => {
-            // gemini-3.7-flash rejects 'minimal', so the sequence must end at 'low'.
+            // gemini-3.8-flash rejects 'minimal', so the sequence must end at 'low'.
             mockCallGemini.mockRejectedValue(MAX_TOKENS_ERROR);
 
             const levelRef = { current: 'high' as const };

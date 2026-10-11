@@ -37,7 +37,6 @@ const ALL_MODELS: readonly ActiveModelId[] = [
     'gemini-3.6-flash',
     'claude-haiku-4-5',
     // member
-    'gemini-3.7-flash',
     'gemini-3.8-flash',
     'deepseek-v4.1-pro',
     'claude-sonnet-5',
@@ -101,11 +100,10 @@ describe('MODEL_SPECS', () => {
     it('carries temperature only on specs whose provider accepts sampling', () => {
         for (const [model, spec] of Object.entries(MODEL_SPECS)) {
             // Adaptive-thinking Claude and every GPT reasoning model reject
-            // sampling parameters outright.
+            // sampling parameters outright. Gemini ignores them from 3.6 Flash
+            // on and announced a 400 for them on upcoming models.
             const acceptsSampling =
-                spec.provider === 'gemini' ||
-                spec.provider === 'deepseek' ||
-                model === 'claude-haiku-4-5';
+                spec.provider === 'deepseek' || model === 'claude-haiku-4-5';
             expect('temperature' in spec, model).toBe(acceptsSampling);
             if ('temperature' in spec) {
                 expect(spec.temperature, model).toBe(0);
@@ -188,7 +186,6 @@ describe('supportsHardOff', () => {
      * comments in `MODEL_SPECS`.
      */
     const PARTIAL_OFF_MODELS: readonly ActiveModelId[] = [
-        'gemini-3.7-flash',
         'gemini-3.8-flash',
         'gemini-3.1-pro-preview',
         'claude-fable-5-1',
@@ -208,10 +205,9 @@ describe('supportsHardOff', () => {
     });
 
     it('keeps a partial-off Gemini model off the `minimal` level it rejects', () => {
-        // gemini-3.7-flash / 3.8-flash / 3.1-pro-preview return 400 for
-        // `minimal`, so their off state must bottom out at `low`.
+        // gemini-3.8-flash / 3.1-pro-preview return 400 for `minimal`, so
+        // their off state must bottom out at `low`.
         for (const model of [
-            'gemini-3.7-flash',
             'gemini-3.8-flash',
             'gemini-3.1-pro-preview',
         ] as const) {

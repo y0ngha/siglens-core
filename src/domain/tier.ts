@@ -68,7 +68,6 @@ const FREE_MODELS: readonly TierModel[] = [
  * 함께 검토할 것.
  */
 const MEMBER_MODELS: readonly TierModel[] = [
-    'gemini-3.7-flash',
     'gemini-3.8-flash',
     'deepseek-v4.1-pro',
     'claude-sonnet-5',

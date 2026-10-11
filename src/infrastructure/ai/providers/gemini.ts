@@ -116,7 +116,8 @@ export async function callGemini(
             config: {
                 abortSignal: controller.signal,
                 systemInstruction: options.system ?? AI_SYSTEM_PROMPT,
-                temperature: spec.temperature,
+                // temperature·topP·topK는 보내지 않는다. 3.6 Flash부터 Google이
+                // 고정한 기본값으로 무시되고, 이후 모델은 400으로 거부한다.
                 maxOutputTokens,
                 responseMimeType: 'application/json',
                 ...(options.seed !== undefined && {
@@ -132,8 +133,8 @@ export async function callGemini(
                 //
                 // 숫자 `thinkingBudget`은 쓰지 않는다 — 3세대 모델은 이를
                 // 거부하거나(`gemini-3.1-pro-preview`, `3.5-flash-lite`,
-                // `3.6-flash`가 0에 400) 에러 없이 무시한다(`3.7-flash`,
-                // `3.8-flash`). 조용한 무시가 특히 위험해서 level로 전환했다.
+                // `3.6-flash`가 0에 400) 에러 없이 무시한다(`3.8-flash`).
+                // 조용한 무시가 특히 위험해서 level로 전환했다.
                 thinkingConfig: {
                     thinkingLevel: THINKING_LEVEL_TO_SDK[thinkingLevel],
                     includeThoughts: false,

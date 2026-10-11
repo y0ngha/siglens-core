@@ -24,3 +24,13 @@
 - Violation: `for` loop in `findLastIndex` lacked a one-line rationale for the CP-5 exception.
 - Rule: CONVENTIONS.md#CP-5
 - Fix: Added a one-line rationale comment.
+
+## [2026-10-11] fix/gemini-sampling-params round 1 (recommended)
+- Violation: docs/PUBLIC_API.md registry header still said "16 models" and listed gemini-3.7-flash after the model was removed from code (count/list not synchronized).
+- Rule: CONVENTIONS.md#DS-5
+- Fix: Updated the count and list in PUBLIC_API.md.
+
+## [2026-10-11] fix/gemini-sampling-params round 1 (recommended)
+- Violation: Edited JSDoc line in modelSpecs.ts (and a comment in gemini.ts) left over-long and mentioning a retired model; not re-wrapped to neighbouring width.
+- Rule: CONVENTIONS.md#JD-5
+- Fix: Re-wrapped the lines and dropped the retired model name.

@@ -2376,8 +2376,8 @@ export type EffortLevel = 'low' | 'medium' | 'high';
  * Generation-3 Gemini models control thinking with this string rather than a
  * numeric budget. Support is per-model and does NOT follow the version number:
  * `gemini-3.5-flash-lite` and `gemini-3.6-flash` accept `'minimal'` (measured
- * `thoughtsTokenCount === 0`), while `gemini-3.7-flash`, `gemini-3.8-flash`,
- * and `gemini-3.1-pro-preview` reject it with a 400 and bottom out at
+ * `thoughtsTokenCount === 0`), while `gemini-3.8-flash` and
+ * `gemini-3.1-pro-preview` reject it with a 400 and bottom out at
  * `'low'`. Never infer support from the model name — measure it.
  */
 export type GeminiThinkingLevel = 'minimal' | 'low' | 'medium' | 'high';
@@ -2513,15 +2513,19 @@ export interface ClaudeAdaptiveModelSpec extends BaseModelSpec {
 }
 
 /**
- * Gemini model using `thinkingLevel` controls and sampling temperature.
+ * Gemini model using `thinkingLevel` controls.
  */
 export interface GeminiModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
     provider: 'gemini';
     /** Per-toggle-state thinking levels. */
     reasoning: ReasoningModes<GeminiReasoningConfig>;
-    /** Sampling temperature. */
-    temperature: number;
+    /**
+     * Gemini takes no sampling parameters. From 3.6 Flash on, custom
+     * `temperature` / `top_p` / `top_k` have no effect, and Google announced
+     * that upcoming models reject them with a 400.
+     */
+    temperature?: undefined;
 }
 
 /**
@@ -2627,13 +2631,13 @@ export function isClaudeBudgetModelSpec(
  * {@link DeepSeekReasoningConfig.thinking}) before sending it.
  *
  * @param spec - The model spec to narrow.
- * @returns `true` when `spec` is a `ClaudeBudgetModelSpec`, `GeminiModelSpec`,
- *   or `DeepSeekModelSpec`.
+ * @returns `true` when `spec` is a `ClaudeBudgetModelSpec` or
+ *   `DeepSeekModelSpec`.
  */
 export function isTemperatureModelSpec(
     spec: ModelSpec
-): spec is ClaudeBudgetModelSpec | GeminiModelSpec | DeepSeekModelSpec {
-    return spec.provider !== 'chatgpt' && !isClaudeAdaptiveModelSpec(spec);
+): spec is ClaudeBudgetModelSpec | DeepSeekModelSpec {
+    return isClaudeBudgetModelSpec(spec) || spec.provider === 'deepseek';
 }
 
 /**
@@ -2668,7 +2672,6 @@ export type TierModel =
     | 'gemini-3.1-pro-preview'
     | 'gemini-3.5-flash-lite'
     | 'gemini-3.6-flash'
-    | 'gemini-3.7-flash'
     | 'gemini-3.8-flash'
     | 'claude-haiku-4-5'
     | 'claude-sonnet-5'

@@ -81,6 +81,19 @@ describe('callGemini seed', () => {
         mockedGoogleGenAI.mockClear();
     });
 
+    it('sends no sampling parameters (temperature / topP / topK)', async () => {
+        // Google ignores them from Gemini 3.6 Flash on and announced a 400
+        // for them on upcoming models.
+        mockGenerateContent.mockResolvedValueOnce(SUCCESS);
+
+        await callGemini('prompt', { model: MODEL, apiKey: 'key' });
+
+        const config = mockGenerateContent.mock.calls[0][0].config;
+        expect(config).not.toHaveProperty('temperature');
+        expect(config).not.toHaveProperty('topP');
+        expect(config).not.toHaveProperty('topK');
+    });
+
     it('omits seed from config when seed is absent (backward-compat)', async () => {
         mockGenerateContent.mockResolvedValueOnce(SUCCESS);
 
