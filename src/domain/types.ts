@@ -2631,7 +2631,8 @@ export function isClaudeBudgetModelSpec(
  * {@link DeepSeekReasoningConfig.thinking}) before sending it.
  *
  * @param spec - The model spec to narrow.
- * @returns `true` when `spec` is a `ClaudeBudgetModelSpec` or `DeepSeekModelSpec`.
+ * @returns `true` when `spec` is a `ClaudeBudgetModelSpec` or
+ *   `DeepSeekModelSpec`.
  */
 export function isTemperatureModelSpec(
     spec: ModelSpec
