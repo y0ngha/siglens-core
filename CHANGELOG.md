@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.16.2](https://github.com/y0ngha/siglens-core/compare/v2.16.1...v2.16.2) (2026-10-11)
+
+### Bug Fixes
+
+* Gemini 호출에서 sampling 파라미터를 빼고 gemini-3.7-flash를 퇴역시킨다 ([#271](https://github.com/y0ngha/siglens-core/issues/271)) ([de9dc70](https://github.com/y0ngha/siglens-core/commit/de9dc706a1d671335420b1f7119090be059209ad))
+
 ## [2.16.1](https://github.com/y0ngha/siglens-core/compare/v2.16.0...v2.16.1) (2026-10-10)
 
 ### Features
