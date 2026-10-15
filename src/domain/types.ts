@@ -2393,9 +2393,21 @@ export interface GeminiReasoningConfig {
  *
  * `{mode:'disabled'}` maps to `thinking: {type:'disabled'}`; `{mode:'adaptive'}`
  * maps to `thinking: {type:'adaptive'}` plus `output_config.effort`.
+ *
+ * `{mode:'between_tools'}` maps to `thinking: {type:'between_tools'}` and is
+ * the lowest strength of models that reject `{type:'disabled'}` with a 400
+ * pointing at it (`claude-sonnet-5-5`). Measured live 2026-10-15: the API
+ * treats it as thinking disabled — a structured-output call with the schema
+ * tool returned no `thinking` block; `display` alongside it is a 400 ("Extra
+ * inputs are not permitted"); effort `xhigh` with it is a 400 ("not supported
+ * when thinking is disabled ... use effort 'high' or below"), while no effort
+ * and effort `high` both succeed. So this variant deliberately carries no
+ * `effort` and the adapter sends no `output_config` for it.
  */
 export type ClaudeAdaptiveReasoningConfig =
-    { mode: 'disabled' } | { mode: 'adaptive'; effort: ClaudeEffortLevel };
+    | { mode: 'disabled' }
+    | { mode: 'between_tools' }
+    | { mode: 'adaptive'; effort: ClaudeEffortLevel };
 
 /**
  * Claude extended-thinking configuration for one toggle state, used by
@@ -2471,8 +2483,8 @@ interface BaseModelSpec {
     /**
      * Actual model identifier sent to the provider API.
      *
-     * May differ from the internal `ActiveModelId` key (e.g. `claude-haiku-4-5`
-     * maps to `claude-haiku-4-5-20251001` on the Anthropic API). SDK callers
+     * May differ from the internal `ActiveModelId` key (e.g. `deepseek-v4.1-flash`
+     * maps to `deepseek-flash` on the DeepSeek API). SDK callers
      * must use this value — never the raw `ActiveModelId` key — when building
      * the provider request payload.
      */
@@ -2483,7 +2495,8 @@ interface BaseModelSpec {
 
 /**
  * Claude model on the pre-4.6 extended-thinking API, which takes a numeric
- * `budget_tokens` rather than adaptive thinking. Currently Claude haiku.
+ * `budget_tokens` rather than adaptive thinking. No registry row uses it since
+ * the last Claude 4.x haiku row was retired; the variant stays for the type contract.
  */
 export interface ClaudeBudgetModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
@@ -2673,15 +2686,18 @@ export type TierModel =
     | 'gemini-3.5-flash-lite'
     | 'gemini-3.6-flash'
     | 'gemini-3.8-flash'
-    | 'claude-haiku-4-5'
-    | 'claude-sonnet-5'
+    | 'gemini-4-argon'
+    | 'claude-haiku-5-5'
+    | 'claude-sonnet-5-5'
     | 'claude-opus-4-8'
     | 'claude-opus-5'
+    | 'claude-opus-5-5'
     | 'claude-fable-5-1'
-    | 'gpt-5.6-luna'
-    | 'gpt-5.6-terra'
+    | 'gpt-6-luna'
+    | 'gpt-6-sol'
     | 'gpt-5.6-sol'
     | 'gpt-6-astra'
+    | 'gpt-6.1-sol'
     | 'deepseek-v4.1-flash'
     | 'deepseek-v4.1-pro';
 

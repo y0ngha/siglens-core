@@ -396,7 +396,7 @@ describe('runAnalysis', () => {
         });
 
         it('explicit modelId is forwarded to callAnalysisAi', async () => {
-            // claude-haiku-4-5 is in FREE_MODELS so no BYOK gate fires.
+            // claude-haiku-5-5 is in FREE_MODELS so no BYOK gate fires.
             await runAnalysis(
                 mockSymbol,
                 mockCompanyName,
@@ -405,12 +405,12 @@ describe('runAnalysis', () => {
                 undefined,
                 {
                     marketDataProvider: fakeProvider,
-                    modelId: 'claude-haiku-4-5',
+                    modelId: 'claude-haiku-5-5',
                 }
             );
 
             expect(mockCallAnalysisAi).toHaveBeenCalledWith(
-                expect.objectContaining({ model: 'claude-haiku-4-5' })
+                expect.objectContaining({ model: 'claude-haiku-5-5' })
             );
         });
 

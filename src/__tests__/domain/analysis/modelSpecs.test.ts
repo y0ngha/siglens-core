@@ -31,23 +31,26 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 /** Every model the registry is expected to hold, in access-class order. */
 const ALL_MODELS: readonly ActiveModelId[] = [
     // free
-    'gpt-5.6-luna',
+    'gpt-6-luna',
     'gemini-3.5-flash-lite',
     'deepseek-v4.1-flash',
     'gemini-3.6-flash',
-    'claude-haiku-4-5',
+    'claude-haiku-5-5',
     // member
     'gemini-3.8-flash',
     'deepseek-v4.1-pro',
-    'claude-sonnet-5',
-    'gpt-5.6-terra',
+    'claude-sonnet-5-5',
+    'gpt-6-sol',
     'gemini-3.1-pro-preview',
     // byok
     'gpt-5.6-sol',
     'claude-opus-4-8',
     'claude-opus-5',
+    'claude-opus-5-5',
     'claude-fable-5-1',
     'gpt-6-astra',
+    'gpt-6.1-sol',
+    'gemini-4-argon',
 ];
 
 /**
@@ -66,6 +69,11 @@ const REMOVED_MODEL_IDS: readonly string[] = [
     'gpt-5.5',
     'claude-sonnet-4',
     'claude-opus-4',
+    // 2026-10-15 replacement by newer, cheaper successors.
+    'claude-haiku-4-5',
+    'gpt-5.6-luna',
+    'claude-sonnet-5',
+    'gpt-5.6-terra',
 ];
 
 describe('MODEL_SPECS', () => {
@@ -84,9 +92,6 @@ describe('MODEL_SPECS', () => {
     it('keys every apiModelId to its own row, except where the provider names it differently', () => {
         /** Rows whose provider id genuinely differs from our registry key. */
         const RENAMED: Record<string, string> = {
-            // Pre-4.6 Claude models keep a dated snapshot id; 4.6 onward the
-            // dateless id IS the pinned snapshot and a date suffix 404s.
-            'claude-haiku-4-5': 'claude-haiku-4-5-20251001',
             // `deepseek-v4.1-*` is a version designation, not an API id —
             // sending it returns 400. The API accepts only these two.
             'deepseek-v4.1-flash': 'deepseek-flash',
@@ -102,8 +107,7 @@ describe('MODEL_SPECS', () => {
             // Adaptive-thinking Claude and every GPT reasoning model reject
             // sampling parameters outright. Gemini ignores them from 3.6 Flash
             // on and announced a 400 for them on upcoming models.
-            const acceptsSampling =
-                spec.provider === 'deepseek' || model === 'claude-haiku-4-5';
+            const acceptsSampling = spec.provider === 'deepseek';
             expect('temperature' in spec, model).toBe(acceptsSampling);
             if ('temperature' in spec) {
                 expect(spec.temperature, model).toBe(0);
@@ -112,8 +116,6 @@ describe('MODEL_SPECS', () => {
     });
 
     it('keeps max output tokens aligned with each provider cap', () => {
-        expect(MODEL_SPECS['claude-haiku-4-5'].maxOutputTokens).toBe(64_000);
-
         for (const [model, spec] of Object.entries(MODEL_SPECS)) {
             if (spec.provider === 'gemini') {
                 expect(spec.maxOutputTokens, model).toBe(65_536);
@@ -122,7 +124,7 @@ describe('MODEL_SPECS', () => {
             } else if (spec.provider === 'deepseek') {
                 // DeepSeek V4.1 supports 384K (384 * 1024) output tokens.
                 expect(spec.maxOutputTokens, model).toBe(393_216);
-            } else if (model !== 'claude-haiku-4-5') {
+            } else {
                 // Adaptive-thinking Claude shares max_tokens with thinking, so
                 // every one of them requests the 128K ceiling.
                 expect(spec.maxOutputTokens, model).toBe(128_000);
@@ -131,12 +133,13 @@ describe('MODEL_SPECS', () => {
     });
 
     it('splits Claude specs by thinking API', () => {
-        // haiku is the only pre-4.6 model left, so it is the only budget spec.
-        expect(MODEL_SPECS['claude-haiku-4-5'].thinkingApi).toBe('budget');
+        // No pre-4.6 model is left, so no registry row uses the budget API.
         for (const model of [
-            'claude-sonnet-5',
+            'claude-haiku-5-5',
+            'claude-sonnet-5-5',
             'claude-opus-4-8',
             'claude-opus-5',
+            'claude-opus-5-5',
             'claude-fable-5-1',
         ] as const) {
             expect(MODEL_SPECS[model].thinkingApi, model).toBe('adaptive');
@@ -188,8 +191,11 @@ describe('supportsHardOff', () => {
     const PARTIAL_OFF_MODELS: readonly ActiveModelId[] = [
         'gemini-3.8-flash',
         'gemini-3.1-pro-preview',
+        'claude-opus-5-5',
         'claude-fable-5-1',
         'gpt-6-astra',
+        'gpt-6.1-sol',
+        'gemini-4-argon',
     ];
 
     it('reports false for exactly the models that cannot disable reasoning', () => {
@@ -210,6 +216,7 @@ describe('supportsHardOff', () => {
         for (const model of [
             'gemini-3.8-flash',
             'gemini-3.1-pro-preview',
+            'gemini-4-argon',
         ] as const) {
             expect(MODEL_SPECS[model].reasoning.off.level, model).toBe('low');
         }
@@ -228,11 +235,12 @@ describe('supportsHardOff', () => {
 });
 
 describe('isReasoningToggleable', () => {
-    it('reports false only for claude-haiku-4-5', () => {
+    it('reports true for every registry row', () => {
+        // The only non-toggleable row (the haiku 4.5 row) was retired.
         const actual = ALL_MODELS.filter(
             model => !isReasoningToggleable(model)
         );
-        expect(actual).toEqual(['claude-haiku-4-5']);
+        expect(actual).toEqual([]);
     });
 
     it('gives a non-toggleable model identical off and on states', () => {
@@ -314,8 +322,8 @@ describe('getThinkingLevelSequence', () => {
 
 describe('getProvider', () => {
     it('routes Claude models to the claude provider', () => {
-        expect(getProvider('claude-haiku-4-5')).toBe('claude');
-        expect(getProvider('claude-sonnet-5')).toBe('claude');
+        expect(getProvider('claude-haiku-5-5')).toBe('claude');
+        expect(getProvider('claude-sonnet-5-5')).toBe('claude');
         expect(getProvider('claude-fable-5-1')).toBe('claude');
     });
 
@@ -325,7 +333,7 @@ describe('getProvider', () => {
     });
 
     it('routes GPT models to the chatgpt provider', () => {
-        expect(getProvider('gpt-5.6-luna')).toBe('chatgpt');
+        expect(getProvider('gpt-6-luna')).toBe('chatgpt');
         expect(getProvider('gpt-6-astra')).toBe('chatgpt');
     });
 
@@ -377,6 +385,24 @@ describe('provider type guards', () => {
     });
 });
 
+/**
+ * A pre-4.6 budget-API Claude spec. The registry no longer holds one (the last, haiku 4.5,
+ * was retired), but the type variant and its guard stay
+ * part of the contract, so they are exercised with a hand-built spec.
+ */
+const BUDGET_SPEC: ClaudeBudgetModelSpec = {
+    provider: 'claude',
+    thinkingApi: 'budget',
+    apiModelId: 'test-budget-model',
+    maxOutputTokens: 8_192,
+    temperature: 0,
+    reasoning: {
+        off: { budgetTokens: 0 },
+        on: { budgetTokens: 8_192 },
+        default: 'off',
+    },
+};
+
 describe('spec type guards', () => {
     it('isClaudeModelSpec matches every Claude spec regardless of thinking API', () => {
         for (const model of ALL_MODELS) {
@@ -387,20 +413,18 @@ describe('spec type guards', () => {
         }
     });
 
-    it('isClaudeAdaptiveModelSpec excludes the budget-based haiku spec', () => {
-        const haiku: ModelSpec = MODEL_SPECS['claude-haiku-4-5'];
-        const sonnet: ModelSpec = MODEL_SPECS['claude-sonnet-5'];
-        expect(isClaudeAdaptiveModelSpec(haiku)).toBe(false);
+    it('isClaudeAdaptiveModelSpec excludes a budget-based spec', () => {
+        const sonnet: ModelSpec = MODEL_SPECS['claude-sonnet-5-5'];
+        expect(isClaudeAdaptiveModelSpec(BUDGET_SPEC)).toBe(false);
         expect(isClaudeAdaptiveModelSpec(sonnet)).toBe(true);
     });
 
-    it('isClaudeBudgetModelSpec matches only the haiku spec', () => {
+    it('isClaudeBudgetModelSpec matches no registry row, only a budget spec', () => {
         for (const model of ALL_MODELS) {
             const spec: ModelSpec = MODEL_SPECS[model];
-            expect(isClaudeBudgetModelSpec(spec), model).toBe(
-                model === 'claude-haiku-4-5'
-            );
+            expect(isClaudeBudgetModelSpec(spec), model).toBe(false);
         }
+        expect(isClaudeBudgetModelSpec(BUDGET_SPEC)).toBe(true);
     });
 
     it('isTemperatureModelSpec matches exactly the specs that carry a temperature', () => {
@@ -424,7 +448,7 @@ describe('spec type guards', () => {
     });
 
     it('narrows to the budget Claude spec and exposes its budget tokens', () => {
-        const spec: ModelSpec = MODEL_SPECS['claude-haiku-4-5'];
+        const spec: ModelSpec = BUDGET_SPEC;
         if (isClaudeBudgetModelSpec(spec)) {
             expectTypeOf(spec).toEqualTypeOf<ClaudeBudgetModelSpec>();
             expect(spec.reasoning.off.budgetTokens).toBe(0);
@@ -432,10 +456,50 @@ describe('spec type guards', () => {
     });
 
     it('narrows a ChatGPT spec through its provider discriminant', () => {
-        const spec: ModelSpec = MODEL_SPECS['gpt-5.6-terra'];
+        const spec: ModelSpec = MODEL_SPECS['gpt-6-sol'];
         if (spec.provider === 'chatgpt') {
             expectTypeOf(spec).toEqualTypeOf<ChatGPTModelSpec>();
             expect(spec.reasoning.off).toEqual({ effort: 'none' });
+        }
+    });
+});
+
+describe('2026-10 roster rows (verified live 2026-10-15)', () => {
+    it('gives sonnet 5.5 a between_tools off state and no effort', () => {
+        const spec = MODEL_SPECS['claude-sonnet-5-5'];
+        expect(spec.reasoning.off).toEqual({ mode: 'between_tools' });
+        expect(spec.reasoning.default).toBe('off');
+        expect(supportsHardOff('claude-sonnet-5-5')).toBe(true);
+    });
+
+    it('keeps opus 5.5 on adaptive low as its floor, default on', () => {
+        const spec = MODEL_SPECS['claude-opus-5-5'];
+        expect(spec.reasoning.off).toEqual({ mode: 'adaptive', effort: 'low' });
+        expect(spec.reasoning.on).toEqual({ mode: 'adaptive', effort: 'high' });
+        expect(spec.reasoning.default).toBe('on');
+        expect(supportsHardOff('claude-opus-5-5')).toBe(false);
+    });
+
+    it('keeps haiku 5.5 toggleable with disabled as its off state', () => {
+        const spec = MODEL_SPECS['claude-haiku-5-5'];
+        expect(spec.reasoning.off).toEqual({ mode: 'disabled' });
+        expect(isReasoningToggleable('claude-haiku-5-5')).toBe(true);
+    });
+
+    it('floors gemini-4-argon at low and gpt-6.1-sol at low (neither accepts the lower value)', () => {
+        expect(MODEL_SPECS['gemini-4-argon'].reasoning.off).toEqual({
+            level: 'low',
+        });
+        expect(MODEL_SPECS['gpt-6.1-sol'].reasoning.off).toEqual({
+            effort: 'low',
+        });
+    });
+
+    it('turns reasoning fully off on the new gpt-6 free and member rows', () => {
+        for (const model of ['gpt-6-luna', 'gpt-6-sol'] as const) {
+            expect(MODEL_SPECS[model].reasoning.off, model).toEqual({
+                effort: 'none',
+            });
         }
     });
 });

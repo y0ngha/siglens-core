@@ -249,20 +249,20 @@ describe('tier', () => {
 
         it('checks models when restrictions are enabled', () => {
             expect(
-                isModelAllowed('member', 'claude-sonnet-5', restrictedConfig)
+                isModelAllowed('member', 'claude-sonnet-5-5', restrictedConfig)
             ).toBe(true);
             expect(
                 isModelAllowed('member', 'claude-opus-5', restrictedConfig)
             ).toBe(false);
         });
 
-        it('allows free-tier models (claude-haiku-4-5, gpt-5.6-luna)', () => {
+        it('allows free-tier models (claude-haiku-5-5, gpt-6-luna)', () => {
             expect(
-                isModelAllowed('free', 'claude-haiku-4-5', restrictedConfig)
+                isModelAllowed('free', 'claude-haiku-5-5', restrictedConfig)
             ).toBe(true);
-            expect(
-                isModelAllowed('free', 'gpt-5.6-luna', restrictedConfig)
-            ).toBe(true);
+            expect(isModelAllowed('free', 'gpt-6-luna', restrictedConfig)).toBe(
+                true
+            );
         });
 
         it('allows the free DeepSeek line but not the pro one', () => {
@@ -279,19 +279,19 @@ describe('tier', () => {
             ).toBe(true);
         });
 
-        it('allows gpt-5.6-terra and gemini-3.8-flash for member tier', () => {
+        it('allows gpt-6-sol and gemini-3.8-flash for member tier', () => {
             expect(
-                isModelAllowed('member', 'gpt-5.6-terra', restrictedConfig)
+                isModelAllowed('member', 'gpt-6-sol', restrictedConfig)
             ).toBe(true);
             expect(
                 isModelAllowed('member', 'gemini-3.8-flash', restrictedConfig)
             ).toBe(true);
         });
 
-        it('restricts gpt-5.6-terra and gemini-3.8-flash from free tier', () => {
-            expect(
-                isModelAllowed('free', 'gpt-5.6-terra', restrictedConfig)
-            ).toBe(false);
+        it('restricts gpt-6-sol and gemini-3.8-flash from free tier', () => {
+            expect(isModelAllowed('free', 'gpt-6-sol', restrictedConfig)).toBe(
+                false
+            );
             expect(
                 isModelAllowed('free', 'gemini-3.8-flash', restrictedConfig)
             ).toBe(false);
@@ -345,12 +345,12 @@ describe('tier', () => {
             }
         });
 
-        it('restricts member-only models (claude-sonnet-5) from free tier', () => {
+        it('restricts member-only models (claude-sonnet-5-5) from free tier', () => {
             expect(
-                isModelAllowed('member', 'claude-sonnet-5', restrictedConfig)
+                isModelAllowed('member', 'claude-sonnet-5-5', restrictedConfig)
             ).toBe(true);
             expect(
-                isModelAllowed('free', 'claude-sonnet-5', restrictedConfig)
+                isModelAllowed('free', 'claude-sonnet-5-5', restrictedConfig)
             ).toBe(false);
         });
 
@@ -359,8 +359,8 @@ describe('tier', () => {
         // claude-opus-5를 MEMBER_MODELS로 옮기면 반드시 실패해야 한다.
         it('places the member models in member but not free', () => {
             for (const model of [
-                'claude-sonnet-5',
-                'gpt-5.6-terra',
+                'claude-sonnet-5-5',
+                'gpt-6-sol',
                 'gemini-3.8-flash',
                 'gemini-3.1-pro-preview',
                 'deepseek-v4.1-pro',
@@ -424,11 +424,11 @@ describe('tier', () => {
 
         it('classifies the free models', () => {
             for (const model of [
-                'gpt-5.6-luna',
+                'gpt-6-luna',
                 'gemini-3.5-flash-lite',
                 'deepseek-v4.1-flash',
                 'gemini-3.6-flash',
-                'claude-haiku-4-5',
+                'claude-haiku-5-5',
             ] as const) {
                 expect(getModelAccess(model), model).toBe('free');
             }
@@ -438,8 +438,8 @@ describe('tier', () => {
             for (const model of [
                 'gemini-3.8-flash',
                 'deepseek-v4.1-pro',
-                'claude-sonnet-5',
-                'gpt-5.6-terra',
+                'claude-sonnet-5-5',
+                'gpt-6-sol',
                 'gemini-3.1-pro-preview',
             ] as const) {
                 expect(getModelAccess(model), model).toBe('member');
@@ -451,8 +451,11 @@ describe('tier', () => {
                 'gpt-5.6-sol',
                 'claude-opus-4-8',
                 'claude-opus-5',
+                'claude-opus-5-5',
                 'claude-fable-5-1',
                 'gpt-6-astra',
+                'gpt-6.1-sol',
+                'gemini-4-argon',
             ] as const) {
                 expect(getModelAccess(model), model).toBe('byok');
             }
@@ -495,13 +498,13 @@ describe('tier', () => {
     describe('isPremiumModel', () => {
         it('returns false for free models', () => {
             expect(isPremiumModel('gemini-3.6-flash')).toBe(false);
-            expect(isPremiumModel('claude-haiku-4-5')).toBe(false);
+            expect(isPremiumModel('claude-haiku-5-5')).toBe(false);
         });
 
         it('returns true for member models as well as byok models', () => {
             // "Premium" means "not free" — it spans both paid-by-server member
             // models and user-key byok models.
-            expect(isPremiumModel('claude-sonnet-5')).toBe(true);
+            expect(isPremiumModel('claude-sonnet-5-5')).toBe(true);
             expect(isPremiumModel('claude-opus-5')).toBe(true);
         });
 
@@ -548,8 +551,8 @@ describe('tier', () => {
             // covered by the server key. The previous binary classifier returned
             // true here, forcing members to supply a key for models we pay for.
             for (const model of [
-                'claude-sonnet-5',
-                'gpt-5.6-terra',
+                'claude-sonnet-5-5',
+                'gpt-6-sol',
                 'gemini-3.8-flash',
                 'deepseek-v4.1-pro',
             ] as const) {
@@ -591,7 +594,7 @@ describe('tier', () => {
                 true
             );
             expect(
-                requiresByokKey('member', 'claude-sonnet-5', restricted)
+                requiresByokKey('member', 'claude-sonnet-5-5', restricted)
             ).toBe(false);
         });
     });

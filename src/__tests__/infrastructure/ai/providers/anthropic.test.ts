@@ -37,13 +37,14 @@ vi.mock('@/domain/analysis/modelSpecs', () => ({
             },
         },
         // 추론 기본 OFF(member 등급 상당).
-        'claude-sonnet-5': {
+        'claude-sonnet-5-5': {
             provider: 'claude',
             thinkingApi: 'adaptive',
-            apiModelId: 'claude-sonnet-5',
+            apiModelId: 'claude-sonnet-5-5',
             maxOutputTokens: 64_000,
             reasoning: {
-                off: { mode: 'disabled' },
+                // 실제 스펙과 같다 — `disabled`는 400이라 between_tools를 쓴다.
+                off: { mode: 'between_tools' },
                 on: { mode: 'adaptive', effort: 'medium' },
                 default: 'off',
             },
@@ -63,11 +64,12 @@ vi.mock('@/domain/analysis/modelSpecs', () => ({
                 default: 'off',
             },
         },
-        // budget API + 토글 불가.
-        'claude-haiku-4-5': {
+        // budget API + 토글 불가 — mock 전용 합성 id(프로덕션 레지스트리에는 이런 행이 없다).
+        // 실제 id를 빌려 쓰면 그 모델이 thinking을 안 보낸다고 읽히므로 합성 id를 쓴다.
+        'claude-budget-only-mock': {
             provider: 'claude',
             thinkingApi: 'budget',
-            apiModelId: 'claude-haiku-4-5-20251001',
+            apiModelId: 'claude-budget-only-mock',
             maxOutputTokens: 8_192,
             temperature: 0,
             reasoning: {
@@ -89,8 +91,9 @@ const mockedAnthropic = vi.mocked(Anthropic);
 /** 추론 기본 ON인 adaptive 모델. */
 const MODEL_WITH_EFFORT: ClaudeModelId = 'claude-opus-5';
 /** 추론 기본 OFF인 adaptive 모델. */
-const MODEL_DEFAULT_OFF: ClaudeModelId = 'claude-sonnet-5';
-const MODEL_WITHOUT_THINKING: ClaudeModelId = 'claude-haiku-4-5';
+const MODEL_DEFAULT_OFF: ClaudeModelId = 'claude-sonnet-5-5';
+/** budget API·토글 불가인 합성 mock 모델 — thinking 블록을 보내지 않는 경로. */
+const MODEL_WITHOUT_THINKING = 'claude-budget-only-mock' as ClaudeModelId;
 /** budget API를 쓰면서 추론을 켤 수 있는 모델(mock 전용). */
 const MODEL_BUDGET_THINKING: ClaudeModelId = 'claude-opus-4-8';
 
@@ -216,10 +219,57 @@ describe('callClaude', () => {
         });
 
         const call = mockStream.mock.calls[0][0];
-        expect(call.thinking).toEqual({ type: 'disabled' });
+        // 이 모델의 OFF는 disabled가 아니라 between_tools다.
+        expect(call.thinking).toEqual({ type: 'between_tools' });
     });
 
-    it('omits thinking config when model does not support thinking (haiku)', async () => {
+    it('sends thinking:{type:"between_tools"} alone, with no effort or display', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'end_turn',
+                content: [{ type: 'text', text: 'ok' }],
+            })
+        );
+
+        await callClaude('prompt', {
+            model: MODEL_DEFAULT_OFF,
+            apiKey: 'key',
+            reasoning: { mode: 'between_tools' },
+        });
+
+        const call = mockStream.mock.calls[0][0];
+        expect(call.thinking).toStrictEqual({ type: 'between_tools' });
+        expect(call).not.toHaveProperty('output_config');
+        expect(call).not.toHaveProperty('temperature');
+    });
+
+    it('keeps tool_choice auto with a schema under between_tools', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'tool_use',
+                content: [
+                    {
+                        type: 'tool_use',
+                        id: 't1',
+                        name: 'structured_analysis',
+                        input: { a: 1 },
+                    },
+                ],
+            })
+        );
+
+        await callClaude('prompt', {
+            model: MODEL_DEFAULT_OFF,
+            apiKey: 'key',
+            reasoning: { mode: 'between_tools' },
+            responseSchema: { type: 'object' },
+        });
+
+        const call = mockStream.mock.calls[0][0];
+        expect(call.tool_choice).toEqual({ type: 'auto' });
+    });
+
+    it('omits thinking config when model does not support thinking (budget-only mock)', async () => {
         mockStream.mockReturnValueOnce(
             makeStream({
                 stop_reason: 'end_turn',
@@ -473,7 +523,7 @@ describe('callClaude', () => {
             expect(call.tool_choice).toEqual({ type: 'auto' });
         });
 
-        it('omits thinking on Haiku even when a schema is present', async () => {
+        it('omits thinking on the budget-only mock even when a schema is present', async () => {
             mockStream.mockReturnValueOnce(
                 makeStream({
                     stop_reason: 'tool_use',
@@ -495,7 +545,7 @@ describe('callClaude', () => {
             });
 
             const call = mockStream.mock.calls[0][0];
-            // haiku는 effort가 없어 schema 유무와 무관하게 thinking이 없다.
+            // budget-only mock은 effort가 없어 schema 유무와 무관하게 thinking이 없다.
             // (4) forced path still passes thinking=off correctly: no `thinking`/
             // `output_config` key alongside the forced tool_choice below.
             expect(call).not.toHaveProperty('thinking');
@@ -503,7 +553,7 @@ describe('callClaude', () => {
             expect(call.temperature).toBe(0);
             // (1) responseSchema + non-thinking model → tool_choice is FORCED
             // to the structured-output tool. Non-thinking Claude models (no
-            // `effort` in MODEL_SPECS, e.g. haiku) never send `thinking`, so
+            // `effort` in MODEL_SPECS, e.g. the budget-only mock) never send `thinking`, so
             // forced tool_choice is always safe here — see the forced+thinking
             // 400 note in the next test.
             expect(call.tool_choice).toEqual({
@@ -578,12 +628,12 @@ describe('callClaude', () => {
             expect(result).not.toBe('null');
         });
 
-        // forced-tool 경로(haiku + schema → tool_choice: {type:'tool'})의 방어적 폴백.
+        // forced-tool 경로(budget-only mock + schema → tool_choice: {type:'tool'})의 방어적 폴백.
         // forced tool_choice는 정상적으로 tool 호출을 보장하지만, 응답에 tool_use 블록이
         // 없으면(모델이 text만 반환) claude.ts의 text 추출 폴백으로 넘어가야 하며 throw하지
         // 않아야 한다. 기존 폴백/W7 테스트는 전부 MODEL_WITH_EFFORT(auto tool_choice) 경로만
         // 커버했다 — forced 경로의 폴백 분기를 여기서 검증한다.
-        it('forced-tool path (haiku + schema) falls back to text extraction when no tool_use block is present', async () => {
+        it('forced-tool path (budget-only mock + schema) falls back to text extraction when no tool_use block is present', async () => {
             mockStream.mockReturnValueOnce(
                 makeStream({
                     stop_reason: 'tool_use',
@@ -609,7 +659,7 @@ describe('callClaude', () => {
             expect(result).toBe('{"sentiment":"bullish"}');
         });
 
-        // Audit fix: a forced-tool (haiku) call truncated by max_tokens can still
+        // Audit fix: a forced-tool (budget-only mock) call truncated by max_tokens can still
         // materialize a tool_use block with a partial non-null `input`. The
         // structured early-return must NOT treat that as success — it has to
         // fall through to the dedicated max_tokens branch so callers retry
@@ -738,7 +788,7 @@ describe('callClaude — analyze path prompt-cache construction (design C)', () 
         ]);
     });
 
-    it('constructs the cached system block for a no-effort (haiku) model — cache wrapping precedes the effort branch', async () => {
+    it('constructs the cached system block for a no-effort (budget-only mock) model — cache wrapping precedes the effort branch', async () => {
         mockStream.mockReturnValueOnce(
             makeStream({
                 stop_reason: 'end_turn',
@@ -753,7 +803,7 @@ describe('callClaude — analyze path prompt-cache construction (design C)', () 
         });
 
         const call = mockStream.mock.calls[0][0];
-        // haiku has no adaptive-thinking branch, but the system prompt is still
+        // the budget-only mock has no adaptive-thinking branch, but the system prompt is still
         // wrapped in a cache_control block — caching is independent of effort.
         expect(call.system).toEqual([
             {

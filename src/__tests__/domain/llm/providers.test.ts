@@ -8,12 +8,12 @@ describe('getProviderForModel', () => {
             expect(getProviderForModel('gemini-3.6-flash')).toBe('google');
         });
 
-        it('returns anthropic for claude-haiku-4-5', () => {
-            expect(getProviderForModel('claude-haiku-4-5')).toBe('anthropic');
+        it('returns anthropic for claude-haiku-5-5', () => {
+            expect(getProviderForModel('claude-haiku-5-5')).toBe('anthropic');
         });
 
-        it('returns openai for gpt-5.6-luna', () => {
-            expect(getProviderForModel('gpt-5.6-luna')).toBe('openai');
+        it('returns openai for gpt-6-luna', () => {
+            expect(getProviderForModel('gpt-6-luna')).toBe('openai');
         });
 
         it('returns deepseek for deepseek-v4.1-flash', () => {
