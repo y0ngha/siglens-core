@@ -497,7 +497,6 @@ limit error) is defined in `application/` or `infrastructure/`, not `domain/`. T
 holds only the error cases of its own pure validation.
 
 <a id="DOM-10"></a>
-
 #### DOM-10 — Sufficiency gates count only usable evidence, under one as-of rule
 
 An axis (or input group) is "sufficient" only when it holds evidence the consumer can act on:
