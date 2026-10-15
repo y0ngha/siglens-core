@@ -1,5 +1,12 @@
 # Changelog
 
+# [2.18.0](https://github.com/y0ngha/siglens-core/compare/v2.17.0...v2.18.0) (2026-10-15)
+
+### Features
+
+* 공개 API 키 정책(byok-only) 옵션 추가 ([#274](https://github.com/y0ngha/siglens-core/issues/274)) ([509b411](https://github.com/y0ngha/siglens-core/commit/509b4117fada0625cc316dda9d862640a5853156))
+* 수급(투자자 흐름) 분석 추가 ([#273](https://github.com/y0ngha/siglens-core/issues/273)) ([8178c97](https://github.com/y0ngha/siglens-core/commit/8178c979b1375cf8c04ea7d9573c183c8bbe765c))
+
 # [2.17.0](https://github.com/y0ngha/siglens-core/compare/v2.16.2...v2.17.0) (2026-10-15)
 
 ### Features
