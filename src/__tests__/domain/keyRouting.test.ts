@@ -9,7 +9,7 @@ import type { ActiveModelId } from '@/domain/types';
 /** Free class — server key for everyone, anonymous included. */
 const FREE_MODEL: ActiveModelId = 'gemini-3.6-flash';
 /** Member class — server key, but sign-in required. */
-const MEMBER_MODEL: ActiveModelId = 'claude-sonnet-5';
+const MEMBER_MODEL: ActiveModelId = 'claude-sonnet-5-5';
 /** Byok class — the caller's own key on any non-pro tier. */
 const BYOK_MODEL: ActiveModelId = 'claude-opus-5';
 

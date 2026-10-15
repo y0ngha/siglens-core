@@ -123,9 +123,16 @@ export async function callClaude(
     // 이 요청이 실제로 thinking을 보내는지 — 스펙이 아니라 **해석된 상태**로 판정한다.
     // adaptive 모델이라도 추론 OFF면 thinking 블록을 보내지 않으므로, 아래
     // tool_choice 제약이 걸리지 않는다.
+    //
+    // `between_tools`는 API가 thinking 꺼짐으로 취급하지만(스키마 툴 호출에서도 thinking
+    // 블록 없음, 실측) 여기서는 thinking 활성으로 분류해 tool_choice를 `auto`로 둔다. 실측(2026-10-15): claude-sonnet-5-5는
+    // `between_tools`와 함께든 아니든 forced tool_choice(`tool`/`any`)를 400
+    // ("not supported for this model")으로 거부하고, `auto`에서는 tool_use로 정상 응답한다.
+    // 같은 세대의 opus-5-5·fable-5-1도 forced를 거부하지만 둘은 thinking을 끌 수 없어
+    // (off가 adaptive) 항상 이 `auto` 경로를 탄다. haiku-5-5는 `disabled`에서 forced를 받는다.
     const thinkingActive =
         adaptiveConfig !== undefined
-            ? adaptiveConfig.mode === 'adaptive'
+            ? adaptiveConfig.mode !== 'disabled'
             : budgetThinking;
 
     // PR5a — tool_choice 강제 여부는 thinking 지원 여부로 갈린다.
@@ -202,26 +209,39 @@ export async function callClaude(
                 }),
                 // thinking은 schema 유무와 독립적으로 thinkingApi로만 결정된다.
                 ...(adaptiveConfig !== undefined
-                    ? adaptiveConfig.mode === 'disabled'
+                    ? adaptiveConfig.mode === 'between_tools'
                         ? {
-                              // 추론 OFF — Free·Member 등급 adaptive 모델의 기본값.
-                              // `effort: 'low'`로 낮추는 것과 다르다: low는 여전히
-                              // 사고 토큰을 쓴다.
-                              //
-                              // ⚠️ Opus 5는 `disabled`를 effort `high` 이하에서만
-                              // 허용한다(xhigh/max와 함께 보내면 400). 여기서는
-                              // disabled일 때 output_config을 아예 보내지 않으므로
-                              // 충돌하지 않는다.
-                              thinking: { type: 'disabled' as const },
-                          }
-                        : {
+                              // Sonnet 5.5의 추론 OFF — `disabled`는 400이고 에러
+                              // 메시지가 이 값을 쓰라고 안내한다. 다른 필드(`display`,
+                              // `budget_tokens`)와 함께 보낼 수 없고 effort `high` 이하
+                              // 에서만 허용되므로 `output_config`는 보내지 않는다.
+                              // SDK 타입(0.128)에 아직 없어 단언한다.
                               thinking: {
-                                  type: 'adaptive' as const,
-                                  // 응답에 thinking 블록을 포함하지 않아 전송량을 줄인다.
-                                  display: 'omitted' as const,
-                              },
-                              output_config: { effort: adaptiveConfig.effort },
+                                  type: 'between_tools',
+                              } as unknown as Anthropic.Messages.ThinkingConfigParam,
                           }
+                        : adaptiveConfig.mode === 'disabled'
+                          ? {
+                                // 추론 OFF — Free·Member 등급 adaptive 모델의 기본값.
+                                // `effort: 'low'`로 낮추는 것과 다르다: low는 여전히
+                                // 사고 토큰을 쓴다.
+                                //
+                                // ⚠️ Opus 5는 `disabled`를 effort `high` 이하에서만
+                                // 허용한다(xhigh/max와 함께 보내면 400). 여기서는
+                                // disabled일 때 output_config을 아예 보내지 않으므로
+                                // 충돌하지 않는다.
+                                thinking: { type: 'disabled' as const },
+                            }
+                          : {
+                                thinking: {
+                                    type: 'adaptive' as const,
+                                    // 응답에 thinking 블록을 포함하지 않아 전송량을 줄인다.
+                                    display: 'omitted' as const,
+                                },
+                                output_config: {
+                                    effort: adaptiveConfig.effort,
+                                },
+                            }
                     : {
                           // haiku: pre-4.6 extended thinking — budget_tokens 경로.
                           // budget 0이면 thinking 블록을 생략한다.

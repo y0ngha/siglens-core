@@ -22,7 +22,7 @@ function resolveTierOrDefault(tier: Tier | undefined): Tier {
  *
  * ⚠️ Do NOT reimplement this as `isFreeModel(model) || tier === 'pro'`. That
  * was the pre-three-way-axis form, and it charges member-class models to the
- * caller's key — a member requesting `claude-sonnet-5` would be told
+ * caller's key — a member requesting `claude-sonnet-5-5` would be told
  * "User API key required" for a model the server pays for. Key routing must
  * go through {@link requiresByokKey}, which is the only classifier that knows
  * the `'member'` class exists.

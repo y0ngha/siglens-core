@@ -96,7 +96,7 @@ describe('callAnalysisAi — 키 라우팅', () => {
         await expect(
             callAnalysisAi({
                 prompt: 'p',
-                model: 'claude-sonnet-5',
+                model: 'claude-sonnet-5-5',
                 tier: 'member',
             })
         ).resolves.toBeDefined();

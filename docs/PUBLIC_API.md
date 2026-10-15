@@ -1,5 +1,41 @@
 # Public API Boundary
 
+> ⚠️ **모델 로스터 교체: 신규 7종 추가, 구 4종 퇴역 (API-5 예외, 2026-10-15)**
+>
+> 신규 7종(`claude-haiku-5-5`, `claude-sonnet-5-5`, `claude-opus-5-5`,
+> `gemini-4-argon`, `gpt-6-luna`, `gpt-6-sol`, `gpt-6.1-sol`)을 추가하고, 더 싸고
+> 새로운 후속 모델이 생긴 구 4종을 `TierModel` / `ModelId` / `ActiveModelId`,
+> `MODEL_SPECS`, `TIER_CONFIG.models`에서 `@deprecated` 이행 없이 지운다.
+> `PUBLIC_API.md#API-5`의 예외이며 근거는 0.60.0 및 `gemini-3.7-flash` 퇴역과 같다.
+> 사용자가 대체를 결정했다.
+>
+> | 퇴역 | 후속 | 등급 |
+> |---|---|---|
+> | `claude-haiku-4-5` | `claude-haiku-5-5` | free |
+> | `gpt-5.6-luna` | `gpt-6-luna` | free |
+> | `claude-sonnet-5` | `claude-sonnet-5-5` | member |
+> | `gpt-5.6-terra` | `gpt-6-sol` | member |
+>
+> 신규 중 후속이 없는 3종(`claude-opus-5-5`, `gpt-6.1-sol`, `gemini-4-argon`)은 byok에
+> 추가만 한다. core는 후속 매핑을 export하지 않으며(새 공개 API를 만들지 않는다) 위 표는
+> 문서일 뿐이다 — 이행은 소비자 몫이다.
+>
+> 1. **union 멤버를 남기면 컴파일 에러가 런타임 에러로 바뀐다.** 퇴역 id를
+>    `@deprecated`로 되살리거나 `TIER_CONFIG.models`에서만 빼면 `getModelAccess`가 그
+>    id에서 throw한다. 3.7-flash 퇴역 때와 같은 이유로 둘 다 삭제보다 나쁘다.
+> 2. **소비자가 전부 내부 레포다.** `siglens`는 이 릴리스와 같은 작업에서 저장된
+>    선택값을 위 표대로 옮긴다. `siglens-trader`(2.0.1)와 `siglens-worker`(0.40.0)는
+>    옛 버전에 고정돼 있어 버전을 올릴 때까지 영향이 없다(trader `Settings.tsx` 모델
+>    목록에 퇴역 id가 있으면 올릴 때 함께 고칠 것).
+> 3. **`ClaudeAdaptiveReasoningConfig`에 `{ mode: 'between_tools' }`가 추가됐다**
+>    (additive union 확장). `claude-sonnet-5-5`가 `thinking: {type:'disabled'}`를 400으로
+>    거부하며 이 값을 쓰라고 안내하기 때문이다. effort 필드가 없다(API가 다른 필드와의
+>    조합을 허용하지 않는다). 이 union으로 `switch (config.mode)`를 하던 소비자는 분기를
+>    추가해야 한다. 마지막 `claude-haiku-4-5` 퇴역으로 `thinkingApi: 'budget'` 행이
+>    레지스트리에 없어졌지만 `ClaudeBudgetModelSpec`과 가드는 타입 계약으로 남긴다.
+>
+> 이 예외도 이번 변경에 한정한다.
+
 > ⚠️ **`gemini-3.7-flash` 퇴역 (API-5 예외, 2026-10-11)**
 >
 > Google이 2026-10 `gemini-3.7-flash`의 지원을 종료하고 모든 요청을
@@ -21,7 +57,7 @@
 >
 > 설계 문서: `docs/superpowers/specs/2026-09-06-model-tier-restructure-design.md`
 >
-> **모델 레지스트리** — 16개로 재편(2026-10-11 `gemini-3.7-flash` 퇴역으로 현재 15개). 삭제 9개(`claude-sonnet-4-6`,
+> **모델 레지스트리** — 16개로 재편(2026-10-11 `gemini-3.7-flash` 퇴역으로 15개, 2026-10-15 로스터 교체로 현재 18개). 삭제 9개(`claude-sonnet-4-6`,
 > `claude-opus-4-7`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`,
 > `gemini-2.5-pro`, `gemini-3-flash-preview`, `gpt-5-mini`, `gpt-5.4`,
 > `gpt-5.5`), 신규 6개(`gpt-5.6-luna`, `gemini-3.7-flash`, `gemini-3.8-flash`,
@@ -982,3 +1018,4 @@ export { MODEL_REGISTRY } from '@/domain/…';
 | 2026-10-10 | **v2.16.0 (semver minor) — 미터형 전체 공개 정책 + `get_guide` 에이전트 툴 (additive).** (1) Tier 4 `MeteredRevealPolicy { dailySymbols, revealAs }` 신규, `TierConfig.meteredReveal?`(티어별 정책)·`TierFeatureFlags.enableMeteredReveal?` optional 필드 추가. 기본 `TIER_CONFIG`는 `free: { dailySymbols: 1, revealAs: 'member' }` + 플래그 `true`. Tier 2 `getMeteredRevealPolicy(tier, config?)`(플래그 off·정책 없음·`dailySymbols <= 0`이면 `null`), `buildRevealedTierConfig(tier, config?)`(`infoDepth[tier]`만 교체, 타임프레임·모델·한도·플래그는 같은 참조 유지). 분석 캐시 키에는 `tierConfig`가 들어가지 않는다 — 티어는 스킬 샘플링 계획(`createSkillSamplingPlan`)을 통해서만 키에 영향을 주므로 공개 요청은 같은 티어의 생성분을 재사용하고 마스킹만 달라진다. (2) `AGENT_TOOL_SPECS`에 `get_guide`(`{ query }`, costClass `free`) 추가 — 실행기는 siglens. 시스템 프롬프트 라우팅 표에 개념 설명 질문 → `get_guide` 줄과 출처 호칭 `guide` 추가, `AGENT_PROMPT_VERSION` → `2026-10-10.1`. |
 | 2026-10-10 | **에이전트 브랜드 표기를 답변 언어에 맞춤 (프롬프트 텍스트만, 시그니처 불변).** `AGENT_PROMPT_VERSION` → `2026-10-10.2`. `@internal` `AGENT_BRAND`(`domain/agent/promptShared.ts`)로 ko는 `시그렌즈`/`시그렌즈 AI`, en·ja·zh는 `SIGLENS`/`SIGLENS AI`를 프롬프트에 주입한다(모델이 철자를 고르지 않음). 출처 호칭(`… quotes / … guide`)과 한국어 출처 예시도 같은 이름을 쓴다. 분석 방식을 설명하는 문장·제목에서 브랜드를 주어로 쓰지 않게 하고(가이드의 `시그렌즈는 이렇게 찾아요` 같은 제목 포함) 답변 언어의 대체 예시를 준다 — 서비스 자체 소개는 예외. 실LLM A/B(14문항·4개 언어): 언어 불일치 표기 22→0, 브랜드 주어 문장 11→1(서비스 소개), 도구 선택 변화 없음. |
 | 2026-10-11 | **Gemini sampling 파라미터 제거 + `gemini-3.7-flash` 퇴역.** Google 공지(2026-10): Gemini 3.6 Flash부터 `temperature`/`top_p`/`top_k`는 기본값으로 고정돼 효과가 없고, 이후 모델은 이 값을 400으로 거부한다. 또 `gemini-3.7-flash`는 지원 종료되어 모든 요청이 `gemini-3.8-flash`로 자동 리다이렉트된다(가격 동일). (1) `GeminiModelSpec.temperature`가 `number` → `temperature?: undefined`(ChatGPT·adaptive Claude와 같은 모양)로 바뀌고, Gemini `MODEL_SPECS` 행에서 `temperature`가 빠졌다. `callGemini`는 `config.temperature`를 더 이상 보내지 않는다. 출력은 달라지지 않는다(3.6+에서 이미 무시되던 값). (2) `isTemperatureModelSpec`의 narrowing 결과가 `ClaudeBudgetModelSpec \| DeepSeekModelSpec`로 좁아졌다 — Gemini 스펙에는 `false`. (3) `TierModel`/`ModelId`/`ActiveModelId`와 `MODEL_SPECS`, `TIER_CONFIG.models`(member)에서 `'gemini-3.7-flash'`를 제거했다. ⚠️ **consumer 영향**: 저장된 `'gemini-3.7-flash'` 선택값(localStorage 등)은 allowlist 검증에서 탈락하므로 consumer가 `'gemini-3.8-flash'`로 옮겨 주는 것이 좋다. 해당 모델 id로 키가 잡힌 분석 캐시는 TTL로 자연 소멸한다. Gemini `spec.temperature`를 읽던 consumer 코드는 타입 에러가 난다. API-4 소비자 grep: `siglens` — 퇴역 id는 `modelDisplay`·`providerDefaults` 목록에만 있고 동반 PR에서 제거, Gemini `spec.temperature` 읽기 없음. `siglens-trader`(core 2.0.1 고정) — `src/pages/Settings.tsx` 모델 목록에 `'gemini-3.7-flash'`. `siglens-worker`(core 0.40.0 고정) — `src/gemini.ts`가 `spec.temperature`를 보낸다. 두 레포 모두 core를 올릴 때 함께 고칠 것. 소비자 조치: siglens는 동반 PR로 배선. 분석 캐시는 TTL까지 옛 모델 id 키를 유지한다. 공개 union 멤버 삭제(API-5 예외, 상단 배너 참조). 버전은 `yarn release --ci`가 커밋 타입으로 정한다. |
+| 2026-10-15 | **모델 로스터 교체: 신규 7종 추가, 구 4종 퇴역.** (1) `TierModel`/`ModelId`/`ActiveModelId`와 `MODEL_SPECS`에 `'claude-haiku-5-5'`, `'claude-sonnet-5-5'`, `'claude-opus-5-5'`, `'gemini-4-argon'`, `'gpt-6-luna'`, `'gpt-6-sol'`, `'gpt-6.1-sol'` 추가(additive). 배치: free `claude-haiku-5-5`·`gpt-6-luna`, member `claude-sonnet-5-5`·`gpt-6-sol`, byok `claude-opus-5-5`·`gemini-4-argon`·`gpt-6.1-sol`. 전부 `temperature` 없음, apiModelId = 키. (2) `ClaudeAdaptiveReasoningConfig`에 `{ mode: 'between_tools' }` 추가 — `callClaude`가 `thinking: {type:'between_tools'}`만 보내고 `output_config`는 보내지 않는다. `claude-sonnet-5-5`의 off 상태다(`disabled`는 400). 추론 사용 여부 판정(`thinkingActive`)은 `between_tools`를 활성으로 취급해 구조화 출력의 `tool_choice`를 `auto`로 둔다. (3) `'claude-haiku-4-5'`, `'gpt-5.6-luna'`, `'claude-sonnet-5'`, `'gpt-5.6-terra'`를 union·`MODEL_SPECS`·`TIER_CONFIG.models`에서 제거(후속: `claude-haiku-5-5`, `gpt-6-luna`, `claude-sonnet-5-5`, `gpt-6-sol`). ⚠️ **consumer 영향**: 저장된 퇴역 id 선택값은 allowlist 검증에서 탈락하므로 consumer가 후속 id로 옮겨 줘야 한다. 퇴역 id로 키가 잡힌 분석 캐시는 TTL로 자연 소멸한다. `ClaudeAdaptiveReasoningConfig`를 `mode`로 분기하던 consumer는 `'between_tools'` 분기를 추가해야 한다. API-4 소비자 grep: `siglens` — 동반 PR로 배선. `siglens-trader`(2.0.1)·`siglens-worker`(0.40.0)는 옛 core에 고정돼 있어 올릴 때 함께 고칠 것. 공개 union 멤버 삭제(API-5 예외, 상단 배너 참조). 버전은 `yarn release --ci`가 커밋 타입으로 정한다. |

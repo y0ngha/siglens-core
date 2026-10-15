@@ -51,9 +51,11 @@ const DEFAULT_TEMPERATURE = 0 as const;
  *   change the request and consumer UIs must disable it.
  *
  * Per-provider mapping:
- * - Claude `thinkingApi: 'budget'` (haiku): numeric `budget_tokens`; `0` disables.
- * - Claude `thinkingApi: 'adaptive'` (sonnet/opus/fable): `thinking.type` plus
- *   `output_config.effort`; no sampling temperature.
+ * - Claude `thinkingApi: 'budget'` (pre-4.6, no live row): numeric
+ *   `budget_tokens`; `0` disables.
+ * - Claude `thinkingApi: 'adaptive'` (haiku/sonnet/opus/fable 5+): `thinking.type`
+ *   plus `output_config.effort`; no sampling temperature. `{mode:'between_tools'}`
+ *   is the "off" of models that reject `disabled` (sonnet 5.5).
  * - Gemini: `thinkingConfig.thinkingLevel` string. The numeric `thinkingBudget`
  *   is NOT used — generation-3 models either reject it or ignore it silently.
  * - ChatGPT: `reasoning.effort` on the Responses API; no temperature.
@@ -61,9 +63,9 @@ const DEFAULT_TEMPERATURE = 0 as const;
  */
 export const MODEL_SPECS = {
     // ---------------------------------------------------------------- free
-    'gpt-5.6-luna': {
+    'gpt-6-luna': {
         provider: 'chatgpt',
-        apiModelId: 'gpt-5.6-luna',
+        apiModelId: 'gpt-6-luna',
         maxOutputTokens: 128_000,
         reasoning: {
             off: { effort: 'none' },
@@ -114,26 +116,20 @@ export const MODEL_SPECS = {
             default: 'off',
         },
     },
-    'claude-haiku-4-5': {
+    'claude-haiku-5-5': {
         provider: 'claude',
-        thinkingApi: 'budget',
-        // Older Claude models keep dated snapshot ids; the 4.6 generation
-        // onward uses the dateless id as its own pinned snapshot.
-        apiModelId: 'claude-haiku-4-5-20251001',
-        maxOutputTokens: 64_000,
-        temperature: DEFAULT_TEMPERATURE,
+        thinkingApi: 'adaptive',
+        // Dateless id, like the rest of the Claude 5 generation.
+        apiModelId: 'claude-haiku-5-5',
+        maxOutputTokens: 128_000,
+        // Unlike haiku 4.5 this model takes no sampling temperature (400
+        // "deprecated for this model") and can be toggled.
         reasoning: {
-            // haiku is the lowest-latency free model and is deliberately kept
-            // thinking-free. Enabling it would need a `budget_tokens >= 1024`
-            // path plus verification that extended thinking tolerates
-            // `temperature: 0` — for no product gain, since a user who wants
-            // reasoning should pick a stronger model. `toggleable: false`
-            // tells consumer UIs to disable the control rather than let a user
-            // flip a switch that changes nothing.
-            off: { budgetTokens: 0 },
-            on: { budgetTokens: 0 },
+            // `{type:'disabled'}` works, but only at effort `high` or lower;
+            // the adapter sends no `output_config` for it, so it never clashes.
+            off: { mode: 'disabled' },
+            on: { mode: 'adaptive', effort: 'high' },
             default: 'off',
-            toggleable: false,
         },
     },
 
@@ -173,28 +169,32 @@ export const MODEL_SPECS = {
             default: 'off',
         },
     },
-    'claude-sonnet-5': {
+    'claude-sonnet-5-5': {
         provider: 'claude',
         thinkingApi: 'adaptive',
         // The Claude 5 generation's ids are themselves the complete model id
         // Anthropic documents — appending a dated snapshot suffix 404s.
-        apiModelId: 'claude-sonnet-5',
-        // Sonnet 5 has adaptive thinking on by default, and thinking tokens
-        // share the max_tokens budget, so we request the model ceiling.
+        apiModelId: 'claude-sonnet-5-5',
+        // Thinking tokens share the max_tokens budget, so we request the
+        // model ceiling. No sampling temperature (400 "deprecated").
         maxOutputTokens: 128_000,
         reasoning: {
-            off: { mode: 'disabled' },
+            // Verified live 2026-10-15: `{type:'disabled'}` returns 400 and the
+            // message says to send `{type:'between_tools'}` instead. The API
+            // treats that mode as thinking disabled: a structured-output call
+            // with the schema tool returned no `thinking` block, so `off` is a
+            // real off (default `hardOff`).
+            off: { mode: 'between_tools' },
             on: { mode: 'adaptive', effort: 'high' },
             default: 'off',
         },
     },
-    'gpt-5.6-terra': {
+    'gpt-6-sol': {
         provider: 'chatgpt',
-        // The GPT-5.6 family pins explicit variant ids instead of the
-        // `gpt-5.6` alias (which routes to sol), because a provider can
-        // silently repoint an alias, and this repo binds analysis cache keys
-        // and response characteristics to the model id.
-        apiModelId: 'gpt-5.6-terra',
+        // Explicit variant id, never an alias: a provider can silently
+        // repoint an alias, and this repo binds analysis cache keys and
+        // response characteristics to the model id.
+        apiModelId: 'gpt-6-sol',
         maxOutputTokens: 128_000,
         reasoning: {
             off: { effort: 'none' },
@@ -253,6 +253,23 @@ export const MODEL_SPECS = {
             default: 'on',
         },
     },
+    'claude-opus-5-5': {
+        provider: 'claude',
+        thinkingApi: 'adaptive',
+        apiModelId: 'claude-opus-5-5',
+        maxOutputTokens: 128_000,
+        reasoning: {
+            // Verified live 2026-10-15: `{type:'disabled'}` returns 400 at
+            // every effort, so the floor is adaptive thinking at `low`.
+            //
+            // ⚠️ The API's default effort is `medium`, not `high`, so effort
+            // must always be sent explicitly — never rely on the default.
+            off: { mode: 'adaptive', effort: 'low' },
+            on: { mode: 'adaptive', effort: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
+    },
     'claude-fable-5-1': {
         provider: 'claude',
         thinkingApi: 'adaptive',
@@ -276,6 +293,32 @@ export const MODEL_SPECS = {
             // Unlike the 5.6 family, astra returns 400 for `effort: 'none'`.
             off: { effort: 'low' },
             on: { effort: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
+    },
+    'gpt-6.1-sol': {
+        provider: 'chatgpt',
+        apiModelId: 'gpt-6.1-sol',
+        maxOutputTokens: 128_000,
+        reasoning: {
+            // Verified live 2026-10-15: `effort: 'none'` returns 400; the API
+            // accepts low, medium, high, xhigh and max.
+            off: { effort: 'low' },
+            on: { effort: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
+    },
+    'gemini-4-argon': {
+        provider: 'gemini',
+        apiModelId: 'gemini-4-argon',
+        maxOutputTokens: 65_536,
+        reasoning: {
+            // Verified live 2026-10-15: rejects `minimal` with a 400 ("not
+            // supported for this model"); `low` and `high` work. Floor `low`.
+            off: { level: 'low' },
+            on: { level: 'high' },
             default: 'on',
             hardOff: false,
         },

@@ -812,7 +812,7 @@ describe('runAgentTurn', () => {
         const d = deps(p);
         d.counters.premiumTurns = memoryCounter(0);
         const r = await runAgentTurn(
-            params({ tier: 'free', model: 'claude-sonnet-5' }),
+            params({ tier: 'free', model: 'claude-sonnet-5-5' }),
             d
         );
         expect(r).toEqual({ ok: false, error: 'premium_turn_limit' });
@@ -824,7 +824,7 @@ describe('runAgentTurn', () => {
         const d = deps(p);
         d.counters.premiumTurns = unavailableCounter();
         const r = await runAgentTurn(
-            params({ tier: 'free', model: 'claude-sonnet-5' }),
+            params({ tier: 'free', model: 'claude-sonnet-5-5' }),
             d
         );
         expect(r).toEqual({ ok: false, error: 'server_busy' });
@@ -841,13 +841,13 @@ describe('runAgentTurn', () => {
             throw new Error('db down');
         });
         const d = deps(p, { usageLogs: { recordUsage } });
-        const r = await runAgentTurn(params({ model: 'claude-sonnet-5' }), d);
+        const r = await runAgentTurn(params({ model: 'claude-sonnet-5-5' }), d);
         expect(r.ok).toBe(true);
         expect(recordUsage).toHaveBeenCalledWith(
             expect.objectContaining({
                 userId: 'u1',
                 actionType: 'premium_model',
-                modelUsed: 'claude-sonnet-5',
+                modelUsed: 'claude-sonnet-5-5',
                 date: '2026-09-12',
             })
         );
@@ -868,7 +868,7 @@ describe('runAgentTurn', () => {
             { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
         ]);
         const d = deps(p, { usageLogs: undefined });
-        const r = await runAgentTurn(params({ model: 'claude-sonnet-5' }), d);
+        const r = await runAgentTurn(params({ model: 'claude-sonnet-5-5' }), d);
         expect(r.ok).toBe(true);
     });
 
@@ -891,7 +891,7 @@ describe('runAgentTurn', () => {
         );
         const d = deps(p);
         const r = await runAgentTurn(
-            params({ tier: 'pro', model: 'claude-sonnet-5' }),
+            params({ tier: 'pro', model: 'claude-sonnet-5-5' }),
             d
         );
         expect(r).toEqual({ ok: false, error: 'rate_limited' });

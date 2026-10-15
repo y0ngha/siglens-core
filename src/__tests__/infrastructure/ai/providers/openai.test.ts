@@ -102,10 +102,10 @@ describe('callChatGPT', () => {
         });
     });
 
-    it("passes the spec's default effort for gpt-5.6-luna", async () => {
+    it("passes the spec's default effort for gpt-6-luna", async () => {
         mockCreate.mockResolvedValueOnce({ ...SUCCESS, output_text: 'ok' });
 
-        await callChatGPT('prompt', { model: 'gpt-5.6-luna', apiKey: 'key' });
+        await callChatGPT('prompt', { model: 'gpt-6-luna', apiKey: 'key' });
 
         // Free-class model → `reasoning.default: 'off'` → `effort: 'none'`.
         expect(mockCreate.mock.calls[0][0].reasoning).toEqual({

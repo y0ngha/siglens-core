@@ -53,11 +53,11 @@ const MEMBER_INFO_DEPTH: readonly TierInfoDepth[] = [...PRO_INFO_DEPTH];
 
 /** 서버 키로 대납하며 비회원도 호출할 수 있는 모델. */
 const FREE_MODELS: readonly TierModel[] = [
-    'gpt-5.6-luna',
+    'gpt-6-luna',
     'gemini-3.5-flash-lite',
     'deepseek-v4.1-flash',
     'gemini-3.6-flash',
-    'claude-haiku-4-5',
+    'claude-haiku-5-5',
 ];
 
 /**
@@ -70,8 +70,8 @@ const FREE_MODELS: readonly TierModel[] = [
 const MEMBER_MODELS: readonly TierModel[] = [
     'gemini-3.8-flash',
     'deepseek-v4.1-pro',
-    'claude-sonnet-5',
-    'gpt-5.6-terra',
+    'claude-sonnet-5-5',
+    'gpt-6-sol',
     'gemini-3.1-pro-preview',
 ];
 
@@ -87,8 +87,11 @@ const BYOK_MODELS: readonly TierModel[] = [
     'gpt-5.6-sol',
     'claude-opus-4-8',
     'claude-opus-5',
+    'claude-opus-5-5',
     'claude-fable-5-1',
     'gpt-6-astra',
+    'gpt-6.1-sol',
+    'gemini-4-argon',
 ];
 
 /** 등급별 누적 허용 목록 — 상위 등급은 하위 등급 모델을 모두 포함한다. */
