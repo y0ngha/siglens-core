@@ -1,4 +1,8 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
+import {
+    assertByokOnlyKeyPresent,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import type {
@@ -63,7 +67,10 @@ async function fetchSnapshot(
  * catalog, so the cache key carries no skill fingerprint.
  *
  * Investor flows data is public: there is no usage-limit gate and no BYOK-required
- * check — tier gating for `modelId` is the caller's responsibility. The cache
+ * check — tier gating for `modelId` is the caller's responsibility. With
+ * `options.keyPolicy: 'byok-only'` a missing key throws
+ * `UserApiKeyMissingError` after the cache read (a cached result is still
+ * served keyless) and before the snapshot fetch. The cache
  * key folds `reasoning`, `locale` and `includeFinraData`, and the seed folds
  * `reasoning` (so the toggles never share an entry).
  *
@@ -75,6 +82,8 @@ async function fetchSnapshot(
  * @returns `cached`, `done` (with the scorecard it interpreted),
  *   `miss_no_trigger`, `no_data` (no snapshot, or every axis insufficient) or
  *   `error` (`fetch_failed`).
+ * @throws {UserApiKeyMissingError} When `options.keyPolicy` is `'byok-only'`
+ *   and `options.userApiKey` is missing or empty on a cache miss.
  * @throws If the AI provider call fails (network, 5xx, abort).
  */
 export async function runInvestorFlowsAnalysis(
@@ -113,6 +122,10 @@ export async function runInvestorFlowsAnalysis(
 
     if (options.skipEnqueueIfMiss) return { status: 'miss_no_trigger' };
 
+    // byok-only: a missing key fails here — after the cache read (a cached
+    // result is still served keyless), before the snapshot fetch or Redis lock.
+    assertByokOnlyKeyPresent(options.keyPolicy, options.userApiKey);
+
     const fetched = await fetchSnapshot(dataProvider, symbol);
     if (fetched.status === 'error') return fetched;
     const { snapshot } = fetched;
@@ -150,6 +163,7 @@ export async function runInvestorFlowsAnalysis(
                 model: callModelId,
                 tier,
                 userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal: options.signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -160,7 +174,14 @@ export async function runInvestorFlowsAnalysis(
                 reasoning: options.reasoning,
                 correlationId: `${symbol}:investorFlows`,
             }),
-        { signal: options.signal }
+        {
+            signal: options.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // normalize parses fences/garbage itself; parsing here would let a non-JSON

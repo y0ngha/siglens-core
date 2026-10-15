@@ -1,5 +1,6 @@
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
+import type { KeyPolicy } from '@/domain/keyRouting';
 import type { InvestorFlowsDataProvider } from '@/domain/ports/investorFlowsDataProvider';
 import type {
     ModelId,
@@ -34,6 +35,18 @@ export interface RunInvestorFlowsAnalysisOptions extends BackgroundTaskOptions {
     locale?: AnalysisLocale;
     /** BYOK API key forwarded to the AI call. */
     userApiKey?: string;
+    /**
+     * Which key pays for generation. Default `'tier'` (free/member models on
+     * the server key, byok-class models on `userApiKey`). `'byok-only'` makes
+     * every generation use `userApiKey` regardless of model or tier, throws
+     * `UserApiKeyMissingError` when it is missing, disables the server-key
+     * `providerFallback`, and never reads a server key. Not part of any cache
+     * key, so results are shared across policies; a cache hit is served even
+     * without a key (the key gate runs after the cache read, before the
+     * snapshot fetch or provider call), and concurrent byok-only runs only join
+     * runs on the same key. See {@link KeyPolicy}.
+     */
+    keyPolicy?: KeyPolicy;
     /** Aborts the in-flight AI call. */
     signal?: AbortSignal;
     /** Retry a failed server-key DeepSeek generation once on the fallback model. */
