@@ -124,12 +124,17 @@ export async function callClaude(
     // adaptive 모델이라도 추론 OFF면 thinking 블록을 보내지 않으므로, 아래
     // tool_choice 제약이 걸리지 않는다.
     //
-    // `between_tools`는 API가 thinking 꺼짐으로 취급하지만(스키마 툴 호출에서도 thinking
-    // 블록 없음, 실측) 여기서는 thinking 활성으로 분류해 tool_choice를 `auto`로 둔다. 실측(2026-10-15): claude-sonnet-5-5는
-    // `between_tools`와 함께든 아니든 forced tool_choice(`tool`/`any`)를 400
-    // ("not supported for this model")으로 거부하고, `auto`에서는 tool_use로 정상 응답한다.
-    // 같은 세대의 opus-5-5·fable-5-1도 forced를 거부하지만 둘은 thinking을 끌 수 없어
-    // (off가 adaptive) 항상 이 `auto` 경로를 탄다. haiku-5-5는 `disabled`에서 forced를 받는다.
+    // ⚠️ 이 변수는 "API가 thinking을 켰는가"가 아니라 "forced tool_choice를 피해야 하는가"다.
+    // `between_tools`가 그 차이가 드러나는 경우다. API는 이 모드를 thinking 꺼짐으로
+    // 취급하지만(스키마 툴 호출에서도 thinking 블록 없음), 여기서는 활성으로 분류해
+    // tool_choice를 `auto`로 둔다.
+    //
+    // 실측(2026-10-15):
+    // - claude-sonnet-5-5는 `between_tools`와 함께든 아니든 forced tool_choice(`tool`/`any`)를
+    //   400("not supported for this model")으로 거부하고, `auto`에서는 tool_use로 응답한다.
+    // - opus-5-5·fable-5-1도 forced를 거부하지만 thinking을 끌 수 없어(off가 adaptive)
+    //   항상 이 `auto` 경로를 탄다.
+    // - haiku-5-5는 `disabled`에서 forced를 받는다.
     const thinkingActive =
         adaptiveConfig !== undefined
             ? adaptiveConfig.mode !== 'disabled'
@@ -215,7 +220,9 @@ export async function callClaude(
                               // 메시지가 이 값을 쓰라고 안내한다. 다른 필드(`display`,
                               // `budget_tokens`)와 함께 보낼 수 없고 effort `high` 이하
                               // 에서만 허용되므로 `output_config`는 보내지 않는다.
-                              // SDK 타입(0.128)에 아직 없어 단언한다.
+                              // SDK 타입(0.128)에 아직 없어 단언한다. 런타임 안전 근거:
+                              // 2026-10-15 실측에서 API가 정확히 이 형태를 받았다(200,
+                              // 툴 유무 모두). SDK가 이 값을 타입에 넣으면 단언을 지운다.
                               thinking: {
                                   type: 'between_tools',
                               } as unknown as Anthropic.Messages.ThinkingConfigParam,

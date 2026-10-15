@@ -127,6 +127,8 @@ export const MODEL_SPECS = {
         reasoning: {
             // `{type:'disabled'}` works, but only at effort `high` or lower;
             // the adapter sends no `output_config` for it, so it never clashes.
+            // `on` is a separate request: raising its effort past `high` later
+            // does not touch this constraint.
             off: { mode: 'disabled' },
             on: { mode: 'adaptive', effort: 'high' },
             default: 'off',
