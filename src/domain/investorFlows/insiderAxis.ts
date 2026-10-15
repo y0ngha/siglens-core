@@ -90,6 +90,8 @@ function sumValue(
 /**
  * Largest number of distinct insiders whose buys fall within one cluster span.
  * `buys` must be sorted by day ascending; a two-pointer sweep keeps it linear.
+ * The mutable `start`/`best` cursors are deliberate: a reduce over every
+ * window start would be O(n²), and this runs once per symbol per snapshot.
  */
 function largestBuyCluster(buys: readonly DatedTransaction[]): number {
     const counts = new Map<string, number>();

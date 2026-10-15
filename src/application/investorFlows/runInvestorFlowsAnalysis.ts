@@ -129,6 +129,11 @@ export async function runInvestorFlowsAnalysis(
     const fetched = await fetchSnapshot(dataProvider, symbol);
     if (fetched.status === 'error') return fetched;
     const { snapshot } = fetched;
+    // `no_data` is not cached (INF-10 trade-off): a symbol without data refetches
+    // its snapshot on every call. The snapshot provider is the consumer's own
+    // cached DB read, so a repeat is cheap, and a negative cache here would
+    // hide data that lands after the next 13F/FINRA ingest. Revisit if the
+    // provider becomes a remote call.
     if (snapshot === null) return { status: 'no_data' };
 
     const scorecard = evaluateInvestorFlows(snapshot, { includeFinraData });

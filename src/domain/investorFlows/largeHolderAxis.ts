@@ -164,6 +164,8 @@ export function evaluateLargeHolderAxis(
 
     // One pass in date order, remembering each filer's latest filing per
     // schedule, so finding the "previous" stake is O(1) instead of a re-scan.
+    // The loop mutates a Map on purpose: an immutable rebuild per filing would
+    // turn this linear pass into O(n²) for no readability gain.
     const lastByFiler = new Map<string, ParsedFiling>();
     const inWindow: WindowedFiling[] = [];
     for (const current of parsed) {
