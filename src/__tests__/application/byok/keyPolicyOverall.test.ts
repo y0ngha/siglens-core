@@ -317,6 +317,73 @@ describe('runOverallAnalysis — keyPolicy: byok-only', () => {
         }
     );
 
+    it('a keyless cache probe is served a cached overall entry', async () => {
+        mockCreateCacheProvider.mockReturnValue({
+            get: vi.fn((k: string) => {
+                cacheGets.push(k);
+                return Promise.resolve(
+                    k.includes(':analysis:overall:') ? overallResult : null
+                );
+            }),
+            set: vi.fn(() => Promise.resolve(undefined)),
+            delete: vi.fn(),
+        });
+        mockTechnical.mockResolvedValue({
+            status: 'cached',
+            result: technicalResult,
+        });
+        mockNews.mockResolvedValue({ status: 'cached', result: newsResult });
+        mockFundamental.mockResolvedValue({
+            status: 'cached',
+            result: fundamentalResult,
+        });
+        mockOptions.mockResolvedValue({
+            status: 'cached',
+            result: optionsResult,
+        });
+
+        const result = await runOverallAnalysis(
+            options({
+                modelId: 'claude-opus-5',
+                tier: 'free',
+                keyPolicy: 'byok-only',
+                skipEnqueueIfMiss: true,
+            })
+        );
+
+        expect(result).toMatchObject({ status: 'cached' });
+        expect(dispatchKeys()).toHaveLength(0);
+        expect(mockResolveServerApiKey).not.toHaveBeenCalled();
+    });
+
+    it('a keyless cache probe ends at miss_no_trigger on a miss, with no provider call', async () => {
+        const result = await runOverallAnalysis(
+            options({
+                modelId: 'claude-opus-5',
+                tier: 'free',
+                keyPolicy: 'byok-only',
+                skipEnqueueIfMiss: true,
+            })
+        );
+
+        expect(result).toEqual({ status: 'miss_no_trigger' });
+        expect(dispatchKeys()).toHaveLength(0);
+        expect(mockResolveServerApiKey).not.toHaveBeenCalled();
+    });
+
+    it('the default policy still denies a keyless byok-class probe up front', async () => {
+        const result = await runOverallAnalysis(
+            options({
+                modelId: 'claude-opus-5',
+                tier: 'free',
+                skipEnqueueIfMiss: true,
+            })
+        );
+
+        expect(result).toMatchObject({ status: 'key_error' });
+        expect(mockTechnical).not.toHaveBeenCalled();
+    });
+
     it('does not fall back to Gemini on a DeepSeek failure even when requested', async () => {
         vi.mocked(callDeepSeekWithRetry).mockRejectedValue(
             Object.assign(new Error('upstream down'), { status: 503 })

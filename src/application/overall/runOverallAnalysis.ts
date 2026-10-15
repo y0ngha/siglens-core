@@ -37,6 +37,7 @@ import {
     computeFearGreedIndex,
     fearGreedInputs,
 } from '@/domain/indicators/fearGreed';
+import { isByokOnly } from '@/domain/keyRouting';
 import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
 import { DEFAULT_TIER, isTimeframeAllowed, TIER_CONFIG } from '@/domain/tier';
 import type {
@@ -170,7 +171,15 @@ export async function runOverallAnalysis(
     }
 
     // ── 1. BYOK gate for overall job's own AI call ──
+    // A byok-only cache probe (`skipEnqueueIfMiss`) skips this early gate: every
+    // axis and the overall step then end at `miss_no_trigger` on a miss, so no
+    // provider call can happen, and a cached overall entry is served keyless —
+    // the same contract as the single-axis use-cases. A generating byok-only
+    // call still fails fast here, before the axes run.
     if (
+        !(
+            isByokOnly(options.keyPolicy) && options.skipEnqueueIfMiss === true
+        ) &&
         isUserApiKeyGateDenied(
             tier,
             modelId,
