@@ -1,3 +1,7 @@
+import {
+    assertByokOnlyKeyPresent,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
@@ -79,19 +83,30 @@ async function fetchProviderData(
  * **no BYOK-required check** — tier gating for `modelId` is the caller's
  * (siglens) responsibility, consistent with the submit/poll contract. The
  * optional `options.userApiKey` is forwarded to `callAnalysisAi` unchanged.
+ * With `options.keyPolicy: 'byok-only'` a missing key throws
+ * `UserApiKeyMissingError` (this function has no `key_error` result variant),
+ * after the cache read and before the trade fetch.
  *
  * Skills are loaded once via {@link loadSkillsCached} and used for both the
  * sampling plan (cache-key fingerprint + prompt assembly) — a single load
  * replaces the split across submit and poll.
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
  * @throws If the AI provider call fails (network, 5xx, abort). All other
  *   outcomes are returned as discriminated-union variants.
+ * @throws {UserApiKeyMissingError} When `options.keyPolicy` is `'byok-only'`
+ *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
+ *   Thrown after the cache read — a cached result is still returned keyless —
+ *   and before any data fetch, Redis lock or provider call.
  *
  * @see submitCongressTrend — the queued predecessor; still exported for
  *   the existing production path until siglens switches to runCongressTrend.
@@ -143,6 +158,10 @@ export async function runCongressTrend(
         return { status: 'miss_no_trigger' };
     }
 
+    // byok-only: a missing key fails here — after the cache read (a cached
+    // result is still served keyless), before any data fetch or Redis lock.
+    assertByokOnlyKeyPresent(options.keyPolicy, options.userApiKey);
+
     const providerData = await fetchProviderData(dataProvider, symbol, limit);
     if (providerData.status === 'error') return providerData;
     const { trades } = providerData;
@@ -188,6 +207,7 @@ export async function runCongressTrend(
                 model: callModelId,
                 tier,
                 userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal: options.signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -196,7 +216,14 @@ export async function runCongressTrend(
                 reasoning: options.reasoning,
                 correlationId: `${symbol}:congress`,
             }),
-        { signal: options.signal }
+        {
+            signal: options.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // Inline post-processing (formerly in pollCongressTrend). No job queue involved.

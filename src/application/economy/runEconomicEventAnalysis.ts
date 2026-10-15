@@ -1,3 +1,7 @@
+import {
+    assertByokOnlyKeyPresent,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { GEMINI_FLASH_LITE_MODEL } from '@/application/chat/constants';
@@ -70,16 +74,26 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
  * `gemini-3.5-flash-lite` with reasoning off (short structured classification task).
  *
- * Economic-event analysis has no usage gate — no tier, no BYOK, no quota check
- * or record. The analysis is public-economy data, same as congress trade analysis.
+ * Economic-event analysis has no usage gate — no tier gate, no quota check or
+ * record, and by default no user key (fixed server-key model). With `keyPolicy:
+ * 'byok-only'` it runs on `userApiKey` instead. The analysis is public-economy
+ * data, same as congress trade analysis.
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
  * @throws {Error} If the AI provider call fails (network, 5xx, AbortError).
+ * @throws {UserApiKeyMissingError} When `options.keyPolicy` is `'byok-only'`
+ *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
+ *   Thrown after the cache read — a cached result is still returned keyless —
+ *   and before any data fetch, Redis lock or provider call.
  *
  */
 export async function runEconomicEventAnalysis(
@@ -107,6 +121,10 @@ export async function runEconomicEventAnalysis(
         }
     }
 
+    // byok-only: a missing key fails here — after the cache read (a cached
+    // result is still served keyless), before any data fetch or Redis lock.
+    assertByokOnlyKeyPresent(options?.keyPolicy, options?.userApiKey);
+
     // This builder has no skills catalog and no separate system prompt —
     // `stable` is always '' (Design C), so `prompt` is `dynamic` alone.
     const { dynamic } = buildEconomicEventAnalysisPrompt(input);
@@ -119,6 +137,8 @@ export async function runEconomicEventAnalysis(
             callAnalysisAi({
                 prompt,
                 model: ECONOMIC_EVENT_MODEL,
+                userApiKey: options?.userApiKey,
+                keyPolicy: options?.keyPolicy,
                 signal: options?.signal,
                 seed: analysisSeed(prompt),
                 // 짧은 구조화 분류(sentiment + 두 문장)라 추론 이득이 없다.
@@ -127,7 +147,14 @@ export async function runEconomicEventAnalysis(
                 reasoning: false,
                 correlationId: `economic-event:${input.event}`,
             }),
-        { signal: options?.signal }
+        {
+            signal: options?.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options?.keyPolicy,
+                options?.userApiKey
+            ),
+        }
     );
 
     // raw를 미리 JSON.parse하지 않는다 — 이 normalize 함수는 parseLlmPayload로

@@ -183,6 +183,53 @@ describe('dedupeGeneration', () => {
         expect(generate).toHaveBeenCalledTimes(1);
     });
 
+    it('(Worst) 락 승자(다른 inFlightKey)가 실패하면, 대기하던 호출자는 자기 키로 직접 생성한다', async () => {
+        const { provider } = createSharedStore();
+        let failWinner: (error: Error) => void = () => {};
+        const winnerGenerate = vi.fn(
+            () =>
+                new Promise<string>((_resolve, reject) => {
+                    failWinner = reject;
+                })
+        );
+        const waiterGenerate = vi.fn().mockResolvedValue(PEER_RAW);
+
+        // Same cacheKey (shared Redis lock), different in-process join key:
+        // a byok-only run on a bad key and a tier run on the server key.
+        const winner = dedupeGeneration(provider, KEY, winnerGenerate, {
+            ...FAST,
+            inFlightKey: `${KEY}:byok:abcdef0123456789`,
+        });
+        const settledWinner = winner.catch((error: unknown) => error as Error);
+        await vi.waitFor(() => expect(winnerGenerate).toHaveBeenCalled());
+        const waiter = dedupeGeneration(provider, KEY, waiterGenerate, FAST);
+        // The waiter did NOT join the winner's promise, and has not generated yet.
+        expect(waiterGenerate).not.toHaveBeenCalled();
+
+        failWinner(new Error('401 invalid key'));
+
+        await expect(waiter).resolves.toBe(PEER_RAW);
+        expect(((await settledWinner) as Error).message).toBe(
+            '401 invalid key'
+        );
+        expect(winnerGenerate).toHaveBeenCalledTimes(1);
+        expect(waiterGenerate).toHaveBeenCalledTimes(1);
+    });
+
+    it('(Edge) inFlightKey가 다르면 같은 cacheKey여도 프로세스 내에서 합류하지 않는다', async () => {
+        const generateA = vi.fn().mockResolvedValue(RAW);
+        const generateB = vi.fn().mockResolvedValue(PEER_RAW);
+
+        const [a, b] = await Promise.all([
+            dedupeGeneration(null, KEY, generateA, { inFlightKey: `${KEY}:a` }),
+            dedupeGeneration(null, KEY, generateB, { inFlightKey: `${KEY}:b` }),
+        ]);
+
+        expect([a, b]).toEqual([RAW, PEER_RAW]);
+        expect(generateA).toHaveBeenCalledTimes(1);
+        expect(generateB).toHaveBeenCalledTimes(1);
+    });
+
     it('(Worst) 피어 결과가 accept를 통과하지 못하면 한 번 직접 생성한다', async () => {
         const { put, provider } = createSharedStore();
         put(LOCK, 'peer-token');

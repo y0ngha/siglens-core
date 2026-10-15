@@ -1,7 +1,11 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
-import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import {
+    buildUserApiKeyRequiredError,
+    isUserApiKeyGateDenied,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildTimeframeNotAllowedError } from '@/application/market/types';
 import { runAnalysisForOverall } from '@/application/market/runAnalysis';
@@ -31,12 +35,7 @@ import {
     fearGreedInputs,
 } from '@/domain/indicators/fearGreed';
 import { pickNearestExpiration } from '@/domain/options/pickNearestExpiration';
-import {
-    DEFAULT_TIER,
-    isTimeframeAllowed,
-    requiresByokKey,
-    TIER_CONFIG,
-} from '@/domain/tier';
+import { DEFAULT_TIER, isTimeframeAllowed, TIER_CONFIG } from '@/domain/tier';
 import type {
     ActiveModelId,
     AnalysisResponse,
@@ -169,8 +168,13 @@ export async function runOverallAnalysis(
 
     // ── 1. BYOK gate for overall job's own AI call ──
     if (
-        requiresByokKey(tier, modelId, tierConfig) &&
-        options.userApiKey === undefined
+        isUserApiKeyGateDenied(
+            tier,
+            modelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
     ) {
         return buildUserApiKeyRequiredError(
             tier,
@@ -280,6 +284,7 @@ export async function runOverallAnalysis(
                   force: effectiveAxisForce,
                   signal,
                   providerFallback: options.providerFallback,
+                  keyPolicy: options.keyPolicy,
               })
             : Promise.resolve({
                   status: 'no_chains_error' as const,
@@ -312,6 +317,7 @@ export async function runOverallAnalysis(
               force: effectiveAxisForce,
               signal,
               providerFallback: options.providerFallback,
+              keyPolicy: options.keyPolicy,
           });
 
     const [technicalResult, fundamentalResult, newsResult, optionsResult] =
@@ -345,6 +351,7 @@ export async function runOverallAnalysis(
                     skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                     signal,
                     providerFallback: options.providerFallback,
+                    keyPolicy: options.keyPolicy,
                 }
             ),
             fundamentalRun,
@@ -373,6 +380,7 @@ export async function runOverallAnalysis(
                 force: effectiveAxisForce,
                 signal,
                 providerFallback: options.providerFallback,
+                keyPolicy: options.keyPolicy,
             }),
             optionsRun,
         ]);
@@ -720,6 +728,7 @@ export async function runOverallAnalysis(
                 model: callModelId,
                 tier,
                 userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -729,7 +738,14 @@ export async function runOverallAnalysis(
                 correlationId: `${symbol}:overall`,
             });
         },
-        { signal: signal }
+        {
+            signal: signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // ── 11. Normalize and cache ──

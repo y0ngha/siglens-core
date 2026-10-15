@@ -1,7 +1,11 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
-import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import {
+    buildUserApiKeyRequiredError,
+    isUserApiKeyGateDenied,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import {
     analysisSeed,
     hashAnalysisInput,
@@ -26,7 +30,7 @@ import { buildOptionsAnalysisPrompt } from '@/domain/options/optionsPrompt';
 import { OPTIONS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { optionsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import {
     buildOptionsCacheKey,
     OPTIONS_CACHE_TTL_SECONDS,
@@ -94,9 +98,13 @@ function hashOptionsInput(
  * An empty response (summary blank, no expirations, no signals) is logged as a
  * warning and still written to cache (matches `pollOptionsAnalysis` behaviour).
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Pass `options.signal` (e.g. `request.signal` from the SSE route handler)
  * so a dropped connection aborts the in-flight LLM call.
@@ -186,8 +194,13 @@ export async function runOptionsAnalysis(
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
     if (
-        requiresByokKey(tier, modelId, tierConfig) &&
-        options.userApiKey === undefined
+        isUserApiKeyGateDenied(
+            tier,
+            modelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
     ) {
         return buildUserApiKeyRequiredError(tier, modelId);
     }
@@ -244,6 +257,7 @@ export async function runOptionsAnalysis(
                 model: callModelId,
                 tier,
                 userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal: options.signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -252,7 +266,14 @@ export async function runOptionsAnalysis(
                 reasoning: options.reasoning,
                 correlationId: `${symbol}:options`,
             }),
-        { signal: options.signal }
+        {
+            signal: options.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // Inline post-processing (formerly in pollOptionsAnalysis). No job queue involved.

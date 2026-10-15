@@ -1,3 +1,4 @@
+import type { KeyPolicy } from '@/domain/keyRouting';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -80,6 +81,18 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      * When provided, forwarded to the worker as the X-AI-API-KEY header.
      */
     userApiKey?: string;
+    /**
+     * Which key pays for generation. Default `'tier'` (free/member models on
+     * the server key, byok-class models on `userApiKey`). `'byok-only'` makes
+     * every generation use `userApiKey` regardless of model or tier, returns
+     * the `key_error` result when it is missing, disables the server-key
+     * `providerFallback`, and never reads a server key. Not part of any cache
+     * key, so results are shared across policies; a cache hit is served even
+     * without a key (the key gate runs after the cache read, before any data
+     * fetch or provider call), and concurrent byok-only runs only join runs on
+     * the same key. See {@link KeyPolicy}.
+     */
+    keyPolicy?: KeyPolicy;
     /**
      * When `true`, skip enqueueing a new analysis job on cache miss and return
      * `{ status: 'miss_no_trigger' }` instead. Cache hits are unaffected and
@@ -218,6 +231,21 @@ export type PollNewsAnalysisResult =
 export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
     /** The raw news item to analyze. */
     item: NewsItem;
+    /**
+     * Caller's own provider key. Used only when `keyPolicy` is `'byok-only'`
+     * (this pipeline's fixed model is a free-class server-key model otherwise).
+     */
+    userApiKey?: string;
+    /**
+     * Which key pays for generation. Default `'tier'` (server key — this
+     * pipeline's model is free-class). `'byok-only'` uses `userApiKey` instead,
+     * throws `UserApiKeyMissingError` when it is missing, and never reads a
+     * server key. Not part of any cache key, so results are shared across policies; a
+     * cache hit is served even without a key (the key gate runs after the cache
+     * read, before any data fetch or provider call), and concurrent byok-only
+     * runs only join runs on the same key. See {@link KeyPolicy}.
+     */
+    keyPolicy?: KeyPolicy;
     /**
      * Cancellation signal for the in-flight LLM call (used by `runNewsCardAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection

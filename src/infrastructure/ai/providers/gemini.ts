@@ -1,3 +1,4 @@
+import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
 import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
@@ -28,15 +29,12 @@ const THINKING_LEVEL_TO_SDK: Record<GeminiThinkingLevel, ThinkingLevel> = {
     high: ThinkingLevel.HIGH,
 };
 
-const clientCache = new Map<string, GoogleGenAI>();
+const clientCache = createClientCache<GoogleGenAI>(
+    apiKey => new GoogleGenAI({ apiKey })
+);
 
 function getClient(apiKey: string): GoogleGenAI {
-    let client = clientCache.get(apiKey);
-    if (!client) {
-        client = new GoogleGenAI({ apiKey });
-        clientCache.set(apiKey, client);
-    }
-    return client;
+    return clientCache.get(apiKey);
 }
 
 export interface GeminiCallOptions {

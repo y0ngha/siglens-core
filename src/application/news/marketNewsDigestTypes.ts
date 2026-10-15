@@ -1,3 +1,4 @@
+import type { KeyPolicy } from '@/domain/keyRouting';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type {
@@ -73,6 +74,21 @@ export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
      * dispatching a worker job (preserves the bot cost guard).
      */
     force?: boolean;
+    /**
+     * Caller's own provider key. Used only when `keyPolicy` is `'byok-only'`
+     * (this pipeline's fixed model is a free-class server-key model otherwise).
+     */
+    userApiKey?: string;
+    /**
+     * Which key pays for generation. Default `'tier'` (server key — this
+     * pipeline's model is free-class). `'byok-only'` uses `userApiKey` instead,
+     * throws `UserApiKeyMissingError` when it is missing, and never reads a
+     * server key. Not part of any cache key, so results are shared across policies; a
+     * cache hit is served even without a key (the key gate runs after the cache
+     * read, before any data fetch or provider call), and concurrent byok-only
+     * runs only join runs on the same key. See {@link KeyPolicy}.
+     */
+    keyPolicy?: KeyPolicy;
     /**
      * Cancellation signal for the in-flight LLM call (used by `runMarketNewsDigest`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection

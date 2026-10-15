@@ -250,8 +250,14 @@ async function generateOnceAcrossInstances(
 
 /**
  * @internal
- * Run an expensive LLM generation at most once per `cacheKey` — within this
- * process AND across instances sharing the cache.
+ * Run an expensive LLM generation at most once per in-flight key — within this
+ * process AND across instances sharing the cache. The in-flight key is
+ * `options.inFlightKey`, defaulting to `cacheKey`: callers pass `cacheKey` under
+ * `keyPolicy: 'tier'` (so website callers share one run) and a per-key-hash
+ * scoped key under `'byok-only'` (so a run only ever serves callers on the same
+ * user key). Across instances the Redis lock and result keys derive from
+ * `cacheKey` alone, so a cross-instance waiter still coordinates with a winner
+ * on any key, and generates on its own key if that winner failed.
  *
  * In-process callers join one promise ({@link dedupeInFlight}). Across
  * instances, the first caller takes a Redis `SET NX` lock derived from
@@ -278,11 +284,13 @@ async function generateOnceAcrossInstances(
  * {@link GENERATION_LOCK_TTL_SECONDS}.
  *
  * @param cache - The cache provider the caller reads/writes `cacheKey` with.
- * @param cacheKey - The result's cache key; contention is scoped to it.
+ * @param cacheKey - The result's cache key; the cross-instance lock and
+ *   result keys are scoped to it.
  * @param generate - The LLM call. Runs at most once per winner; a waiter that
  *   receives the peer's output never calls it.
  * @param options - `signal` aborts a waiter's polling; wait/poll bounds; the
- *   `accept` check for shareable output.
+ *   `accept` check for shareable output; `inFlightKey` scopes the in-process
+ *   join (default `cacheKey`) without changing the cache or Redis keys.
  * @returns The raw LLM output — this caller's, or the winning peer's.
  */
 export function dedupeGeneration(
@@ -291,7 +299,7 @@ export function dedupeGeneration(
     generate: () => Promise<string>,
     options: GenerationDedupeOptions = {}
 ): Promise<string> {
-    return dedupeInFlight(cacheKey, () =>
+    return dedupeInFlight(options.inFlightKey ?? cacheKey, () =>
         generateOnceAcrossInstances(cache, cacheKey, generate, options)
     );
 }

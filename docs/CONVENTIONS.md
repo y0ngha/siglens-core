@@ -1096,6 +1096,10 @@ throws" or "dynamic TTL" are checked against the code, and each documented branc
 exception has a test. A claim that outlives a refactor misleads callers (a function split
 in two keeps describing both halves).
 
+When a contract changes (cache-hit semantics, error behavior, a default), grep for every JSDoc,
+doc table and sibling entry point that restates it and update them in the same change — a
+restatement left behind is the most common stale claim.
+
 For an optional field (`x?: T`), do not write "Required"; write "Must be provided when …".
 Tag requirements per tier are in [Required Tags by Tier](#required-tags-by-tier).
 

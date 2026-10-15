@@ -1,3 +1,7 @@
+import {
+    assertByokOnlyKeyPresent,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeInFlight } from '@/application/analysis/inFlight';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
@@ -55,18 +59,23 @@ export const NEWS_CARD_MODEL_ID = DEEPSEEK_V4_1_FLASH_MODEL;
  *    before calling this function.
  * 2. Persisting the result after this call returns.
  *
- * Concurrent calls for the same `item.id` are deduplicated via
- * {@link dedupeInFlight}: only one LLM call fires; all waiting callers
- * receive the same result.
+ * Concurrent calls sharing the same in-flight key (`item.id` + locale under
+ * `keyPolicy: 'tier'`; additionally the same `userApiKey`, scoped by a hash, under
+ * `'byok-only'`) are deduplicated via {@link dedupeInFlight}: only one LLM call
+ * fires; all waiting callers with that key receive the same result.
  *
- * Unlike the other run* functions, there is **no tier, usage, or BYOK gate**
- * — per-card analysis is a lightweight data-pipeline call, not a member
- * feature.
+ * Unlike the other run* functions, there is **no tier or usage gate** and, by
+ * default, no user key — per-card analysis is a lightweight data-pipeline call
+ * on the server key. With `keyPolicy: 'byok-only'` it runs on `userApiKey`
+ * instead. There is no cache, so that key gate is the first thing it does.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
- * @throws If the AI provider call fails (network, 5xx, abort). There are no
- *   gate denials to return — failures are always thrown.
+ * @throws If the AI provider call fails (network, 5xx, abort).
+ * @throws {UserApiKeyMissingError} When `options.keyPolicy` is `'byok-only'`
+ *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
+ *   Thrown before the prompt is built or any provider call (this function has no
+ *   cache).
  *
  * @see submitNewsCardAnalysis — the queued predecessor; still exported for
  *   the existing production path until siglens switches to runNewsCardAnalysis.
@@ -75,6 +84,10 @@ export async function runNewsCardAnalysis(
     options: SubmitNewsCardAnalysisOptions
 ): Promise<RunNewsCardAnalysisResult> {
     const { item } = options;
+
+    // byok-only: no cache here, so the key gate is the first thing — before
+    // the prompt is built or anything is joined or dispatched.
+    assertByokOnlyKeyPresent(options.keyPolicy, options.userApiKey);
 
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildNewsCardAnalysisPrompt(item, locale);
@@ -94,11 +107,17 @@ export async function runNewsCardAnalysis(
      * 요청이 오면 하나로 합쳐져 늦게 부른 쪽이 **요청하지 않은 언어**를 받는다.
      * 캐시 키와 같은 규약이라 ko는 접미가 없다.
      */
-    const inFlightKey = `news-card:${item.id}${localeKeySuffixFor(locale)}`;
+    const inFlightKey = resolveInFlightKey(
+        `news-card:${item.id}${localeKeySuffixFor(locale)}`,
+        options.keyPolicy,
+        options.userApiKey
+    );
     const raw = await dedupeInFlight(inFlightKey, () =>
         callAnalysisAi({
             prompt,
             model: NEWS_CARD_MODEL_ID,
+            userApiKey: options.userApiKey,
+            keyPolicy: options.keyPolicy,
             signal: options.signal,
             fallbackOnProviderFailure: options.providerFallback,
             system,
