@@ -14,11 +14,12 @@ import { isModelAllowed, requiresByokKey } from '@/domain/tier';
  *
  * `'byok-only'` changes ONLY who pays. It never changes what is generated or
  * how results are cached: the policy is deliberately absent from every cache
- * key and every Redis lock/result key (the in-process in-flight join key is
- * the one place it is scoped — see below), so a result produced on a user key and one produced on the
- * server key are the same entry. `tier` keeps its other meanings under
- * `'byok-only'` — timeframe access, info depth and skill sampling are still
- * derived from it — it just no longer decides the key.
+ * key and every Redis lock/result key, so a result produced on a user key and
+ * one produced on the server key are the same entry. The one place the policy
+ * is scoped is the in-process in-flight join key (see "In-flight sharing"
+ * below). `tier` keeps its other
+ * meanings under `'byok-only'` — timeframe access, info depth and skill
+ * sampling are still derived from it — it just no longer decides the key.
  *
  * **In-flight sharing.** The cache entry and the cross-instance Redis
  * lock/result keys are shared across policies, but the IN-PROCESS in-flight

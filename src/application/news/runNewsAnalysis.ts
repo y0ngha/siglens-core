@@ -2,7 +2,7 @@ import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import {
     buildUserApiKeyRequiredError,
-    isUserApiKeyGateDenied,
+    isUserApiKeyGateDeniedAt,
     resolveInFlightKey,
 } from '@/application/byok/gate';
 import type {
@@ -24,7 +24,6 @@ import {
 } from '@/domain/analysis/outputLocale';
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
-import { isByokOnly } from '@/domain/keyRouting';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import type {
     ActiveModelId,
@@ -136,8 +135,8 @@ export async function runNewsAnalysis(
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
     if (
-        !isByokOnly(options.keyPolicy) &&
-        isUserApiKeyGateDenied(
+        isUserApiKeyGateDeniedAt(
+            'before-cache',
             tier,
             modelId,
             tierConfig,
@@ -229,8 +228,8 @@ export async function runNewsAnalysis(
     // keyless), before any provider fetch or Redis lock. Under the default
     // policy the gate stays at the top, unchanged.
     if (
-        isByokOnly(options.keyPolicy) &&
-        isUserApiKeyGateDenied(
+        isUserApiKeyGateDeniedAt(
+            'after-cache',
             tier,
             modelId,
             tierConfig,

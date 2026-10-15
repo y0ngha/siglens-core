@@ -3,6 +3,7 @@ import {
     buildUserApiKeyRequiredError,
     assertByokOnlyKeyPresent,
     isUserApiKeyGateDenied,
+    isUserApiKeyGateDeniedAt,
     resolveInFlightKey,
 } from '@/application/byok/gate';
 import type { KeyPolicy } from '@/domain/keyRouting';
@@ -33,6 +34,40 @@ describe('buildUserApiKeyRequiredError', () => {
         const b = buildUserApiKeyRequiredError('free', 'claude-opus-5');
         expect(a.error).toBe(b.error);
         expect(a.error).toBe(USER_API_KEY_REQUIRED_MESSAGE);
+    });
+});
+
+describe('isUserApiKeyGateDeniedAt', () => {
+    const at = (
+        stage: 'before-cache' | 'after-cache',
+        keyPolicy: KeyPolicy | undefined,
+        userApiKey: string | undefined
+    ) =>
+        isUserApiKeyGateDeniedAt(
+            stage,
+            'free',
+            'claude-opus-5',
+            TIER_CONFIG,
+            userApiKey,
+            keyPolicy
+        );
+
+    it('default policy denies only before the cache read', () => {
+        expect(at('before-cache', undefined, undefined)).toBe(true);
+        expect(at('after-cache', undefined, undefined)).toBe(false);
+        expect(at('before-cache', 'tier', undefined)).toBe(true);
+        expect(at('after-cache', 'tier', undefined)).toBe(false);
+    });
+
+    it('byok-only denies only after the cache read', () => {
+        expect(at('before-cache', 'byok-only', undefined)).toBe(false);
+        expect(at('after-cache', 'byok-only', undefined)).toBe(true);
+        expect(at('after-cache', 'byok-only', '')).toBe(true);
+    });
+
+    it('never denies when a key is present', () => {
+        expect(at('before-cache', 'tier', 'sk-test')).toBe(false);
+        expect(at('after-cache', 'byok-only', 'sk-test')).toBe(false);
     });
 });
 

@@ -3,7 +3,7 @@ import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
 import {
     buildUserApiKeyRequiredError,
-    isUserApiKeyGateDenied,
+    isUserApiKeyGateDeniedAt,
     resolveInFlightKey,
 } from '@/application/byok/gate';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
@@ -68,7 +68,6 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
-import { isByokOnly } from '@/domain/keyRouting';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import {
     createSkillSamplingPlan,
@@ -239,11 +238,10 @@ async function runAnalysisImpl(
     // result is served keyless; it also covers the "no modelId" default model,
     // because that call still goes to a provider with the caller's key.
     const gateModelId = options.modelId ?? callModelId;
-    const byokOnly = isByokOnly(options.keyPolicy);
     if (
-        !byokOnly &&
         options.modelId !== undefined &&
-        isUserApiKeyGateDenied(
+        isUserApiKeyGateDeniedAt(
+            'before-cache',
             tier,
             options.modelId,
             tierConfig,
@@ -392,8 +390,8 @@ async function runAnalysisImpl(
 
     // byok-only key gate: after the cache read, before the bars fetch.
     if (
-        byokOnly &&
-        isUserApiKeyGateDenied(
+        isUserApiKeyGateDeniedAt(
+            'after-cache',
             tier,
             gateModelId,
             tierConfig,

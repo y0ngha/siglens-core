@@ -1,8 +1,8 @@
 import { UserApiKeyMissingError } from '@/application/byok/errors';
-import { hashApiKeyScope } from '@/infrastructure/hash/analysisInput';
 import { isByokOnly, type KeyPolicy } from '@/domain/keyRouting';
 import { requiresByokKey } from '@/domain/tier';
 import type { ModelId, Tier, TierConfig } from '@/domain/types';
+import { hashApiKeyScope } from '@/infrastructure/hash/analysisInput';
 import type { UserApiKeyRequiredError } from './types';
 import { USER_API_KEY_REQUIRED_MESSAGE } from './messages';
 
@@ -53,6 +53,44 @@ export function isUserApiKeyGateDenied(
     }
     return (
         requiresByokKey(tier, modelId, tierConfig) && userApiKey === undefined
+    );
+}
+
+/**
+ * Where a use-case runs the key gate relative to its cache read.
+ *
+ * - `'before-cache'`: the default (`'tier'`) policy gate. It runs first, so a
+ *   byok-class model without a key is denied even on a cache hit (unchanged).
+ * - `'after-cache'`: the `'byok-only'` gate. It runs after the cache read, so
+ *   a cached result is served keyless, and before any provider fetch or lock.
+ *
+ * @internal
+ */
+export type UserApiKeyGateStage = 'before-cache' | 'after-cache';
+
+/**
+ * `isUserApiKeyGateDenied`, applied only at the stage that owns the policy:
+ * `'before-cache'` checks only the default policy and `'after-cache'` checks
+ * only `byok-only`. A use-case calls it at both points, and exactly one of
+ * them can deny.
+ *
+ * @internal
+ */
+export function isUserApiKeyGateDeniedAt(
+    stage: UserApiKeyGateStage,
+    tier: Tier,
+    modelId: ModelId,
+    tierConfig: TierConfig,
+    userApiKey: string | undefined,
+    keyPolicy: KeyPolicy | undefined
+): boolean {
+    const ownsStage =
+        stage === 'after-cache'
+            ? isByokOnly(keyPolicy)
+            : !isByokOnly(keyPolicy);
+    return (
+        ownsStage &&
+        isUserApiKeyGateDenied(tier, modelId, tierConfig, userApiKey, keyPolicy)
     );
 }
 

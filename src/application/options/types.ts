@@ -67,14 +67,15 @@ export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
     /** BYOK API key. Must be provided when a non-pro tier requests a premium model. */
     userApiKey?: string;
     /**
-     * Which key pays for generation. Default `'tier'` (free/member models on the
-     * server key, byok-class models on `userApiKey`). `'byok-only'` makes every
-     * generation use `userApiKey` regardless of model or tier, returns the
-     * `key_error` result when it is missing, disables the server-key
-     * `providerFallback`, and never reads a server key. Not part of any cache key, so results are shared across policies; a
-     * cache hit is served even without a key (the key gate runs after the cache
-     * read, before any data fetch or provider call), and concurrent byok-only
-     * runs only join runs on the same key. See {@link KeyPolicy}.
+     * Which key pays for generation. Default `'tier'` (free/member models on
+     * the server key, byok-class models on `userApiKey`). `'byok-only'` makes
+     * every generation use `userApiKey` regardless of model or tier, returns
+     * the `key_error` result when it is missing, disables the server-key
+     * `providerFallback`, and never reads a server key. Not part of any cache
+     * key, so results are shared across policies; a cache hit is served even
+     * without a key (the key gate runs after the cache read, before any data
+     * fetch or provider call), and concurrent byok-only runs only join runs on
+     * the same key. See {@link KeyPolicy}.
      */
     keyPolicy?: KeyPolicy;
     /**

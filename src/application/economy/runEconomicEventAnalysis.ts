@@ -75,8 +75,9 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  * `gemini-3.5-flash-lite` with reasoning off (short structured classification task).
  *
  * Economic-event analysis has no usage gate — no tier gate, no quota check or
- * record, and by default no user key (fixed server-key model). With
- * `keyPolicy: 'byok-only'` it runs on `userApiKey` instead. The analysis is public-economy data, same as congress trade analysis.
+ * record, and by default no user key (fixed server-key model). With `keyPolicy:
+ * 'byok-only'` it runs on `userApiKey` instead. The analysis is public-economy
+ * data, same as congress trade analysis.
  *
  * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers

@@ -3,7 +3,7 @@ import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import {
     buildUserApiKeyRequiredError,
-    isUserApiKeyGateDenied,
+    isUserApiKeyGateDeniedAt,
     resolveInFlightKey,
 } from '@/application/byok/gate';
 import {
@@ -27,7 +27,6 @@ import {
 import { FUNDAMENTAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { fundamentalSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { isByokOnly } from '@/domain/keyRouting';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import {
@@ -199,8 +198,8 @@ export async function runFundamentalAnalysis(
 
     // ── 0a. BYOK gate (tier + premium model + no userApiKey) ──
     if (
-        !isByokOnly(options.keyPolicy) &&
-        isUserApiKeyGateDenied(
+        isUserApiKeyGateDeniedAt(
+            'before-cache',
             tier,
             modelId,
             tierConfig,
@@ -276,8 +275,8 @@ export async function runFundamentalAnalysis(
     // keyless), before any provider fetch or Redis lock. Under the default
     // policy the gate stays at the top, unchanged.
     if (
-        isByokOnly(options.keyPolicy) &&
-        isUserApiKeyGateDenied(
+        isUserApiKeyGateDeniedAt(
+            'after-cache',
             tier,
             modelId,
             tierConfig,
