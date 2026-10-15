@@ -221,6 +221,54 @@ export type {
     CongressTrendResponse,
 } from './domain/types';
 
+// Investor flows (수급) — pure domain functions and types (server-only `runInvestorFlowsAnalysis`
+// is omitted from the browser entry, mirroring congress above).
+export { evaluateInvestorFlows } from './domain/investorFlows/evaluateInvestorFlows';
+export { normalizeInvestorFlowsAnalysisResponse } from './domain/analysis/normalizeInvestorFlows';
+export { INVESTOR_FLOWS_AXES } from './domain/investorFlows/constants';
+export type { InvestorFlowsDataProvider } from './domain/ports/investorFlowsDataProvider';
+export type {
+    InstitutionalHolderChangeKind,
+    InstitutionalQuarter,
+    InstitutionalHolderChange,
+    InsiderTransactionType,
+    InsiderTransaction,
+    InsiderStatistics,
+    LargeHolderFiling,
+    ShortInterestPoint,
+    ShortVolumePoint,
+    InstitutionalSnapshot,
+    InsiderSnapshot,
+    InvestorFlowsSnapshot,
+    InvestorFlowsAxisId,
+    InvestorFlowsSignalDirection,
+    InvestorFlowsSignalStrength,
+    InvestorFlowsSignalId,
+    InvestorFlowsEvidence,
+    InvestorFlowsSignal,
+    InvestorFlowsLabel,
+    InvestorFlowsSufficiency,
+    InvestorFlowsAxisBase,
+    NetShareChangeBasis,
+    PartialInstitutionalQuarter,
+    InstitutionalMetrics,
+    InstitutionalAxis,
+    InsiderMetrics,
+    InsiderAxis,
+    LargeHolderMetrics,
+    LargeHolderAxis,
+    ShortInterestTrend,
+    ShortMetrics,
+    ShortAxis,
+    InvestorFlowsComposite,
+    InvestorFlowsWindow,
+    InvestorFlowsFreshness,
+    InvestorFlowsScorecard,
+    EvaluateInvestorFlowsOptions,
+    InvestorFlowsAnalysisResponse,
+    InvestorFlowsAxisInterpretation,
+} from './domain/types';
+
 // Model spec helpers
 export {
     getProvider,

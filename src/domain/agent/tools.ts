@@ -231,7 +231,19 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_congress_trades',
         description:
-            'Recent disclosed US congressional trades in a US stock, with a buy/sell trend summary. US stocks only. Use when the user asks about congressional or insider political trading in a symbol.',
+            "Recent disclosed US congressional trades in a US stock — trades by members of the US Senate and House (e.g. Pelosi), with a buy/sell trend summary. US stocks only. Use only when the user asks about lawmakers' or politicians' trading. It covers members of Congress only, not company executives, directors or other corporate insiders.",
+        costClass: 'cached',
+        inputSchema: {
+            type: 'object',
+            properties: { symbol: symbolProp },
+            required: ['symbol'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_investor_flows',
+        description:
+            'Investor flows (수급) of a US stock — who is buying and selling it. Returns a precomputed scorecard (composite and per-axis labels and scores for institutions, insiders, 5% holders and short sellers, signals with their numeric evidence, and the as-of date of every source) plus the largest institutional holders with their quarter-over-quarter change, recent insider (Form 4) transactions, recent 13D/13G filings and FINRA short-interest and short-volume data. Call it for questions about institutional buying or selling or holdings (기관 매수/매도, 기관 보유, 기관 수급, 13F), corporate insiders (내부자 매수/매도, executives or CEO buying, cluster buys), 5%+ holders and activists (13D, 13G), or short selling (공매도, 공매도 잔고, short interest, days to cover, 숏스퀴즈, short squeeze). The data is lagged and partial: 13F is quarterly and filed up to ~45 days after quarter end, so it shows past positioning (an in-progress quarter is partial and not scored); Form 4 arrives about 2 business days after a trade; 13D/13G within days; FINRA short interest settles twice a month and is published ~8 business days later; FINRA short volume covers off-exchange trades only. Always state the as-of dates from the result and never present the data as live. An axis marked insufficient has no data — say so, never call it neutral. US stocks only (Korean institutional/foreign net-buying is not available); for members of Congress use get_congress_trades. Quote labels and scores as given.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',

@@ -32,6 +32,7 @@ import type {
     EnrichedNewsItem,
     FinancialsScorecard,
     FundamentalAnalysisResponse,
+    InvestorFlowsScorecard,
     ModelId,
     NewsAnalysisResponse,
     OptionsAnalysisResponse,
@@ -392,6 +393,21 @@ export interface OverallDependencyInputs {
      * Omit to skip the financials axis in the overall analysis.
      */
     financialsScorecard?: FinancialsScorecard;
+
+    /**
+     * Pre-computed investor-flows scorecard (`evaluateInvestorFlows`). Injected
+     * synchronously like {@link OverallDependencyInputs.financialsScorecard}: a
+     * supplementary section in the overall prompt plus an optional
+     * `investorFlowsBulletsKo` in the result, folded into the input hash so a changed
+     * scorecard misses the cache.
+     *
+     * - omitted (`undefined`): investor flows is not integrated — prompt, schema and
+     *   cache key are byte-identical to a run without this field;
+     * - `null`: integrated, but the symbol has no investor flows data — the prompt says
+     *   NO DATA explicitly (never neutral);
+     * - a scorecard: rendered with weighting guidance and as-of dates.
+     */
+    investorFlowsScorecard?: InvestorFlowsScorecard | null;
 
     /**
      * Top-level force flag. When true, the resolver forwards `force: true` to

@@ -384,6 +384,7 @@ own types — they import from the feature-local `types.ts`.
 Also exempted: `domain/indicators/marketFearGreed/types.ts` and
 `domain/indicators/cryptoFearGreed/types.ts` — index-specific input/factor/snapshot types
 kept beside their module; all public ones are re-exported from `domain/types.ts`.
+`domain/investorFlows/types.ts` (investor flows / 수급: snapshot, scorecard and AI-response types, 40+) follows the same rule and is re-exported from `domain/types.ts`.
 
 ```typescript
 // ✅ domain/options/types.ts defines OptionsContract, OptionsChain, ...
@@ -494,6 +495,23 @@ wave 5 that edges past its cap within tolerance.
 A code produced by application logic or infrastructure I/O (a duplicate-check failure, a
 limit error) is defined in `application/` or `infrastructure/`, not `domain/`. The domain
 holds only the error cases of its own pure validation.
+
+<a id="DOM-10"></a>
+#### DOM-10 — Sufficiency gates count only usable evidence, under one as-of rule
+
+An axis (or input group) is "sufficient" only when it holds evidence the consumer can act on:
+
+- Data that carries no direction (an axis with only non-directional rows) is insufficient, so
+  the axis abstains; it never votes neutral (see the overall axis weighting section).
+- Rows dated after the reference date (`now` or the analysis as-of date) are excluded before
+  counting. Future-dated rows must not make a gate pass.
+- Every axis applies the same as-of rule. One shared predicate answers "is this row
+  usable at the reference date"; do not let each axis re-derive it.
+
+```typescript
+// ❌ rows.length >= MIN_ROWS            // counts future-dated and non-directional rows
+// ✅ rows.filter(r => isUsableAsOf(r, now)).length >= MIN_ROWS
+```
 
 
 ## Lazy Evaluation

@@ -28,7 +28,10 @@ import {
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
-import { OVERALL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
+import {
+    OVERALL_RESPONSE_SCHEMA,
+    OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA,
+} from '@/domain/analysis/responseSchemas';
 import { overallSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
     computeFearGreedIndex,
@@ -539,6 +542,7 @@ export async function runOverallAnalysis(
             n: newsData,
             o: stableOptions,
             fin: options.financialsScorecard,
+            investorFlows: options.investorFlowsScorecard,
             ph: historyFingerprint,
         })
     );
@@ -683,7 +687,8 @@ export async function runOverallAnalysis(
         locale,
         priorAnalysisBars,
         priorAnalysisCandidates,
-        options.currency
+        options.currency,
+        options.investorFlowsScorecard
     );
     // Design C: `stable` is always '' for the overall builder (no skills catalog),
     // so system stays the base persona unchanged.
@@ -732,7 +737,10 @@ export async function runOverallAnalysis(
                 signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
-                responseSchema: OVERALL_RESPONSE_SCHEMA,
+                responseSchema:
+                    options.investorFlowsScorecard === undefined
+                        ? OVERALL_RESPONSE_SCHEMA
+                        : OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA,
                 seed: analysisSeed(`${system}\n\n${prompt}`),
                 reasoning,
                 correlationId: `${symbol}:overall`,

@@ -1,3 +1,4 @@
+import { INVESTOR_FLOWS_AXES } from '@/domain/investorFlows/constants';
 import type { ResponseJsonSchema } from '@/domain/types';
 
 /**
@@ -193,6 +194,42 @@ export const CONGRESS_RESPONSE_SCHEMA = {
 
 /**
  * @internal
+ * Structured-output schema for {@link InvestorFlowsAnalysisResponse}
+ * (investor-flows analysis). `axisInterpretations` is an array of nested objects
+ * whose `axis` is one of the four investor flows axes.
+ */
+export const INVESTOR_FLOWS_RESPONSE_SCHEMA = {
+    type: 'object',
+    properties: {
+        summaryKo: { type: 'string' },
+        axisInterpretations: {
+            type: 'array',
+            items: {
+                type: 'object',
+                properties: {
+                    axis: { type: 'string', enum: [...INVESTOR_FLOWS_AXES] },
+                    interpretationKo: { type: 'string' },
+                },
+                required: ['axis', 'interpretationKo'],
+                additionalProperties: false,
+            },
+        },
+        keySignalsKo: { type: 'array', items: { type: 'string' } },
+        risksKo: { type: 'array', items: { type: 'string' } },
+        dataNotesKo: { type: 'array', items: { type: 'string' } },
+    },
+    required: [
+        'summaryKo',
+        'axisInterpretations',
+        'keySignalsKo',
+        'risksKo',
+        'dataNotesKo',
+    ],
+    additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
  * Structured-output schema for {@link OverallAnalysisResponse}
  * (analysisType `overall`). `scenarios` is an array of nested objects.
  *
@@ -238,6 +275,21 @@ export const OVERALL_RESPONSE_SCHEMA = {
         'optionsOiStale',
     ],
     additionalProperties: false,
+} as const satisfies ResponseJsonSchema;
+
+/**
+ * @internal
+ * {@link OVERALL_RESPONSE_SCHEMA} plus the `investorFlowsBulletsKo` field, used only
+ * when the overall run injected an investor flows (수급) scorecard. Kept separate so the
+ * schema every other overall run sends stays byte-identical.
+ */
+export const OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA = {
+    ...OVERALL_RESPONSE_SCHEMA,
+    properties: {
+        ...OVERALL_RESPONSE_SCHEMA.properties,
+        investorFlowsBulletsKo: { type: 'array', items: { type: 'string' } },
+    },
+    required: [...OVERALL_RESPONSE_SCHEMA.required, 'investorFlowsBulletsKo'],
 } as const satisfies ResponseJsonSchema;
 
 /**

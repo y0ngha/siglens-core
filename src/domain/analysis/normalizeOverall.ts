@@ -109,6 +109,15 @@ export function normalizeOverallAnalysisResponse(
         newsBulletsKo: normalizeStringArray(o.newsBulletsKo),
         optionsBulletsKo: normalizeStringArray(o.optionsBulletsKo),
         financialsBulletsKo: normalizeStringArray(o.financialsBulletsKo),
+        // Only when the model returned the field: it is requested solely for
+        // investor-flows-integrated runs, and an absent field must stay absent.
+        ...(Array.isArray(o.investorFlowsBulletsKo)
+            ? {
+                  investorFlowsBulletsKo: normalizeStringArray(
+                      o.investorFlowsBulletsKo
+                  ),
+              }
+            : {}),
         integratedConclusionKo: asString(o.integratedConclusionKo),
         scenarios: compact(asArray(o.scenarios).map(normalizeScenario)),
         riskFactorsKo: normalizeStringArray(o.riskFactorsKo),

@@ -40,6 +40,13 @@ import { runFundamentalAnalysis } from '@/application/fundamental/runFundamental
 import { runFinancialsAnalysis } from '@/application/financials/runFinancialsAnalysis';
 import { runOptionsAnalysis } from '@/application/options/runOptionsAnalysis';
 import { runCongressTrend } from '@/application/congress/runCongressTrend';
+import { runInvestorFlowsAnalysis } from '@/application/investorFlows/runInvestorFlowsAnalysis';
+import type { InvestorFlowsDataProvider } from '@/domain/ports/investorFlowsDataProvider';
+import {
+    emptySnapshot,
+    quarter,
+    topHolders,
+} from '../../fixtures/investorFlows';
 import { runMarketNewsDigest } from '@/application/news/runMarketNewsDigest';
 import { runNewsCardAnalysis } from '@/application/news/runNewsCardAnalysis';
 import { runIndicatorTranslation } from '@/application/economy/runIndicatorTranslation';
@@ -191,6 +198,23 @@ const marketDataProvider: MarketDataProvider = {
 const congressProvider: CongressTradesProvider = {
     getTrades: vi.fn((_symbol: string, chamber: string) =>
         Promise.resolve(chamber === 'senate' ? [SENATE_ROW] : [])
+    ),
+};
+const FLOWS_QUARTER = quarter({
+    holders: 106_000,
+    newHolders: 7000,
+    exited: 1000,
+    netShareChange: 35_000_000,
+});
+const investorFlowsProvider: InvestorFlowsDataProvider = {
+    getInvestorFlowsSnapshot: vi.fn().mockResolvedValue(
+        emptySnapshot({
+            institutional: {
+                quarters: [FLOWS_QUARTER],
+                topHolders: topHolders(10, 8, 0),
+                topHoldersPeriod: FLOWS_QUARTER.period,
+            },
+        })
     ),
 };
 const fundamentalProvider: FundamentalDataProvider = {
@@ -394,6 +418,30 @@ const SCENARIOS: Scenario[] = [
             }),
     },
     {
+        name: 'runInvestorFlowsAnalysis',
+        modelIsParameter: true,
+        denial: 'throw',
+        raw: {
+            summaryKo: '기관 순매수가 이어졌습니다.',
+            axisInterpretations: [
+                { axis: 'institutional', interpretationKo: '해석' },
+            ],
+            keySignalsKo: [],
+            risksKo: [],
+            dataNotesKo: [],
+        },
+        run: a =>
+            runInvestorFlowsAnalysis({
+                symbol: 'AAPL',
+                modelId: a.modelId,
+                dataProvider: investorFlowsProvider,
+                tier: a.tier,
+                userApiKey: a.userApiKey,
+                keyPolicy: a.keyPolicy,
+                providerFallback: a.providerFallback,
+            }),
+    },
+    {
         name: 'runMarketNewsDigest',
         modelIsParameter: true,
         denial: 'throw',
@@ -516,6 +564,9 @@ function makeRecordingCache(
 const IO_SPIES: Record<string, () => Mock[]> = {
     runAnalysis: () => [mockFetchBars],
     runCongressTrend: () => [congressProvider.getTrades as Mock],
+    runInvestorFlowsAnalysis: () => [
+        investorFlowsProvider.getInvestorFlowsSnapshot as Mock,
+    ],
     runFundamentalAnalysis: () => [fundamentalProvider.getProfile as Mock],
     runFinancialsAnalysis: () => [financialsProvider.getIncomeStatements],
 };
