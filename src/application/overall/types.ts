@@ -762,9 +762,11 @@ export interface RunOverallAnalysisOptions extends SubmitOverallAnalysisOptions 
      * key, so results are shared across policies; a cache hit is served by the
      * axes without a key. Unlike the single-axis use-cases, overall's own key
      * gate runs BEFORE the axes (they must run first to produce its cache key),
-     * so a keyless byok-only overall call is denied even if the overall entry
-     * is cached. Concurrent byok-only runs only join runs on the same key. See
-     * {@link KeyPolicy}.
+     * so a keyless generating byok-only call is denied up front. A keyless
+     * byok-only cache probe (`skipEnqueueIfMiss: true`) skips that gate: it is
+     * served a cached overall entry, or ends at `miss_no_trigger` with no
+     * provider call. Concurrent byok-only runs only join runs on the same key.
+     * See {@link KeyPolicy}.
      *
      * Scoped across all four dependency axes AND the overall job's own AI call,
      * like `modelId`. It is applied after any per-axis options, so an axis-level
