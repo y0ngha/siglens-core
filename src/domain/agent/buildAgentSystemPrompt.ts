@@ -13,7 +13,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-10.2';
+export const AGENT_PROMPT_VERSION = '2026-10-15.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -140,7 +140,19 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_congress_trades'],
-        text: "Congressional or politicians' trades (Pelosi, lawmakers) → get_congress_trades.",
+        // The pointer to get_investor_flows is added only when that tool is available, so the
+        // table never names a tool the model cannot call.
+        text: available =>
+            `Congressional or politicians' trades (Pelosi, lawmakers) → get_congress_trades.${available.has('get_investor_flows') ? ' Executives and other corporate insiders are not Congress — use get_investor_flows for those.' : ''}`,
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: available => {
+            const broad = available.has('get_cached_analysis')
+                ? ' For a broad "how is it overall / 종합적으로 어때" question about a US stock, call get_investor_flows alongside the outlook tools and weigh it with the source notes that end this row.'
+                : '';
+            return `Who is buying or selling a US stock — institutional buying/selling or holdings (기관 매수/매도, 13F), insider trades (내부자), 5% holders or activists (13D/13G), short selling or short squeeze (공매도, 숏스퀴즈) → get_investor_flows.${broad} Its 13F part is quarterly and ~45 days late (structural, not today's positioning); insider clusters and new 13D filings are event-level; squeeze risk and short-volume z-scores are short-term. Always give the as-of dates it returns, and report an axis marked insufficient as no data, never as neutral.`;
+        },
     },
     {
         requires: ['get_market_overview'],
@@ -344,7 +356,7 @@ ${AGENT_WRITING_STYLE}
 ## User
 ${
     input.guest
-        ? '- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, web search) works without it.'
+        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급), ' : ''}web search) works without it.`
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'

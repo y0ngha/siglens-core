@@ -1,6 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/domain/analysis/overallPrompt';
+import { evaluateInvestorFlows } from '@/domain/investorFlows/evaluateInvestorFlows';
+import {
+    emptySnapshot,
+    insiderTx,
+    quarter,
+    shortInterestSeries,
+    topHolders,
+} from '../../fixtures/investorFlows';
 import type {
+    InvestorFlowsScorecard,
     AnalysisResponse,
     Bar,
     FearGreedSnapshot,
@@ -1595,4 +1604,175 @@ describe('buildOverallAnalysisPrompt — 출력 로케일', () => {
         expect(build('ko')).toContain('Korean (존댓말)');
         expect(build('ko')).toContain('(한국어)');
     });
+});
+
+describe('buildOverallAnalysisPrompt — investor flows (수급) section', () => {
+    const q = quarter({
+        holders: 106_000,
+        newHolders: 7000,
+        exited: 1000,
+        netShareChange: 35_000_000,
+    });
+    const scorecard: InvestorFlowsScorecard = evaluateInvestorFlows(
+        emptySnapshot({
+            institutional: {
+                quarters: [
+                    q,
+                    quarter({ period: '2026-09-30', complete: false }),
+                ],
+                topHolders: topHolders(10, 8, 0),
+                topHoldersPeriod: q.period,
+            },
+            insider: {
+                transactions: [insiderTx({ name: 'CEO', value: 400_000 })],
+            },
+            shortInterest: shortInterestSeries(12_000_000, 9_000_000),
+        })
+    );
+    const build = (
+        flows?: InvestorFlowsScorecard | null,
+        locale: Parameters<typeof buildOverallAnalysisPromptRaw>[11] = 'ko'
+    ): string =>
+        buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'equity',
+            locale,
+            undefined,
+            undefined,
+            'USD',
+            flows
+        );
+
+    it('leaves the prompt byte-identical when investor flows is not integrated', () => {
+        const without = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day'
+        );
+        expect(build(undefined)).toBe(without);
+        expect(without).not.toContain('Investor Flows');
+        expect(without).not.toContain('investorFlowsBulletsKo');
+    });
+
+    it('renders the section with the key numbers and labels as computed', () => {
+        const prompt = build(scorecard);
+        expect(prompt).toContain('## Investor Flows (supplementary axis)');
+        expect(prompt).toContain(
+            `Composite: label=${scorecard.composite.label}, score=${scorecard.composite.score}`
+        );
+        expect(prompt).toContain(
+            `label=${scorecard.institutional.label}, score=${scorecard.institutional.score}`
+        );
+        expect(prompt).toContain('insider_open_market_buying');
+        expect(prompt).toContain('holderCountChangePct=');
+    });
+
+    it('renders the freshness dates so the answer can cite them', () => {
+        const prompt = build(scorecard);
+        expect(prompt).toContain('Snapshot as-of: 2026-10-15');
+        expect(prompt).toContain('scored quarter 2026-06-30');
+        expect(prompt).toContain(
+            '2026-09-30 is IN PROGRESS (partial, not scored)'
+        );
+        expect(prompt).toContain('FINRA short interest settlement date:');
+        expect(prompt).toContain('Insider window:');
+    });
+
+    it('tells the model how much each source carries and why', () => {
+        const prompt = build(scorecard);
+        expect(prompt).toContain(
+            'institutional (13F) is quarterly and filed up to ~45 days after quarter end'
+        );
+        expect(prompt).toContain('STRUCTURAL thesis');
+        expect(prompt).toContain('are EVENT-level');
+        expect(prompt).toContain('are SHORT-TERM and volatile');
+        expect(prompt).toContain(
+            'Insider sales and 13G filings are weak evidence'
+        );
+        expect(prompt).toContain('NOT part of ## Axis Weighting');
+    });
+
+    it('requires as-of citations and forbids reading a missing axis as neutral', () => {
+        const prompt = build(scorecard);
+        expect(prompt).toContain(
+            'Cite the as-of date of every investor-flows source'
+        );
+        expect(prompt).toContain(
+            'never read it as neutral, quiet or supportive'
+        );
+        // the short and large-holder axes had no data in this fixture
+        expect(prompt).toContain(
+            'NO DATA — the inputs for this axis are missing or too thin to score. This is not a neutral reading.'
+        );
+    });
+
+    it('asks for investorFlowsBulletsKo and attribution only when integrated', () => {
+        const prompt = build(scorecard);
+        expect(prompt).toContain('"investorFlowsBulletsKo": [');
+        expect(prompt).toContain(
+            '- investorFlowsBulletsKo: provide 2–4 bullets'
+        );
+        expect(prompt).toContain('"수급 분석에서는…"');
+    });
+
+    it('says NO DATA explicitly, not neutral, when integrated but the symbol has no data', () => {
+        const prompt = build(null);
+        expect(prompt).toContain('## Investor Flows (supplementary axis)');
+        expect(prompt).toContain('NO DATA — investor-flows data');
+        expect(prompt).toContain(
+            'This is missing information, not a neutral reading'
+        );
+        expect(prompt).toContain('Leave investorFlowsBulletsKo empty');
+        expect(prompt).not.toContain('Composite: label=');
+        expect(prompt).toContain('"investorFlowsBulletsKo": [');
+    });
+
+    it('places the section after the financials scorecard and before the axis weighting', () => {
+        const prompt = build(scorecard);
+        const financials = prompt.indexOf('## Financials Scorecard');
+        const flows = prompt.indexOf('## Investor Flows (supplementary axis)');
+        const weighting = prompt.indexOf('## Axis Weighting');
+        const schema = prompt.indexOf('## Output Schema');
+        expect(financials).toBeLessThan(flows);
+        expect(flows).toBeLessThan(weighting);
+        expect(weighting).toBeLessThan(schema);
+    });
+
+    it('changes the prompt when the scorecard changes', () => {
+        const changed = evaluateInvestorFlows(
+            emptySnapshot({
+                institutional: {
+                    quarters: [q],
+                    topHolders: [],
+                    topHoldersPeriod: null,
+                },
+            })
+        );
+        expect(build(changed)).not.toBe(build(scorecard));
+    });
+
+    it.each(['en', 'ja', 'zh'] as const)(
+        '%s: the schema example uses the output language',
+        locale => {
+            const prompt = build(scorecard, locale);
+            expect(prompt).not.toContain(
+                '수급(기관·내부자·공매도) 요약 bullet 1 (한국어)'
+            );
+            expect(prompt).toContain(
+                '수급(기관·내부자·공매도) 요약 bullet 1 ('
+            );
+        }
+    );
 });

@@ -4,10 +4,15 @@ import {
     NEWS_RESPONSE_SCHEMA,
     FUNDAMENTAL_RESPONSE_SCHEMA,
     OVERALL_RESPONSE_SCHEMA,
+    OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA,
+    INVESTOR_FLOWS_RESPONSE_SCHEMA,
     OPTIONS_RESPONSE_SCHEMA,
     TECHNICAL_RESPONSE_SCHEMA,
 } from '@/domain/analysis/responseSchemas';
 import type {
+    InvestorFlowsAnalysisResponse,
+    InvestorFlowsAxisId,
+    InvestorFlowsAxisInterpretation,
     ActionRecommendation,
     AnalysisResponse,
     AnalysisSignal,
@@ -220,6 +225,14 @@ describe('responseSchemas — strict-mode invariants', () => {
             schema: FUNDAMENTAL_RESPONSE_SCHEMA,
         },
         { name: 'OVERALL_RESPONSE_SCHEMA', schema: OVERALL_RESPONSE_SCHEMA },
+        {
+            name: 'OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA',
+            schema: OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA,
+        },
+        {
+            name: 'INVESTOR_FLOWS_RESPONSE_SCHEMA',
+            schema: INVESTOR_FLOWS_RESPONSE_SCHEMA,
+        },
         { name: 'OPTIONS_RESPONSE_SCHEMA', schema: OPTIONS_RESPONSE_SCHEMA },
         {
             name: 'TECHNICAL_RESPONSE_SCHEMA',
@@ -358,6 +371,7 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
         newsBulletsKo: ['뉴스'],
         optionsBulletsKo: ['옵션'],
         financialsBulletsKo: [],
+        investorFlowsBulletsKo: ['수급'],
         integratedConclusionKo: '종합',
         scenarios: [nestedSample],
         riskFactorsKo: ['리스크'],
@@ -370,10 +384,24 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
     const llmSampleKeys = sortedKeys(sample).filter(
         key => key !== 'analyzedAt'
     );
+    // `investorFlowsBulletsKo` is requested only on investor-flows-integrated runs, so the
+    // base schema omits it and the with-investor-flows schema carries it.
+    const baseSampleKeys = llmSampleKeys.filter(
+        key => key !== 'investorFlowsBulletsKo'
+    );
 
-    it('schema key-set matches the response interface (minus server-set analyzedAt)', () => {
-        expect(sortedRequired(OVERALL_RESPONSE_SCHEMA)).toEqual(llmSampleKeys);
-        expect(propertyKeys(OVERALL_RESPONSE_SCHEMA)).toEqual(llmSampleKeys);
+    it('schema key-set matches the response interface (minus server-set analyzedAt and the investor-flows-only field)', () => {
+        expect(sortedRequired(OVERALL_RESPONSE_SCHEMA)).toEqual(baseSampleKeys);
+        expect(propertyKeys(OVERALL_RESPONSE_SCHEMA)).toEqual(baseSampleKeys);
+    });
+
+    it('the with-investor-flows schema carries every response key', () => {
+        expect(
+            sortedRequired(OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA)
+        ).toEqual(llmSampleKeys);
+        expect(
+            propertyKeys(OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA)
+        ).toEqual(llmSampleKeys);
     });
 
     it('models the optional optionsOiStale field as a boolean|null union', () => {
@@ -768,5 +796,46 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             if ('items' in record) visit(record.items);
         };
         visit(TECHNICAL_RESPONSE_SCHEMA);
+    });
+});
+
+describe('INVESTOR_FLOWS_RESPONSE_SCHEMA drift guard', () => {
+    const interpretationSample: InvestorFlowsAxisInterpretation = {
+        axis: 'institutional',
+        interpretationKo: '해석',
+    };
+    const sample: InvestorFlowsAnalysisResponse = {
+        summaryKo: '요약',
+        axisInterpretations: [interpretationSample],
+        keySignalsKo: ['신호'],
+        risksKo: ['리스크'],
+        dataNotesKo: ['노트'],
+    };
+
+    it('schema key-set matches the response interface', () => {
+        expect(sortedRequired(INVESTOR_FLOWS_RESPONSE_SCHEMA)).toEqual(
+            sortedKeys(sample)
+        );
+        expect(propertyKeys(INVESTOR_FLOWS_RESPONSE_SCHEMA)).toEqual(
+            sortedKeys(sample)
+        );
+    });
+
+    it('nested axisInterpretations schema matches the nested interface and the axis union', () => {
+        const item = nestedItems(
+            INVESTOR_FLOWS_RESPONSE_SCHEMA,
+            'axisInterpretations'
+        );
+        expect(sortedRequired(item)).toEqual(sortedKeys(interpretationSample));
+        expect(propertyKeys(item)).toEqual(sortedKeys(interpretationSample));
+        expect(item.additionalProperties).toBe(false);
+        expect(nestedEnumValues(item, 'axis')).toEqual(
+            Object.keys({
+                institutional: true,
+                insider: true,
+                largeHolders: true,
+                short: true,
+            } satisfies Record<InvestorFlowsAxisId, true>).toSorted()
+        );
     });
 });

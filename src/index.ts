@@ -32,9 +32,10 @@ export { runMarketNewsDigest } from './application/news/runMarketNewsDigest';
 export { peekMarketNewsDigestCache } from './application/news/peekMarketNewsDigestCache';
 export type { MarketNewsDigestCacheKeyOptions } from './application/news/marketNewsDigestTypes';
 
-// Overall / congress
+// Overall / congress / investorFlows
 export { runOverallAnalysis } from './application/overall/runOverallAnalysis';
 export { runCongressTrend } from './application/congress/runCongressTrend';
+export { runInvestorFlowsAnalysis } from './application/investorFlows/runInvestorFlowsAnalysis';
 
 // Economy use-cases
 export { runMacroBriefing } from './application/economy/runMacroBriefing';
@@ -45,6 +46,15 @@ export { runIndicatorTranslation } from './application/economy/runIndicatorTrans
 export type { RunBriefingResult } from './application/market/types';
 export type { RunOverallAnalysisResult } from './application/overall/types';
 export type { RunCongressTrendResult } from './application/congress/types';
+export type {
+    RunInvestorFlowsAnalysisCached,
+    RunInvestorFlowsAnalysisDone,
+    RunInvestorFlowsAnalysisFetchError,
+    RunInvestorFlowsAnalysisMissNoTrigger,
+    RunInvestorFlowsAnalysisNoData,
+    RunInvestorFlowsAnalysisOptions,
+    RunInvestorFlowsAnalysisResult,
+} from './application/investorFlows/types';
 export type {
     RunNewsAnalysisResult,
     RunNewsCardAnalysisResult,
@@ -198,6 +208,10 @@ export { normalizeFinancialsSnapshot } from './domain/analysis/normalizeFinancia
 export { normalizeCongressTrades } from './domain/analysis/normalizeCongressTrades';
 export { summarizeCongressTrades } from './domain/analysis/summarizeCongressTrades';
 export { normalizeCongressTrendResponse } from './domain/analysis/normalizeCongressTrend';
+
+// Investor flows (수급) domain building blocks (pure; the same set is in index.client.ts)
+export { evaluateInvestorFlows } from './domain/investorFlows/evaluateInvestorFlows';
+export { normalizeInvestorFlowsAnalysisResponse } from './domain/analysis/normalizeInvestorFlows';
 
 // Economy domain building blocks (normalization + 2s10s spread)
 export { normalizeEconomicIndicatorSeries } from './domain/economy/normalizeEconomicIndicators';
@@ -624,6 +638,7 @@ export type { FmpConfig } from './infrastructure/fmp/types';
 export type { FundamentalDataProvider } from './domain/ports/fundamentalDataProvider';
 export type { FinancialStatementsProvider } from './domain/ports/financialStatementsProvider';
 export type { CongressTradesProvider } from './domain/ports/congressTradesProvider';
+export type { InvestorFlowsDataProvider } from './domain/ports/investorFlowsDataProvider';
 export type {
     GetBarsOptions,
     MarketDataProvider,
@@ -1141,3 +1156,47 @@ export type {
     CounterPeriod,
     CounterFailurePolicy,
 } from './infrastructure/usage/counterStore';
+
+// Investor flows (수급) — snapshot, scorecard and analysis types (Tier 4)
+export type {
+    InstitutionalHolderChangeKind,
+    InstitutionalQuarter,
+    InstitutionalHolderChange,
+    InsiderTransactionType,
+    InsiderTransaction,
+    InsiderStatistics,
+    LargeHolderFiling,
+    ShortInterestPoint,
+    ShortVolumePoint,
+    InstitutionalSnapshot,
+    InsiderSnapshot,
+    InvestorFlowsSnapshot,
+    InvestorFlowsAxisId,
+    InvestorFlowsSignalDirection,
+    InvestorFlowsSignalStrength,
+    InvestorFlowsSignalId,
+    InvestorFlowsEvidence,
+    InvestorFlowsSignal,
+    InvestorFlowsLabel,
+    InvestorFlowsSufficiency,
+    InvestorFlowsAxisBase,
+    NetShareChangeBasis,
+    PartialInstitutionalQuarter,
+    InstitutionalMetrics,
+    InstitutionalAxis,
+    InsiderMetrics,
+    InsiderAxis,
+    LargeHolderMetrics,
+    LargeHolderAxis,
+    ShortInterestTrend,
+    ShortMetrics,
+    ShortAxis,
+    InvestorFlowsComposite,
+    InvestorFlowsWindow,
+    InvestorFlowsFreshness,
+    InvestorFlowsScorecard,
+    EvaluateInvestorFlowsOptions,
+    InvestorFlowsAnalysisResponse,
+    InvestorFlowsAxisInterpretation,
+} from './domain/types';
+export { INVESTOR_FLOWS_AXES } from './domain/investorFlows/constants';

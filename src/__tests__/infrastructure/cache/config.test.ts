@@ -19,6 +19,7 @@ import {
     buildBriefingCacheKey,
     buildCongressTrendCacheKey,
     buildFinancialsCacheKey,
+    buildInvestorFlowsCacheKey,
     buildFundamentalCacheKey,
     buildMacroBriefingCacheKey,
     buildMarketNewsDigestCacheKey,
@@ -36,6 +37,8 @@ import {
     FINANCIALS_CACHE_TTL_SECONDS,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
+    INVESTOR_FLOWS_CACHE_TTL_SECONDS,
+    INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION,
     MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION,
     MARKET_BRIEFING_CACHE_TTL,
     MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION,
@@ -553,6 +556,87 @@ describe('buildCongressTrendCacheKey', () => {
         ).toBe(
             `v1:analysis:congress:AAPL:gemini-3.6-flash:${CONGRESS_PROMPT_TEMPLATE_VERSION}:sk1`
         );
+    });
+});
+
+describe('buildInvestorFlowsCacheKey', () => {
+    const base = `v1:analysis:investorFlows:AAPL:gemini-3.6-flash:${INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION}`;
+
+    it('has no skill fingerprint or input hash, so the lookup precedes the snapshot fetch', () => {
+        expect(buildInvestorFlowsCacheKey('AAPL', 'gemini-3.6-flash')).toBe(
+            base
+        );
+    });
+
+    it('is scoped by symbol and model', () => {
+        expect(buildInvestorFlowsCacheKey('MSFT', 'gemini-3.6-flash')).not.toBe(
+            base
+        );
+        expect(buildInvestorFlowsCacheKey('AAPL', 'gpt-6-luna')).not.toBe(base);
+    });
+
+    it('reasoning on appends a suffix; off and omitted match the base key', () => {
+        expect(
+            buildInvestorFlowsCacheKey('AAPL', 'gemini-3.6-flash', true)
+        ).toBe(`${base}:reason=on`);
+        expect(
+            buildInvestorFlowsCacheKey('AAPL', 'gemini-3.6-flash', false)
+        ).toBe(base);
+    });
+
+    it('locale: ko matches the base key, other locales append :lang=', () => {
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                undefined,
+                'ko'
+            )
+        ).toBe(base);
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                undefined,
+                'en'
+            )
+        ).toBe(`${base}:lang=en`);
+    });
+
+    it('FINRA off appends :finra=off; on and omitted match the base key', () => {
+        const off = buildInvestorFlowsCacheKey(
+            'AAPL',
+            'gemini-3.6-flash',
+            undefined,
+            undefined,
+            false
+        );
+        expect(off).toBe(`${base}:finra=off`);
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                undefined,
+                undefined,
+                true
+            )
+        ).toBe(base);
+    });
+
+    it('combines every suffix in a fixed order', () => {
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                true,
+                'en',
+                false
+            )
+        ).toBe(`${base}:reason=on:lang=en:finra=off`);
+    });
+
+    it('caches for 12 hours', () => {
+        expect(INVESTOR_FLOWS_CACHE_TTL_SECONDS).toBe(12 * SECONDS_PER_HOUR);
     });
 });
 

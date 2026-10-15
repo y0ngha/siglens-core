@@ -297,3 +297,42 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
         });
     });
 });
+
+describe('normalizeOverallAnalysisResponse — investorFlowsBulletsKo', () => {
+    it('keeps the field absent when the model did not return it', () => {
+        const result = normalizeOverallAnalysisResponse(validPayload);
+        expect(result).not.toHaveProperty('investorFlowsBulletsKo');
+    });
+
+    it('returns the bullets when present, dropping non-strings and empties', () => {
+        const result = normalizeOverallAnalysisResponse({
+            ...validPayload,
+            investorFlowsBulletsKo: [
+                '기관 순매수',
+                7,
+                '',
+                '내부자 클러스터 매수',
+            ],
+        });
+        expect(result.investorFlowsBulletsKo).toEqual([
+            '기관 순매수',
+            '내부자 클러스터 매수',
+        ]);
+    });
+
+    it('keeps an explicit empty array (integrated, no data) distinct from absence', () => {
+        const result = normalizeOverallAnalysisResponse({
+            ...validPayload,
+            investorFlowsBulletsKo: [],
+        });
+        expect(result.investorFlowsBulletsKo).toEqual([]);
+    });
+
+    it('ignores a non-array value', () => {
+        const result = normalizeOverallAnalysisResponse({
+            ...validPayload,
+            investorFlowsBulletsKo: '수급',
+        });
+        expect(result).not.toHaveProperty('investorFlowsBulletsKo');
+    });
+});

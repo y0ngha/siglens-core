@@ -25,8 +25,20 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import { OVERALL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
+import {
+    OVERALL_RESPONSE_SCHEMA,
+    OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA,
+} from '@/domain/analysis/responseSchemas';
+import { evaluateInvestorFlows } from '@/domain/investorFlows/evaluateInvestorFlows';
+import {
+    emptySnapshot,
+    insiderTx,
+    quarter,
+    topHolders,
+} from '../../fixtures/investorFlows';
 import type { RunOverallAnalysisOptions } from '@/application/overall/types';
 import type {
+    InvestorFlowsScorecard,
     AnalysisResponse,
     EconomicCalendarEvent,
     EnrichedNewsItem,
@@ -1773,6 +1785,146 @@ describe('runOverallAnalysis', () => {
             } finally {
                 warnSpy.mockRestore();
             }
+        });
+    });
+
+    /**
+     * 수급(investor flows) 스코어카드 주입. 생략하면 프롬프트·스키마·캐시 키가
+     * 예전과 같고, 주입하면 inputHash에 접혀 카드가 바뀔 때 캐시가 갈린다.
+     */
+    describe('investorFlowsScorecard', () => {
+        const flowsQuarter = quarter({
+            holders: 106_000,
+            newHolders: 7000,
+            exited: 1000,
+            netShareChange: 35_000_000,
+        });
+        const scorecard: InvestorFlowsScorecard = evaluateInvestorFlows(
+            emptySnapshot({
+                institutional: {
+                    quarters: [flowsQuarter],
+                    topHolders: topHolders(10, 8, 0),
+                    topHoldersPeriod: flowsQuarter.period,
+                },
+                insider: { transactions: [insiderTx({ value: 400_000 })] },
+            })
+        );
+        const changedScorecard: InvestorFlowsScorecard = evaluateInvestorFlows(
+            emptySnapshot({
+                institutional: {
+                    quarters: [
+                        { ...flowsQuarter, netShareChange: -35_000_000 },
+                    ],
+                    topHolders: topHolders(10, 0, 8),
+                    topHoldersPeriod: flowsQuarter.period,
+                },
+                insider: { transactions: [insiderTx({ value: 400_000 })] },
+            })
+        );
+
+        const cacheKeyFor = async (
+            flows: InvestorFlowsScorecard | null | undefined
+        ): Promise<string> => {
+            mockCacheGet.mockClear();
+            await runOverallAnalysis({
+                ...baseOptions(),
+                investorFlowsScorecard: flows,
+            });
+            return mockCacheGet.mock.calls[0]![0] as string;
+        };
+        const lastCall = () =>
+            mockCallAnalysisAi.mock.calls.at(-1)![0] as {
+                prompt: string;
+                responseSchema: unknown;
+            };
+
+        it('생략하면 캐시 키가 정확히 고정된 값이고 프롬프트·스키마도 달라지지 않는다', async () => {
+            // Golden: the key this input produced BEFORE the field existed. It is
+            // sha256 of the inputHash JSON without an `investorFlows` key (an
+            // `undefined` value drops out of JSON.stringify), so any change that
+            // lets the omitted case leak into the hash (e.g. `?? 0`, `?? null`)
+            // changes this literal.
+            expect(await cacheKeyFor(undefined)).toBe(
+                'v1:analysis:overall:AAPL:1Day:deepseek-v4.1-flash:p4:db97fcfbcde0adcb'
+            );
+            await runOverallAnalysis(baseOptions());
+            expect(lastCall().prompt).not.toContain('Investor Flows');
+            expect(lastCall().responseSchema).toBe(OVERALL_RESPONSE_SCHEMA);
+        });
+
+        it('주입하면 캐시 키가 생략 시와 달라지고 같은 카드면 같다', async () => {
+            const omitted = await cacheKeyFor(undefined);
+            const withCard = await cacheKeyFor(scorecard);
+            expect(withCard).not.toBe(omitted);
+            expect(await cacheKeyFor(scorecard)).toBe(withCard);
+        });
+
+        it('카드가 바뀌면 inputHash가 바뀌어 캐시 키가 갈린다', async () => {
+            expect(await cacheKeyFor(changedScorecard)).not.toBe(
+                await cacheKeyFor(scorecard)
+            );
+        });
+
+        it('null(데이터 없음)은 생략과도, 카드와도 다른 키다', async () => {
+            const nullKey = await cacheKeyFor(null);
+            expect(nullKey).not.toBe(await cacheKeyFor(undefined));
+            expect(nullKey).not.toBe(await cacheKeyFor(scorecard));
+        });
+
+        it('주입하면 섹션이 프롬프트에 들어가고 수급 필드를 포함한 스키마를 쓴다', async () => {
+            await runOverallAnalysis({
+                ...baseOptions(),
+                investorFlowsScorecard: scorecard,
+            });
+            expect(lastCall().prompt).toContain(
+                '## Investor Flows (supplementary axis)'
+            );
+            expect(lastCall().responseSchema).toBe(
+                OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA
+            );
+        });
+
+        it('null이어도 데이터 없음 섹션과 확장 스키마를 쓴다', async () => {
+            await runOverallAnalysis({
+                ...baseOptions(),
+                investorFlowsScorecard: null,
+            });
+            expect(lastCall().prompt).toContain(
+                'NO DATA — investor-flows data'
+            );
+            expect(lastCall().responseSchema).toBe(
+                OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA
+            );
+        });
+
+        it('모델이 돌려준 investorFlowsBulletsKo를 결과와 캐시에 싣는다', async () => {
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify({
+                    ...mockOverallResult,
+                    investorFlowsBulletsKo: [
+                        '기관 순매수 (13F 2026-06-30 기준)',
+                    ],
+                })
+            );
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                investorFlowsScorecard: scorecard,
+            });
+            expect(result.status).toBe('done');
+            if (result.status === 'done') {
+                expect(result.result.investorFlowsBulletsKo).toEqual([
+                    '기관 순매수 (13F 2026-06-30 기준)',
+                ]);
+            }
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    investorFlowsBulletsKo: [
+                        '기관 순매수 (13F 2026-06-30 기준)',
+                    ],
+                }),
+                OVERALL_CACHE_TTL_SECONDS
+            );
         });
     });
 });

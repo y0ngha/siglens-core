@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
     AGENT_FOLLOW_UP_MARKER,
@@ -426,7 +427,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-10.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-15.1');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
@@ -464,6 +465,142 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'which has been the riskier case (washoutBelowMa200)'
         );
+    });
+
+    describe('get_investor_flows routing', () => {
+        const without = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_investor_flows'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+
+        it('routes investor-flows questions to the tool with the weighting and as-of rules', () => {
+            expect(prompt).toContain('→ get_investor_flows.');
+            expect(prompt).toContain('기관 매수/매도, 13F');
+            expect(prompt).toContain('공매도, 숏스퀴즈');
+            expect(prompt).toContain('quarterly and ~45 days late');
+            expect(prompt).toContain('Always give the as-of dates it returns');
+            expect(prompt).toContain('never as neutral');
+        });
+
+        it('pairs it with the outlook tools for a broad question when get_cached_analysis is available', () => {
+            expect(prompt).toContain(
+                'call get_investor_flows alongside the outlook tools'
+            );
+        });
+
+        it('drops the broad-question pairing when get_cached_analysis is not available', () => {
+            const noAnalysis = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(
+                    t => t.name !== 'get_cached_analysis'
+                ),
+                now: NOW,
+                etSessionStatus: 'open',
+            });
+            expect(noAnalysis).toContain('→ get_investor_flows.');
+            expect(noAnalysis).not.toContain('alongside the outlook tools');
+        });
+
+        /**
+         * With the tool absent the prompt must match what the previous version
+         * produced, byte for byte, apart from the version line. The hashes were
+         * taken from the pre-change file at the same inputs (NOW, 'open').
+         */
+        it.each([
+            [
+                'ko',
+                false,
+                '7de1c5a9170f2391f4426da94ffbe6486bbaeb5e6de0b59c94222cc369f00516',
+            ],
+            [
+                'ko',
+                true,
+                '04b4ab8a135d070b0a8c74b1d13e54e5443b9145195d653144c053c791226770',
+            ],
+            [
+                'en',
+                false,
+                'cbe4ef208b4d48c902076cade878b59d356332244854832ec1cea3d2d0f843ae',
+            ],
+            [
+                'en',
+                true,
+                '65aa48d5a0212b9b7981cafe91848d039c517a125721ce6df7f022f405ef1870',
+            ],
+        ] as const)(
+            'is byte-identical to the previous output when get_investor_flows is absent (%s, guest=%s)',
+            (locale, guest, previousHash) => {
+                const absent = buildAgentSystemPrompt({
+                    locale,
+                    tools: AGENT_TOOL_SPECS.filter(
+                        t => t.name !== 'get_investor_flows'
+                    ),
+                    now: NOW,
+                    etSessionStatus: 'open',
+                    guest,
+                });
+                const asPrevious = absent.replace(
+                    `Prompt version: ${AGENT_PROMPT_VERSION}`,
+                    'Prompt version: 2026-10-10.2'
+                );
+                expect(asPrevious).not.toBe(absent);
+                expect(
+                    createHash('sha256').update(asPrevious).digest('hex')
+                ).toBe(previousHash);
+            }
+        );
+
+        it('names investor flows in the guest line only when the tool is available', () => {
+            const guestOf = (tools: typeof AGENT_TOOL_SPECS) =>
+                buildAgentSystemPrompt({
+                    locale: 'ko',
+                    tools,
+                    now: NOW,
+                    etSessionStatus: 'open',
+                    guest: true,
+                });
+            expect(guestOf(AGENT_TOOL_SPECS)).toContain(
+                'congress trades, investor flows (수급), web search'
+            );
+            expect(
+                guestOf(
+                    AGENT_TOOL_SPECS.filter(
+                        t => t.name !== 'get_investor_flows'
+                    )
+                )
+            ).toContain('congress trades, web search) works without it');
+        });
+
+        it('leaves no investor-flows row when the tool is not provided', () => {
+            expect(without).not.toContain('get_investor_flows');
+        });
+
+        it('tells the model corporate insiders are not Congress, only when get_investor_flows exists', () => {
+            expect(prompt).toContain(
+                'Executives and other corporate insiders are not Congress'
+            );
+            expect(without).toContain('→ get_congress_trades.');
+            expect(without).not.toContain(
+                'corporate insiders are not Congress'
+            );
+        });
+
+        it('lists investor flows (수급) among the guest-accessible features', () => {
+            const guest = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS,
+                now: NOW,
+                etSessionStatus: 'open',
+                guest: true,
+            });
+            expect(guest).toContain(
+                'congress trades, investor flows (수급), web search'
+            );
+        });
     });
 
     it('신규 데이터 툴 4종은 가용할 때만 호출 규칙을 넣는다', () => {

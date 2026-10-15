@@ -2107,6 +2107,7 @@ export interface RawOverallAnalysisResponse {
     newsBulletsKo?: unknown;
     optionsBulletsKo?: unknown;
     financialsBulletsKo?: unknown;
+    investorFlowsBulletsKo?: unknown;
     integratedConclusionKo?: unknown;
     scenarios?: unknown;
     riskFactorsKo?: unknown;
@@ -3471,6 +3472,13 @@ export interface OverallAnalysisResponse {
     optionsBulletsKo: string[];
     /** Financials scorecard summary bullet points (Korean output). Empty array when no financials data was injected. */
     financialsBulletsKo: string[];
+    /**
+     * Investor flows (수급: institutional / insider / short) summary bullets (Korean
+     * output). Present only when the caller injected an investor flows (수급) scorecard (or
+     * `null` for "no data"); omitted otherwise, so entries cached before this
+     * field existed stay valid.
+     */
+    investorFlowsBulletsKo?: string[];
     /** 4-axis synthesis conclusion block, one or two paragraphs (Korean output). */
     integratedConclusionKo: string;
     /** Scenario analysis (bullish / neutral / bearish). */
@@ -4109,6 +4117,54 @@ export type {
     MacroRegime,
     MacroBriefingResponse,
 } from './economy/types';
+
+// =============================================================================
+// Investor flows (수급) (13F / Form 4 / 13D-G / FINRA short) — 40+ cohesive types live in
+// ./investorFlows/types and are re-exported here (see the options note above).
+// =============================================================================
+export type {
+    InstitutionalHolderChangeKind,
+    InstitutionalQuarter,
+    InstitutionalHolderChange,
+    InsiderTransactionType,
+    InsiderTransaction,
+    InsiderStatistics,
+    LargeHolderFiling,
+    ShortInterestPoint,
+    ShortVolumePoint,
+    InstitutionalSnapshot,
+    InsiderSnapshot,
+    InvestorFlowsSnapshot,
+    InvestorFlowsAxisId,
+    InvestorFlowsSignalDirection,
+    InvestorFlowsSignalStrength,
+    InvestorFlowsSignalId,
+    InvestorFlowsEvidence,
+    InvestorFlowsSignal,
+    InvestorFlowsLabel,
+    InvestorFlowsSufficiency,
+    InvestorFlowsAxisBase,
+    NetShareChangeBasis,
+    PartialInstitutionalQuarter,
+    InstitutionalMetrics,
+    InstitutionalAxis,
+    InsiderMetrics,
+    InsiderAxis,
+    LargeHolderMetrics,
+    LargeHolderAxis,
+    ShortInterestTrend,
+    ShortMetrics,
+    ShortAxis,
+    InvestorFlowsComposite,
+    InvestorFlowsWindow,
+    InvestorFlowsFreshness,
+    InvestorFlowsScorecard,
+    EvaluateInvestorFlowsOptions,
+    InvestorFlowsAxisInterpretation,
+    InvestorFlowsAnalysisResponse,
+    RawInvestorFlowsAnalysisResponse,
+    RawInvestorFlowsAxisInterpretation,
+} from './investorFlows/types';
 
 // =============================================================================
 // Chart-pattern screener and qualification types. Defined directly here rather

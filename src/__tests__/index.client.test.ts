@@ -26,6 +26,8 @@ import {
 } from '@/index.client';
 import * as clientApi from '@/index.client';
 import type {
+    InvestorFlowsDataProvider,
+    InvestorFlowsScorecard,
     FinancialSignal,
     FinancialSignalType,
     FinancialStatementsProvider,
@@ -114,6 +116,26 @@ describe('browser public API exports', () => {
         expect('submitAnalysis' in clientApi).toBe(false);
         expect('requestChatCompletion' in clientApi).toBe(false);
         expect('createCacheProvider' in clientApi).toBe(false);
+    });
+
+    it('exports the pure investor flows (수급) helpers for browser consumers, not the server use-case', () => {
+        expect(typeof clientApi.evaluateInvestorFlows).toBe('function');
+        expect(typeof clientApi.normalizeInvestorFlowsAnalysisResponse).toBe(
+            'function'
+        );
+        expect(clientApi.INVESTOR_FLOWS_AXES).toEqual([
+            'institutional',
+            'insider',
+            'largeHolders',
+            'short',
+        ]);
+        expect('runInvestorFlowsAnalysis' in clientApi).toBe(false);
+        expect('buildInvestorFlowsAnalysisPrompt' in clientApi).toBe(false);
+
+        const scorecard = {} as InvestorFlowsScorecard;
+        const provider = {} as InvestorFlowsDataProvider;
+        void scorecard;
+        void provider;
     });
 
     it('exports financials pure-domain helpers for browser consumers', () => {

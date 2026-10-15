@@ -1764,6 +1764,64 @@ export function buildCongressTrendCacheKey(
 }
 
 /**
+ * Prompt-template version for the investor-flows analysis cache keys.
+ *
+ * Scoped to the investor flows (수급) analysis type so its prompt-template changes
+ * invalidate independently. Bump whenever the investor flows system/user prompt
+ * template, response schema, or the scorecard rendering it embeds changes in a
+ * way that would make previously cached results stale.
+ *
+ * @remarks
+ * **`p1`** = first generation. The prompt consumes no skill catalog, so the key
+ * carries no skill fingerprint.
+ *
+ * @internal
+ */
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+
+/**
+ * @internal TTL for investor-flows analysis cache results. Default: 12 hours —
+ * the inputs move at most daily (FINRA short volume after the close, Form 4
+ * within ~2 business days, 13F in batches), so a day-old read is stale but a
+ * half-day-old one is not.
+ */
+export const INVESTOR_FLOWS_CACHE_TTL_SECONDS = 12 * SECONDS_PER_HOUR;
+
+/**
+ * Build the Redis key for a cached investor-flows analysis result.
+ *
+ * Format: `{version}:analysis:investorFlows:<symbol>:<modelId>:<promptVersion>`
+ * plus the reasoning, locale and FINRA suffixes.
+ *
+ * Like the congress key it carries no input hash, so the cache lookup happens
+ * before the snapshot fetch; freshness is governed by the TTL
+ * ({@link INVESTOR_FLOWS_CACHE_TTL_SECONDS}), the schema-version prefix and the
+ * prompt-version segment.
+ *
+ * `includeFinraData: false` appends `:finra=off` because it changes what the
+ * model is shown; the default (`true`/`undefined`) leaves the key unsuffixed.
+ *
+ * @internal
+ * @param symbol - U.S. equity ticker (canonical uppercase).
+ * @param modelId - LLM model identifier.
+ * @param reasoning - Per-request deep-thinking toggle; `true` appends `:reason=on`.
+ * @param locale - AI output language; the default (`ko`) adds nothing.
+ * @param includeFinraData - `false` when FINRA short data is excluded.
+ * @returns The cache key.
+ */
+export function buildInvestorFlowsCacheKey(
+    symbol: string,
+    modelId: string,
+    reasoning?: boolean,
+    locale?: AnalysisLocale,
+    includeFinraData?: boolean
+): string {
+    const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:investorFlows:${symbol}:${modelId}:${INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION}`;
+    const finra = includeFinraData === false ? ':finra=off' : '';
+    return `${base}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}${finra}`;
+}
+
+/**
  * Prompt-template version for the news analysis and market-news-digest cache
  * keys.
  *

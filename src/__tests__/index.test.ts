@@ -1,4 +1,8 @@
 import type {
+    InvestorFlowsDataProvider,
+    InvestorFlowsScorecard,
+    InvestorFlowsSnapshot,
+    RunInvestorFlowsAnalysisResult,
     ConfluenceHtfMode,
     ConfluenceParams,
     ConfluenceSnapshot,
@@ -295,6 +299,41 @@ describe('public API exports', () => {
         // Compile-time check: FinancialSignalType must be exported.
         const signalType: FinancialSignalType = 'net_cash';
         void signalType;
+    });
+
+    it('exports the investor flows (수급) entrypoints, scorecard types and the provider port', () => {
+        expect(typeof coreApi.runInvestorFlowsAnalysis).toBe('function');
+        expect(typeof coreApi.evaluateInvestorFlows).toBe('function');
+        expect(typeof coreApi.normalizeInvestorFlowsAnalysisResponse).toBe(
+            'function'
+        );
+        expect(coreApi.INVESTOR_FLOWS_AXES).toEqual([
+            'institutional',
+            'insider',
+            'largeHolders',
+            'short',
+        ]);
+
+        // Compile-time: siglens implements the port and injects the scorecard.
+        const snapshot = {} as InvestorFlowsSnapshot;
+        const provider: InvestorFlowsDataProvider = {
+            getInvestorFlowsSnapshot: async () => snapshot,
+        };
+        const scorecard = {} as InvestorFlowsScorecard;
+        const result = {
+            status: 'no_data',
+        } satisfies RunInvestorFlowsAnalysisResult;
+        void provider;
+        void scorecard;
+        void result;
+    });
+
+    it('keeps investor-flows prompt, schema and cache-key internals private (API-2)', () => {
+        expect('buildInvestorFlowsAnalysisPrompt' in coreApi).toBe(false);
+        expect('investorFlowsSystemPrompt' in coreApi).toBe(false);
+        expect('INVESTOR_FLOWS_RESPONSE_SCHEMA' in coreApi).toBe(false);
+        expect('buildInvestorFlowsCacheKey' in coreApi).toBe(false);
+        expect('INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION' in coreApi).toBe(false);
     });
 
     it('does not export prompt builders reclassified as @internal', () => {

@@ -9,9 +9,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('14개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(14);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(14);
+    it('15개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(15);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(15);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -34,6 +34,7 @@ describe('AGENT_TOOL_SPECS', () => {
             get_market_overview: { market: 'us' },
             get_economy: {},
             get_congress_trades: { symbol: 'AAPL' },
+            get_investor_flows: { symbol: 'AAPL' },
             get_guide: { query: '이중바닥' },
             run_fresh_analysis: { symbol: 'AAPL', kind: 'technical' },
             web_search: { query: 'Apple earnings', freshness: 'week' },
@@ -84,6 +85,62 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(
             findToolSpec('get_economy')?.inputSchema.required
         ).toBeUndefined();
+    });
+
+    describe('get_investor_flows', () => {
+        const spec = findToolSpec('get_investor_flows');
+
+        it('is a cached, symbol-only tool', () => {
+            expect(spec?.costClass).toBe('cached');
+            expect(spec?.inputSchema.required).toEqual(['symbol']);
+            expect(Object.keys(spec?.inputSchema.properties ?? {})).toEqual([
+                'symbol',
+            ]);
+        });
+
+        it.each([
+            '기관 매수/매도',
+            '기관 보유',
+            '내부자',
+            '공매도',
+            '숏스퀴즈',
+            '13F',
+            '13D',
+            'short interest',
+            'Form 4',
+        ])('names the trigger "%s" so the model reaches for it', term => {
+            expect(spec?.description).toContain(term);
+        });
+
+        it('states every data lag and tells the model to quote as-of dates', () => {
+            const description = spec?.description ?? '';
+            expect(description).toContain('up to ~45 days after quarter end');
+            expect(description).toContain('about 2 business days');
+            expect(description).toContain('off-exchange trades only');
+            expect(description).toContain('as-of dates');
+            expect(description).toContain('never call it neutral');
+        });
+
+        it('is selected when siglens provides it and left out when it does not', () => {
+            expect(
+                selectTools(new Set(['get_quote', 'get_investor_flows'])).map(
+                    s => s.name
+                )
+            ).toEqual(['get_quote', 'get_investor_flows']);
+            expect(
+                selectTools(new Set(['get_quote'])).map(s => s.name)
+            ).not.toContain('get_investor_flows');
+        });
+
+        it('keeps corporate-insider questions away from get_congress_trades', () => {
+            const congress = findToolSpec('get_congress_trades')?.description;
+            expect(congress).toContain('members of the US Senate and House');
+            expect(congress).toContain('members of Congress only');
+            expect(congress).toContain('not company executives');
+            // a static description cannot be gated on the tool, so it never names it
+            expect(congress).not.toContain('get_investor_flows');
+            expect(congress).not.toContain('insider political trading');
+        });
     });
 
     it('findToolSpec', () => {
