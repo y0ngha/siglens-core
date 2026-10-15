@@ -13,10 +13,13 @@ export type {
     CallBriefingAiOptions,
 } from './application/analysis/types';
 export {
+    DEFAULT_KEY_POLICY,
     isModelAllowedForTier,
     requiresUserApiKey,
     shouldUseServerKey,
 } from './domain/keyRouting';
+export type { KeyPolicy } from './domain/keyRouting';
+export { UserApiKeyMissingError } from './application/byok/errors';
 
 // Market analysis
 export { fetchBarsWithIndicators } from './application/market/barsApi';

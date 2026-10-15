@@ -1,3 +1,4 @@
+import type { KeyPolicy } from '@/domain/keyRouting';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -736,6 +737,23 @@ export interface RunOverallAnalysisOptions extends SubmitOverallAnalysisOptions 
      * a user-selected model must fail visibly instead.
      */
     providerFallback?: boolean;
+    /**
+     * Which key pays for generation. Default `'tier'` (free/member models on the
+     * server key, byok-class models on `userApiKey`). `'byok-only'` makes every
+     * generation use `userApiKey` regardless of model or tier, returns the
+     * `key_error` result when it is missing, disables the server-key
+     * `providerFallback`, and never reads a server key. Not part of any cache key, so results are shared across policies; a
+     * cache hit is served by the axes without a key. Unlike the single-axis
+     * use-cases, overall's own key gate runs BEFORE the axes (they must run first
+     * to produce its cache key), so a keyless byok-only overall call is denied
+     * even if the overall entry is cached. Concurrent byok-only runs only join
+     * runs on the same key. See {@link KeyPolicy}.
+     *
+     * Scoped across all four dependency axes AND the overall job's own AI call,
+     * like `modelId`. It is applied after any per-axis options, so an axis-level
+     * object cannot opt itself out of `'byok-only'`.
+     */
+    keyPolicy?: KeyPolicy;
 }
 
 /**

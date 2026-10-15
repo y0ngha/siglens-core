@@ -27,6 +27,16 @@ export function hashAnalysisInput(serialized: string): string {
     return sha256Hex(serialized).slice(0, ANALYSIS_INPUT_HASH_LENGTH);
 }
 
+/**
+ * @internal
+ * Non-reversible scope tag for a caller-supplied API key, used only to keep
+ * in-process in-flight joins apart. 16 hex chars (~64 bits) of SHA-256; the raw
+ * key never leaves this function.
+ */
+export function hashApiKeyScope(apiKey: string): string {
+    return sha256Hex(apiKey).slice(0, ANALYSIS_INPUT_HASH_LENGTH);
+}
+
 /** @internal Fields read from a {@link Skill} when hashing a prompt-skill set for a cache key. */
 interface NormalizedSkillForHash {
     name: string;

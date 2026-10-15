@@ -2,6 +2,53 @@ import type { ActiveModelId, Tier } from '@/domain/types';
 import { isModelAllowed, requiresByokKey } from '@/domain/tier';
 
 /**
+ * Which key pays for a generation.
+ *
+ * - `'tier'` (default): today's behaviour. The server key covers `'free'` and
+ *   `'member'` class models (and every model for a pro-tier caller); only a
+ *   `'byok'`-class model on a non-pro tier falls through to `userApiKey`.
+ * - `'byok-only'`: every generation uses the caller's own `userApiKey`, for
+ *   any model and any tier. No server key is ever read — not for the call, not
+ *   for a retry, not for the DeepSeek→Gemini `providerFallback`. A missing
+ *   `userApiKey` fails fast, before any provider call.
+ *
+ * `'byok-only'` changes ONLY who pays. It never changes what is generated or
+ * how results are cached: the policy is deliberately absent from every cache
+ * key and every Redis lock/result key (the in-process in-flight join key is
+ * the one place it is scoped — see below), so a result produced on a user key and one produced on the
+ * server key are the same entry. `tier` keeps its other meanings under
+ * `'byok-only'` — timeframe access, info depth and skill sampling are still
+ * derived from it — it just no longer decides the key.
+ *
+ * **In-flight sharing.** The cache entry and the cross-instance Redis
+ * lock/result keys are shared across policies, but the IN-PROCESS in-flight
+ * join is not: a `'byok-only'` generation joins only runs with the same policy
+ * AND the same `userApiKey` (scoped by a hash of the key, never the raw key),
+ * while `'tier'` runs join each other exactly as before. So a website caller
+ * never inherits a byok-only caller's bad-key failure or abort, and one
+ * byok-only user's bad key never breaks another's run. A cross-instance waiter
+ * whose lock winner failed generates on its own key.
+ *
+ * **Fail closed.** Any value other than `undefined` or `'tier'` (an untyped JS
+ * caller's typo, say) is treated as `'byok-only'` — see {@link isByokOnly}.
+ *
+ * Intended for the public API, where the website keeps `'tier'`.
+ */
+export type KeyPolicy = 'tier' | 'byok-only';
+
+/**
+ * Whether `keyPolicy` means "caller's own key only". Fails closed: only
+ * `undefined` and `'tier'` select the tier routing; every other value,
+ * including an unknown string, is byok-only.
+ */
+export function isByokOnly(keyPolicy: unknown): boolean {
+    return keyPolicy !== undefined && keyPolicy !== 'tier';
+}
+
+/** Policy applied when a caller omits `keyPolicy`. */
+export const DEFAULT_KEY_POLICY: KeyPolicy = 'tier';
+
+/**
  * `tier`가 없으면 가장 제한적인 등급으로 본다.
  *
  * `requiresByokKey`는 `tier === 'pro'`만 특별 취급하므로, 미지의 호출자를 free로
@@ -18,7 +65,8 @@ function resolveTierOrDefault(tier: Tier | undefined): Tier {
  *
  * Server key covers the `'free'` and `'member'` access classes, plus every
  * model for a pro-tier caller. Only a `'byok'`-class model on a non-pro tier
- * falls through to the user's own key.
+ * falls through to the user's own key. Under `keyPolicy: 'byok-only'` the
+ * answer is always `false` (see {@link KeyPolicy}).
  *
  * ⚠️ Do NOT reimplement this as `isFreeModel(model) || tier === 'pro'`. That
  * was the pre-three-way-axis form, and it charges member-class models to the
@@ -29,8 +77,10 @@ function resolveTierOrDefault(tier: Tier | undefined): Tier {
  */
 export function shouldUseServerKey(
     model: ActiveModelId,
-    tier: Tier | undefined
+    tier: Tier | undefined,
+    keyPolicy: KeyPolicy = DEFAULT_KEY_POLICY
 ): boolean {
+    if (isByokOnly(keyPolicy)) return false;
     return !requiresByokKey(resolveTierOrDefault(tier), model);
 }
 
@@ -42,8 +92,10 @@ export function shouldUseServerKey(
  */
 export function requiresUserApiKey(
     model: ActiveModelId,
-    tier: Tier | undefined
+    tier: Tier | undefined,
+    keyPolicy: KeyPolicy = DEFAULT_KEY_POLICY
 ): boolean {
+    if (isByokOnly(keyPolicy)) return true;
     return requiresByokKey(resolveTierOrDefault(tier), model);
 }
 

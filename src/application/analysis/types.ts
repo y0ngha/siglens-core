@@ -1,4 +1,5 @@
 import type { BriefingModelId } from '@/application/analysis/briefingModel';
+import type { KeyPolicy } from '@/domain/keyRouting';
 import type { CacheProvider } from '@/domain/ports/cache';
 import type { ActiveModelId, Tier } from '@/domain/types';
 
@@ -13,6 +14,20 @@ export interface CallAnalysisAiOptions {
     tier?: Tier;
     /** BYOK. 서버 키를 쓰지 않는 경로(byok 등급 모델 + non-pro tier)에서 필수. */
     userApiKey?: string;
+    /**
+     * Which key pays for this call. Default `'tier'` (the pre-existing routing:
+     * server key for free/member models, `userApiKey` for byok-class models on
+     * non-pro tiers). `'byok-only'` always uses `userApiKey` — see
+     * {@link KeyPolicy}. Under `'byok-only'`:
+     *
+     * - a missing/empty `userApiKey` throws `UserApiKeyMissingError` before any
+     *   provider call;
+     * - no server key is read anywhere in the call, and
+     *   `fallbackOnProviderFailure` is ignored (the DeepSeek→Gemini fallback
+     *   would bill the server's Gemini key);
+     * - `tier` no longer influences key selection.
+     */
+    keyPolicy?: KeyPolicy;
     signal?: AbortSignal;
     system?: string;
     responseSchema?: unknown;
@@ -36,6 +51,8 @@ export interface CallAnalysisAiOptions {
      * where the user cannot choose the model (SEO prewarm, the ai.siglens.io agent)
      * set it — a user-chosen model must not change silently; its failure should
      * surface so the user can switch models (product decision 2026-09-15).
+     *
+     * Ignored when `keyPolicy` is `'byok-only'`.
      */
     fallbackOnProviderFailure?: boolean;
 }
@@ -68,6 +85,12 @@ export interface GenerationDedupeOptions {
      * only that caller's signal is observed — see `dedupeGeneration`.
      */
     signal?: AbortSignal;
+    /**
+     * Key for the IN-PROCESS join only; defaults to `cacheKey`. The Redis
+     * lock/result keys always derive from `cacheKey` so instances still
+     * coordinate. See `resolveInFlightKey`.
+     */
+    inFlightKey?: string;
     /** Upper bound on waiting for a peer; defaults to `GENERATION_WAIT_MAX_MS`. */
     maxWaitMs?: number;
     /** Delay between checks; defaults to `GENERATION_POLL_INTERVAL_MS`. */

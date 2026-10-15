@@ -1,7 +1,11 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { notifyPromptAssembled } from '@/application/analysis/notifyPromptAssembled';
-import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import {
+    buildUserApiKeyRequiredError,
+    isUserApiKeyGateDenied,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { isEmptyAnalysis } from '@/application/market/peekAnalysisCache';
@@ -42,12 +46,7 @@ import {
 import { lastNonNull } from '@/domain/indicators/utils';
 import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
 import type { CacheProvider } from '@/domain/ports/cache';
-import {
-    DEFAULT_TIER,
-    TIER_CONFIG,
-    isTimeframeAllowed,
-    requiresByokKey,
-} from '@/domain/tier';
+import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type {
     ActiveModelId,
     AnalysisResponse,
@@ -69,6 +68,7 @@ import {
 } from '@/infrastructure/cache/config';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
+import { isByokOnly } from '@/domain/keyRouting';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import {
     createSkillSamplingPlan,
@@ -233,10 +233,23 @@ async function runAnalysisImpl(
             ? (options.modelId as ActiveModelId)
             : DEFAULT_RUN_ANALYSIS_MODEL;
 
+    // Key gate. Under the default policy it stays here, before the cache read
+    // (a byok-class model keyless is denied even on a cache hit — unchanged).
+    // Under `byok-only` it moves AFTER the cache read (see below) so a cached
+    // result is served keyless; it also covers the "no modelId" default model,
+    // because that call still goes to a provider with the caller's key.
+    const gateModelId = options.modelId ?? callModelId;
+    const byokOnly = isByokOnly(options.keyPolicy);
     if (
+        !byokOnly &&
         options.modelId !== undefined &&
-        requiresByokKey(tier, options.modelId, tierConfig) &&
-        options.userApiKey === undefined
+        isUserApiKeyGateDenied(
+            tier,
+            options.modelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
     ) {
         return buildUserApiKeyRequiredError(tier, options.modelId);
     }
@@ -377,6 +390,20 @@ async function runAnalysisImpl(
         return { status: 'miss_no_trigger' };
     }
 
+    // byok-only key gate: after the cache read, before the bars fetch.
+    if (
+        byokOnly &&
+        isUserApiKeyGateDenied(
+            tier,
+            gateModelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
+    ) {
+        return buildUserApiKeyRequiredError(tier, gateModelId);
+    }
+
     const { marketDataProvider } = options;
     if (marketDataProvider == null) {
         throw new Error(
@@ -507,6 +534,7 @@ async function runAnalysisImpl(
                 model: callModelId,
                 tier,
                 userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal: options.signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -516,7 +544,14 @@ async function runAnalysisImpl(
                 correlationId: `${symbol}:${timeframe}`,
             });
         },
-        { signal: options.signal }
+        {
+            signal: options.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // Inline post-processing (formerly in pollAnalysis). No job queue involved.
@@ -648,9 +683,13 @@ async function runAnalysisImpl(
  * `pollAnalysis` pair. The caller awaits a single promise; no job IDs, no
  * Redis meta, no polling loop.
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Pass `options.signal` (e.g. `request.signal` from the SSE route handler)
  * so a dropped connection aborts the in-flight LLM call.

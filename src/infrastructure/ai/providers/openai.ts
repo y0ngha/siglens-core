@@ -1,3 +1,4 @@
+import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
 import type { ChatGPTModelSpec, ChatGptReasoningConfig } from '@/domain/types';
 import { resolveReasoningConfig } from '@/domain/types';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
@@ -32,15 +33,10 @@ function isTransientResponseErrorCode(
     return code != null && TRANSIENT_RESPONSE_ERROR_CODES.has(code);
 }
 
-const clientCache = new Map<string, OpenAI>();
+const clientCache = createClientCache<OpenAI>(apiKey => new OpenAI({ apiKey }));
 
 function getClient(apiKey: string): OpenAI {
-    let client = clientCache.get(apiKey);
-    if (!client) {
-        client = new OpenAI({ apiKey });
-        clientCache.set(apiKey, client);
-    }
-    return client;
+    return clientCache.get(apiKey);
 }
 
 export interface ChatGPTCallOptions {

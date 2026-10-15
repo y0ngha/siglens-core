@@ -1,4 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    afterEach,
+    beforeEach,
+    describe,
+    expect,
+    it,
+    vi,
+    type MockInstance,
+} from 'vitest';
 import * as normalizeJsonResponseModule from '@/infrastructure/ai/normalizeJsonResponse';
 
 vi.mock('@/infrastructure/ai/retry/anthropicRetry', () => ({
@@ -19,6 +27,8 @@ import {
     callAnalysisAi,
     DEEPSEEK_FALLBACK_MODEL,
 } from '@/application/analysis/callAnalysisAi';
+import { UserApiKeyMissingError } from '@/application/byok/errors';
+import * as serverKeysModule from '@/infrastructure/ai/serverKeys';
 import { callClaudeWithRetry } from '@/infrastructure/ai/retry/anthropicRetry';
 import { callDeepSeekWithRetry } from '@/infrastructure/ai/retry/deepseekRetry';
 import { callGeminiWithRetry } from '@/infrastructure/ai/retry/geminiRetry';
@@ -576,5 +586,249 @@ describe('callAnalysisAi — DeepSeek 장애 시 Gemini 1회 폴백', () => {
         ).rejects.toBe(failure);
         expect(callGeminiWithRetry).toHaveBeenCalledTimes(1);
         expect(callDeepSeekWithRetry).not.toHaveBeenCalled();
+    });
+});
+
+describe('callAnalysisAi — keyPolicy', () => {
+    const CLASSES = [
+        { access: 'free', model: GEMINI_FREE },
+        { access: 'member', model: 'claude-sonnet-5-5' },
+        { access: 'byok', model: CLAUDE_PREMIUM },
+    ] as const;
+
+    /** Throws if anything asks for a server key — the env stubs stay set on purpose. */
+    let serverKeySpy: MockInstance | undefined;
+
+    /** Restored after every test, pass or fail, so it cannot leak into the next. */
+    afterEach(() => {
+        serverKeySpy?.mockRestore();
+        serverKeySpy = undefined;
+    });
+
+    function spyServerKeyThrows() {
+        const spy = vi
+            .spyOn(serverKeysModule, 'resolveServerApiKey')
+            .mockImplementation(provider => {
+                throw new Error(`server key read for ${provider}`);
+            });
+        serverKeySpy = spy;
+        return spy;
+    }
+
+    function usedKeys(): unknown[] {
+        return [
+            callClaudeWithRetry,
+            callChatGPTWithRetry,
+            callGeminiWithRetry,
+            callDeepSeekWithRetry,
+        ].flatMap(a => vi.mocked(a).mock.calls.map(c => c[2]));
+    }
+
+    describe('byok-only', () => {
+        it.each(CLASSES)(
+            'passes the user key to the $access-class dispatch and never reads a server key',
+            async ({ model }) => {
+                const spy = spyServerKeyThrows();
+                await callAnalysisAi({
+                    prompt: 'p',
+                    model,
+                    tier: 'free',
+                    userApiKey: 'user-key',
+                    keyPolicy: 'byok-only',
+                });
+                expect(usedKeys()).toEqual(['user-key']);
+                expect(spy).not.toHaveBeenCalled();
+            }
+        );
+
+        it('uses the user key on a pro tier and with no tier at all', async () => {
+            const spy = spyServerKeyThrows();
+            for (const tier of ['pro', undefined] as const) {
+                vi.clearAllMocks();
+                await callAnalysisAi({
+                    prompt: 'p',
+                    model: GEMINI_FREE,
+                    tier,
+                    userApiKey: 'user-key',
+                    keyPolicy: 'byok-only',
+                });
+                expect(usedKeys()).toEqual(['user-key']);
+            }
+            expect(spy).not.toHaveBeenCalled();
+        });
+
+        it.each(CLASSES)(
+            'throws UserApiKeyMissingError for the $access-class model without a key, before any provider call',
+            async ({ model }) => {
+                const spy = spyServerKeyThrows();
+                const attempt = callAnalysisAi({
+                    prompt: 'p',
+                    model,
+                    tier: 'pro',
+                    keyPolicy: 'byok-only',
+                });
+                await expect(attempt).rejects.toBeInstanceOf(
+                    UserApiKeyMissingError
+                );
+                await expect(attempt).rejects.toMatchObject({
+                    code: 'user_api_key_required',
+                });
+                expect(usedKeys()).toHaveLength(0);
+                expect(spy).not.toHaveBeenCalled();
+            }
+        );
+
+        it('treats an empty key as missing', async () => {
+            await expect(
+                callAnalysisAi({
+                    prompt: 'p',
+                    model: GEMINI_FREE,
+                    userApiKey: '',
+                    keyPolicy: 'byok-only',
+                })
+            ).rejects.toBeInstanceOf(UserApiKeyMissingError);
+            expect(usedKeys()).toHaveLength(0);
+        });
+
+        describe('provider fallback', () => {
+            const stalled = Object.assign(new Error('DeepSeek stalled'), {
+                code: 'DEEPSEEK_STALLED',
+            });
+
+            beforeEach(() => {
+                vi.spyOn(console, 'warn').mockImplementation(() => {});
+                vi.mocked(callDeepSeekWithRetry).mockReset();
+                vi.mocked(callGeminiWithRetry)
+                    .mockReset()
+                    .mockResolvedValue(OK);
+            });
+
+            it('is disabled even when requested: the DeepSeek failure surfaces, Gemini is never called', async () => {
+                vi.mocked(callDeepSeekWithRetry).mockRejectedValue(stalled);
+                const spy = spyServerKeyThrows();
+
+                await expect(
+                    callAnalysisAi({
+                        prompt: 'p',
+                        model: DEEPSEEK_FREE,
+                        tier: 'free',
+                        userApiKey: 'user-key',
+                        keyPolicy: 'byok-only',
+                        fallbackOnProviderFailure: true,
+                    })
+                ).rejects.toBe(stalled);
+
+                expect(callGeminiWithRetry).not.toHaveBeenCalled();
+                expect(spy).not.toHaveBeenCalled();
+            });
+
+            it('control: the same request under the default policy does fall back', async () => {
+                vi.mocked(callDeepSeekWithRetry).mockRejectedValueOnce(stalled);
+
+                await callAnalysisAi({
+                    prompt: 'p',
+                    model: DEEPSEEK_FREE,
+                    tier: 'free',
+                    fallbackOnProviderFailure: true,
+                });
+
+                expect(callGeminiWithRetry).toHaveBeenCalledTimes(1);
+            });
+        });
+
+        it('a JSON-regeneration retry reuses the user key', async () => {
+            vi.spyOn(console, 'warn').mockImplementation(() => {});
+            const spy = spyServerKeyThrows();
+            vi.mocked(callGeminiWithRetry)
+                .mockReset()
+                .mockResolvedValueOnce('{"a":1,,,,"b":}')
+                .mockResolvedValueOnce(OK);
+
+            await callAnalysisAi({
+                prompt: 'p',
+                model: GEMINI_FREE,
+                userApiKey: 'user-key',
+                keyPolicy: 'byok-only',
+            });
+
+            expect(usedKeys()).toEqual(['user-key', 'user-key']);
+            expect(spy).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('unknown keyPolicy value fails closed', () => {
+        it('uses the user key and never reads a server key', async () => {
+            const spy = spyServerKeyThrows();
+            await callAnalysisAi({
+                prompt: 'p',
+                model: GEMINI_FREE,
+                tier: 'pro',
+                userApiKey: 'user-key',
+                keyPolicy: 'byok_only' as never,
+            });
+            expect(usedKeys()).toEqual(['user-key']);
+            expect(spy).not.toHaveBeenCalled();
+        });
+
+        it('throws UserApiKeyMissingError without a key', async () => {
+            const spy = spyServerKeyThrows();
+            await expect(
+                callAnalysisAi({
+                    prompt: 'p',
+                    model: GEMINI_FREE,
+                    tier: 'pro',
+                    keyPolicy: 'oops' as never,
+                })
+            ).rejects.toBeInstanceOf(UserApiKeyMissingError);
+            expect(usedKeys()).toHaveLength(0);
+            expect(spy).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('default policy (regression)', () => {
+        it.each([
+            { access: 'free', model: GEMINI_FREE, key: 'server-gemini' },
+            {
+                access: 'member',
+                model: 'claude-sonnet-5-5',
+                key: 'server-anthropic',
+            },
+        ] as const)(
+            '$access-class model runs on the server key even if a user key is supplied',
+            async ({ model, key }) => {
+                await callAnalysisAi({
+                    prompt: 'p',
+                    model,
+                    tier: 'free',
+                    userApiKey: 'user-key',
+                });
+                expect(usedKeys()).toEqual([key]);
+            }
+        );
+
+        it('byok-class model on a non-pro tier runs on the user key', async () => {
+            await callAnalysisAi({
+                prompt: 'p',
+                model: CLAUDE_PREMIUM,
+                tier: 'free',
+                userApiKey: 'user-key',
+                keyPolicy: 'tier',
+            });
+            expect(usedKeys()).toEqual(['user-key']);
+        });
+
+        it('missing-key failure is the same error type and message as before', async () => {
+            const attempt = callAnalysisAi({
+                prompt: 'p',
+                model: CLAUDE_PREMIUM,
+                tier: 'free',
+            });
+            await expect(attempt).rejects.toBeInstanceOf(
+                UserApiKeyMissingError
+            );
+            await expect(attempt).rejects.toThrow(
+                'User API key required for this model and tier combination'
+            );
+        });
     });
 });

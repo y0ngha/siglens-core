@@ -1,3 +1,4 @@
+import type { KeyPolicy } from '@/domain/keyRouting';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
@@ -73,6 +74,17 @@ export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
      * decides when a key is required.
      */
     userApiKey?: string;
+    /**
+     * Which key pays for generation. Default `'tier'` (free/member models on the
+     * server key, byok-class models on `userApiKey`). `'byok-only'` makes every
+     * generation use `userApiKey` regardless of model or tier, throws
+     * `UserApiKeyMissingError` when it is missing, disables the server-key
+     * `providerFallback`, and never reads a server key. Not part of any cache key, so results are shared across policies; a
+     * cache hit is served even without a key (the key gate runs after the cache
+     * read, before any data fetch or provider call), and concurrent byok-only
+     * runs only join runs on the same key. See {@link KeyPolicy}.
+     */
+    keyPolicy?: KeyPolicy;
     /**
      * Cancellation signal for the in-flight LLM call (used by `runCongressTrend`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection

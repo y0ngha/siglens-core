@@ -1,3 +1,4 @@
+import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
 import Anthropic from '@anthropic-ai/sdk';
 import type {
     ClaudeAdaptiveReasoningConfig,
@@ -42,15 +43,12 @@ export const MAX_TOKENS_CODE = 'CLAUDE_MAX_TOKENS';
 
 const CLAUDE_TIMEOUT_MS = 3600_000;
 
-const clientCache = new Map<string, Anthropic>();
+const clientCache = createClientCache<Anthropic>(
+    apiKey => new Anthropic({ apiKey })
+);
 
 function getClient(apiKey: string): Anthropic {
-    let client = clientCache.get(apiKey);
-    if (!client) {
-        client = new Anthropic({ apiKey });
-        clientCache.set(apiKey, client);
-    }
-    return client;
+    return clientCache.get(apiKey);
 }
 
 export interface ClaudeCallOptions {
