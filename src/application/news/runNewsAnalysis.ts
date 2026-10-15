@@ -1,6 +1,10 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
-import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import {
+    buildUserApiKeyRequiredError,
+    isUserApiKeyGateDeniedAt,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import type {
     RunNewsAnalysisResult,
     SubmitNewsAnalysisLimitError,
@@ -20,7 +24,7 @@ import {
 } from '@/domain/analysis/outputLocale';
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
-import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import type {
     ActiveModelId,
     NewsAnalysisResponse,
@@ -82,9 +86,13 @@ function hashNewsInput(
  * assembly) and the result — a single `loadSkillsCached()` replaces the split
  * across submit and poll.
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Usage is recorded AFTER the LLM resolves, so an aborted or failed call
  * does not consume quota.
@@ -127,8 +135,14 @@ export async function runNewsAnalysis(
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
     if (
-        requiresByokKey(tier, modelId, tierConfig) &&
-        options.userApiKey === undefined
+        isUserApiKeyGateDeniedAt(
+            'before-cache',
+            tier,
+            modelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
     ) {
         return buildUserApiKeyRequiredError(tier, modelId);
     }
@@ -210,6 +224,22 @@ export async function runNewsAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
+    // byok-only key gate: after the cache read (a cached result is served
+    // keyless), before any provider fetch or Redis lock. Under the default
+    // policy the gate stays at the top, unchanged.
+    if (
+        isUserApiKeyGateDeniedAt(
+            'after-cache',
+            tier,
+            modelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
+    ) {
+        return buildUserApiKeyRequiredError(tier, modelId);
+    }
+
     // ── 6. Build prompt ──
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildNewsAnalysisPrompt(
@@ -246,6 +276,7 @@ export async function runNewsAnalysis(
                 model: modelId as ActiveModelId,
                 tier,
                 userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal: options.signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -254,7 +285,14 @@ export async function runNewsAnalysis(
                 reasoning: options.reasoning,
                 correlationId: `${symbol}:news`,
             }),
-        { signal: options.signal }
+        {
+            signal: options.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // ── 8. Inline post-processing (formerly in pollNewsAnalysis) ──

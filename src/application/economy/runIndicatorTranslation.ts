@@ -1,3 +1,7 @@
+import {
+    assertByokOnlyKeyPresent,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { GEMINI_FLASH_LITE_MODEL } from '@/application/chat/constants';
@@ -43,19 +47,29 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_FLASH_LITE_MODEL;
  * the worker's `/analyze` endpoint, not `/briefing`. The model is fixed at
  * `gemini-3.5-flash-lite` with reasoning off (single Korean string output).
  *
- * Indicator translation has no usage gate — no tier, no BYOK, no quota check.
+ * Indicator translation has no usage gate — no tier gate and no quota check;
+ * by default it uses the server key (fixed model). With
+ * `keyPolicy: 'byok-only'` it runs on `userApiKey` instead.
  *
  * The cache TTL is 30 days (indicator names rarely change). An empty `nameKo`
  * result (garbage from the LLM) is cached and returned — callers should fall
  * back to the original English name when `nameKo === ''`.
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
  * @throws If the AI provider call fails (network, 5xx, AbortError).
+ * @throws {UserApiKeyMissingError} When `options.keyPolicy` is `'byok-only'`
+ *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
+ *   Thrown after the cache read — a cached result is still returned keyless —
+ *   and before any data fetch, Redis lock or provider call.
  *
  * @see submitIndicatorTranslation — the queued predecessor; still exported for
  *   the existing production path until siglens switches to runIndicatorTranslation.
@@ -85,6 +99,10 @@ export async function runIndicatorTranslation(
         }
     }
 
+    // byok-only: a missing key fails here — after the cache read (a cached
+    // result is still served keyless), before any data fetch or Redis lock.
+    assertByokOnlyKeyPresent(options?.keyPolicy, options?.userApiKey);
+
     // This builder has no skills catalog and no separate system prompt —
     // `stable` is always '' (Design C), so `prompt` is `dynamic` alone.
     const { dynamic } = buildIndicatorTranslationPrompt(normalizedName);
@@ -97,6 +115,8 @@ export async function runIndicatorTranslation(
             callAnalysisAi({
                 prompt,
                 model: INDICATOR_TRANSLATION_MODEL,
+                userApiKey: options?.userApiKey,
+                keyPolicy: options?.keyPolicy,
                 signal: options?.signal,
                 seed: analysisSeed(prompt),
                 // 지표명 한 줄 번역 — 사실상 사전 조회다. 추론은 지연·출력 토큰만
@@ -105,7 +125,14 @@ export async function runIndicatorTranslation(
                 reasoning: false,
                 correlationId: `indicator-translation:${normalizedName}`,
             }),
-        { signal: options?.signal }
+        {
+            signal: options?.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options?.keyPolicy,
+                options?.userApiKey
+            ),
+        }
     );
 
     // raw를 JSON.parse하지 않고 그대로 넘긴다 — normalizeIndicatorTranslation이

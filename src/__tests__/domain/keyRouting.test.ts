@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    DEFAULT_KEY_POLICY,
+    isByokOnly,
     isModelAllowedForTier,
     requiresUserApiKey,
     shouldUseServerKey,
@@ -142,5 +144,67 @@ describe('cost guard is unaffected by the model-gating policy change', () => {
         expect(isModelAllowedForTier(FREE_MODEL, 'member')).toBe(true);
         expect(requiresUserApiKey(FREE_MODEL, 'member')).toBe(false);
         expect(shouldUseServerKey(FREE_MODEL, 'member')).toBe(true);
+    });
+});
+
+describe('keyPolicy', () => {
+    const MODELS: ActiveModelId[] = [
+        'gemini-3.6-flash',
+        'claude-sonnet-5-5',
+        'claude-opus-5',
+    ];
+    const TIERS = ['free', 'member', 'pro', undefined] as const;
+
+    it('defaults to "tier"', () => {
+        expect(DEFAULT_KEY_POLICY).toBe('tier');
+    });
+
+    it.each(MODELS)(
+        'byok-only never selects the server key for %s, on any tier',
+        model => {
+            for (const tier of TIERS) {
+                expect(shouldUseServerKey(model, tier, 'byok-only')).toBe(
+                    false
+                );
+                expect(requiresUserApiKey(model, tier, 'byok-only')).toBe(true);
+            }
+        }
+    );
+
+    it.each(MODELS)(
+        'an explicit "tier" is identical to the omitted policy for %s',
+        model => {
+            for (const tier of TIERS) {
+                expect(shouldUseServerKey(model, tier, 'tier')).toBe(
+                    shouldUseServerKey(model, tier)
+                );
+                expect(requiresUserApiKey(model, tier, 'tier')).toBe(
+                    requiresUserApiKey(model, tier)
+                );
+            }
+        }
+    );
+});
+
+describe('keyPolicy fails closed', () => {
+    it('only undefined and "tier" select tier routing', () => {
+        expect(isByokOnly(undefined)).toBe(false);
+        expect(isByokOnly('tier')).toBe(false);
+        expect(isByokOnly('byok-only')).toBe(true);
+        for (const odd of ['byok_only', 'BYOK-ONLY', '', 'server', null, 0]) {
+            expect(isByokOnly(odd)).toBe(true);
+        }
+    });
+
+    it('an unknown string never selects the server key', () => {
+        const bogus = 'bogus' as never;
+        for (const model of [
+            'gemini-3.6-flash',
+            'claude-sonnet-5-5',
+            'claude-opus-5',
+        ] as const) {
+            expect(shouldUseServerKey(model, 'pro', bogus)).toBe(false);
+            expect(requiresUserApiKey(model, 'pro', bogus)).toBe(true);
+        }
     });
 });

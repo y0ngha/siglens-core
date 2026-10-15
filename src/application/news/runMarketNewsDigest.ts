@@ -1,3 +1,7 @@
+import {
+    assertByokOnlyKeyPresent,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
@@ -36,14 +40,21 @@ const LOG_TAG = '[RunMarketNewsDigest]' as const;
  * Skills are accepted as an option (`options.skills`) rather than loaded
  * internally, matching the submit/poll pair's contract.
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
- * @throws If the AI provider call fails (network, 5xx, abort). Gate denials
- *   are returned as discriminated-union variants, not thrown.
+ * @throws If the AI provider call fails (network, 5xx, abort).
+ * @throws {UserApiKeyMissingError} When `options.keyPolicy` is `'byok-only'`
+ *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
+ *   Thrown after the cache read — a cached result is still returned keyless —
+ *   and before any data fetch, Redis lock or provider call.
  *
  * @see submitMarketNewsDigest — the queued predecessor; still exported for
  *   the existing production path until siglens switches to runMarketNewsDigest.
@@ -82,6 +93,10 @@ export async function runMarketNewsDigest(
         return { status: 'miss_no_trigger' };
     }
 
+    // byok-only: a missing key fails here — after the cache read (a cached
+    // result is still served keyless), before any data fetch or Redis lock.
+    assertByokOnlyKeyPresent(options.keyPolicy, options.userApiKey);
+
     // ── 3. Build prompt ──
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const { stable, dynamic } = buildMarketNewsDigestPrompt(
@@ -117,6 +132,8 @@ export async function runMarketNewsDigest(
                 prompt,
                 model: callModelId,
                 tier,
+                userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal: options.signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -130,7 +147,14 @@ export async function runMarketNewsDigest(
                 reasoning: options.reasoning,
                 correlationId: `${category}:market-news-digest`,
             }),
-        { signal: options.signal }
+        {
+            signal: options.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // ── 5. Inline post-processing (formerly in pollMarketNewsDigest) ──

@@ -1,4 +1,8 @@
-import type { ModelId, Tier } from '@/domain/types';
+import { UserApiKeyMissingError } from '@/application/byok/errors';
+import { isByokOnly, type KeyPolicy } from '@/domain/keyRouting';
+import { requiresByokKey } from '@/domain/tier';
+import type { ModelId, Tier, TierConfig } from '@/domain/types';
+import { hashApiKeyScope } from '@/infrastructure/hash/analysisInput';
 import type { UserApiKeyRequiredError } from './types';
 import { USER_API_KEY_REQUIRED_MESSAGE } from './messages';
 
@@ -21,4 +25,110 @@ export function buildUserApiKeyRequiredError(
         modelId,
         tier,
     };
+}
+
+/**
+ * Whether a run must be denied with a BYOK-required result because it has no
+ * usable user key.
+ *
+ * - `keyPolicy: 'tier'` (default): the pre-existing gate — a `'byok'`-class
+ *   model on a non-pro tier with `userApiKey === undefined`. Unchanged.
+ * - `keyPolicy: 'byok-only'`: every model needs the caller's key, so the gate
+ *   denies whenever `userApiKey` is missing or empty. `tier` plays no part.
+ *
+ * Use-cases call this where they used to inline `requiresByokKey(...) &&
+ * userApiKey === undefined`, so the gate and `callAnalysisAi`'s routing agree.
+ *
+ * @internal
+ */
+export function isUserApiKeyGateDenied(
+    tier: Tier,
+    modelId: ModelId,
+    tierConfig: TierConfig,
+    userApiKey: string | undefined,
+    keyPolicy: KeyPolicy | undefined
+): boolean {
+    if (isByokOnly(keyPolicy)) {
+        return userApiKey === undefined || userApiKey === '';
+    }
+    return (
+        requiresByokKey(tier, modelId, tierConfig) && userApiKey === undefined
+    );
+}
+
+/**
+ * Where a use-case runs the key gate relative to its cache read.
+ *
+ * - `'before-cache'`: the default (`'tier'`) policy gate. It runs first, so a
+ *   byok-class model without a key is denied even on a cache hit (unchanged).
+ * - `'after-cache'`: the `'byok-only'` gate. It runs after the cache read, so
+ *   a cached result is served keyless, and before any provider fetch or lock.
+ *
+ * @internal
+ */
+export type UserApiKeyGateStage = 'before-cache' | 'after-cache';
+
+/**
+ * `isUserApiKeyGateDenied`, applied only at the stage that owns the policy:
+ * `'before-cache'` checks only the default policy and `'after-cache'` checks
+ * only `byok-only`. A use-case calls it at both points, and exactly one of
+ * them can deny.
+ *
+ * @internal
+ */
+export function isUserApiKeyGateDeniedAt(
+    stage: UserApiKeyGateStage,
+    tier: Tier,
+    modelId: ModelId,
+    tierConfig: TierConfig,
+    userApiKey: string | undefined,
+    keyPolicy: KeyPolicy | undefined
+): boolean {
+    const ownsStage =
+        stage === 'after-cache'
+            ? isByokOnly(keyPolicy)
+            : !isByokOnly(keyPolicy);
+    return (
+        ownsStage &&
+        isUserApiKeyGateDenied(tier, modelId, tierConfig, userApiKey, keyPolicy)
+    );
+}
+
+/**
+ * Throw `UserApiKeyMissingError` when `keyPolicy` is byok-only and the key is
+ * missing or empty. For the use-cases with no `key_error` result variant; call
+ * it AFTER the cache read (a cached result is served keyless — cache hits are
+ * free) and BEFORE any data fetch or Redis lock.
+ *
+ * @internal
+ */
+export function assertByokOnlyKeyPresent(
+    keyPolicy: KeyPolicy | undefined,
+    userApiKey: string | undefined
+): void {
+    if (
+        isByokOnly(keyPolicy) &&
+        (userApiKey === undefined || userApiKey === '')
+    ) {
+        throw new UserApiKeyMissingError();
+    }
+}
+
+/**
+ * Key for the in-process in-flight join (`dedupeGeneration`'s `inFlightKey`).
+ *
+ * `'tier'` runs keep `cacheKey`, so website callers still share one dispatch.
+ * A byok-only run is scoped by policy and by a hash of its own key, so it
+ * never joins a run on another key or policy (and never leaks its failure or
+ * abort signal to one). The raw key is never part of the result.
+ *
+ * @internal
+ */
+export function resolveInFlightKey(
+    cacheKey: string,
+    keyPolicy: KeyPolicy | undefined,
+    userApiKey: string | undefined
+): string {
+    if (!isByokOnly(keyPolicy)) return cacheKey;
+    return `${cacheKey}:byok:${hashApiKeyScope(userApiKey ?? '')}`;
 }

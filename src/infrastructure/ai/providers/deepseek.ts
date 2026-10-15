@@ -1,3 +1,4 @@
+import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import type {
@@ -63,15 +64,12 @@ type DeepSeekChatCompletionCreateParams =
         thinking: DeepSeekThinkingConfig;
     };
 
-const clientCache = new Map<string, OpenAI>();
+const clientCache = createClientCache<OpenAI>(
+    apiKey => new OpenAI({ apiKey, baseURL: DEEPSEEK_BASE_URL })
+);
 
 function getClient(apiKey: string): OpenAI {
-    let client = clientCache.get(apiKey);
-    if (!client) {
-        client = new OpenAI({ apiKey, baseURL: DEEPSEEK_BASE_URL });
-        clientCache.set(apiKey, client);
-    }
-    return client;
+    return clientCache.get(apiKey);
 }
 
 export interface DeepSeekCallOptions {

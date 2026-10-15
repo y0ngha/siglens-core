@@ -8,7 +8,8 @@ import type {
     DeepSeekModelId,
     GeminiModelId,
 } from '@/domain/analysis/modelSpecs';
-import { shouldUseServerKey } from '@/domain/keyRouting';
+import { UserApiKeyMissingError } from '@/application/byok/errors';
+import { isByokOnly, shouldUseServerKey } from '@/domain/keyRouting';
 import { getProviderForModel } from '@/domain/llm/providers';
 import { normalizeJsonResponse } from '@/infrastructure/ai/normalizeJsonResponse';
 import { callClaudeWithRetry } from '@/infrastructure/ai/retry/anthropicRetry';
@@ -108,6 +109,7 @@ export async function callAnalysisAi(
         model,
         tier,
         userApiKey,
+        keyPolicy,
         signal,
         system,
         responseSchema,
@@ -117,15 +119,18 @@ export async function callAnalysisAi(
         fallbackOnProviderFailure = false,
     } = options;
 
-    const useServerKey = shouldUseServerKey(model, tier);
+    // `byok-only` never reaches `resolveServerApiKey`: `shouldUseServerKey`
+    // answers false for every model and tier, so the server-key branch below —
+    // and the fallback in `generate`, which is gated on `useServerKey` — are
+    // unreachable. An empty key is treated as missing there (a blank header
+    // would only surface later as an opaque provider 401).
+    const useServerKey = shouldUseServerKey(model, tier, keyPolicy);
     const apiKey = useServerKey
         ? resolveServerApiKey(getProviderForModel(model))
         : userApiKey;
 
-    if (apiKey === undefined) {
-        throw new Error(
-            'User API key required for this model and tier combination'
-        );
+    if (apiKey === undefined || (isByokOnly(keyPolicy) && apiKey === '')) {
+        throw new UserApiKeyMissingError();
     }
 
     // 추론 OFF를 요청했지만 모델이 완전히 끄지 못하는 경우(`hardOff: false`)를

@@ -1,7 +1,11 @@
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
-import { buildUserApiKeyRequiredError } from '@/application/byok/gate';
+import {
+    buildUserApiKeyRequiredError,
+    isUserApiKeyGateDeniedAt,
+    resolveInFlightKey,
+} from '@/application/byok/gate';
 import {
     buildUsageLimitError,
     checkAnalysisUsageAllowed,
@@ -24,7 +28,7 @@ import {
 import { FINANCIALS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { financialsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { DEFAULT_TIER, requiresByokKey, TIER_CONFIG } from '@/domain/tier';
+import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import {
     buildFinancialsCacheKey,
     FINANCIALS_CACHE_TTL_SECONDS,
@@ -110,9 +114,13 @@ async function fetchProviderData(
  * synchronously as a local variable immediately after the provider fetch —
  * no Redis round-trip is needed (invariant 1 of the worker-removal design).
  *
- * Concurrent calls for the same `cacheKey` are deduplicated via
+ * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
- * receive the same result.
+ * with that key receive the same result.
+ * "Same in-flight key" means the same `cacheKey` for `keyPolicy: 'tier'` (the
+ * default), and the same `cacheKey` plus the same `userApiKey` (scoped by a hash,
+ * never the raw key) for `'byok-only'` — callers on other keys or policies
+ * neither join this run nor receive its result or failure.
  *
  * Pass `options.signal` (e.g. `request.signal` from the SSE route handler)
  * so a dropped connection aborts the in-flight LLM call.
@@ -138,8 +146,14 @@ export async function runFinancialsAnalysis(
 
     // ── 0a. BYOK gate (tier + premium model + no userApiKey) ──
     if (
-        requiresByokKey(tier, modelId, tierConfig) &&
-        options.userApiKey === undefined
+        isUserApiKeyGateDeniedAt(
+            'before-cache',
+            tier,
+            modelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
     ) {
         return buildUserApiKeyRequiredError(tier, modelId);
     }
@@ -207,6 +221,22 @@ export async function runFinancialsAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
+    // byok-only key gate: after the cache read (a cached result is served
+    // keyless), before any provider fetch or Redis lock. Under the default
+    // policy the gate stays at the top, unchanged.
+    if (
+        isUserApiKeyGateDeniedAt(
+            'after-cache',
+            tier,
+            modelId,
+            tierConfig,
+            options.userApiKey,
+            options.keyPolicy
+        )
+    ) {
+        return buildUserApiKeyRequiredError(tier, modelId);
+    }
+
     const providerData = await fetchProviderData(
         dataProvider,
         symbol,
@@ -252,6 +282,7 @@ export async function runFinancialsAnalysis(
                 model: callModelId,
                 tier,
                 userApiKey: options.userApiKey,
+                keyPolicy: options.keyPolicy,
                 signal: options.signal,
                 fallbackOnProviderFailure: options.providerFallback,
                 system,
@@ -260,7 +291,14 @@ export async function runFinancialsAnalysis(
                 reasoning: options.reasoning,
                 correlationId: `${symbol}:financials`,
             }),
-        { signal: options.signal }
+        {
+            signal: options.signal,
+            inFlightKey: resolveInFlightKey(
+                cacheKey,
+                options.keyPolicy,
+                options.userApiKey
+            ),
+        }
     );
 
     // Inline post-processing (formerly in pollFinancialsAnalysis). No job queue involved.
