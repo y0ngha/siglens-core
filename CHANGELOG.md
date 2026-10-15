@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.18.1](https://github.com/y0ngha/siglens-core/compare/v2.18.0...v2.18.1) (2026-10-15)
+
+### Bug Fixes
+
+* byok-only 종합 분석 캐시 조회는 키 없이 통과 ([#275](https://github.com/y0ngha/siglens-core/issues/275)) ([4b088cc](https://github.com/y0ngha/siglens-core/commit/4b088ccc28b3e938b73d47a561df0a02dd2271e2))
+
 # [2.18.0](https://github.com/y0ngha/siglens-core/compare/v2.17.0...v2.18.0) (2026-10-15)
 
 ### Features
