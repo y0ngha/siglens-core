@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.17.0](https://github.com/y0ngha/siglens-core/compare/v2.16.2...v2.17.0) (2026-10-15)
+
+### Features
+
+* 신규 모델 7종 추가와 구모델 4종 퇴역 ([#272](https://github.com/y0ngha/siglens-core/issues/272)) ([5868f5b](https://github.com/y0ngha/siglens-core/commit/5868f5b689afbbdd474d538ad5856191700ddaae))
+
 ## [2.16.2](https://github.com/y0ngha/siglens-core/compare/v2.16.1...v2.16.2) (2026-10-11)
 
 ### Bug Fixes
