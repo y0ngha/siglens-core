@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.21.0](https://github.com/y0ngha/siglens-core/compare/v2.20.0...v2.21.0) (2026-10-16)
+
+### Features
+
+* 수급 분석 실데이터 A/B 반영 — FTD 최대치 날짜, Form 144 신고자 CIK·발행주식 비율 기준, 변화율 기준일, 프롬프트 표기 개선 ([#278](https://github.com/y0ngha/siglens-core/issues/278)) ([de79ea6](https://github.com/y0ngha/siglens-core/commit/de79ea6d15048a5b408bdbd896ef1a85d67e5700))
+
 # [2.20.0](https://github.com/y0ngha/siglens-core/compare/v2.19.0...v2.20.0) (2026-10-16)
 
 ### Features
