@@ -1775,9 +1775,15 @@ export function buildCongressTrendCacheKey(
  * **`p1`** = first generation. The prompt consumes no skill catalog, so the key
  * carries no skill fingerprint.
  *
+ * **`p2`** = investor-flows expansion: a fifth axis (`dilution`) in the
+ * scorecard, the response schema's axis enum and the per-axis rules; Form 144,
+ * 13F option, fails-to-deliver, threshold-list and offering facts; the squeeze
+ * score block; and a Korean (DART) prompt variant. A `p1` entry has four axis
+ * interpretations and would render without the dilution axis.
+ *
  * @internal
  */
-export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p1' as const;
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
 
 /**
  * @internal TTL for investor-flows analysis cache results. Default: 12 hours —
@@ -1798,8 +1804,12 @@ export const INVESTOR_FLOWS_CACHE_TTL_SECONDS = 12 * SECONDS_PER_HOUR;
  * ({@link INVESTOR_FLOWS_CACHE_TTL_SECONDS}), the schema-version prefix and the
  * prompt-version segment.
  *
- * `includeFinraData: false` appends `:finra=off` because it changes what the
- * model is shown; the default (`true`/`undefined`) leaves the key unsuffixed.
+ * `includeFinraData: false` appends `:finra=off` and `includeExchangeLists:
+ * false` appends `:regsho=off`, because each changes what the model is shown;
+ * the defaults (`true`/`undefined`) leave the key unsuffixed. `squeeze: true`
+ * (a squeeze context was supplied) appends `:squeeze=on`, because the context
+ * adds a squeeze-score block and changes how `short_squeeze_risk` is decided;
+ * without one the key is unsuffixed.
  *
  * @internal
  * @param symbol - U.S. equity ticker (canonical uppercase).
@@ -1807,6 +1817,8 @@ export const INVESTOR_FLOWS_CACHE_TTL_SECONDS = 12 * SECONDS_PER_HOUR;
  * @param reasoning - Per-request deep-thinking toggle; `true` appends `:reason=on`.
  * @param locale - AI output language; the default (`ko`) adds nothing.
  * @param includeFinraData - `false` when FINRA short data is excluded.
+ * @param includeExchangeLists - `false` when the Reg SHO threshold lists are excluded.
+ * @param squeeze - `true` when a squeeze context (daily bars) was supplied.
  * @returns The cache key.
  */
 export function buildInvestorFlowsCacheKey(
@@ -1814,11 +1826,15 @@ export function buildInvestorFlowsCacheKey(
     modelId: string,
     reasoning?: boolean,
     locale?: AnalysisLocale,
-    includeFinraData?: boolean
+    includeFinraData?: boolean,
+    includeExchangeLists?: boolean,
+    squeeze?: boolean
 ): string {
     const base = `${CACHE_KEY_SCHEMA_VERSION}:analysis:investorFlows:${symbol}:${modelId}:${INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION}`;
     const finra = includeFinraData === false ? ':finra=off' : '';
-    return `${base}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}${finra}`;
+    const regSho = includeExchangeLists === false ? ':regsho=off' : '';
+    const squeezeSuffix = squeeze === true ? ':squeeze=on' : '';
+    return `${base}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}${finra}${regSho}${squeezeSuffix}`;
 }
 
 /**
@@ -2040,9 +2056,17 @@ export function buildNewsCacheKey(
  * A section-scoped byte test cannot back a whole-prompt claim — `overallPrompt.test.ts`
  * now pins the full prompt for the default equity path and for crypto + no-news.
  *
+ * **`p5`** — investor-flows expansion (2026-10-16). Only prompts that carry the
+ * `## Investor Flows` section change: the weighting guidance gains the
+ * dilution / fails-to-deliver / Form 144 lines, the scorecard renders a fifth
+ * axis and the squeeze score, the NO DATA line names the new sources, and a
+ * Korean scorecard (or a `null` one on a KRW listing) gets DART wording. A
+ * prompt without investor flows is byte-identical, but the guidance text is not
+ * folded into `inputHash`, so the segment is bumped for every entry.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

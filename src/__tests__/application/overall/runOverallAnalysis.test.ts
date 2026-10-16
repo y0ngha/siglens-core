@@ -1845,7 +1845,7 @@ describe('runOverallAnalysis', () => {
             // lets the omitted case leak into the hash (e.g. `?? 0`, `?? null`)
             // changes this literal.
             expect(await cacheKeyFor(undefined)).toBe(
-                'v1:analysis:overall:AAPL:1Day:deepseek-v4.1-flash:p4:db97fcfbcde0adcb'
+                'v1:analysis:overall:AAPL:1Day:deepseek-v4.1-flash:p5:db97fcfbcde0adcb'
             );
             await runOverallAnalysis(baseOptions());
             expect(lastCall().prompt).not.toContain('Investor Flows');

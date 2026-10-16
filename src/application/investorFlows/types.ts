@@ -5,7 +5,9 @@ import type { InvestorFlowsDataProvider } from '@/domain/ports/investorFlowsData
 import type {
     ModelId,
     InvestorFlowsAnalysisResponse,
+    InvestorFlowsMarket,
     InvestorFlowsScorecard,
+    SqueezeRiskContext,
     Tier,
 } from '@/domain/types';
 
@@ -17,7 +19,7 @@ import type {
  * congress. `userApiKey` is forwarded to the AI call unchanged.
  */
 export interface RunInvestorFlowsAnalysisOptions extends BackgroundTaskOptions {
-    /** U.S. equity ticker (e.g. `"AAPL"`). */
+    /** Ticker (`"AAPL"`, or a Korean listing such as `"005930.KS"` whose snapshot is `market: 'kr'`). */
     symbol: string;
     /** LLM model identifier used for the analysis and cache scoping. */
     modelId: ModelId;
@@ -57,6 +59,28 @@ export interface RunInvestorFlowsAnalysisOptions extends BackgroundTaskOptions {
      * Default `true`.
      */
     includeFinraData?: boolean;
+    /**
+     * `false` drops the Reg SHO threshold-list status from the scorecard, the
+     * squeeze score and the prompt (the exchange lists are licensed for
+     * non-commercial use only). Folded into the cache key. Default `true`.
+     */
+    includeExchangeLists?: boolean;
+    /**
+     * Daily bars for the price-aware squeeze score (see `evaluateSqueezeRisk`).
+     * Its presence is folded into the cache key (`:squeeze=on`) because it adds
+     * the squeeze block to the prompt; the bars themselves are not hashed. Omit
+     * to keep the price-free squeeze rule.
+     */
+    squeezeContext?: SqueezeRiskContext;
+    /**
+     * Market of the symbol, as the provider will report it in
+     * `snapshot.market`. Only shapes the cache key, which is built before the
+     * snapshot is fetched: for `'kr'` the FINRA, exchange-list and squeeze
+     * suffixes are left off because those sources do not exist for Korean
+     * listings and cannot change the output. Core never infers the market from
+     * the symbol. Default `'us'`.
+     */
+    market?: InvestorFlowsMarket;
 }
 
 /**

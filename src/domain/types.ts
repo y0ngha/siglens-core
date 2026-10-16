@@ -4119,7 +4119,7 @@ export type {
 } from './economy/types';
 
 // =============================================================================
-// Investor flows (수급) (13F / Form 4 / 13D-G / FINRA short) — 40+ cohesive types live in
+// Investor flows (수급) (13F / Form 4 / Form 144 / 13D-G / FINRA / SEC FTD / DART) — 60+ cohesive types live in
 // ./investorFlows/types and are re-exported here (see the options note above).
 // =============================================================================
 export type {
@@ -4164,6 +4164,30 @@ export type {
     InvestorFlowsAnalysisResponse,
     RawInvestorFlowsAnalysisResponse,
     RawInvestorFlowsAxisInterpretation,
+    InstitutionalOptionsQuarter,
+    FailsToDeliverPoint,
+    ProposedSale,
+    OfferingKind,
+    OfferingFiling,
+    ThresholdListStatus,
+    InvestorFlowsMarket,
+    KrMajorHolderReportForm,
+    KrMajorHolderReport,
+    KrInsiderReport,
+    KrTradingPlan,
+    KrDisclosureSnapshot,
+    KrInsiderMetrics,
+    KrMajorHolderMetrics,
+    DilutionMetrics,
+    DilutionAxis,
+    SqueezeRiskBar,
+    SqueezeRiskContext,
+    EvaluateSqueezeRiskOptions,
+    SqueezeRiskLevel,
+    SqueezeRiskComponentId,
+    SqueezeRiskComponent,
+    SqueezeRiskSufficiency,
+    SqueezeRiskScore,
 } from './investorFlows/types';
 
 // =============================================================================

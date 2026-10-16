@@ -4,6 +4,7 @@ import { normalizeInvestorFlowsAnalysisResponse } from '@/domain/analysis/normal
 const FULL = {
     summaryKo: '기관 매수가 이어졌습니다.',
     axisInterpretations: [
+        { axis: 'dilution', interpretationKo: '희석 해석' },
         { axis: 'short', interpretationKo: '공매도 해석' },
         { axis: 'institutional', interpretationKo: '기관 해석' },
         { axis: 'largeHolders', interpretationKo: '대량보유 해석' },
@@ -30,8 +31,23 @@ describe('normalizeInvestorFlowsAnalysisResponse', () => {
             'insider',
             'largeHolders',
             'short',
+            'dilution',
         ]);
         expect(r.axisInterpretations[0].interpretationKo).toBe('기관 해석');
+    });
+
+    it('keeps a Korean response that interprets only the two DART axes', () => {
+        const r = normalizeInvestorFlowsAnalysisResponse({
+            ...FULL,
+            axisInterpretations: [
+                { axis: 'largeHolders', interpretationKo: '대량보유' },
+                { axis: 'insider', interpretationKo: '임원' },
+            ],
+        });
+        expect(r.axisInterpretations.map(i => i.axis)).toEqual([
+            'insider',
+            'largeHolders',
+        ]);
     });
 
     it('parses a markdown-fenced JSON string', () => {

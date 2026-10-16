@@ -15,6 +15,10 @@ import {
     NEW_VS_EXITED_MODERATE_BALANCE,
     NEW_VS_EXITED_STRONG_BALANCE,
     NEW_VS_EXITED_WEAK_BALANCE,
+    PUT_CALL_MAX_STRENGTH,
+    PUT_CALL_MIN_HOLDERS,
+    PUT_CALL_SHIFT_MULTIPLE,
+    PUT_CALL_SKEW_RATIO,
     TOP_HOLDER_CONSENSUS_MODERATE,
     TOP_HOLDER_CONSENSUS_STRONG,
     TOP_HOLDER_CONSENSUS_WEAK,
@@ -39,6 +43,7 @@ import type {
     InstitutionalAxis,
     InstitutionalHolderChange,
     InstitutionalMetrics,
+    InstitutionalOptionsQuarter,
     InstitutionalQuarter,
     InstitutionalSnapshot,
     NetShareChangeBasis,
@@ -59,7 +64,107 @@ const EMPTY_METRICS: InstitutionalMetrics = {
     topHolderConsensus: null,
     topHolderCount: null,
     partialQuarter: null,
+    optionsPeriod: null,
+    putCallValueRatio: null,
+    priorPutCallValueRatio: null,
 };
+
+interface PutCallReading {
+    readonly current: InstitutionalOptionsQuarter;
+    readonly ratio: number;
+    readonly priorRatio: number | null;
+}
+
+/** Put / call notional ratio of a quarter; `null` when it has too few filers or no notional on a side. */
+function putCallRatio(q: InstitutionalOptionsQuarter): number | null {
+    const numbers = [
+        q.putHolders,
+        q.callHolders,
+        q.putValueUsd,
+        q.callValueUsd,
+    ];
+    if (!numbers.every(isFiniteNumber)) return null;
+    if (q.putHolders + q.callHolders < PUT_CALL_MIN_HOLDERS) return null;
+    if (q.putValueUsd <= 0 || q.callValueUsd <= 0) return null;
+    return roundValue(q.putValueUsd / q.callValueUsd);
+}
+
+/**
+ * The latest complete, fresh 13F option quarter and its put / call ratio, plus
+ * the ratio of the complete quarter before it. Same as-of and freshness rules as
+ * the holdings quarters.
+ */
+function readPutCall(
+    options: readonly InstitutionalOptionsQuarter[] | undefined,
+    asOfDay: number | null
+): PutCallReading | null {
+    const complete = (options ?? [])
+        .filter(q => {
+            const day = parseDay(q.period);
+            return (
+                q.complete &&
+                day !== null &&
+                isVisibleAsOf(day, asOfDay) &&
+                (asOfDay === null ||
+                    daysBetween(day, asOfDay) <= INSTITUTIONAL_MAX_AGE_DAYS)
+            );
+        })
+        .sort((a, b) => b.period.localeCompare(a.period));
+    const [current, prior] = complete;
+    const ratio = current === undefined ? null : putCallRatio(current);
+    if (current === undefined || ratio === null) return null;
+    return {
+        current,
+        ratio,
+        priorRatio: prior === undefined ? null : putCallRatio(prior),
+    };
+}
+
+/** Direction of a ratio that is past the skew band (or of a shift past the shift multiple); `null` inside. */
+function tiltOf(
+    ratio: number,
+    threshold: number
+): InvestorFlowsSignalDirection | null {
+    if (ratio >= threshold) return 'bearish';
+    if (ratio <= 1 / threshold) return 'bullish';
+    return null;
+}
+
+/**
+ * Weak signal from the put / call notional ratio: one-sided when the ratio is
+ * past {@link PUT_CALL_SKEW_RATIO} (or its inverse), or when it moved by
+ * {@link PUT_CALL_SHIFT_MULTIPLE}x versus the prior quarter. A level and a
+ * shift pointing opposite ways cancel. Never stronger than weak — 13F option
+ * notional is mostly hedging.
+ */
+function putCallSignal(reading: PutCallReading): InvestorFlowsSignal[] {
+    const level = tiltOf(reading.ratio, PUT_CALL_SKEW_RATIO);
+    const shift =
+        reading.priorRatio === null
+            ? null
+            : tiltOf(
+                  reading.ratio / reading.priorRatio,
+                  PUT_CALL_SHIFT_MULTIPLE
+              );
+    if (level !== null && shift !== null && level !== shift) return [];
+    const direction = level ?? shift;
+    if (direction === null) return [];
+    return [
+        makeSignal(
+            'institutional',
+            'institutional_put_call_skew',
+            direction,
+            PUT_CALL_MAX_STRENGTH,
+            {
+                putCallValueRatio: reading.ratio,
+                priorPutCallValueRatio: reading.priorRatio,
+                putHolders: reading.current.putHolders,
+                callHolders: reading.current.callHolders,
+            },
+            reading.current.period
+        ),
+    ];
+}
 
 /**
  * Whether a quarter can be scored: a parsable period and finite counts. The one
@@ -161,6 +266,11 @@ export function usableQuarters(
  * {@link INSTITUTIONAL_MAX_AGE_DAYS} before `asOfDay` is stale: the axis is
  * insufficient and carries a neutral `data_stale` signal with the period.
  *
+ * When the snapshot carries 13F option positions, a weak
+ * `institutional_put_call_skew` signal reads the put / call notional ratio of
+ * the latest complete option quarter (see `putCallSignal`); it is only added
+ * to an otherwise sufficient axis.
+ *
  * Scores the latest **complete** quarter. An in-progress quarter only counts
  * the filers that have already reported, so it is surfaced as
  * `metrics.partialQuarter` plus a neutral signal and is never scored.
@@ -257,7 +367,11 @@ export function evaluateInstitutionalAxis(
             ? topHolderConsensus(snapshot.topHolders)
             : null;
 
-    const signals: InvestorFlowsSignal[] = [...partialSignals];
+    const putCall = readPutCall(snapshot.options, asOfDay);
+    const signals: InvestorFlowsSignal[] = [
+        ...partialSignals,
+        ...(putCall === null ? [] : putCallSignal(putCall)),
+    ];
 
     const holderStrength = strengthOf(Math.abs(holderCountChangePct), {
         weak: HOLDER_COUNT_CHANGE_WEAK_PCT,
@@ -378,6 +492,9 @@ export function evaluateInstitutionalAxis(
             topHolderConsensus: consensus?.consensus ?? null,
             topHolderCount: consensus?.count ?? null,
             partialQuarter: partial,
+            optionsPeriod: putCall?.current.period ?? null,
+            putCallValueRatio: putCall?.ratio ?? null,
+            priorPutCallValueRatio: putCall?.priorRatio ?? null,
         },
     };
 }

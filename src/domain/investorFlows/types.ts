@@ -144,6 +144,189 @@ export interface ShortVolumePoint {
     readonly totalVolume: number;
 }
 
+/**
+ * Aggregated 13F option positions (`putCall` rows) in one symbol for one report
+ * quarter. `*Shares` is the underlying share count (`sshPrnamt`) and `*ValueUsd`
+ * the underlying notional as filed — not the option premium.
+ */
+export interface InstitutionalOptionsQuarter {
+    /** Report-period end, e.g. `2026-06-30`. */
+    readonly period: string;
+    /** `true` once the 13F filing deadline for `period` has passed; partial quarters are never scored. */
+    readonly complete: boolean;
+    /** Institutions reporting a put position. */
+    readonly putHolders: number;
+    /** Underlying shares of the put positions. */
+    readonly putShares: number;
+    /** Underlying notional of the put positions, USD. */
+    readonly putValueUsd: number;
+    /** Institutions reporting a call position. */
+    readonly callHolders: number;
+    /** Underlying shares of the call positions. */
+    readonly callShares: number;
+    /** Underlying notional of the call positions, USD. */
+    readonly callValueUsd: number;
+}
+
+/** One SEC fails-to-deliver (FTD) settlement day. Rows exist only on days with fails. */
+export interface FailsToDeliverPoint {
+    /** Settlement date. */
+    readonly settlementDate: string;
+    /** Shares that failed to deliver on that day (cumulative open fails as published). */
+    readonly failsQty: number;
+    /** Closing price published with the row; `null` when the file has `.`. */
+    readonly price: number | null;
+}
+
+/** One SEC Form 144 notice of a proposed sale by an affiliate. */
+export interface ProposedSale {
+    /** Date the Form 144 was filed. */
+    readonly filingDate: string;
+    /** Person for whose account the shares are to be sold. */
+    readonly filer: string;
+    /** Relationships to the issuer as filed (`Officer`, `Director`, ...). */
+    readonly relationships: readonly string[];
+    /** Shares to be sold. */
+    readonly shares: number;
+    /** Aggregate market value of the shares to be sold, USD. */
+    readonly valueUsd: number;
+    /** Approximate sale date; `null` when not filed. */
+    readonly approxSaleDate: string | null;
+    /** Rule 10b5-1 plan adoption date; `null` when the sale is not under a plan. */
+    readonly planAdoptionDate: string | null;
+    /** Link to the SEC filing. */
+    readonly url: string;
+}
+
+/**
+ * Classification of a registration / offering filing, assigned by the consumer:
+ * `shelf` (S-3, S-3ASR, F-3 and amendments), `registration` (S-1, F-1 and
+ * amendments), `atm` / `underwritten` / `best_efforts` (424B5 classified from its
+ * cover text), `private_placement` (Form D), `prospectus` (other 424B forms) and
+ * `other` (a 424B5 that could not be classified).
+ */
+export type OfferingKind =
+    | 'shelf'
+    | 'registration'
+    | 'prospectus'
+    | 'atm'
+    | 'underwritten'
+    | 'best_efforts'
+    | 'private_placement'
+    | 'other';
+
+/** One registration, prospectus or Form D filing by the issuer. */
+export interface OfferingFiling {
+    /** Filing date. */
+    readonly filingDate: string;
+    /** Form as filed (`S-3`, `424B5`, `D`, ...). */
+    readonly form: string;
+    /** Classification. */
+    readonly kind: OfferingKind;
+    /** Link to the SEC filing. */
+    readonly url: string;
+}
+
+/**
+ * Reg SHO threshold-list status (Nasdaq / NYSE / Cboe lists).
+ *
+ * With `asOf`, a status whose list date is more than
+ * `THRESHOLD_LIST_MAX_AGE_DAYS` days before the reference day (or after it) is
+ * treated as unavailable, like a switched-off feed. Without `asOf` the status is
+ * taken as current — a provider that cannot date it should send `null` once its
+ * lists stop updating.
+ */
+export interface ThresholdListStatus {
+    /** Whether the symbol is on a threshold list as of the latest list date. */
+    readonly listed: boolean;
+    /** Consecutive trading days on a list up to the latest list date (0 when not listed). */
+    readonly consecutiveDays: number;
+    /** First day of the current listing streak; `null` when not listed. */
+    readonly firstListedDate: string | null;
+    /** Markets whose list carries the symbol (`Nasdaq`, `NYSE`, ...). */
+    readonly markets: readonly string[];
+    /** Trade date of the latest list this status reflects; optional for older providers. */
+    readonly asOf?: string;
+}
+
+/** Market the snapshot describes; it selects the axis evaluators and the prompt wording. */
+export type InvestorFlowsMarket = 'us' | 'kr';
+
+/**
+ * DART major-holder report form: `detailed` is 일반 and `abbreviated` is 약식.
+ * Informational only — 약식 is used both for simple investment and for a
+ * professional investor's general investment, so the form never sets strength.
+ */
+export type KrMajorHolderReportForm = 'detailed' | 'abbreviated';
+
+/** One DART 5%+ major-holder report (대량보유 상황보고, `majorstock.json`). */
+export interface KrMajorHolderReport {
+    /** Receipt date (`rcept_dt`). */
+    readonly receiptDate: string;
+    /** Reporter (`repror`). */
+    readonly reporter: string;
+    /** Report form (`report_tp`). */
+    readonly reportForm: KrMajorHolderReportForm;
+    /** Shares held after the change (`stkqy`). */
+    readonly shares: number;
+    /** Change in shares held (`stkqy_irds`). */
+    readonly sharesChange: number;
+    /** Holding ratio after the change, percent (`stkrt`). */
+    readonly ratioPct: number;
+    /** Change in the holding ratio, percentage points (`stkrt_irds`). */
+    readonly ratioChangePct: number;
+    /** Free-text reason (`report_resn`). */
+    readonly reason: string;
+    /** Link to the DART filing. */
+    readonly url: string;
+}
+
+/** One DART executive / major-shareholder ownership report (임원·주요주주 소유보고, `elestock.json`). */
+export interface KrInsiderReport {
+    /** Receipt date (`rcept_dt`). */
+    readonly receiptDate: string;
+    /** Reporter (`repror`). */
+    readonly reporter: string;
+    /** Position (`isu_exctv_ofcps`); `null` when not an executive. */
+    readonly position: string | null;
+    /** Registered executive (`isu_exctv_rgist_at`). */
+    readonly registered: boolean;
+    /** Major shareholder (`isu_main_shrholdr`). */
+    readonly majorShareholder: boolean;
+    /** Shares held after the change (`sp_stock_lmp_cnt`). */
+    readonly shares: number;
+    /** Change in shares held (`sp_stock_lmp_irds_cnt`); the report carries no cause. */
+    readonly sharesChange: number;
+    /** Holding ratio after the change, percent (`sp_stock_lmp_rate`). */
+    readonly ratioPct: number;
+    /** Change in the holding ratio, percentage points (`sp_stock_lmp_irds_rate`). */
+    readonly ratioChangePct: number;
+    /** Link to the DART filing. */
+    readonly url: string;
+}
+
+/** One DART insider trading-plan report (거래계획보고서, D005). */
+export interface KrTradingPlan {
+    /** Receipt date. */
+    readonly receiptDate: string;
+    /** Reporter. */
+    readonly reporter: string;
+    /** Report title as listed. */
+    readonly title: string;
+    /** Link to the DART filing. */
+    readonly url: string;
+}
+
+/** Korean (DART) disclosure section of the snapshot; read only when `market` is `kr`. */
+export interface KrDisclosureSnapshot {
+    /** Major-holder reports, about the last 2 years, any order. */
+    readonly majorHolders: readonly KrMajorHolderReport[];
+    /** Executive / major-shareholder reports, about the last 2 years, any order. */
+    readonly insiders: readonly KrInsiderReport[];
+    /** Trading-plan reports, any order. */
+    readonly tradingPlans: readonly KrTradingPlan[];
+}
+
 /** Institutional (13F) section of the snapshot. */
 export interface InstitutionalSnapshot {
     /** Quarters with data, in any order; the scorecard sorts by `period`. */
@@ -156,6 +339,8 @@ export interface InstitutionalSnapshot {
      * an in-progress quarter would show false exits. `null` when unknown.
      */
     readonly topHoldersPeriod: string | null;
+    /** 13F option positions per quarter, any order; absent in snapshots built before it existed. */
+    readonly options?: readonly InstitutionalOptionsQuarter[];
 }
 
 /** Insider section of the snapshot. */
@@ -194,13 +379,29 @@ export interface InvestorFlowsSnapshot {
     readonly shortInterest: readonly ShortInterestPoint[] | null;
     /** FINRA daily off-exchange short volume, any order; `null` when the FINRA feature flag is off. */
     readonly shortVolume: readonly ShortVolumePoint[] | null;
+    /**
+     * Market the snapshot describes. Absent means `us`. With `kr` the scorecard
+     * reads only {@link InvestorFlowsSnapshot.kr}: the major-holder and insider
+     * axes are scored from DART reports and the US-only axes are insufficient.
+     */
+    readonly market?: InvestorFlowsMarket;
+    /** SEC fails-to-deliver days, any order; `null` when unavailable. Optional for older snapshots. */
+    readonly failsToDeliver?: readonly FailsToDeliverPoint[] | null;
+    /** SEC Form 144 notices, about the last year, any order. Optional for older snapshots. */
+    readonly proposedSales?: readonly ProposedSale[];
+    /** Registration / offering filings, about the last 2 years, any order. Optional for older snapshots. */
+    readonly offerings?: readonly OfferingFiling[];
+    /** Reg SHO threshold-list status; `null` when the exchange-list feature flag is off. */
+    readonly thresholdList?: ThresholdListStatus | null;
+    /** DART disclosures; read only when `market` is `kr`. */
+    readonly kr?: KrDisclosureSnapshot;
 }
 
 // ─── Scorecard (deterministic output) ────────────────
 
-/** The four investor-flows axes. */
+/** The five investor-flows axes. */
 export type InvestorFlowsAxisId =
-    'institutional' | 'insider' | 'largeHolders' | 'short';
+    'institutional' | 'insider' | 'largeHolders' | 'short' | 'dilution';
 
 /** Direction a signal pushes investor flows (수급); `neutral` signals carry no score. */
 export type InvestorFlowsSignalDirection = 'bullish' | 'bearish' | 'neutral';
@@ -216,12 +417,15 @@ export type InvestorFlowsSignalId =
     | 'institutional_new_vs_exited'
     | 'institutional_top_holder_consensus'
     | 'institutional_partial_quarter'
+    | 'institutional_put_call_skew'
     // insider
     | 'insider_open_market_buying'
     | 'insider_cluster_buy'
     | 'insider_routine_selling'
     | 'insider_large_selling'
     | 'insider_quiet'
+    | 'insider_proposed_sale'
+    | 'insider_proposed_sale_cluster'
     // large holders
     | 'activist_13d_new'
     | 'activist_13d_increase'
@@ -232,12 +436,29 @@ export type InvestorFlowsSignalId =
     | 'passive_13g_reduction'
     | 'passive_13g_exit'
     | 'large_holder_amendment'
+    // large holders, Korea (DART)
+    | 'kr_major_holder_new'
+    | 'kr_major_holder_increase'
+    | 'kr_major_holder_reduction'
+    | 'kr_major_holder_exit'
+    // insider, Korea (DART)
+    | 'kr_insider_net_change'
+    | 'kr_insider_cluster'
+    | 'kr_trading_plan'
     // short
     | 'short_interest_level'
     | 'short_interest_trend'
     | 'days_to_cover_high'
     | 'off_exchange_short_ratio_z'
     | 'short_squeeze_risk'
+    | 'fails_to_deliver_elevated'
+    | 'reg_sho_threshold_listed'
+    // dilution
+    | 'atm_offering_active'
+    | 'underwritten_offering'
+    | 'shelf_registration_new'
+    | 'registration_new'
+    | 'private_placement'
     // any axis
     | 'data_stale';
 
@@ -325,6 +546,12 @@ export interface InstitutionalMetrics {
     readonly topHolderCount: number | null;
     /** In-progress quarter, when the latest quarter is not complete. */
     readonly partialQuarter: PartialInstitutionalQuarter | null;
+    /** 13F option quarter the put/call ratio was read from. */
+    readonly optionsPeriod: string | null;
+    /** Put notional / call notional in {@link InstitutionalMetrics.optionsPeriod}. */
+    readonly putCallValueRatio: number | null;
+    /** The same ratio one quarter earlier. */
+    readonly priorPutCallValueRatio: number | null;
 }
 
 /** Institutional (13F) axis. */
@@ -358,13 +585,37 @@ export interface InsiderMetrics {
     readonly clusterBuy: boolean;
     /** Sells that were large relative to the seller's holdings. */
     readonly largeSellCount: number;
+    /** Form 144 notices filed in the window. */
+    readonly proposedSaleCount: number;
+    /** Distinct Form 144 filers in the window. */
+    readonly proposedSaleFilerCount: number;
+    /** Aggregate value of the window's Form 144 notices, USD. */
+    readonly proposedSaleValueUsd: number;
+    /** Part of {@link InsiderMetrics.proposedSaleValueUsd} under a Rule 10b5-1 plan, USD. */
+    readonly proposedSalePlannedValueUsd: number;
 }
 
-/** Insider (Form 4) axis. */
+/** Computed figures of the Korean insider axis over the insider window. */
+export interface KrInsiderMetrics {
+    /** Executive / major-shareholder reports in the window. */
+    readonly reports: number;
+    /** Distinct reporters in the window. */
+    readonly reporters: number;
+    /** Net change in shares held across the window's reports. */
+    readonly netSharesChange: number;
+    /** Net change as percent of shares outstanding (else the summed ratio change); `null` when neither is usable. */
+    readonly netChangePct: number | null;
+    /** Trading-plan reports in the window. */
+    readonly tradingPlans: number;
+}
+
+/** Insider axis: Form 4 and Form 144 for US listings, DART ownership reports for Korean ones. */
 export interface InsiderAxis extends InvestorFlowsAxisBase {
     readonly id: 'insider';
-    /** Computed figures; `null` when the axis is insufficient. */
+    /** US figures; `null` when the axis is insufficient or the snapshot is Korean. */
     readonly metrics: InsiderMetrics | null;
+    /** Korean figures; present only for a Korean snapshot with data in the window. */
+    readonly krMetrics?: KrInsiderMetrics;
 }
 
 /** Computed 13D/13G figures over the large-holder window. */
@@ -375,11 +626,48 @@ export interface LargeHolderMetrics {
     readonly filings13g: number;
 }
 
-/** 5% beneficial-owner (13D/13G) axis. */
+/** Computed figures of the Korean major-holder axis over the large-holder window. */
+export interface KrMajorHolderMetrics {
+    /** Major-holder reports in the window. */
+    readonly reports: number;
+    /** Distinct reporters in the window. */
+    readonly reporters: number;
+    /** Reports in the window filed on the detailed (일반) form; informational. */
+    readonly detailedReports: number;
+}
+
+/** 5% beneficial-owner axis: 13D/13G for US listings, DART major-holder reports for Korean ones. */
 export interface LargeHolderAxis extends InvestorFlowsAxisBase {
     readonly id: 'largeHolders';
-    /** Computed figures; `null` when the axis is insufficient. */
+    /** US figures; `null` when the axis is insufficient or the snapshot is Korean. */
     readonly metrics: LargeHolderMetrics | null;
+    /** Korean figures; present only for a Korean snapshot with data in the window. */
+    readonly krMetrics?: KrMajorHolderMetrics;
+}
+
+/** Computed dilution figures over the dilution window. */
+export interface DilutionMetrics {
+    /** Offering filings in the window, every kind. */
+    readonly filingsInWindow: number;
+    /** At-the-market program filings (424B5 `atm`). */
+    readonly atmFilings: number;
+    /** Marketed offerings: underwritten or placement-agent (best efforts) 424B5. */
+    readonly marketedOfferingFilings: number;
+    /** Shelf registrations (S-3 / F-3 family). */
+    readonly shelfFilings: number;
+    /** Full registrations (S-1 / F-1 family). */
+    readonly registrationFilings: number;
+    /** Form D private placements. */
+    readonly privatePlacementFilings: number;
+    /** Newest filing date in the window. */
+    readonly latestFilingDate: string | null;
+}
+
+/** Dilution (registration / offering filings) axis. */
+export interface DilutionAxis extends InvestorFlowsAxisBase {
+    readonly id: 'dilution';
+    /** Computed figures; `null` when the axis is insufficient. */
+    readonly metrics: DilutionMetrics | null;
 }
 
 /** Direction of the last short-interest settlements. */
@@ -405,12 +693,23 @@ export interface ShortMetrics {
      * Whether the squeeze-risk conditions all held: short interest % of float,
      * the days-to-cover *level* of the latest settlement (not its change) and a
      * rising short-interest trend. There is no price condition — the snapshot
-     * carries no price.
+     * carries no price. With a squeeze context the flag instead means the squeeze
+     * score reached `high` (see `evaluateSqueezeRisk`).
      */
     readonly squeezeRisk: boolean;
+    /** Largest fails-to-deliver quantity in the recent FTD window. */
+    readonly failsToDeliverPeakQty: number | null;
+    /** That peak as percent of shares outstanding. */
+    readonly failsToDeliverPctOutstanding: number | null;
+    /** That peak divided by the baseline's average daily fails; `null` without a baseline. */
+    readonly failsToDeliverMultiple: number | null;
+    /** Reg SHO threshold-list status; `null` when the lists are excluded or unavailable. */
+    readonly thresholdListed: boolean | null;
+    /** Consecutive days on a threshold list; `null` when the lists are excluded or unavailable. */
+    readonly thresholdConsecutiveDays: number | null;
 }
 
-/** Short-selling axis (FINRA data). */
+/** Short-selling axis: FINRA short interest and short volume, plus SEC fails to deliver and Reg SHO threshold lists as neutral context. */
 export interface ShortAxis extends InvestorFlowsAxisBase {
     readonly id: 'short';
     /** Computed figures. */
@@ -457,6 +756,12 @@ export interface InvestorFlowsFreshness {
     readonly insiderTransactionsInWindow: number;
     /** Window 13D/13G activity was measured over. */
     readonly largeHolderWindow: InvestorFlowsWindow;
+    /** Newest fails-to-deliver settlement date. */
+    readonly failsToDeliverLatestDate: string | null;
+    /** Window offering filings were measured over. */
+    readonly dilutionWindow: InvestorFlowsWindow;
+    /** Newest DART receipt date (major-holder, insider or trading-plan report); `null` for US snapshots. */
+    readonly krDisclosureLatestDate: string | null;
 }
 
 /** The deterministic investor-flows scorecard. The LLM interprets it; it never recomputes it. */
@@ -467,8 +772,14 @@ export interface InvestorFlowsScorecard {
     readonly insider: InsiderAxis;
     /** 13D/13G axis. */
     readonly largeHolders: LargeHolderAxis;
-    /** FINRA short axis. */
+    /** Short axis (FINRA short data, SEC fails to deliver, Reg SHO threshold lists). */
     readonly short: ShortAxis;
+    /** Registration / offering (dilution) axis. */
+    readonly dilution: DilutionAxis;
+    /** Market the scorecard was evaluated for. */
+    readonly market: InvestorFlowsMarket;
+    /** Short-squeeze score; `null` without a squeeze context or for Korean snapshots. */
+    readonly squeezeRisk: SqueezeRiskScore | null;
     /** Composite across the axes with data. */
     readonly composite: InvestorFlowsComposite;
     /** Data freshness metadata. */
@@ -481,6 +792,108 @@ export interface EvaluateInvestorFlowsOptions {
     readonly asOf?: string;
     /** `false` ignores the FINRA short data even when the snapshot carries it. Default `true`. */
     readonly includeFinraData?: boolean;
+    /**
+     * `false` ignores the Reg SHO threshold-list status even when the snapshot
+     * carries it (the exchange lists are licensed for non-commercial use only).
+     * Default `true`. Needed beside the provider's `null` feed for the same
+     * reason as `includeFinraData`: a cached snapshot outlives a flag change.
+     */
+    readonly includeExchangeLists?: boolean;
+    /**
+     * Daily bars for the price-aware squeeze score. When given, the
+     * `short_squeeze_risk` signal comes from `evaluateSqueezeRisk` and the
+     * scorecard carries the score; without it the signal keeps the price-free rule.
+     */
+    readonly squeezeContext?: SqueezeRiskContext;
+}
+
+// ─── Short-squeeze score ─────────────────────────────
+
+/** One daily bar the squeeze score reads. */
+export interface SqueezeRiskBar {
+    /** Session date (`yyyy-mm-dd`, or a datetime whose leading date is the session). */
+    readonly date: string;
+    /** Close. */
+    readonly close: number;
+    /** Share volume. */
+    readonly volume: number;
+}
+
+/** Price context for {@link SqueezeRiskScore}. */
+export interface SqueezeRiskContext {
+    /**
+     * Daily bars, any order. Only bars dated **before** the reference day are
+     * used, so a still-forming bar of the reference day never changes the score.
+     */
+    readonly dailyBars: readonly SqueezeRiskBar[];
+}
+
+/** Options for `evaluateSqueezeRisk`. */
+export interface EvaluateSqueezeRiskOptions {
+    /** Overrides `snapshot.asOf` (same normalization as `evaluateInvestorFlows`). */
+    readonly asOf?: string;
+    /** `false` drops the FINRA components. Default `true`. */
+    readonly includeFinraData?: boolean;
+    /** `false` drops the threshold-list component. Default `true`. */
+    readonly includeExchangeLists?: boolean;
+}
+
+/** Squeeze-score band. */
+export type SqueezeRiskLevel = 'low' | 'elevated' | 'high' | 'extreme';
+
+/** Inputs of the squeeze score. */
+export type SqueezeRiskComponentId =
+    | 'short_interest_pct_float'
+    | 'days_to_cover'
+    | 'short_interest_trend'
+    | 'off_exchange_short_ratio_z'
+    | 'fails_to_deliver_pct'
+    | 'threshold_list_days'
+    | 'price_change_20d'
+    | 'volume_ratio';
+
+/** One input of the squeeze score. */
+export interface SqueezeRiskComponent {
+    /** Which input. */
+    readonly id: SqueezeRiskComponentId;
+    /** Raw value in the input's own unit (percent, days, z, multiple). */
+    readonly value: number;
+    /** Value mapped onto 0..1. */
+    readonly normalized: number;
+    /** Weight after renormalizing over the available inputs (the weights of the listed components sum to 1). */
+    readonly weight: number;
+    /** Points this input adds to the 0..100 score (`normalized x weight x 100`, rounded). */
+    readonly contribution: number;
+}
+
+/** `full` = every input present; `partial` = some missing, weights renormalized; `insufficient` = no short-side input. */
+export type SqueezeRiskSufficiency = 'full' | 'partial' | 'insufficient';
+
+/** Deterministic short-squeeze risk score. */
+export interface SqueezeRiskScore {
+    /** 0..100; `null` when insufficient. */
+    readonly score: number | null;
+    /** Band of `score`; `null` when insufficient. */
+    readonly level: SqueezeRiskLevel | null;
+    /** Inputs that were present, largest contribution first. */
+    readonly components: readonly SqueezeRiskComponent[];
+    /** Inputs that were missing or excluded by an option. */
+    readonly missing: readonly SqueezeRiskComponentId[];
+    /** Data sufficiency. */
+    readonly sufficiency: SqueezeRiskSufficiency;
+    /**
+     * `true` when the level was held at `elevated` because no short-positioning
+     * input (short interest, days to cover, trend, short-volume z) was present.
+     */
+    readonly levelCapped: boolean;
+    /** Whether a FINRA-derived input contributed. */
+    readonly includesFinra: boolean;
+    /** Whether the threshold-list input contributed. */
+    readonly includesExchangeLists: boolean;
+    /** Reference day; `null` when unusable. */
+    readonly asOf: string | null;
+    /** Last bar date the price inputs used; `null` without usable bars. */
+    readonly lastBarDate: string | null;
 }
 
 // ─── AI interpretation ───────────────────────────────

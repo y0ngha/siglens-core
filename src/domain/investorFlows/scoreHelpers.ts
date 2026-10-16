@@ -188,3 +188,22 @@ export function isFiniteNumber(
 ): value is number {
     return typeof value === 'number' && Number.isFinite(value);
 }
+
+/**
+ * Group items by key, keeping first-seen key order and each group's input
+ * order. A stand-in for ES2024 `Map.groupBy`, which the ES2022 browser entry
+ * cannot use; the Map is local, so mutating it keeps the pass linear.
+ */
+export function groupByKey<T>(
+    items: readonly T[],
+    keyOf: (item: T) => string
+): Map<string, T[]> {
+    const groups = new Map<string, T[]>();
+    for (const item of items) {
+        const key = keyOf(item);
+        const group = groups.get(key);
+        if (group === undefined) groups.set(key, [item]);
+        else group.push(item);
+    }
+    return groups;
+}

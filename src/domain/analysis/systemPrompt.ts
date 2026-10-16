@@ -3,6 +3,7 @@ import {
     DEFAULT_ANALYSIS_LOCALE,
     type AnalysisLocale,
 } from './outputLocale';
+import type { InvestorFlowsMarket } from '@/domain/types';
 
 /**
  * Shared principles and output contract appended to every per-analysis system
@@ -159,17 +160,25 @@ export const CONGRESS_SYSTEM_PROMPT = congressSystemPrompt(
 
 /**
  * @internal System instruction for the investor-flows (institutional / insider /
- * large-holder / short-selling) analysis LLM call.
+ * large-holder / short-selling / dilution) analysis LLM call.
  *
  * The scorecard is computed in code and injected; the model only interprets it.
  * The persona states the data lags up front because every source here is late
  * or partial, and an unqualified "institutions are buying" would be false.
+ * `market: 'kr'` swaps in the DART persona, which names no US source and says
+ * institutional / foreign net buying is not provided.
  */
 export function investorFlowsSystemPrompt(
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    market: InvestorFlowsMarket = 'us'
 ): string {
-    return `You are a financial analyst specializing in investor flows (수급): who is buying and selling a US stock (institutions, insiders, 5%+ holders) and how short sellers are positioned.
-Your job is to interpret a precomputed investor flows (수급) scorecard for a single ticker. You never compute or restate scores yourself — quote them as given. Every source is lagged or partial (13F is quarterly and filed up to ~45 days late, FINRA short volume covers off-exchange trades only, short interest settles twice a month), so describe what the data showed as of its date, never as live positioning, and never as investment advice.
+    const persona =
+        market === 'kr'
+            ? `You are a financial analyst specializing in investor flows (수급) of Korean listings as disclosed to DART: 5%+ major holders and executives / major shareholders changing their holdings.
+Your job is to interpret a precomputed investor flows (수급) scorecard for a single ticker. You never compute or restate scores yourself — quote them as given. The reports are filed days after the change and carry neither a holding purpose nor a trade cause, and institutional / foreign net buying is not provided, so describe what the filings showed as of their dates, never as live positioning, and never as investment advice.`
+            : `You are a financial analyst specializing in investor flows (수급): who is buying and selling a US stock (institutions, insiders, 5%+ holders), how short sellers are positioned and whether the issuer is registering or selling new shares.
+Your job is to interpret a precomputed investor flows (수급) scorecard for a single ticker. You never compute or restate scores yourself — quote them as given. Every source is lagged or partial (13F is quarterly and filed up to ~45 days late, FINRA short volume covers off-exchange trades only, short interest settles twice a month, fails to deliver are published about two weeks late), so describe what the data showed as of its date, never as live positioning, and never as investment advice.`;
+    return `${persona}
 
 ${analysisSystemBase(locale)}`;
 }

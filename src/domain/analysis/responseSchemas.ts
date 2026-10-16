@@ -196,7 +196,8 @@ export const CONGRESS_RESPONSE_SCHEMA = {
  * @internal
  * Structured-output schema for {@link InvestorFlowsAnalysisResponse}
  * (investor-flows analysis). `axisInterpretations` is an array of nested objects
- * whose `axis` is one of the four investor flows axes.
+ * whose `axis` is one of the five investor flows axes (a Korean response uses
+ * only `insider` and `largeHolders`).
  */
 export const INVESTOR_FLOWS_RESPONSE_SCHEMA = {
     type: 'object',

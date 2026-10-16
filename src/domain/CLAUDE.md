@@ -384,7 +384,7 @@ own types — they import from the feature-local `types.ts`.
 Also exempted: `domain/indicators/marketFearGreed/types.ts` and
 `domain/indicators/cryptoFearGreed/types.ts` — index-specific input/factor/snapshot types
 kept beside their module; all public ones are re-exported from `domain/types.ts`.
-`domain/investorFlows/types.ts` (investor flows / 수급: snapshot, scorecard and AI-response types, 40+) follows the same rule and is re-exported from `domain/types.ts`.
+`domain/investorFlows/types.ts` (investor flows / 수급: snapshot, scorecard, squeeze-score and AI-response types, 60+) follows the same rule and is re-exported from `domain/types.ts`.
 
 ```typescript
 // ✅ domain/options/types.ts defines OptionsContract, OptionsChain, ...
@@ -507,6 +507,8 @@ An axis (or input group) is "sufficient" only when it holds evidence the consume
   counting. Future-dated rows must not make a gate pass.
 - Every axis applies the same as-of rule. One shared predicate answers "is this row
   usable at the reference date"; do not let each axis re-derive it.
+- Every time-series input (daily bars, quotes) carries the same max-age gate as its sibling
+  inputs. An old series must not satisfy a gate that fresher siblings are held to.
 
 ```typescript
 // ❌ rows.length >= MIN_ROWS            // counts future-dated and non-directional rows
