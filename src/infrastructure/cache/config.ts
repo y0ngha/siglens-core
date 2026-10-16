@@ -1790,9 +1790,18 @@ export function buildCongressTrendCacheKey(
  * mega cap's plan sales as bearish. Round-by-round detail lives in
  * `docs/PUBLIC_API.md`.
  *
+ * **`p4`** = Korean insider cluster fix (2026-10-17). A cluster counts only
+ * reporters with a material change, opposite clusters are netted, and a
+ * routine mass filing (a large cap's hundreds of tiny grant / reshuffle
+ * reports) renders as the neutral `kr_insider_routine_mass_filing` instead of
+ * a cluster; the Korean prompt gains a rule for it. A `p3` entry can read
+ * Samsung's 723 routine filers as a coordinated cluster buy. The overall key
+ * is not bumped: its `inputHash` folds in the scorecard, which changes for
+ * every affected symbol, and the new rendering only appears with the new signal.
+ *
  * @internal
  */
-export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * @internal TTL for investor-flows analysis cache results. Default: 12 hours —

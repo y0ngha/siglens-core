@@ -7,6 +7,8 @@ import {
     type AnalysisLocale,
 } from './outputLocale';
 import {
+    INSIDER_CLUSTER_WINDOW_DAYS,
+    KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS,
     PROMPT_MAX_FAILS_TO_DELIVER,
     PROMPT_MAX_INSIDER_TRANSACTIONS,
     PROMPT_MAX_KR_REPORTS,
@@ -376,6 +378,7 @@ ${formatKrTradingPlans(kr.tradingPlans, scorecard.freshness.insiderWindow)}
 ## How To Read Each Source
 - Major-holder reports are filed within 5 business days of crossing 5% or of a 1%p change. The form (detailed/abbreviated) does not reveal intent — the abbreviated form covers both simple investment and a professional investor's general investment — and the reports carry no holding purpose, so never infer activism or passivity from them.
 - Executive / major-shareholder reports give the holding change but no cause: an open-market trade, a gift, an inheritance and an option exercise look alike. Read the computed net change and clusters, not single rows, and never name a cause the report does not state.
+- A cluster counts only reporters whose own change is material. A routine mass filing (more than ${KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS} reporters inside ${INSIDER_CLUSTER_WINDOW_DAYS} days whose median change is too small to count) is neutral context: never call it a cluster, coordinated buying or selling, or a sign of insider conviction.
 - A trading-plan report pre-announces an insider trade; it is context, not a completed trade.
 - Not provided for Korean listings: institutional / foreign net buying, short selling and offering filings. Say they are not provided; never fill them in from general knowledge.
 

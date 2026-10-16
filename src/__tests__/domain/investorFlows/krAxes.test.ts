@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
     INSIDER_CLUSTER_WINDOW_DAYS,
+    KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE,
+    KR_INSIDER_CLUSTER_MEMBER_MIN_RATIO_CHANGE_PCT,
     KR_INSIDER_CLUSTER_MIN_REPORTERS,
+    KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS,
     KR_MAJOR_HOLDER_CHANGE_STRONG_PCT,
     KR_WINDOW_DAYS,
 } from '@/domain/investorFlows/constants';
@@ -316,6 +319,357 @@ describe('evaluateKrInsiderAxis', () => {
         expect(
             axis.signals.find(s => s.id === 'kr_insider_cluster')
         ).toBeUndefined();
+    });
+
+    describe('cluster materiality', () => {
+        /** Samsung Electronics' common shares outstanding (~5.97B). */
+        const SAMSUNG_SHARES_OUT = 5_969_782_550;
+
+        /**
+         * A Samsung-like 30 days: hundreds of executives / employees filing
+         * 100–3,000-share changes (DART ratio change `0`), a few dozen small
+         * sellers, and one major shareholder's large addition.
+         */
+        function samsungLikeReports(): KrInsiderReport[] {
+            const buyers = Array.from({ length: 700 }, (_, i) =>
+                krInsiderReport({
+                    reporter: `임원${i}`,
+                    position: '상무',
+                    registered: false,
+                    shares: 1_000 + i,
+                    sharesChange: 100 + (i % 30) * 100,
+                    ratioPct: 0,
+                    ratioChangePct: 0,
+                    receiptDate: daysBeforeAsOf(60 + (i % 30)),
+                })
+            );
+            const sellers = Array.from({ length: 31 }, (_, i) =>
+                krInsiderReport({
+                    reporter: `매도${i}`,
+                    position: '상무',
+                    registered: false,
+                    shares: 2_000,
+                    sharesChange: -(100 + i * 10),
+                    ratioPct: 0,
+                    ratioChangePct: 0,
+                    receiptDate: daysBeforeAsOf(59 + (i % 30)),
+                })
+            );
+            const major = krInsiderReport({
+                reporter: '이재용',
+                position: '회장',
+                registered: false,
+                majorShareholder: true,
+                shares: 105_219_053,
+                sharesChange: 7_667_100,
+                ratioPct: 1.58,
+                ratioChangePct: 0.14,
+                receiptDate: daysBeforeAsOf(1),
+            });
+            return [...buyers, ...sellers, major];
+        }
+
+        it.each([
+            ['with shares outstanding', SAMSUNG_SHARES_OUT],
+            ['without shares outstanding', null],
+        ])(
+            'reads hundreds of tiny reports as a routine mass filing, not a cluster (%s)',
+            (_label, sharesOutstanding) => {
+                const axis = axisOf(
+                    samsungLikeReports(),
+                    [],
+                    sharesOutstanding
+                );
+                expect(
+                    axis.signals.filter(s => s.id === 'kr_insider_cluster')
+                ).toEqual([]);
+                const routine = axis.signals.find(
+                    s => s.id === 'kr_insider_routine_mass_filing'
+                );
+                expect(routine).toMatchObject({
+                    direction: 'neutral',
+                    strength: 'weak',
+                    evidence: {
+                        windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
+                        ...(sharesOutstanding === null
+                            ? { medianRatioChangePct: 0 }
+                            : { medianChangePctOutstanding: 0 }),
+                    },
+                });
+                expect(routine?.evidence.reporters).toBeGreaterThan(
+                    KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS
+                );
+                // The net change still reads the major shareholder's addition.
+                expect(
+                    axis.signals.find(s => s.id === 'kr_insider_net_change')
+                        ?.direction
+                ).toBe('bullish');
+            }
+        );
+
+        it('does not let a routine mass filing alone make the axis sufficient', () => {
+            const axis = axisOf(
+                samsungLikeReports().filter(r => r.reporter !== '이재용'),
+                [],
+                SAMSUNG_SHARES_OUT
+            );
+            expect(axis.signals.map(s => s.id)).toEqual([
+                'kr_insider_routine_mass_filing',
+            ]);
+            expect(axis.sufficiency).toBe('insufficient');
+            expect(axis.score).toBeNull();
+        });
+
+        it('still fires a genuine material cluster hidden in routine noise, without the routine note', () => {
+            // 100,000 / 5.97B ≈ 0.0017% each, inside the tiny buyers' span.
+            const material = [0, 1, 2, 3].map(i =>
+                krInsiderReport({
+                    reporter: `실매수${i}`,
+                    sharesChange: 100_000,
+                    ratioChangePct: 0,
+                    receiptDate: daysBeforeAsOf(61 + i),
+                })
+            );
+            const axis = axisOf(
+                [...samsungLikeReports(), ...material],
+                [],
+                SAMSUNG_SHARES_OUT
+            );
+            expect(
+                axis.signals.filter(s => s.id === 'kr_insider_cluster')
+            ).toEqual([
+                expect.objectContaining({
+                    direction: 'bullish',
+                    evidence: {
+                        reporters: 4,
+                        windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
+                    },
+                    subject: `${daysBeforeAsOf(64)} to ${daysBeforeAsOf(61)}`,
+                }),
+            ]);
+            expect(
+                axis.signals.find(
+                    s => s.id === 'kr_insider_routine_mass_filing'
+                )
+            ).toBeUndefined();
+        });
+
+        it('would cluster the routine filers without the member floor (the floor is what drops them)', () => {
+            // Same 700 tiny buyers on a 1M-share company: each clears 0.001%.
+            const axis = axisOf(
+                samsungLikeReports().filter(r => r.sharesChange > 0),
+                [],
+                1_000_000
+            );
+            expect(
+                axis.signals.find(s => s.id === 'kr_insider_cluster')?.evidence
+                    .reporters
+            ).toBeGreaterThan(KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS);
+        });
+
+        /**
+         * 32 reporters in one span: 16 tiny (1 share), plus 8 buyers and 8
+         * sellers of `materialShares` each on 50M shares, which net out — so
+         * no cluster survives and only the median decides the routine note.
+         * The even-count median is the mean of a tiny change and the material one.
+         */
+        function straddle(materialShares: number) {
+            const tiny = Array.from({ length: 16 }, (_, i) =>
+                krInsiderReport({
+                    reporter: `소액${i}`,
+                    sharesChange: 1,
+                    receiptDate: daysBeforeAsOf(5 + i),
+                })
+            );
+            const buyers = Array.from({ length: 8 }, (_, i) =>
+                krInsiderReport({
+                    reporter: `매수${i}`,
+                    sharesChange: materialShares,
+                    receiptDate: daysBeforeAsOf(5 + i),
+                })
+            );
+            const sellers = Array.from({ length: 8 }, (_, i) =>
+                krInsiderReport({
+                    reporter: `매도${i}`,
+                    sharesChange: -materialShares,
+                    receiptDate: daysBeforeAsOf(5 + i),
+                })
+            );
+            return axisOf([...tiny, ...buyers, ...sellers]).signals;
+        }
+
+        it('compares the raw even-count median with the floor', () => {
+            // (0.000002% + 0.0021%) / 2 ≈ 0.00105% ≥ 0.001%: not routine.
+            const above = straddle(1_050);
+            expect(above.map(s => s.id)).not.toContain('kr_insider_cluster');
+            expect(above.map(s => s.id)).not.toContain(
+                'kr_insider_routine_mass_filing'
+            );
+            // (0.000002% + 0.0019%) / 2 ≈ 0.00095% < 0.001%: routine, though
+            // 4-decimal rounding would read it as 0.001 (the floor).
+            const below = straddle(950);
+            expect(below.map(s => s.id)).not.toContain('kr_insider_cluster');
+            expect(
+                below.find(s => s.id === 'kr_insider_routine_mass_filing')
+                    ?.evidence
+            ).toMatchObject({
+                reporters: 32,
+                medianChangePctOutstanding: 0.001,
+            });
+        });
+
+        it('needs more than the reporter cap for the routine note', () => {
+            const tiny = (count: number) =>
+                Array.from({ length: count }, (_, i) =>
+                    krInsiderReport({
+                        reporter: `소액${i}`,
+                        sharesChange: 1,
+                        receiptDate: daysBeforeAsOf(5 + (i % 20)),
+                    })
+                );
+            const has = (count: number) =>
+                axisOf(tiny(count)).signals.some(
+                    s => s.id === 'kr_insider_routine_mass_filing'
+                );
+            expect(has(KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS)).toBe(
+                false
+            );
+            expect(has(KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS + 1)).toBe(
+                true
+            );
+        });
+
+        it('flags four small-cap executives buying meaningful amounts as a cluster', () => {
+            // 20,000–50,000 shares on 50M = 0.04–0.1% each.
+            const axis = axisOf(
+                [20_000, 30_000, 40_000, 50_000].map((sharesChange, i) =>
+                    krInsiderReport({
+                        reporter: `임원${i}`,
+                        sharesChange,
+                        receiptDate: daysBeforeAsOf(3 + i * 5),
+                    })
+                )
+            );
+            expect(
+                axis.signals.find(s => s.id === 'kr_insider_cluster')
+            ).toMatchObject({
+                direction: 'bullish',
+                evidence: { reporters: 4 },
+                subject: `${daysBeforeAsOf(18)} to ${daysBeforeAsOf(3)}`,
+            });
+            expect(
+                axis.signals.find(
+                    s => s.id === 'kr_insider_routine_mass_filing'
+                )
+            ).toBeUndefined();
+        });
+
+        it('keeps a cluster of many material reporters (the guard needs a tiny median)', () => {
+            const axis = axisOf(
+                Array.from({ length: 40 }, (_, i) =>
+                    krInsiderReport({
+                        reporter: `임원${i}`,
+                        sharesChange: 5_000,
+                        receiptDate: daysBeforeAsOf(3 + (i % 20)),
+                    })
+                )
+            );
+            expect(
+                axis.signals.find(s => s.id === 'kr_insider_cluster')?.evidence
+                    .reporters
+            ).toBe(40);
+            expect(
+                axis.signals.find(
+                    s => s.id === 'kr_insider_routine_mass_filing'
+                )
+            ).toBeUndefined();
+        });
+
+        it('does not cluster reporters whose own change is immaterial', () => {
+            // 400 / 50M = 0.0008% < 0.001% each.
+            const tiny = ['A', 'B', 'C'].map(reporter =>
+                krInsiderReport({ reporter, sharesChange: 400 })
+            );
+            expect(
+                axisOf(tiny).signals.find(s => s.id === 'kr_insider_cluster')
+            ).toBeUndefined();
+            // 500 / 50M = 0.001%: the floor itself counts.
+            const atFloor = tiny.map(r => ({ ...r, sharesChange: 500 }));
+            expect(
+                axisOf(atFloor).signals.find(s => s.id === 'kr_insider_cluster')
+            ).toBeDefined();
+        });
+
+        it('falls back to the ratio change without shares outstanding, excluding unusable ratios', () => {
+            const reports = (ratioChangePct: number) =>
+                ['A', 'B', 'C'].map(reporter =>
+                    krInsiderReport({ reporter, ratioChangePct })
+                );
+            const cluster = (ratioChangePct: number) =>
+                axisOf(reports(ratioChangePct), [], null).signals.find(
+                    s => s.id === 'kr_insider_cluster'
+                );
+            expect(
+                cluster(KR_INSIDER_CLUSTER_MEMBER_MIN_RATIO_CHANGE_PCT)
+            ).toBeDefined();
+            expect(cluster(0)).toBeUndefined();
+            expect(cluster(Number.NaN)).toBeUndefined();
+        });
+
+        function opposite(buyShares: number, sellShares: number) {
+            return axisOf([
+                ...['A', 'B', 'C'].map(reporter =>
+                    krInsiderReport({ reporter, sharesChange: buyShares })
+                ),
+                ...['D', 'E', 'F'].map(reporter =>
+                    krInsiderReport({ reporter, sharesChange: -sellShares })
+                ),
+            ]).signals.filter(s => s.id === 'kr_insider_cluster');
+        }
+
+        it('suppresses a buying and a selling cluster of similar size', () => {
+            expect(opposite(20_000, 15_000)).toEqual([]);
+        });
+
+        it('nets opposite clusters of unequal size by summed change, not reporter count', () => {
+            const unequal = (sellShares: number) =>
+                axisOf([
+                    // 5 buyers × 10,000 = 0.1% in total.
+                    ...['A', 'B', 'C', 'D', 'E'].map(reporter =>
+                        krInsiderReport({ reporter, sharesChange: 10_000 })
+                    ),
+                    ...['F', 'G', 'H'].map(reporter =>
+                        krInsiderReport({ reporter, sharesChange: -sellShares })
+                    ),
+                ]).signals.filter(s => s.id === 'kr_insider_cluster');
+            // 3 sellers × 40,000 = 0.24% ≥ 2 × 0.1%: the smaller group wins.
+            expect(unequal(40_000)).toEqual([
+                expect.objectContaining({
+                    direction: 'bearish',
+                    evidence: {
+                        reporters: 3,
+                        windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
+                    },
+                }),
+            ]);
+            // 3 sellers × 30,000 = 0.18% < 0.2% and 0.1% < 0.36%: neither.
+            expect(unequal(30_000)).toEqual([]);
+        });
+
+        it('keeps only the clearly dominant side of opposite clusters', () => {
+            expect(
+                opposite(
+                    20_000 * KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE,
+                    20_000
+                ).map(s => s.direction)
+            ).toEqual(['bullish']);
+            expect(
+                opposite(
+                    10_000,
+                    10_000 * KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE
+                ).map(s => s.direction)
+            ).toEqual(['bearish']);
+        });
     });
 
     it('reports trading plans as neutral context that cannot make the axis sufficient', () => {

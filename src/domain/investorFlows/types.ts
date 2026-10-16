@@ -451,6 +451,7 @@ export type InvestorFlowsSignalId =
     // insider, Korea (DART)
     | 'kr_insider_net_change'
     | 'kr_insider_cluster'
+    | 'kr_insider_routine_mass_filing'
     | 'kr_trading_plan'
     // short
     | 'short_interest_level'

@@ -1,8 +1,13 @@
+import { median } from '@/domain/indicators/utils';
 import {
     INSIDER_CLUSTER_WINDOW_DAYS,
+    KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE,
+    KR_INSIDER_CLUSTER_MEMBER_MIN_PCT_OUTSTANDING,
+    KR_INSIDER_CLUSTER_MEMBER_MIN_RATIO_CHANGE_PCT,
     KR_INSIDER_CLUSTER_MIN_REPORTERS,
     KR_INSIDER_NET_CHANGE_MODERATE_PCT,
     KR_INSIDER_NET_CHANGE_WEAK_PCT,
+    KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS,
     KR_WINDOW_DAYS,
     RATIO_DECIMALS,
 } from '@/domain/investorFlows/constants';
@@ -33,6 +38,75 @@ interface DatedInsiderReport {
     readonly day: number;
 }
 
+/** A dated report with the size of its own change (see {@link changeMagnitude}). */
+interface SizedInsiderReport extends DatedInsiderReport {
+    readonly magnitude: number | null;
+}
+
+/** A cluster signal with the summed change of its span's members, for netting. */
+interface InsiderCluster {
+    readonly signal: InvestorFlowsSignal;
+    readonly magnitude: number;
+}
+
+function hasSharesOutstanding(
+    sharesOutstanding: number | null
+): sharesOutstanding is number {
+    return isFiniteNumber(sharesOutstanding) && sharesOutstanding > 0;
+}
+
+/**
+ * Size of one report's own change: % of shares outstanding when that is known,
+ * else the report's |ratio change| in percentage points; `null` when neither
+ * is usable. Every report in one evaluation uses the same measure.
+ */
+function changeMagnitude(
+    report: KrInsiderReport,
+    sharesOutstanding: number | null
+): number | null {
+    if (hasSharesOutstanding(sharesOutstanding)) {
+        return (Math.abs(report.sharesChange) / sharesOutstanding) * 100;
+    }
+    return isFiniteNumber(report.ratioChangePct)
+        ? Math.abs(report.ratioChangePct)
+        : null;
+}
+
+/** Smallest {@link changeMagnitude} that lets a report count toward a cluster. */
+function memberFloor(sharesOutstanding: number | null): number {
+    return hasSharesOutstanding(sharesOutstanding)
+        ? KR_INSIDER_CLUSTER_MEMBER_MIN_PCT_OUTSTANDING
+        : KR_INSIDER_CLUSTER_MEMBER_MIN_RATIO_CHANGE_PCT;
+}
+
+function isMaterial(
+    report: SizedInsiderReport,
+    sharesOutstanding: number | null
+): boolean {
+    return (
+        report.magnitude !== null &&
+        report.magnitude >= memberFloor(sharesOutstanding)
+    );
+}
+
+/** Busiest {@link INSIDER_CLUSTER_WINDOW_DAYS}-day span of day-sorted reports, by distinct reporter. */
+function busiestSpan(sorted: readonly SizedInsiderReport[]): {
+    readonly reporters: number;
+    readonly members: readonly SizedInsiderReport[];
+} {
+    const span = largestClusterSpan(
+        sorted.map(r => ({ day: r.day, key: reporterKey(r.report) }))
+    );
+    return {
+        reporters: span.size,
+        members: sorted.slice(span.start, span.end),
+    };
+}
+
+function spanSubject(members: readonly SizedInsiderReport[]): string {
+    return `${formatDay(members[0].day)} to ${formatDay(members[members.length - 1].day)}`;
+}
+
 function reporterKey(report: KrInsiderReport): string {
     return report.reporter.trim().toLowerCase();
 }
@@ -51,7 +125,7 @@ function netChangePct(
     netShares: number,
     sharesOutstanding: number | null
 ): number | null {
-    if (isFiniteNumber(sharesOutstanding) && sharesOutstanding > 0) {
+    if (hasSharesOutstanding(sharesOutstanding)) {
         return roundValue(
             (netShares / sharesOutstanding) * 100,
             RATIO_DECIMALS
@@ -66,37 +140,93 @@ function netChangePct(
         : null;
 }
 
-function clusterSignal(
-    reports: readonly DatedInsiderReport[],
+function findCluster(
+    material: readonly SizedInsiderReport[],
     direction: Exclude<InvestorFlowsSignalDirection, 'neutral'>
-): InvestorFlowsSignal[] {
-    const side = reports.filter(r =>
+): InsiderCluster | null {
+    const side = material.filter(r =>
         direction === 'bullish'
             ? r.report.sharesChange > 0
             : r.report.sharesChange < 0
     );
-    // The sweep needs events sorted by day.
-    // A copy: `toSorted` is outside the client build's lib target.
-    const sorted = [...side].sort((a, b) => a.day - b.day);
-    const span = largestClusterSpan(
-        sorted.map(r => ({ day: r.day, key: reporterKey(r.report) }))
-    );
-    if (span.size < KR_INSIDER_CLUSTER_MIN_REPORTERS) return [];
-    const members = sorted.slice(span.start, span.end);
-    return [
-        makeSignal(
+    // `material` is already day-sorted (the sweep needs it), and so is a filter of it.
+    const { reporters, members } = busiestSpan(side);
+    if (reporters < KR_INSIDER_CLUSTER_MIN_REPORTERS) return null;
+    return {
+        signal: makeSignal(
             'insider',
             'kr_insider_cluster',
             direction,
             'moderate',
-            {
-                reporters: span.size,
-                windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
-            },
+            { reporters, windowDays: INSIDER_CLUSTER_WINDOW_DAYS },
             // The span's own dates, rendered like the US Form 144 cluster.
-            `${formatDay(members[0].day)} to ${formatDay(members[members.length - 1].day)}`
+            spanSubject(members)
         ),
-    ];
+        magnitude: members.reduce((sum, r) => sum + (r.magnitude ?? 0), 0),
+    };
+}
+
+/**
+ * Opposite clusters in one window are netted: the side whose summed member
+ * change is at least {@link KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE} times the
+ * other's is kept, otherwise neither — a buying and a selling cluster side by
+ * side say nothing about direction.
+ */
+function netClusters(
+    bullish: InsiderCluster | null,
+    bearish: InsiderCluster | null
+): InvestorFlowsSignal[] {
+    if (bullish === null || bearish === null) {
+        return [bullish, bearish].flatMap(c => (c === null ? [] : [c.signal]));
+    }
+    if (
+        bullish.magnitude >=
+        KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE * bearish.magnitude
+    ) {
+        return [bullish.signal];
+    }
+    if (
+        bearish.magnitude >=
+        KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE * bullish.magnitude
+    ) {
+        return [bearish.signal];
+    }
+    return [];
+}
+
+/**
+ * Neutral `kr_insider_routine_mass_filing` when the busiest 30-day span holds
+ * more than {@link KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS} distinct
+ * reporters (either direction) and its median report change is below the
+ * cluster member floor; `null` otherwise. The raw median is compared; it is
+ * rounded only for display, so a rendered median can equal the floor.
+ */
+function routineMassFiling(
+    sorted: readonly SizedInsiderReport[],
+    sharesOutstanding: number | null
+): InvestorFlowsSignal | null {
+    const moved = sorted.filter(r => r.report.sharesChange !== 0);
+    const { reporters, members } = busiestSpan(moved);
+    if (reporters <= KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS) return null;
+    const middle = median(members.map(r => r.magnitude ?? 0)) ?? 0;
+    if (middle >= memberFloor(sharesOutstanding)) return null;
+    // The key names the unit the renderer prints (% of shares outstanding / %p).
+    const medianKey = hasSharesOutstanding(sharesOutstanding)
+        ? 'medianChangePctOutstanding'
+        : 'medianRatioChangePct';
+    return makeSignal(
+        'insider',
+        'kr_insider_routine_mass_filing',
+        'neutral',
+        'weak',
+        {
+            reporters,
+            reports: members.length,
+            [medianKey]: roundValue(middle, RATIO_DECIMALS),
+            windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
+        },
+        spanSubject(members)
+    );
 }
 
 /**
@@ -115,10 +245,24 @@ function clusterSignal(
  *   gift between family members from reading as two moves.
  * - `kr_insider_cluster`: {@link KR_INSIDER_CLUSTER_MIN_REPORTERS} or more
  *   distinct reporters moving the same way within one cluster span (moderate).
+ *   Only reports whose own change is material count — at least
+ *   {@link KR_INSIDER_CLUSTER_MEMBER_MIN_PCT_OUTSTANDING}% of shares outstanding,
+ *   or without it a ratio change of at least
+ *   {@link KR_INSIDER_CLUSTER_MEMBER_MIN_RATIO_CHANGE_PCT}%p (a report with
+ *   neither is excluded). A buying and a selling cluster are netted by summed
+ *   member change ({@link KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE}x to keep one).
+ * - `kr_insider_routine_mass_filing`: neutral context when no material cluster
+ *   survives netting and more than
+ *   {@link KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS} reporters file inside
+ *   one span with a median change below the member floor — a large cap's
+ *   routine grant or reshuffle filings, not a coordinated move. Clusters are
+ *   always computed from material reports first, so a genuine cluster inside
+ *   routine noise still fires; the routine note is then left out (the cluster
+ *   already says what the window shows, and the tiny reports never count).
  * - `kr_trading_plan`: neutral context — a pre-announced trade, direction unknown.
  *
- * **Sufficient means at least one directional signal**; trading plans alone or
- * reports that net to nothing leave the axis insufficient (`krMetrics` still
+ * **Sufficient means at least one directional signal**; trading plans or a
+ * routine mass filing alone, or reports that net to nothing, leave the axis insufficient (`krMetrics` still
  * counts them). Rows dated after the reference day, outside the window or with
  * a non-finite share change are dropped.
  */
@@ -176,11 +320,23 @@ export function evaluateKrInsiderAxis(
             )
         );
     }
-    signals.push(
-        ...clusterSignal(reports, 'bullish'),
-        ...clusterSignal(reports, 'bearish')
+    const sized: SizedInsiderReport[] = reports.map(r => ({
+        ...r,
+        magnitude: changeMagnitude(r.report, sharesOutstanding),
+    }));
+    const material = sized.filter(r => isMaterial(r, sharesOutstanding));
+    const clusters = netClusters(
+        findCluster(material, 'bullish'),
+        findCluster(material, 'bearish')
     );
+    signals.push(...clusters);
     const directional = signals.length > 0;
+    // Only when no material cluster survives: otherwise the cluster speaks.
+    const routine =
+        clusters.length === 0
+            ? routineMassFiling(sized, sharesOutstanding)
+            : null;
+    if (routine !== null) signals.push(routine);
     if (plans > 0) {
         signals.push(
             makeSignal('insider', 'kr_trading_plan', 'neutral', 'weak', {
