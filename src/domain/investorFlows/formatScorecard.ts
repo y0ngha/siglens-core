@@ -199,6 +199,20 @@ export function investorFlowsInterpretationRules(
     ].join('\n');
 }
 
+/** Korean FTD caveat: the whole caveat, both parts in one sentence. Prompt wording. */
+const FTD_CAVEAT_KO_SENTENCE =
+    '결제불이행은 결제 시점·청산·운영 지연 등 여러 원인으로 생기며 무차입(불법) 공매도의 증거가 아닙니다';
+
+/** The FTD caveat rule, one sentence per locale (see {@link investorFlowsOutputRules}). */
+function ftdCaveatRule(caveatTarget: string, locale: AnalysisLocale): string {
+    const scope = `- Whenever the output mentions fails to deliver at all, ${caveatTarget} must also carry the fails-to-deliver caveat`;
+    const once =
+        'State this caveat at most once per output field; never repeat the same sentence. "Interpret separately from short interest" does not replace it.';
+    return locale === 'ko'
+        ? `${scope}, written as exactly this one Korean sentence: "${FTD_CAVEAT_KO_SENTENCE}". That sentence is the whole caveat: never add a second sentence that restates either part (the operational causes or the naked short selling point), in Korean or English. ${once}`
+        : `${scope}: one sentence saying that fails have many operational causes (settlement timing, clearing and operational delays) and are not evidence of naked (illegal) short selling — say it in those words, and never add a second sentence restating either part. ${once}`;
+}
+
 /**
  * Output rules shared by the investor-flows prompt and the overall prompt's
  * investor-flows section, written from real-LLM A/B failures: an FTD peak
@@ -207,13 +221,22 @@ export function investorFlowsInterpretationRules(
  * `strong_bullish`) copied into prose, a 20-day price change quoted without
  * its percent sign, and an active ATM described like a shelf. Prompt wording.
  *
+ * The FTD caveat is one sentence per locale. An English-worded requirement
+ * plus a separate Korean sentence made Korean output carry both (the caveat
+ * twice in one bullet, AAPL real-data run), so Korean output gets a single
+ * Korean sentence that holds both parts and nothing else.
+ *
  * @param caveatTarget - Where the FTD caveat must appear (the output fields of
  * the prompt using the rules).
+ * @param locale - Output locale; picks the caveat's wording.
  */
-export function investorFlowsOutputRules(caveatTarget: string): string {
+export function investorFlowsOutputRules(
+    caveatTarget: string,
+    locale: AnalysisLocale
+): string {
     return [
         '- Fails to deliver: quote an FTD quantity only with its own settlement date — the peak with the peak settlement date shown next to it, never with the latest fails-to-deliver file date.',
-        `- Whenever the output mentions fails to deliver at all, ${caveatTarget} must also say that fails have many operational causes (settlement timing, clearing and operational delays) and are not evidence of naked (illegal) short selling — say it in those words; "interpret separately from short interest" does not replace it. In Korean output include the sentence "결제불이행은 무차입(불법) 공매도의 증거가 아닙니다". State this caveat at most once per output field; never repeat the same sentence.`,
+        ftdCaveatRule(caveatTarget, locale),
         `- Never call fails to deliver routine, normal or usual (일상적) when the baseline multiple (failsToDeliverMultiple) is ${FTD_SPIKE_MIN_MULTIPLE} or more, even when the peak is too small to raise a signal; say the peak is elevated against its usual (baseline) level but small relative to shares outstanding. When the multiple is n/a the baseline was too thin to compare against; make no baseline comparison and use no spike or surge wording (spike, surge, 급증, 급등) — describe only the level against shares outstanding.`,
         '- An active at-the-market (ATM) program means the company may be selling new shares into the market right now, at market prices — say so. Do not describe the size or pace of ATM sales; the filings do not show it. A shelf or a full registration only creates the capacity to sell later and does not mean shares are being sold.',
         INVESTOR_FLOWS_PLAIN_TEXT_RULE,

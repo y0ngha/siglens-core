@@ -758,7 +758,10 @@ export function buildOverallAnalysisPrompt(
             : `\n${investorFlowsInterpretationRules('investorFlowsBulletsKo and the investor-flows claims in integratedConclusionKo', investorFlowsMarket)}\n${
                   investorFlowsMarket === 'kr'
                       ? INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE
-                      : investorFlowsOutputRules('the same bullet or sentence')
+                      : investorFlowsOutputRules(
+                            'the same bullet or sentence',
+                            locale
+                        )
               }${locale === 'ko' && investorFlowsMarket !== 'kr' ? `\n${INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}` : ''}`;
     const investorFlowsRules = investorFlowsIntegrated
         ? `\n- investorFlowsBulletsKo: provide 2–4 bullets from the Investor Flows section, citing the as-of date of each source used and weighting sources as that section describes; for ${notScoredAxisPhrase(investorFlowsMarket)}, say why it is not scored, as its heading says, and never describe it as neutral. Leave the array empty when the section says there is no data.\n- When the Investor Flows section is present, attribute investor-flows claims in integratedConclusionKo to it (e.g. "수급 분석에서는…") and keep them proportional to the section's weighting guidance. Quote its scores as given and state its labels in plain words.${investorFlowsDetailRules}`

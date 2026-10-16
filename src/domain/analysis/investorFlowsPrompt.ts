@@ -498,7 +498,7 @@ ${localizedFieldDirective(locale)}
 - risksKo: 2–4 items covering the lag, conflicts between axes, and what would change the reading.
 - dataNotesKo: state the as-of date of each source you used (13F quarter, short-interest settlement date, latest short-volume date, latest fails-to-deliver date, insider, 13D/13G and offering windows) and the lags above. The last item must state that this is an interpretation of public filings, not investment advice.
 ${investorFlowsInterpretationRules('every output field')}
-${investorFlowsOutputRules('risksKo or dataNotesKo')}${locale === 'ko' ? `\n${INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}` : ''}
+${investorFlowsOutputRules('risksKo or dataNotesKo', locale)}${locale === 'ko' ? `\n${INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}` : ''}
 ${CLOSING_RULES}`;
 
     return { stable: '', dynamic };
