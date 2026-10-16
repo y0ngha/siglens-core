@@ -1,9 +1,9 @@
 import {
     FTD_SPIKE_MIN_MULTIPLE,
     INVESTOR_FLOWS_AXES,
-    SHORT_INTEREST_TREND_POINTS,
     PROMPT_MAX_NAME_CHARS,
     PROMPT_MAX_SQUEEZE_COMPONENTS,
+    SHORT_INTEREST_TREND_POINTS,
 } from '@/domain/investorFlows/constants';
 import {
     DEFAULT_ANALYSIS_LOCALE,
@@ -15,6 +15,7 @@ import type {
     InvestorFlowsEvidence,
     InvestorFlowsFreshness,
     InvestorFlowsLabel,
+    InvestorFlowsMarket,
     InvestorFlowsScorecard,
     InvestorFlowsSignal,
     InvestorFlowsSignalDirection,
@@ -169,6 +170,10 @@ export function krNotProvidedLine(
 export const INVESTOR_FLOWS_PLAIN_TEXT_RULE =
     '- Never write identifiers from this prompt in the output text: no metric, evidence, signal, label or axis identifiers (camelCase such as shortInterestPctFloat or largeHolders, snake_case such as fails_to_deliver_elevated or price_change_20d, label values such as strong_bullish, neutral or insufficient, axis ids such as institutional, insider, short or dilution — where the output schema has an "axis" field, they appear only as its value) and no `name=value` forms. Write labels and axes with the display names the scorecard gives, and state each fact in plain words in the output language, with its number, its unit as rendered here (%, %p, days, shares, USD) and its date.';
 
+/** {@link INVESTOR_FLOWS_PLAIN_TEXT_RULE} with Korean-listing examples: its US examples name short interest, which a Korean prompt says is not provided. */
+export const INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE =
+    '- Never write identifiers from this prompt in the output text: no metric, evidence, signal, label or axis identifiers (camelCase such as ratioChangePct or largeHolders, snake_case such as kr_major_holder_increase or kr_insider_cluster, label values such as strong_bullish, neutral or insufficient, axis ids such as insider or largeHolders — where the output schema has an "axis" field, they appear only as its value) and no `name=value` forms. Write labels and axes with the display names the scorecard gives, and state each fact in plain words in the output language, with its number, its unit as rendered here (%, %p, days, shares, USD) and its date.';
+
 /**
  * Interpretation limits written from the A/B: the model added price-impact
  * predictions ("주가에 부담") and present-tense claims a dated snapshot cannot
@@ -176,11 +181,20 @@ export const INVESTOR_FLOWS_PLAIN_TEXT_RULE =
  *
  * @param scope - Where the limits apply (`the output`, or one section's fields
  * in a prompt that has other axes).
+ * @param market - Picks the example: a Korean prompt has no short data.
  */
-export function investorFlowsInterpretationRules(scope: string): string {
+export function investorFlowsInterpretationRules(
+    scope: string,
+    market: InvestorFlowsMarket = 'us'
+): string {
+    // Korean listings have no short data: their example names a DART report.
+    const example =
+        market === 'kr'
+            ? 'e.g. a 5%+ holder\'s ratio rose 1.2%p between two report receipt dates), not a present-tense process (e.g. "the holder is accumulating now")'
+            : 'e.g. short interest fell 13.59% between two settlement dates), not a present-tense process (e.g. "shorts are covering fast")';
     return [
         `- In ${scope}, describe supply and positioning facts only: never predict the effect on the share price (no "weighs on the stock", "upward pressure", "주가에 부담", "상승 압력").`,
-        `- In ${scope}, never claim what is happening now beyond what the dated data shows: state the change with its dates (e.g. short interest fell 13.59% between two settlement dates), not a present-tense process (e.g. "shorts are covering fast").`,
+        `- In ${scope}, never claim what is happening now beyond what the dated data shows: state the change with its dates (${example}.`,
         '- Quote counts and totals (notices, filers, transactions, values, shares) from the scorecard metrics and evidence; never count the listed source rows yourself — the lists are capped and can include rows outside the scoring window.',
     ].join('\n');
 }
@@ -280,6 +294,7 @@ export function unitOfFigure(key: string): string {
         return PCT_OF_OUTSTANDING;
     }
     if (/pctOfPriorHoldings$/i.test(key)) return '% of prior holdings';
+    if (/percentOfClass$/i.test(key)) return '% of class';
     if (/pct/i.test(key)) return '%';
     return '';
 }
@@ -306,6 +321,7 @@ function formatEvidence(evidence: InvestorFlowsEvidence): string {
 const SUBJECT_LABELS: Partial<Record<InvestorFlowsSignalId, string>> = {
     fails_to_deliver_elevated: 'peak settlement date ',
     insider_proposed_sale_cluster: 'cluster span ',
+    kr_insider_cluster: 'cluster span ',
     short_interest_trend: 'settlements ',
     institutional_holder_count_change: 'quarter ending ',
     institutional_net_share_change: 'quarter ending ',
@@ -380,6 +396,17 @@ function formatSignal(
     return `  - ${signal.id}${subject}: ${words.direction[signal.direction]}, ${words.strength[signal.strength]} (${formatEvidence(signal.evidence)})`;
 }
 
+/**
+ * Notes after specific metric values whose bare reading misleads: a `0` FTD peak
+ * is "no fails reported", not a measured peak, and a `mixed` trend is not a
+ * trend at all.
+ */
+const VALUE_NOTES: Readonly<Record<string, string>> = {
+    'failsToDeliverPeakQty=0': ' (no fails reported in the recent window)',
+    'shortInterestTrend=mixed':
+        ' (the settlements reversed direction; not a trend)',
+};
+
 function formatMetrics(metrics: object | null): string {
     if (metrics === null) return '';
     const record: MetricRecord = { ...metrics };
@@ -387,14 +414,69 @@ function formatMetrics(metrics: object | null): string {
         if (ENDPOINT_ONLY_KEYS.has(key)) return [];
         if (value === null) return [`${key}=n/a`];
         if (typeof value === 'object') return [];
-        if (typeof value !== 'number') return [`${key}=${String(value)}`];
+        if (typeof value !== 'number') {
+            return [
+                `${key}=${String(value)}${VALUE_NOTES[`${key}=${String(value)}`] ?? ''}`,
+            ];
+        }
         const endpoints = CHANGE_ENDPOINTS[key]?.(record) ?? null;
         return [
-            `${formatFigure(key, value)}${endpoints === null ? '' : ` (${endpoints})`}`,
+            `${formatFigure(key, value)}${endpoints === null ? '' : ` (${endpoints})`}${VALUE_NOTES[`${key}=${value}`] ?? ''}`,
         ];
     });
     return parts.length === 0 ? '' : `\n  metrics: ${parts.join(', ')}`;
 }
+
+/**
+ * Every marker an axis heading line uses to say the axis is not scored. The
+ * rules reference this list ({@link notScoredAxisPhrase}) so a new marker
+ * cannot drift out of them.
+ */
+export const NOT_SCORED_MARKERS = {
+    noData: 'NO DATA',
+    finraUnavailable: 'FINRA DATA UNAVAILABLE',
+    finraTooThin: 'FINRA SHORT DATA TOO THIN TO SCORE',
+    finraStale: 'FINRA SHORT DATA STALE',
+    finraMissingOrThin: 'FINRA SHORT DATA MISSING OR TOO THIN TO SCORE',
+    noFilings: 'NO FILINGS',
+} as const;
+
+/** Markers a Korean scorecard can render: its axes are DART-only, so no FINRA or filing marker. */
+const KR_NOT_SCORED_MARKERS: readonly string[] = [NOT_SCORED_MARKERS.noData];
+
+/**
+ * Rule wording for an axis whose heading carries one of the markers the
+ * market's scorecard can render. Prompt wording.
+ */
+export function notScoredAxisPhrase(
+    market: InvestorFlowsMarket = 'us'
+): string {
+    const markers =
+        market === 'kr'
+            ? KR_NOT_SCORED_MARKERS
+            : Object.values(NOT_SCORED_MARKERS);
+    return `an axis whose heading line says it is not scored (${markers.join(', ')})`;
+}
+
+/** {@link notScoredAxisPhrase} for US listings. */
+export const NOT_SCORED_AXIS_PHRASE = notScoredAxisPhrase('us');
+
+const NO_DATA_TEXT = `${NOT_SCORED_MARKERS.noData} — the inputs for this axis are missing or too thin to score. This is not a neutral reading.`;
+
+/** Short axis without FINRA but with SEC / exchange context: not "no data". */
+const FINRA_UNAVAILABLE_TEXT = `${NOT_SCORED_MARKERS.finraUnavailable} — FINRA short interest and short volume are not included, so this axis is not scored and has no direction. The fails-to-deliver and Reg SHO facts are still valid context; do not report them as missing.`;
+
+/** Short axis whose FINRA rows exist but cannot be scored (e.g. one settlement, no float, no volume baseline). */
+const FINRA_TOO_THIN_TEXT = `${NOT_SCORED_MARKERS.finraTooThin} — FINRA short-interest or short-volume rows exist but are too few to compute a level, trend or baseline, so this axis is not scored and has no direction. Quote the listed rows with their dates; do not call them missing.`;
+
+/** Short axis whose FINRA rows exist but are all older than the freshness gate. */
+const FINRA_STALE_TEXT = `${NOT_SCORED_MARKERS.finraStale} — the FINRA rows are older than the freshness limit, so this axis is not scored; the stale signal below carries their date.`;
+
+/** {@link FINRA_UNAVAILABLE_TEXT} when the caller cannot tell excluded from thin (no snapshot). */
+const FINRA_MISSING_OR_THIN_TEXT = `${NOT_SCORED_MARKERS.finraMissingOrThin} — this axis is not scored and has no direction. The fails-to-deliver and Reg SHO facts are still valid context; do not report them as missing.`;
+
+/** Dilution axis whose filing list was provided but empty. */
+const NO_FILINGS_TEXT = `${NOT_SCORED_MARKERS.noFilings} (no offering or registration filings on record) — the axis is not scored. Say no filings were found; do not call dilution neutral or quiet.`;
 
 type FormattableAxis = InvestorFlowsAxisBase & {
     metrics: object | null;
@@ -409,13 +491,52 @@ export interface FormatInvestorFlowsScorecardOptions {
      * schema has no `axis` field passes `false`, so no id appears to be copied.
      */
     readonly axisIds?: boolean;
+    /**
+     * Whether the FINRA feeds are absent (excluded via `includeFinraData: false`
+     * or null / empty in the snapshot). `true` → an insufficient short axis
+     * says "FINRA data unavailable" (when SEC context exists); `false` → rows
+     * exist, so it says "too thin to score". Omitted (no snapshot at hand): a
+     * wording that claims neither. Only the caller holding the snapshot knows —
+     * null metrics cannot tell an excluded feed from a thin one.
+     */
+    readonly finraUnavailable?: boolean;
+}
+
+/** Text of an insufficient axis: NO DATA, unless the scorecard shows why it is something narrower. */
+function insufficientTextOf(
+    scorecard: InvestorFlowsScorecard,
+    id: InvestorFlowsAxisId,
+    options: FormatInvestorFlowsScorecardOptions
+): string {
+    if (id === 'short') {
+        const { metrics } = scorecard.short;
+        const secContext =
+            metrics.failsToDeliverPeakQty !== null ||
+            metrics.thresholdListed !== null;
+        if (options.finraUnavailable === false) {
+            // Present rows dropped as stale carry their own `data_stale` signal.
+            return scorecard.short.signals.some(s => s.id === 'data_stale')
+                ? FINRA_STALE_TEXT
+                : FINRA_TOO_THIN_TEXT;
+        }
+        if (secContext) {
+            return options.finraUnavailable === true
+                ? FINRA_UNAVAILABLE_TEXT
+                : FINRA_MISSING_OR_THIN_TEXT;
+        }
+    }
+    if (id === 'dilution' && scorecard.dilution.noFilingsOnRecord) {
+        return NO_FILINGS_TEXT;
+    }
+    return NO_DATA_TEXT;
 }
 
 function formatAxis(
     axis: FormattableAxis,
     source: string,
     words: ScorecardWords,
-    axisIds: boolean
+    axisIds: boolean,
+    insufficientText: string = NO_DATA_TEXT
 ): string {
     const id = axisIds ? ` (axis "${axis.id}")` : '';
     const heading = `- ${words.axis[axis.id]}${id} — ${source}`;
@@ -423,11 +544,16 @@ function formatAxis(
         formatSignal(signal, words);
     if (axis.sufficiency === 'insufficient') {
         const signals = axis.signals.map(signalLine).join('\n');
-        return `${heading}\n  NO DATA — the inputs for this axis are missing or too thin to score. This is not a neutral reading.${signals === '' ? '' : `\n${signals}`}`;
+        return `${heading}\n  ${insufficientText}${signals === '' ? '' : `\n${signals}`}`;
     }
+    const quietDilution =
+        axis.id === 'dilution' &&
+        axis.metrics !== null &&
+        'filingsInWindow' in axis.metrics &&
+        axis.metrics.filingsInWindow === 0;
     const signals =
         axis.signals.length === 0
-            ? '\n  signals: none'
+            ? `\n  signals: none${quietDilution ? ' (no filings in the window; older filings exist)' : ''}`
             : `\n  signals:\n${axis.signals.map(signalLine).join('\n')}`;
     return `${heading}\n  label: ${words.label[axis.label]}, score: ${axis.score}${formatMetrics(axis.krMetrics ?? axis.metrics)}${signals}`;
 }
@@ -452,16 +578,31 @@ export function formatSqueezeRisk(
         .slice(0, PROMPT_MAX_SQUEEZE_COMPONENTS)
         .map(
             c =>
-                `${formatFigure(c.id, c.value)} (contribution ${c.contribution} points)`
+                `${formatFigure(c.id, c.value)}${c.id === 'fails_to_deliver_pct' && c.value === 0 ? ' (no fails reported)' : ''} (contribution ${c.contribution} points)`
         )
         .join(', ');
-    return `Short squeeze risk (computed): score ${squeeze.score}/100, level: ${squeeze.level === null ? 'n/a' : squeezeLevel[squeeze.level]} (${coverage}${cap})\n  top inputs: ${top}\n  last completed daily bar used: ${squeeze.lastBarDate ?? 'none'}`;
+    const level = squeeze.level === null ? 'n/a' : squeezeLevel[squeeze.level];
+    // Without short interest or short volume the score only reads price and
+    // delivery stress; calling it a squeeze-risk level overstates it.
+    const heading = squeeze.includesFinra
+        ? `Short squeeze risk (computed): score ${squeeze.score}/100, level: ${level}`
+        : `Price and delivery-stress score (computed; price, fails-to-deliver and threshold-list inputs only — no short-positioning input, so this is NOT a short-squeeze risk reading): score ${squeeze.score}/100, ${squeeze.levelCapped ? 'capped level' : 'level'}: ${level}`;
+    return `${heading} (${coverage}${cap})\n  top inputs: ${top}\n  last completed daily bar used: ${squeeze.lastBarDate ?? 'none'}`;
 }
 
 /** Dates of every underlying source, so an answer can say how old each number is. */
 export function formatInvestorFlowsFreshness(
-    freshness: InvestorFlowsFreshness
+    freshness: InvestorFlowsFreshness,
+    ftdPeakQty: number | null = null
 ): string {
+    // A present feed with no fail day reads as "no fails reported", not n/a.
+    const ftdLatest =
+        freshness.failsToDeliverLatestDate ??
+        (ftdPeakQty === 0 ? 'none (no fails reported)' : 'n/a');
+    const thresholdAsOf =
+        freshness.thresholdListStale === null
+            ? 'n/a (not included)'
+            : `${freshness.thresholdListAsOf ?? 'undated (taken as current)'}${freshness.thresholdListStale ? ' (stale, not scored)' : ''}`;
     const quarter =
         freshness.latestInstitutionalPeriod === null
             ? '13F quarters: none'
@@ -473,7 +614,8 @@ export function formatInvestorFlowsFreshness(
         `- FINRA off-exchange short volume latest trade date: ${freshness.shortVolumeLatestDate ?? 'n/a'}`,
         `- Insider window: ${freshness.insiderWindow.from ?? 'n/a'} to ${freshness.insiderWindow.to ?? 'n/a'} (${groupDigits(freshness.insiderTransactionsInWindow)} Form 4 transactions)`,
         `- 13D/13G window: ${freshness.largeHolderWindow.from ?? 'n/a'} to ${freshness.largeHolderWindow.to ?? 'n/a'}`,
-        `- SEC fails-to-deliver latest settlement date: ${freshness.failsToDeliverLatestDate ?? 'n/a'}`,
+        `- SEC fails-to-deliver latest settlement date: ${ftdLatest}`,
+        `- Reg SHO threshold list as-of: ${thresholdAsOf}`,
         `- Offering filings window: ${freshness.dilutionWindow.from ?? 'n/a'} to ${freshness.dilutionWindow.to ?? 'n/a'}`,
     ].join('\n');
 }
@@ -545,12 +687,13 @@ export function formatInvestorFlowsScorecard(
             scorecard[id],
             INVESTOR_FLOWS_AXIS_HEADINGS[id],
             words,
-            axisIds
+            axisIds,
+            insufficientTextOf(scorecard, id, options)
         )
     ).join('\n');
     const squeeze =
         scorecard.squeezeRisk === null
             ? ''
             : `\n${formatSqueezeRisk(scorecard.squeezeRisk, locale)}`;
-    return `${compositeLineOf(scorecard, words)}\n${axes}${squeeze}\n\nData freshness:\n${formatInvestorFlowsFreshness(scorecard.freshness)}`;
+    return `${compositeLineOf(scorecard, words)}\n${axes}${squeeze}\n\nData freshness:\n${formatInvestorFlowsFreshness(scorecard.freshness, scorecard.short.metrics.failsToDeliverPeakQty)}`;
 }

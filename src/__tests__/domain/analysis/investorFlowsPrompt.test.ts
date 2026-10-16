@@ -143,7 +143,7 @@ describe('buildInvestorFlowsAnalysisPrompt', () => {
             'never describe it as "no activity", "neutral" or "stable"'
         );
         expect(dynamic).toContain(
-            'FINRA short data is not included for this symbol'
+            'FINRA short interest and off-exchange short volume are not included for this symbol'
         );
     });
 

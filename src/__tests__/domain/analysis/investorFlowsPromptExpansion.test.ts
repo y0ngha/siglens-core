@@ -13,8 +13,12 @@ import {
     formatSqueezeRisk,
     groupDigits,
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
+    INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     INVESTOR_FLOWS_PLAIN_TEXT_RULE,
     krNotProvidedLine,
+    NOT_SCORED_AXIS_PHRASE,
+    NOT_SCORED_MARKERS,
+    notScoredAxisPhrase,
     scorecardWords,
     unitOfFigure,
 } from '@/domain/investorFlows/formatScorecard';
@@ -32,12 +36,14 @@ import {
     krInsiderReport,
     krMajorHolderReport,
     krTradingPlan,
+    largeHolderFiling,
     offeringFiling,
     optionsQuarter,
     proposedSale,
     quarter,
     shortInterestSeries,
     shortVolumeSeries,
+    topHolders,
 } from '../../fixtures/investorFlows';
 
 function build(
@@ -357,13 +363,16 @@ describe('investor-flows prompt fallbacks', () => {
         );
         expect(prompt).toContain('(relationship n/a)');
         expect(prompt).toContain('2026-06-30 (IN PROGRESS, partial)');
-        expect(prompt).toContain(
-            'listed for 1 consecutive trading days since n/a (market n/a)'
-        );
+        // Unknown since-date and market are dropped, not rendered as n/a.
+        expect(prompt).toContain('  listed for 1 consecutive trading days\n');
+        expect(prompt).not.toContain('since n/a');
+        expect(prompt).not.toContain('market n/a');
         const ftd = prompt.slice(
             prompt.indexOf('SEC fails to deliver, latest')
         );
-        expect(ftd.split('\n')[1]).toBe('  (none)');
+        expect(ftd.split('\n')[1]).toBe(
+            '  (none — the feed is present and no fails were reported)'
+        );
     });
 
     it('says not listed for a status that is not listed', () => {
@@ -565,7 +574,9 @@ describe('investor-flows prompt — real-LLM A/B fixes', () => {
             },
         });
         const text = build(kr);
-        expect(text).toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
+        expect(text).toContain(INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE);
+        expect(text).not.toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
+        expect(INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE).not.toMatch(/short/i);
         expect(text).not.toContain('fails to deliver');
         expect(text).not.toContain('Korean terminology');
     });
@@ -853,5 +864,513 @@ describe('investor-flows prompt — A/B round 6', () => {
         expect(krNotProvidedLine('en')).toMatch(
             /^- institutions, short selling, dilution — NOT PROVIDED/
         );
+    });
+});
+
+describe('investor-flows prompt — render audit', () => {
+    const LISTED = {
+        listed: true,
+        consecutiveDays: 4,
+        firstListedDate: daysBeforeAsOf(6),
+        markets: ['Nasdaq'],
+    } as const;
+
+    it('dates the Reg SHO facts and adds the list to the freshness block', () => {
+        const text = build(
+            emptySnapshot({
+                thresholdList: { ...LISTED, asOf: daysBeforeAsOf(1) },
+            })
+        );
+        expect(text).toContain(
+            `listed for 4 consecutive trading days since ${daysBeforeAsOf(6)} (Nasdaq) as of ${daysBeforeAsOf(1)}`
+        );
+        expect(text).toContain(
+            `- Reg SHO threshold list as-of: ${daysBeforeAsOf(1)}\n`
+        );
+        expect(text).not.toContain('stale, not scored');
+    });
+
+    it('marks a stale Reg SHO status as not scored', () => {
+        const text = build(
+            emptySnapshot({
+                thresholdList: { ...LISTED, asOf: daysBeforeAsOf(20) },
+            })
+        );
+        expect(text).toContain(
+            `as of ${daysBeforeAsOf(20)} (stale, not scored — do not present it as the current status)`
+        );
+        expect(text).toContain(
+            `- Reg SHO threshold list as-of: ${daysBeforeAsOf(20)} (stale, not scored)`
+        );
+    });
+
+    it('says the list is not included in the freshness block when absent', () => {
+        expect(build(emptySnapshot())).toContain(
+            '- Reg SHO threshold list as-of: n/a (not included)'
+        );
+    });
+
+    it('limits the FINRA-off note to FINRA data and keeps the SEC short facts', () => {
+        const text = build(
+            emptySnapshot({
+                insider: { transactions: [insiderTx()] },
+                failsToDeliver: [ftdPoint({ failsQty: 250_000 })],
+                thresholdList: LISTED,
+            })
+        );
+        expect(text).toContain(
+            'do not discuss short interest or short volume beyond saying they are unavailable'
+        );
+        expect(text).not.toContain('do not discuss short selling');
+        const short = text.slice(text.indexOf('- 공매도 (axis "short")'));
+        expect(short).toMatch(/^[^\n]+\n  FINRA DATA UNAVAILABLE — /);
+        expect(short.split('\n')[1]).not.toContain('NO DATA');
+    });
+
+    it('keeps NO DATA for a short axis with no source at all', () => {
+        const text = build(
+            emptySnapshot({ insider: { transactions: [insiderTx()] } })
+        );
+        const short = text.slice(text.indexOf('- 공매도 (axis "short")'));
+        expect(short.split('\n')[1]).toMatch(/^  NO DATA — /);
+    });
+
+    it('labels a squeeze score without short-positioning input as price / delivery stress only', () => {
+        const snapshot = emptySnapshot({
+            sharesOutstanding: 40_000_000,
+            failsToDeliver: [ftdPoint({ failsQty: 300_000 })],
+        });
+        const score = evaluateSqueezeRisk(snapshot, {
+            dailyBars: dailyBars({ count: 25, firstClose: 10, lastClose: 16 }),
+        });
+        expect(score.includesFinra).toBe(false);
+        const text = formatSqueezeRisk(score);
+        expect(text).toContain(
+            'no short-positioning input, so this is NOT a short-squeeze risk reading'
+        );
+        expect(text).toContain('capped level: ');
+        expect(text).not.toContain('Short squeeze risk (computed)');
+    });
+
+    it('keeps the squeeze-risk wording when short positioning is present', () => {
+        const score = evaluateSqueezeRisk(
+            emptySnapshot({
+                floatShares: 30_000_000,
+                shortInterest: shortInterestSeries(6_000_000, 9_000_000, 10),
+            }),
+            { dailyBars: dailyBars({ count: 25 }) }
+        );
+        expect(formatSqueezeRisk(score)).toMatch(
+            /^Short squeeze risk \(computed\): score /
+        );
+    });
+
+    it('renders a mixed short-interest trend as not a trend', () => {
+        const text = build(
+            emptySnapshot({
+                shortInterest: [
+                    { ...shortInterestSeries(10_000_000, 12_000_000)[0] },
+                    {
+                        ...shortInterestSeries(10_000_000, 12_000_000)[1],
+                        shortQty: 14_000_000,
+                    },
+                    { ...shortInterestSeries(10_000_000, 12_000_000)[2] },
+                ],
+            })
+        );
+        expect(text).toContain(
+            'shortInterestTrend=mixed (the settlements reversed direction; not a trend)'
+        );
+    });
+
+    it('tags an in-progress top-holders quarter', () => {
+        const text = build(
+            emptySnapshot({
+                institutional: {
+                    quarters: [
+                        quarter({ period: '2026-09-30', complete: false }),
+                        quarter(),
+                    ],
+                    topHolders: topHolders(2, 1, 0),
+                    topHoldersPeriod: '2026-09-30',
+                },
+            })
+        );
+        expect(text).toContain(
+            'Top institutional holders versus the prior quarter (quarter 2026-09-30, in progress, partial):'
+        );
+        const complete = build(
+            emptySnapshot({
+                institutional: {
+                    quarters: [quarter()],
+                    topHolders: topHolders(2, 1, 0),
+                    topHoldersPeriod: '2026-06-30',
+                },
+            })
+        );
+        expect(complete).toContain(
+            'Top institutional holders versus the prior quarter (quarter 2026-06-30):'
+        );
+    });
+
+    it('renders the Korean insider cluster span', () => {
+        const text = build(
+            emptySnapshot({
+                market: 'kr',
+                kr: {
+                    majorHolders: [],
+                    insiders: ['A', 'B', 'C'].map((reporter, i) =>
+                        krInsiderReport({
+                            reporter,
+                            sharesChange: 1_000,
+                            receiptDate: daysBeforeAsOf(5 + i * 10),
+                        })
+                    ),
+                    tradingPlans: [],
+                },
+            })
+        );
+        expect(text).toContain(
+            `kr_insider_cluster [cluster span ${daysBeforeAsOf(25)} to ${daysBeforeAsOf(5)}]:`
+        );
+    });
+
+    it('tags Korean and 13D/13G rows outside the scoring window', () => {
+        const tag = 'scoring window, not in the metrics)';
+        const kr = build(
+            emptySnapshot({
+                market: 'kr',
+                kr: {
+                    majorHolders: [
+                        krMajorHolderReport({
+                            receiptDate: daysBeforeAsOf(200),
+                        }),
+                    ],
+                    insiders: [
+                        krInsiderReport({ receiptDate: daysBeforeAsOf(5) }),
+                        krInsiderReport({ receiptDate: daysBeforeAsOf(200) }),
+                    ],
+                    tradingPlans: [
+                        krTradingPlan({ receiptDate: daysBeforeAsOf(200) }),
+                    ],
+                },
+            })
+        );
+        expect(kr.split(tag)).toHaveLength(4);
+        const us = build(
+            emptySnapshot({
+                largeHolders: [
+                    largeHolderFiling({ filingDate: daysBeforeAsOf(200) }),
+                ],
+            })
+        );
+        expect(us).toContain(`- ${daysBeforeAsOf(200)} (outside the`);
+    });
+
+    it('says "no fails reported" for an empty FTD feed in facts, metrics, freshness and squeeze inputs', () => {
+        const snapshot = emptySnapshot({
+            floatShares: 30_000_000,
+            shortInterest: shortInterestSeries(6_000_000, 9_000_000, 10),
+            failsToDeliver: [],
+        });
+        const text = build(snapshot, {
+            squeezeContext: { dailyBars: dailyBars({ count: 25 }) },
+        });
+        expect(text).toContain(
+            '(none — the feed is present and no fails were reported)'
+        );
+        expect(text).toContain(
+            'failsToDeliverPeakQty=0 (no fails reported in the recent window)'
+        );
+        expect(text).toContain(
+            '- SEC fails-to-deliver latest settlement date: none (no fails reported)'
+        );
+        const score = evaluateSqueezeRisk(snapshot, {
+            dailyBars: dailyBars({ count: 25 }),
+        });
+        const ftd = score.components.find(c => c.id === 'fails_to_deliver_pct');
+        expect(ftd?.value).toBe(0);
+        // Rendered only when it ranks in the top inputs; the label is per component.
+        const all = formatSqueezeRisk({
+            ...score,
+            components: ftd ? [ftd] : [],
+        });
+        expect(all).toContain(
+            'fails_to_deliver_pct=0% of shares outstanding (no fails reported)'
+        );
+    });
+
+    it('keeps n/a for an unavailable FTD feed in the freshness block', () => {
+        expect(build(emptySnapshot())).toContain(
+            '- SEC fails-to-deliver latest settlement date: n/a'
+        );
+    });
+
+    it('renders a missing value as n/a without a dollar sign, and rounds prices and USD', () => {
+        const text = build(
+            emptySnapshot({
+                insider: {
+                    transactions: [
+                        insiderTx({ price: 23.456789, value: null }),
+                        insiderTx({
+                            date: daysBeforeAsOf(3),
+                            price: 0.123456,
+                            value: 1234567.89,
+                        }),
+                    ],
+                },
+                failsToDeliver: [ftdPoint({ price: 1234.5678 })],
+                proposedSales: [proposedSale({ valueUsd: 2_000_000.6 })],
+            })
+        );
+        expect(text).toContain('@ 23.46 | value n/a |');
+        expect(text).not.toContain('$n/a');
+        expect(text).toContain('@ 0.1235 | value $1,234,568 |');
+        expect(text).toContain('| price 1,234.57');
+        expect(text).toContain('| value $2,000,001 |');
+    });
+
+    it('renders percent of class with its unit', () => {
+        expect(unitOfFigure('percentOfClass')).toBe('% of class');
+        expect(unitOfFigure('prevPercentOfClass')).toBe('% of class');
+    });
+
+    it('says NO FILINGS for an empty offering list and notes a quiet window with older filings', () => {
+        const none = build(
+            emptySnapshot({
+                insider: { transactions: [insiderTx()] },
+                offerings: [],
+            })
+        );
+        const dilution = none.slice(
+            none.indexOf('- 증자·희석 (axis "dilution")')
+        );
+        expect(dilution.split('\n')[1]).toMatch(
+            /^  NO FILINGS \(no offering or registration filings on record\) — /
+        );
+        const absent = build(
+            emptySnapshot({ insider: { transactions: [insiderTx()] } })
+        );
+        expect(
+            absent
+                .slice(absent.indexOf('- 증자·희석 (axis "dilution")'))
+                .split('\n')[1]
+        ).toMatch(/^  NO DATA — /);
+        const quiet = build(
+            emptySnapshot({
+                offerings: [
+                    offeringFiling({ filingDate: daysBeforeAsOf(300) }),
+                ],
+            })
+        );
+        expect(quiet).toContain(
+            'signals: none (no filings in the window; older filings exist)'
+        );
+    });
+});
+
+describe('investor-flows prompt — short axis wording by FINRA state', () => {
+    const shortLine = (text: string): string =>
+        text.slice(text.indexOf('- 공매도 (axis "short")')).split('\n')[1];
+    const ftd = [ftdPoint({ failsQty: 250_000 })];
+
+    it('says FINRA data unavailable when the feeds are null and SEC context exists', () => {
+        const text = build(
+            emptySnapshot({
+                failsToDeliver: ftd,
+                shortInterest: null,
+                shortVolume: null,
+            })
+        );
+        expect(shortLine(text)).toMatch(/^  FINRA DATA UNAVAILABLE — /);
+    });
+
+    it('says too thin to score when FINRA rows exist but cannot be scored', () => {
+        // One settlement and no float: no level, no trend, no volume baseline.
+        const text = build(
+            emptySnapshot({
+                floatShares: null,
+                failsToDeliver: ftd,
+                shortInterest: shortInterestSeries(6_000_000, 9_000_000).slice(
+                    2
+                ),
+                shortVolume: null,
+            })
+        );
+        expect(shortLine(text)).toMatch(
+            /^  FINRA SHORT DATA TOO THIN TO SCORE — /
+        );
+        expect(shortLine(text)).not.toContain('FINRA DATA UNAVAILABLE');
+    });
+
+    it('says too thin even without SEC context when FINRA rows exist', () => {
+        const text = build(
+            emptySnapshot({
+                floatShares: null,
+                shortInterest: shortInterestSeries(6_000_000, 9_000_000).slice(
+                    2
+                ),
+            })
+        );
+        expect(shortLine(text)).toMatch(
+            /^  FINRA SHORT DATA TOO THIN TO SCORE — /
+        );
+    });
+
+    it('says stale when the FINRA rows were dropped by the freshness gate', () => {
+        const text = build(
+            emptySnapshot({
+                shortInterest: [
+                    shortInterestSeries(6_000_000, 9_000_000)[0],
+                ].map(p => ({ ...p, settlementDate: daysBeforeAsOf(120) })),
+            })
+        );
+        expect(shortLine(text)).toMatch(/^  FINRA SHORT DATA STALE — /);
+    });
+
+    it('uses a wording that claims neither when the caller passes no flag', () => {
+        const card = evaluateInvestorFlows(
+            emptySnapshot({ failsToDeliver: ftd })
+        );
+        const block = formatInvestorFlowsScorecard(card, 'ko');
+        expect(block).toContain(
+            'FINRA SHORT DATA MISSING OR TOO THIN TO SCORE'
+        );
+        expect(
+            formatInvestorFlowsScorecard(card, 'ko', { finraUnavailable: true })
+        ).toContain('FINRA DATA UNAVAILABLE');
+    });
+});
+
+describe('investor-flows prompt — re-render audit leftovers', () => {
+    const krSnapshot = emptySnapshot({
+        market: 'kr',
+        kr: {
+            majorHolders: [krMajorHolderReport()],
+            insiders: [krInsiderReport()],
+            tradingPlans: [krTradingPlan()],
+        },
+    });
+
+    it('gives Korean prompts a DART example, never a short-interest one', () => {
+        const ko = build(krSnapshot);
+        const en = buildInvestorFlowsAnalysisPrompt(
+            '005930',
+            krSnapshot,
+            evaluateInvestorFlows(krSnapshot),
+            'en'
+        ).dynamic;
+        for (const text of [ko, en]) {
+            expect(text).not.toMatch(/short interest/i);
+            expect(text).not.toContain('shorts are covering');
+            expect(text).toContain(
+                "e.g. a 5%+ holder's ratio rose 1.2%p between two report receipt dates"
+            );
+        }
+        expect(build(US)).toContain('e.g. short interest fell 13.59%');
+    });
+
+    it('says NO FILINGS from the scorecard alone when the offering list is empty', () => {
+        const card = evaluateInvestorFlows(
+            emptySnapshot({
+                insider: { transactions: [insiderTx()] },
+                offerings: [],
+            })
+        );
+        expect(card.dilution.sufficiency).toBe('insufficient');
+        expect(card.dilution.noFilingsOnRecord).toBe(true);
+        expect(formatInvestorFlowsScorecard(card, 'ko')).toContain(
+            '  NO FILINGS (no offering or registration filings on record) — '
+        );
+        const missing = evaluateInvestorFlows(
+            emptySnapshot({ insider: { transactions: [insiderTx()] } })
+        );
+        expect(missing.dilution.noFilingsOnRecord).toBe(false);
+        expect(formatInvestorFlowsScorecard(missing, 'ko')).not.toContain(
+            'NO FILINGS'
+        );
+    });
+
+    it('says "capped level" only when the level was capped', () => {
+        const uncapped = evaluateSqueezeRisk(
+            emptySnapshot({
+                sharesOutstanding: 40_000_000,
+                failsToDeliver: [ftdPoint({ failsQty: 100_000 })],
+            }),
+            { dailyBars: dailyBars({ count: 25 }) }
+        );
+        expect(uncapped.includesFinra).toBe(false);
+        expect(uncapped.levelCapped).toBe(false);
+        const text = formatSqueezeRisk(uncapped);
+        expect(text).not.toContain('capped level');
+        expect(text).toMatch(/score [\d.]+\/100, level: /);
+        const capped = evaluateSqueezeRisk(
+            emptySnapshot({
+                sharesOutstanding: 40_000_000,
+                failsToDeliver: [ftdPoint({ failsQty: 300_000 })],
+            }),
+            {
+                dailyBars: dailyBars({
+                    count: 25,
+                    firstClose: 10,
+                    lastClose: 16,
+                    recentVolume: 3_000_000,
+                }),
+            }
+        );
+        expect(capped.levelCapped).toBe(true);
+        expect(formatSqueezeRisk(capped)).toContain('capped level: ');
+    });
+});
+
+describe('investor-flows prompt — not-scored markers', () => {
+    it('lists every heading marker in one phrase, and only DART-renderable ones for Korea', () => {
+        for (const marker of Object.values(NOT_SCORED_MARKERS)) {
+            expect(NOT_SCORED_AXIS_PHRASE).toContain(marker);
+        }
+        expect(notScoredAxisPhrase('kr')).toContain(NOT_SCORED_MARKERS.noData);
+        expect(notScoredAxisPhrase('kr')).not.toMatch(/FINRA|FILINGS/);
+    });
+
+    it('applies the not-scored rule to every marker, not only NO DATA (US and Korean prompts)', () => {
+        const us = build(US);
+        const kr = build(
+            emptySnapshot({
+                market: 'kr',
+                kr: {
+                    majorHolders: [krMajorHolderReport()],
+                    insiders: [],
+                    tradingPlans: [],
+                },
+            })
+        );
+        for (const [text, market] of [
+            [us, 'us'],
+            [kr, 'kr'],
+        ] as const) {
+            expect(text).toContain(
+                `For ${notScoredAxisPhrase(market)}, interpretationKo must say why it is not scored, as its heading says, and never call it neutral.`
+            );
+            expect(text).toContain(
+                'is missing or unscorable information, not a neutral or quiet reading'
+            );
+            expect(text).not.toContain('An axis marked NO DATA');
+            expect(text).not.toContain('For an axis marked NO DATA');
+        }
+    });
+
+    it('renders each heading text with its marker', () => {
+        const text = build(
+            emptySnapshot({
+                insider: { transactions: [insiderTx()] },
+                offerings: [],
+                failsToDeliver: [ftdPoint({ failsQty: 250_000 })],
+            })
+        );
+        expect(text).toContain(
+            `  ${NOT_SCORED_MARKERS.noFilings} (no offering`
+        );
+        expect(text).toContain(`  ${NOT_SCORED_MARKERS.finraUnavailable} — `);
+        expect(text).toContain(`  ${NOT_SCORED_MARKERS.noData} — `);
     });
 });

@@ -285,6 +285,7 @@ describe('evaluateKrInsiderAxis', () => {
                 reporters: KR_INSIDER_CLUSTER_MIN_REPORTERS,
                 windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
             },
+            subject: `${daysBeforeAsOf(25)} to ${daysBeforeAsOf(5)}`,
         });
         // tiny shares: the cluster alone makes the axis sufficient.
         expect(axis.sufficiency).toBe('sufficient');

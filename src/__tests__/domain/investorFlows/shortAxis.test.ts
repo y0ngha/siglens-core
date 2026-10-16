@@ -231,7 +231,7 @@ describe('evaluateShortAxis — short-interest trend', () => {
         );
     });
 
-    it('reads a non-monotonic move as flat even when the net change is large', () => {
+    it('reads a reversing move with a large net change as mixed, not a trend (GME A/B case)', () => {
         const axis = evaluateShortAxis(
             [
                 shortInterestPoint({
@@ -251,7 +251,7 @@ describe('evaluateShortAxis — short-interest trend', () => {
             FLOAT
         );
         expect(axis.metrics.shortInterestChangePct).toBe(20);
-        expect(axis.metrics.shortInterestTrend).toBe('flat');
+        expect(axis.metrics.shortInterestTrend).toBe('mixed');
         expect(signalOf(axis.signals, 'short_interest_trend')).toBeUndefined();
     });
 

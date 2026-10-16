@@ -6,9 +6,10 @@ import {
     KR_WINDOW_DAYS,
     RATIO_DECIMALS,
 } from '@/domain/investorFlows/constants';
-import { largestCluster } from '@/domain/investorFlows/insiderAxis';
+import { largestClusterSpan } from '@/domain/investorFlows/insiderAxis';
 import {
     daysBetween,
+    formatDay,
     isFiniteNumber,
     labelForScore,
     makeSignal,
@@ -74,23 +75,28 @@ function clusterSignal(
             ? r.report.sharesChange > 0
             : r.report.sharesChange < 0
     );
-    const size = largestCluster(
-        side.map(r => ({ day: r.day, key: reporterKey(r.report) }))
+    // The sweep needs events sorted by day.
+    // A copy: `toSorted` is outside the client build's lib target.
+    const sorted = [...side].sort((a, b) => a.day - b.day);
+    const span = largestClusterSpan(
+        sorted.map(r => ({ day: r.day, key: reporterKey(r.report) }))
     );
-    return size >= KR_INSIDER_CLUSTER_MIN_REPORTERS
-        ? [
-              makeSignal(
-                  'insider',
-                  'kr_insider_cluster',
-                  direction,
-                  'moderate',
-                  {
-                      reporters: size,
-                      windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
-                  }
-              ),
-          ]
-        : [];
+    if (span.size < KR_INSIDER_CLUSTER_MIN_REPORTERS) return [];
+    const members = sorted.slice(span.start, span.end);
+    return [
+        makeSignal(
+            'insider',
+            'kr_insider_cluster',
+            direction,
+            'moderate',
+            {
+                reporters: span.size,
+                windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
+            },
+            // The span's own dates, rendered like the US Form 144 cluster.
+            `${formatDay(members[0].day)} to ${formatDay(members[members.length - 1].day)}`
+        ),
+    ];
 }
 
 /**

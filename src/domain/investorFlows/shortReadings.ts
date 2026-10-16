@@ -127,11 +127,19 @@ function readTrend(points: readonly ShortInterestPoint[]): TrendReading | null {
     const falling = window.every(
         (p, i) => i === 0 || p.shortQty < window[i - 1].shortQty
     );
-    const trend: ShortInterestTrend =
-        rising && changePct >= SHORT_INTEREST_TREND_MIN_CHANGE_PCT
-            ? 'rising'
-            : falling && changePct <= -SHORT_INTEREST_TREND_MIN_CHANGE_PCT
-              ? 'falling'
+    const material = Math.abs(changePct) >= SHORT_INTEREST_TREND_MIN_CHANGE_PCT;
+    // A reversal needs a step each way; an unchanged step alone is not one.
+    const reversed =
+        window.some((p, i) => i > 0 && p.shortQty > window[i - 1].shortQty) &&
+        window.some((p, i) => i > 0 && p.shortQty < window[i - 1].shortQty);
+    const trend: ShortInterestTrend = !material
+        ? 'flat'
+        : rising
+          ? 'rising'
+          : falling
+            ? 'falling'
+            : reversed
+              ? 'mixed'
               : 'flat';
     return {
         trend,

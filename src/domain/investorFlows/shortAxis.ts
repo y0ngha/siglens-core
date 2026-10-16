@@ -203,9 +203,9 @@ function priceFreeSqueezeSignal(
  *
  * **SEC fails to deliver and Reg SHO lists** add neutral context signals:
  * `fails_to_deliver_elevated` (peak recent fails as % of shares outstanding,
- * with the peak's settlement date as `subject`, held at weak when the peak is under {@link FTD_SPIKE_MIN_MULTIPLE}x the
- * baseline; capped at moderate because fails are not evidence of naked short
- * selling) and `reg_sho_threshold_listed`. Being neutral, they never make the
+ * with the peak's settlement date as `subject`; held at weak when the peak is
+ * under {@link FTD_SPIKE_MIN_MULTIPLE}x the baseline; capped at moderate
+ * because fails are not evidence of naked short selling) and `reg_sho_threshold_listed`. Being neutral, they never make the
  * axis sufficient, but they are reported even when it is insufficient (for
  * example with the FINRA feeds switched off).
  */
@@ -264,7 +264,8 @@ export function evaluateShortAxis(
     }
 
     const trendStrength =
-        trend === null || trend.trend === 'flat'
+        // `mixed` (the steps reversed) is not a trend, like `flat`: it scores nothing.
+        trend === null || trend.trend === 'flat' || trend.trend === 'mixed'
             ? null
             : strengthOf(Math.abs(trend.changePct), {
                   weak: SHORT_INTEREST_TREND_MIN_CHANGE_PCT,

@@ -106,6 +106,10 @@ export function evaluateDilutionAxis(
     if (asOfDay === null || visible.length === 0) {
         return {
             id: 'dilution',
+            noFilingsOnRecord:
+                offerings !== undefined &&
+                offerings.length === 0 &&
+                asOfDay !== null,
             score: null,
             label: 'insufficient',
             sufficiency: 'insufficient',
@@ -136,6 +140,7 @@ export function evaluateDilutionAxis(
     const score = scoreFromSignals(signals);
     return {
         id: 'dilution',
+        noFilingsOnRecord: false,
         score,
         label: labelForScore(score),
         sufficiency: 'sufficient',

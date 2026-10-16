@@ -677,12 +677,27 @@ export interface DilutionMetrics {
 /** Dilution (registration / offering filings) axis. */
 export interface DilutionAxis extends InvestorFlowsAxisBase {
     readonly id: 'dilution';
+    /**
+     * `true` only when the snapshot provided an offering list, the reference
+     * day is usable, and the list is empty — no filing exists for the issuer,
+     * so an insufficient axis renders "no filings". A missing list, an unusable
+     * reference day, or a list whose entries are all unparseable or future-dated
+     * is `false` and renders "no data": those are unusable inputs, not proof
+     * that nothing was filed. Rendering only — sufficiency is unchanged.
+     */
+    readonly noFilingsOnRecord: boolean;
     /** Computed figures; `null` when the axis is insufficient. */
     readonly metrics: DilutionMetrics | null;
 }
 
-/** Direction of the last short-interest settlements. */
-export type ShortInterestTrend = 'rising' | 'falling' | 'flat';
+/**
+ * Direction of the last short-interest settlements: `rising` / `falling` when
+ * every step moved that way and the net change is material, `mixed` when the
+ * steps reversed direction (one up, one down) and the net change is material
+ * (e.g. 57.0M → 39.1M → 42.7M — calling that flat hid a -25% move), `flat`
+ * otherwise (a net change under the minimum, or an unchanged step).
+ */
+export type ShortInterestTrend = 'rising' | 'falling' | 'flat' | 'mixed';
 
 /** Computed short-selling figures; `null` where the input was missing. */
 export interface ShortMetrics {
@@ -785,6 +800,14 @@ export interface InvestorFlowsFreshness {
     readonly largeHolderWindow: InvestorFlowsWindow;
     /** Newest fails-to-deliver settlement date. */
     readonly failsToDeliverLatestDate: string | null;
+    /** `asOf` of the Reg SHO threshold-list status; `null` when the list is excluded, unavailable or undated. */
+    readonly thresholdListAsOf: string | null;
+    /**
+     * Whether the threshold-list status was dropped as stale (dated outside
+     * `THRESHOLD_LIST_MAX_AGE_DAYS`, so not scored); `null` when there is no
+     * status (excluded or unavailable).
+     */
+    readonly thresholdListStale: boolean | null;
     /** Window offering filings were measured over. */
     readonly dilutionWindow: InvestorFlowsWindow;
     /** Newest DART receipt date (major-holder, insider or trading-plan report); `null` for US snapshots. */

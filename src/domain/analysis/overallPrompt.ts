@@ -24,9 +24,10 @@ import {
 import {
     formatInvestorFlowsScorecard,
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
-    INVESTOR_FLOWS_PLAIN_TEXT_RULE,
+    INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     investorFlowsInterpretationRules,
     investorFlowsOutputRules,
+    notScoredAxisPhrase,
 } from '@/domain/investorFlows/formatScorecard';
 import type {
     AnalysisResponse,
@@ -444,6 +445,12 @@ function investorFlowsMarketOf(
     return currency === 'KRW' ? 'kr' : 'us';
 }
 
+/** {@link notScoredAxisPhrase} as a guidance sentence for the market. */
+function notScoredSentence(market: InvestorFlowsMarket): string {
+    const phrase = notScoredAxisPhrase(market);
+    return `${phrase.charAt(0).toUpperCase()}${phrase.slice(1)} is missing or unscorable information — never read it as neutral, quiet or supportive.`;
+}
+
 /**
  * How much each investor-flows source should weigh, and why. Judgment, like the
  * axis weights in `overallScore.ts`: it tells the model what each source can
@@ -456,7 +463,7 @@ const INVESTOR_FLOWS_WEIGHTING_GUIDANCE = [
     '- insider cluster buys, open-market buys by officers/directors and new or larger 13D filings are EVENT-level: recent and specific, but each is one input, not a verdict. Insider sales and 13G filings are weak evidence.',
     '- short squeeze risk and the off-exchange short-volume z-score are SHORT-TERM and volatile; short volume covers off-exchange trades only, and short interest is a snapshot published ~8 business days after its settlement date. Fails to deliver and Reg SHO threshold listings are delivery-stress context, not evidence of naked short selling; each FTD figure belongs to its own settlement date.',
     '- dilution filings are EVENT-level supply: an active at-the-market (ATM) program may be selling new shares into the market now and a priced offering sells a block of new shares, while a shelf or registration only makes a sale possible later. Form 144 notices are intent to sell and weaker under a 10b5-1 plan.',
-    'Cite the as-of date of every investor-flows source you use (13F quarter, short-interest settlement date, latest short-volume date, latest fails-to-deliver date, insider, 13D/13G and offering windows). An axis marked NO DATA is missing information — never read it as neutral, quiet or supportive.',
+    `Cite the as-of date of every investor-flows source you use (13F quarter, short-interest settlement date, latest short-volume date, latest fails-to-deliver date, insider, 13D/13G and offering windows). ${notScoredSentence('us')}`,
 ].join('\n');
 
 /** The Korean (DART) counterpart of {@link INVESTOR_FLOWS_WEIGHTING_GUIDANCE}: no 13F / FINRA wording. */
@@ -465,7 +472,7 @@ const KR_INVESTOR_FLOWS_WEIGHTING_GUIDANCE = [
     'How much each source carries:',
     '- DART 5%+ major-holder reports and executive / major-shareholder ownership reports are EVENT-level: filed within days of the change, but they carry no holding purpose and no trade cause (open market, gift, inheritance, exercise), so each is one input, not a verdict.',
     '- Institutional / foreign net buying is not provided for Korean listings; never infer it or describe it as neutral.',
-    'Cite the DART receipt dates and the window you use. An axis marked NO DATA is missing information — never read it as neutral, quiet or supportive.',
+    `Cite the DART receipt dates and the window you use. ${notScoredSentence('kr')}`,
 ].join('\n');
 
 /**
@@ -743,8 +750,18 @@ export function buildOverallAnalysisPrompt(
     const investorFlowsSchemaEntry = investorFlowsIntegrated
         ? `\n  "investorFlowsBulletsKo": [\n    "${investorFlowsMarket === 'kr' ? '수급(대량보유·임원·주요주주)' : '수급(기관·내부자·공매도)'} 요약 bullet 1 (${schemaLanguage})",\n    "수급 요약 bullet 2 (${schemaLanguage})"\n  ],`
         : '';
+    // Interpretation, FTD / ATM and terminology rules only when there is a
+    // scorecard to interpret: a `null` one renders NO DATA and an empty array.
+    const investorFlowsDetailRules =
+        investorFlows === undefined || investorFlows === null
+            ? ''
+            : `\n${investorFlowsInterpretationRules('investorFlowsBulletsKo and the investor-flows claims in integratedConclusionKo', investorFlowsMarket)}\n${
+                  investorFlowsMarket === 'kr'
+                      ? INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE
+                      : investorFlowsOutputRules('the same bullet or sentence')
+              }${locale === 'ko' && investorFlowsMarket !== 'kr' ? `\n${INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}` : ''}`;
     const investorFlowsRules = investorFlowsIntegrated
-        ? `\n- investorFlowsBulletsKo: provide 2–4 bullets from the Investor Flows section, citing the as-of date of each source used and weighting sources as that section describes; when an axis is marked NO DATA say so explicitly and never describe it as neutral. Leave the array empty when the section says there is no data.\n- When the Investor Flows section is present, attribute investor-flows claims in integratedConclusionKo to it (e.g. "수급 분석에서는…") and keep them proportional to the section's weighting guidance. Quote its scores as given and state its labels in plain words.\n${investorFlowsInterpretationRules('investorFlowsBulletsKo and the investor-flows claims in integratedConclusionKo')}\n${investorFlowsMarket === 'kr' ? INVESTOR_FLOWS_PLAIN_TEXT_RULE : investorFlowsOutputRules('the same bullet or sentence')}${locale === 'ko' && investorFlowsMarket !== 'kr' ? `\n${INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}` : ''}`
+        ? `\n- investorFlowsBulletsKo: provide 2–4 bullets from the Investor Flows section, citing the as-of date of each source used and weighting sources as that section describes; for ${notScoredAxisPhrase(investorFlowsMarket)}, say why it is not scored, as its heading says, and never describe it as neutral. Leave the array empty when the section says there is no data.\n- When the Investor Flows section is present, attribute investor-flows claims in integratedConclusionKo to it (e.g. "수급 분석에서는…") and keep them proportional to the section's weighting guidance. Quote its scores as given and state its labels in plain words.${investorFlowsDetailRules}`
         : '';
 
     const dynamic = `${roleAndAxisLine}

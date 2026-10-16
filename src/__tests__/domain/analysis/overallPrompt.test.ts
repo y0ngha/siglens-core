@@ -3,7 +3,9 @@ import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/d
 import { evaluateInvestorFlows } from '@/domain/investorFlows/evaluateInvestorFlows';
 import {
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
+    INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     INVESTOR_FLOWS_PLAIN_TEXT_RULE,
+    notScoredAxisPhrase,
     scorecardWords,
 } from '@/domain/investorFlows/formatScorecard';
 import {
@@ -1920,9 +1922,70 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
         );
     });
 
+    it('skips the interpretation, FTD, ATM and terminology rules for a null scorecard', () => {
+        const prompt = build(null, 'USD');
+        expect(prompt).toContain('Leave investorFlowsBulletsKo empty');
+        expect(prompt).not.toContain('quote an FTD quantity');
+        expect(prompt).not.toContain('An active at-the-market (ATM) program');
+        expect(prompt).not.toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);
+        expect(prompt).not.toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
+        expect(prompt).not.toContain(
+            'describe supply and positioning facts only'
+        );
+    });
+
+    it('keeps short-interest wording out of the Korean investor-flows section and rules', () => {
+        const prompt = build(krCard, 'KRW');
+        const flows = prompt.slice(
+            prompt.indexOf('## Investor Flows (supplementary axis)'),
+            prompt.indexOf('## Axis Weighting (computed')
+        );
+        expect(flows).not.toMatch(/short interest/i);
+        const rules = prompt.slice(prompt.indexOf('- investorFlowsBulletsKo:'));
+        const flowRules = rules.slice(0, rules.indexOf('- riskFactorsKo:'));
+        expect(flowRules).not.toMatch(/short interest|shorts are covering/i);
+        expect(flowRules).toContain("a 5%+ holder's ratio rose 1.2%p");
+    });
+
+    it('says NO FILINGS in the overall section for an empty offering list', () => {
+        const card = evaluateInvestorFlows(
+            emptySnapshot({
+                insider: { transactions: [insiderTx()] },
+                offerings: [],
+            })
+        );
+        expect(section(build(card, 'USD'))).toContain(
+            'NO FILINGS (no offering or registration filings on record)'
+        );
+    });
+
+    it('applies the not-scored rule to every heading marker in the bullets rule and the guidance', () => {
+        for (const [prompt, market] of [
+            [
+                build(
+                    evaluateInvestorFlows(
+                        emptySnapshot({ offerings: [offeringFiling()] })
+                    ),
+                    'USD'
+                ),
+                'us',
+            ],
+            [build(krCard, 'KRW'), 'kr'],
+        ] as const) {
+            expect(prompt).toContain(
+                `for ${notScoredAxisPhrase(market)}, say why it is not scored, as its heading says, and never describe it as neutral.`
+            );
+            expect(prompt).toContain(
+                'is missing or unscorable information — never read it as neutral, quiet or supportive.'
+            );
+            expect(prompt).not.toContain('An axis marked NO DATA');
+            expect(prompt).not.toContain('when an axis is marked NO DATA');
+        }
+    });
+
     it('gives Korean flows only the identifier rule', () => {
         const prompt = build(krCard, 'KRW');
-        expect(prompt).toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
+        expect(prompt).toContain(INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE);
         expect(prompt).not.toContain('quote an FTD quantity');
         expect(prompt).not.toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);
     });
