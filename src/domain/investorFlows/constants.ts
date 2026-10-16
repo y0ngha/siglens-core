@@ -1,6 +1,8 @@
 import type {
     InvestorFlowsAxisId,
     InvestorFlowsSignalStrength,
+    SqueezeRiskComponentId,
+    SqueezeRiskLevel,
 } from '@/domain/investorFlows/types';
 
 /**
@@ -18,6 +20,7 @@ export const INVESTOR_FLOWS_AXES: readonly InvestorFlowsAxisId[] = [
     'insider',
     'largeHolders',
     'short',
+    'dilution',
 ];
 
 // ─── Scoring frame ───────────────────────────────────
@@ -48,13 +51,22 @@ export const SCORE_LIMIT = 100;
  * Composite weights. 13F is the broadest and most stable measure of who owns
  * the stock but is up to ~45 days late; insider and short data are narrower
  * and noisier, 13D/G events are rare. Judgment only.
+ *
+ * Adding `dilution` (2026-10) took 0.15 for it and scaled the other four by
+ * ~0.85 (0.35/0.25/0.15/0.25 → 0.30/0.22/0.13/0.20), keeping their relative
+ * order. Dilution gets the weight of the 13D/G axis because both are rare,
+ * discrete filings: an offering adds supply the day it prices, but most
+ * symbols have none in the window, and an axis without data abstains anyway.
+ * Weights are relative (the composite divides by the used weights), so the
+ * sum of 1 is only for readability.
  */
 export const COMPOSITE_WEIGHTS: Readonly<Record<InvestorFlowsAxisId, number>> =
     {
-        institutional: 0.35,
-        insider: 0.25,
-        largeHolders: 0.15,
-        short: 0.25,
+        institutional: 0.3,
+        insider: 0.22,
+        largeHolders: 0.13,
+        short: 0.2,
+        dilution: 0.15,
     };
 
 /** Axes with data required for a composite. One axis alone is not an "overall" read. */
@@ -146,6 +158,22 @@ export const TOP_HOLDER_CONSENSUS_MODERATE = 0.6;
 /** See {@link TOP_HOLDER_CONSENSUS_WEAK}. */
 export const TOP_HOLDER_CONSENSUS_STRONG = 0.8;
 
+/** 13F option quarters need at least this many put + call holders before a ratio means anything; one fund's hedge is not positioning. */
+export const PUT_CALL_MIN_HOLDERS = 10;
+
+/**
+ * Put / call notional ratio from which positioning reads one-sided (and its
+ * inverse on the call side). 13F option notional is mostly hedges against long
+ * stock, so a ratio near 1 says nothing; 1.5x is the first clear tilt.
+ */
+export const PUT_CALL_SKEW_RATIO = 1.5;
+
+/** Quarter-over-quarter multiple of the put / call ratio (or its inverse) that counts as a shift on its own. */
+export const PUT_CALL_SHIFT_MULTIPLE = 2;
+
+/** Strength cap of the put / call signal: hedging dominates 13F option notional, so it is never more than weak. */
+export const PUT_CALL_MAX_STRENGTH: InvestorFlowsSignalStrength = 'weak';
+
 // ─── Insider (Form 4) ────────────────────────────────
 
 /** Window insider activity is measured over. A quarter is long enough to see a pattern and short enough to stay current. */
@@ -187,6 +215,27 @@ export const INSIDER_LARGE_SELL_FRACTION = 0.25;
 /** Distinct insiders with large sells for a strong (rather than moderate) large-selling signal. */
 export const INSIDER_LARGE_SELL_STRONG_INSIDERS = 3;
 
+// ─── Insider (Form 144) ──────────────────────────────
+
+/**
+ * Aggregate Form 144 value (USD) in the insider window for a weak
+ * proposed-sale signal. Form 144 is required above $50k in three months, so
+ * small notices are routine; $1M is four times the Form 4 routine-sell floor.
+ */
+export const INSIDER_PROPOSED_SALE_WEAK_USD = 1_000_000;
+/** See {@link INSIDER_PROPOSED_SALE_WEAK_USD}. Capped at moderate: a notice is intent, and the sale reappears later as a Form 4. */
+export const INSIDER_PROPOSED_SALE_MODERATE_USD = 10_000_000;
+
+/**
+ * Value share under a Rule 10b5-1 plan from which the proposed-sale signals
+ * drop one strength step (never below weak): a plan adopted months earlier
+ * says little about today's view.
+ */
+export const INSIDER_PROPOSED_SALE_PLAN_MAJORITY = 0.5;
+
+/** Distinct Form 144 filers within {@link INSIDER_CLUSTER_WINDOW_DAYS} days for a proposed-sale cluster. */
+export const INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS = 3;
+
 // ─── Large holders (13D / 13G) ───────────────────────
 
 /** Window 13D/13G filings are measured over. */
@@ -198,6 +247,11 @@ export const LARGE_HOLDER_WINDOW_DAYS = 90;
  * them must not stack into a strong read.
  */
 export const LARGE_HOLDER_13G_POINTS_CAP = 30;
+
+// ─── Dilution (registration / offering filings) ──────
+
+/** Window offering filings are measured over: long enough to cover a shelf followed by its first takedown. */
+export const DILUTION_WINDOW_DAYS = 180;
 
 // ─── Short selling (FINRA) ───────────────────────────
 
@@ -241,6 +295,146 @@ export const SQUEEZE_STRONG_SHORT_INTEREST_PCT_FLOAT = 25;
 /** See {@link SQUEEZE_STRONG_SHORT_INTEREST_PCT_FLOAT}. */
 export const SQUEEZE_STRONG_DAYS_TO_COVER = 8;
 
+// ─── Fails to deliver (SEC) and Reg SHO lists ────────
+
+/** Days back from the reference day that count as "recent" fails. FTD files publish about two weeks after each half-month, so 30 days holds at least one published period. */
+export const FTD_RECENT_WINDOW_DAYS = 30;
+
+/** Calendar days before the recent window that form the FTD baseline. */
+export const FTD_BASELINE_WINDOW_DAYS = 60;
+
+/** Trading days in {@link FTD_BASELINE_WINDOW_DAYS} calendar days (5/7, minus a holiday). FTD rows exist only on fail days, so the baseline sum is divided by this, not by the row count. */
+export const FTD_BASELINE_TRADING_DAYS = 42;
+
+/** Reg SHO's own share floor for a threshold security; smaller fails are noise. */
+export const FTD_MIN_QTY = 10_000;
+
+/** Peak fails as % of shares outstanding for a weak FTD signal. */
+export const FTD_PCT_OUTSTANDING_WEAK = 0.1;
+/** Reg SHO's threshold-security level (0.5% of shares outstanding) — moderate, the cap: fails are not evidence of naked shorting (SEC). */
+export const FTD_PCT_OUTSTANDING_MODERATE = 0.5;
+
+/** A peak below this multiple of the baseline daily average is chronic, not new; such a signal is held at weak. */
+export const FTD_SPIKE_MIN_MULTIPLE = 2;
+
+/** Consecutive threshold-list days at which Rule 203(b)(3) mandates a close-out — the listing signal becomes moderate. */
+export const THRESHOLD_LIST_CLOSE_OUT_DAYS = 13;
+
+// ─── Short-squeeze score ─────────────────────────────
+
+/** Range of one squeeze input: `floor` maps to 0, `cap` to 1, linear in between. */
+export interface SqueezeComponentScale {
+    readonly floor: number;
+    readonly cap: number;
+}
+
+/**
+ * Squeeze-score inputs: weight and 0..1 scale. Judgment, not measurement.
+ * Crowding (short interest % of float) and the price move carry the most —
+ * a squeeze needs both shorts and a rally against them; days to cover and the
+ * short-interest trend say how hard and how recently the crowd built; the
+ * off-exchange z-score is mostly market-maker hedging, so it carries least.
+ * Weights sum to 1 and are renormalized over the inputs that are present.
+ */
+export const SQUEEZE_COMPONENTS: Readonly<
+    Record<
+        SqueezeRiskComponentId,
+        { readonly weight: number; readonly scale: SqueezeComponentScale }
+    >
+> = {
+    /** 5% is ordinary; 30% of float is among the most crowded US names. */
+    short_interest_pct_float: { weight: 0.25, scale: { floor: 5, cap: 30 } },
+    /** Two days unwinds quietly; ten days of volume is a trap. */
+    days_to_cover: { weight: 0.15, scale: { floor: 2, cap: 10 } },
+    /** Short-interest change across the last 3 settlements, percent; a flat or falling crowd adds nothing. */
+    short_interest_trend: { weight: 0.1, scale: { floor: 0, cap: 30 } },
+    /** Off-exchange short-ratio z-score; only above-baseline shorting counts. */
+    off_exchange_short_ratio_z: { weight: 0.05, scale: { floor: 0, cap: 3 } },
+    /** Recent peak fails as % of shares outstanding; full at the Reg SHO level. */
+    fails_to_deliver_pct: { weight: 0.1, scale: { floor: 0, cap: 0.5 } },
+    /** Consecutive threshold-list days; full at the mandatory close-out. */
+    threshold_list_days: { weight: 0.05, scale: { floor: 0, cap: 13 } },
+    /** 20-session close change, percent; only a rally pressures shorts. */
+    price_change_20d: { weight: 0.2, scale: { floor: 0, cap: 50 } },
+    /** Last 5 sessions' average volume over the 20 before; 3x is a crowd rushing in or out. */
+    volume_ratio: { weight: 0.1, scale: { floor: 1, cap: 3 } },
+};
+
+/** Inputs that measure short positioning itself; without any of them the level is capped. */
+export const SQUEEZE_POSITIONING_COMPONENTS: readonly SqueezeRiskComponentId[] =
+    [
+        'short_interest_pct_float',
+        'days_to_cover',
+        'short_interest_trend',
+        'off_exchange_short_ratio_z',
+    ];
+
+/** Inputs that are about short sellers at all; with none of them there is no squeeze score. */
+export const SQUEEZE_SHORT_SIDE_COMPONENTS: readonly SqueezeRiskComponentId[] =
+    [
+        ...SQUEEZE_POSITIONING_COMPONENTS,
+        'fails_to_deliver_pct',
+        'threshold_list_days',
+    ];
+
+/** Score from which each level starts (ascending). */
+export const SQUEEZE_LEVEL_CUTOFFS: Readonly<
+    Record<Exclude<SqueezeRiskLevel, 'low'>, number>
+> = {
+    elevated: 25,
+    high: 50,
+    extreme: 75,
+};
+
+/** Highest level without a positioning input: fails and price alone cannot call a squeeze. */
+export const SQUEEZE_CAPPED_LEVEL: SqueezeRiskLevel = 'elevated';
+
+/**
+ * Calendar days the newest completed bar may lag the reference day before the
+ * price inputs are dropped. A long weekend plus a holiday puts the last
+ * session up to 4 days back; 7 allows that with slack, while a feed that
+ * stopped a week ago no longer describes the current move.
+ */
+export const SQUEEZE_MAX_BAR_AGE_DAYS = 7;
+
+/** Sessions the price change spans. */
+export const SQUEEZE_PRICE_CHANGE_SESSIONS = 20;
+/** Recent sessions of the volume ratio. */
+export const SQUEEZE_VOLUME_RECENT_SESSIONS = 5;
+/** Baseline sessions of the volume ratio (before the recent ones). */
+export const SQUEEZE_VOLUME_BASELINE_SESSIONS = 20;
+
+// ─── Korea (DART) ────────────────────────────────────
+
+/** Window DART major-holder and insider reports are measured over (the US windows, for comparability). */
+export const KR_WINDOW_DAYS = 90;
+
+/** Ownership level the 5% rule reports around; dropping below it is an exit. */
+export const KR_MAJOR_HOLDER_THRESHOLD_PCT = 5;
+
+/**
+ * Net holding-ratio change (percentage points) per reporter in the window.
+ * 1%p is the change that obliges a new report, so it is the floor; 10%p is a
+ * control-level move. Strength never comes from the report form.
+ */
+export const KR_MAJOR_HOLDER_CHANGE_WEAK_PCT = 1;
+/** See {@link KR_MAJOR_HOLDER_CHANGE_WEAK_PCT}. */
+export const KR_MAJOR_HOLDER_CHANGE_MODERATE_PCT = 3;
+/** See {@link KR_MAJOR_HOLDER_CHANGE_WEAK_PCT}. */
+export const KR_MAJOR_HOLDER_CHANGE_STRONG_PCT = 10;
+
+/**
+ * Net insider share change as % of shares outstanding. The report carries no
+ * cause (open market, gift, inheritance, exercise), so the signal is capped at
+ * moderate; 0.05% is about the size of a meaningful executive purchase.
+ */
+export const KR_INSIDER_NET_CHANGE_WEAK_PCT = 0.05;
+/** See {@link KR_INSIDER_NET_CHANGE_WEAK_PCT}. */
+export const KR_INSIDER_NET_CHANGE_MODERATE_PCT = 0.25;
+
+/** Distinct reporters moving the same way within {@link INSIDER_CLUSTER_WINDOW_DAYS} days for a Korean insider cluster. */
+export const KR_INSIDER_CLUSTER_MIN_REPORTERS = 3;
+
 // ─── Prompt sizing ───────────────────────────────────
 
 /** Compact-fact caps for the analysis prompt. */
@@ -251,5 +445,15 @@ export const PROMPT_MAX_INSIDER_TRANSACTIONS = 15;
 export const PROMPT_MAX_LARGE_HOLDER_FILINGS = 10;
 /** See {@link PROMPT_MAX_TOP_HOLDERS}. */
 export const PROMPT_MAX_SHORT_INTEREST_POINTS = 6;
+/** See {@link PROMPT_MAX_TOP_HOLDERS}. */
+export const PROMPT_MAX_PROPOSED_SALES = 5;
+/** See {@link PROMPT_MAX_TOP_HOLDERS}. */
+export const PROMPT_MAX_OFFERINGS = 5;
+/** See {@link PROMPT_MAX_TOP_HOLDERS}. */
+export const PROMPT_MAX_FAILS_TO_DELIVER = 5;
+/** See {@link PROMPT_MAX_TOP_HOLDERS}. */
+export const PROMPT_MAX_KR_REPORTS = 10;
+/** Squeeze-score inputs listed in prompts, largest contribution first. */
+export const PROMPT_MAX_SQUEEZE_COMPONENTS = 3;
 /** Names come from filings and are untrusted prompt text; clipped to this length. */
 export const PROMPT_MAX_NAME_CHARS = 60;

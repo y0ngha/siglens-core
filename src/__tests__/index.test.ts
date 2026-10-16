@@ -312,7 +312,28 @@ describe('public API exports', () => {
             'insider',
             'largeHolders',
             'short',
+            'dilution',
         ]);
+        expect(typeof coreApi.evaluateSqueezeRisk).toBe('function');
+        expect(
+            coreApi.evaluateSqueezeRisk(
+                {
+                    asOf: '2026-10-15',
+                    sharesOutstanding: null,
+                    floatShares: null,
+                    institutional: {
+                        quarters: [],
+                        topHolders: [],
+                        topHoldersPeriod: null,
+                    },
+                    insider: { transactions: [] },
+                    largeHolders: null,
+                    shortInterest: null,
+                    shortVolume: null,
+                },
+                { dailyBars: [] }
+            ).sufficiency
+        ).toBe('insufficient');
 
         // Compile-time: siglens implements the port and injects the scorecard.
         const snapshot = {} as InvestorFlowsSnapshot;

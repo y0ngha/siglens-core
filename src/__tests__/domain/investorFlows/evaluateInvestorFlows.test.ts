@@ -104,8 +104,10 @@ describe('evaluateInvestorFlows — accumulation archetype', () => {
         expect(card.short.metrics.shortInterestTrend).toBe('falling');
     });
 
-    it('rolls up to a strongly bullish composite using all four axes', () => {
-        expect(card.composite.axesUsed).toEqual([...INVESTOR_FLOWS_AXES]);
+    it('rolls up to a strongly bullish composite using the four axes with data (no offerings: dilution abstains)', () => {
+        expect(card.composite.axesUsed).toEqual(
+            INVESTOR_FLOWS_AXES.filter(a => a !== 'dilution')
+        );
         expect(card.composite.label).toBe('strong_bullish');
         expect(card.composite.score).toBeGreaterThanOrEqual(50);
     });

@@ -18,6 +18,7 @@ import {
     sortSignals,
     strengthOf,
 } from '@/domain/investorFlows/scoreHelpers';
+import { groupByKey } from '@/domain/investorFlows/scoreHelpers';
 
 describe('labelForScore', () => {
     it.each([
@@ -188,5 +189,20 @@ describe('dates and rounding', () => {
         expect(roundValue(-0.001)).toBe(0);
         expect(Object.is(roundValue(-0.001), 0)).toBe(true);
         expect(roundValue(0.123456, 4)).toBe(0.1235);
+    });
+});
+
+describe('groupByKey', () => {
+    it('groups by key in first-seen order and keeps each group in input order', () => {
+        const groups = groupByKey(['b1', 'a1', 'b2', 'a2', 'c1'], v => v[0]);
+        expect([...groups.entries()]).toEqual([
+            ['b', ['b1', 'b2']],
+            ['a', ['a1', 'a2']],
+            ['c', ['c1']],
+        ]);
+    });
+
+    it('returns an empty map for no items', () => {
+        expect(groupByKey([], String).size).toBe(0);
     });
 });

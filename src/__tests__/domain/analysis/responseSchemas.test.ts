@@ -835,6 +835,7 @@ describe('INVESTOR_FLOWS_RESPONSE_SCHEMA drift guard', () => {
                 insider: true,
                 largeHolders: true,
                 short: true,
+                dilution: true,
             } satisfies Record<InvestorFlowsAxisId, true>).toSorted()
         );
     });

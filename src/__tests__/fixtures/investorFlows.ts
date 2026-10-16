@@ -1,13 +1,21 @@
 import { MS_PER_DAY } from '@/domain/constants/time';
 import type {
+    FailsToDeliverPoint,
     InsiderTransaction,
     InstitutionalHolderChange,
     InstitutionalHolderChangeKind,
+    InstitutionalOptionsQuarter,
     InstitutionalQuarter,
+    KrInsiderReport,
+    KrMajorHolderReport,
+    KrTradingPlan,
     LargeHolderFiling,
     InvestorFlowsSnapshot,
+    OfferingFiling,
+    ProposedSale,
     ShortInterestPoint,
     ShortVolumePoint,
+    SqueezeRiskBar,
 } from '@/domain/types';
 
 /** Reference date every investor-flows fixture is measured from. */
@@ -241,4 +249,144 @@ export function emptySnapshot(
         shortVolume: null,
         ...overrides,
     };
+}
+
+/** A registration / offering filing (default: an ATM prospectus supplement 10 days ago). */
+export function offeringFiling(
+    overrides: Partial<OfferingFiling> = {}
+): OfferingFiling {
+    return {
+        filingDate: daysBeforeAsOf(10),
+        form: '424B5',
+        kind: 'atm',
+        url: 'https://www.sec.gov/Archives/example424b5',
+        ...overrides,
+    };
+}
+
+/** A Form 144 notice (default: an officer's $2M sale filed 10 days ago, no 10b5-1 plan). */
+export function proposedSale(
+    overrides: Partial<ProposedSale> = {}
+): ProposedSale {
+    return {
+        filingDate: daysBeforeAsOf(10),
+        filer: 'Jane Roe',
+        relationships: ['Officer'],
+        shares: 10_000,
+        valueUsd: 2_000_000,
+        approxSaleDate: daysBeforeAsOf(8),
+        planAdoptionDate: null,
+        url: 'https://www.sec.gov/Archives/example144',
+        ...overrides,
+    };
+}
+
+/** A complete 13F option quarter (default: balanced puts and calls). */
+export function optionsQuarter(
+    overrides: Partial<InstitutionalOptionsQuarter> = {}
+): InstitutionalOptionsQuarter {
+    return {
+        period: '2026-06-30',
+        complete: true,
+        putHolders: 40,
+        putShares: 5_000_000,
+        putValueUsd: 500_000_000,
+        callHolders: 40,
+        callShares: 5_000_000,
+        callValueUsd: 500_000_000,
+        ...overrides,
+    };
+}
+
+/** A fails-to-deliver day. */
+export function ftdPoint(
+    overrides: Partial<FailsToDeliverPoint> = {}
+): FailsToDeliverPoint {
+    return {
+        settlementDate: daysBeforeAsOf(20),
+        failsQty: 50_000,
+        price: 20,
+        ...overrides,
+    };
+}
+
+/** A DART major-holder report (default: a new 6.2% holder 10 days ago). */
+export function krMajorHolderReport(
+    overrides: Partial<KrMajorHolderReport> = {}
+): KrMajorHolderReport {
+    return {
+        receiptDate: daysBeforeAsOf(10),
+        reporter: '국민연금공단',
+        reportForm: 'abbreviated',
+        shares: 3_100_000,
+        sharesChange: 3_100_000,
+        ratioPct: 6.2,
+        ratioChangePct: 6.2,
+        reason: '단순투자목적 신규 보고',
+        url: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261005000001',
+        ...overrides,
+    };
+}
+
+/** A DART executive / major-shareholder report (default: an executive adding 20,000 shares). */
+export function krInsiderReport(
+    overrides: Partial<KrInsiderReport> = {}
+): KrInsiderReport {
+    return {
+        receiptDate: daysBeforeAsOf(10),
+        reporter: '홍길동',
+        position: '대표이사',
+        registered: true,
+        majorShareholder: false,
+        shares: 120_000,
+        sharesChange: 20_000,
+        ratioPct: 0.24,
+        ratioChangePct: 0.04,
+        url: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261005000002',
+        ...overrides,
+    };
+}
+
+/** A DART trading-plan report. */
+export function krTradingPlan(
+    overrides: Partial<KrTradingPlan> = {}
+): KrTradingPlan {
+    return {
+        receiptDate: daysBeforeAsOf(5),
+        reporter: '홍길동',
+        title: '임원ㆍ주요주주 특정증권등 거래계획보고서',
+        url: 'https://dart.fss.or.kr/dsaf001/main.do?rcpNo=20261010000003',
+        ...overrides,
+    };
+}
+
+/**
+ * `count` consecutive daily bars ending the day before {@link AS_OF}: closes
+ * rise linearly from `firstClose` to `lastClose`, volume is `baseVolume`
+ * except the last `recentSessions` bars, which trade `recentVolume`.
+ */
+export function dailyBars(
+    options: {
+        count?: number;
+        firstClose?: number;
+        lastClose?: number;
+        baseVolume?: number;
+        recentVolume?: number;
+        recentSessions?: number;
+    } = {}
+): SqueezeRiskBar[] {
+    const {
+        count = 30,
+        firstClose = 100,
+        lastClose = 100,
+        baseVolume = 1_000_000,
+        recentVolume = baseVolume,
+        recentSessions = 5,
+    } = options;
+    const step = count > 1 ? (lastClose - firstClose) / (count - 1) : 0;
+    return Array.from({ length: count }, (_, i) => ({
+        date: daysBeforeAsOf(count - i),
+        close: firstClose + step * i,
+        volume: i >= count - recentSessions ? recentVolume : baseVolume,
+    }));
 }

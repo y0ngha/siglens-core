@@ -224,6 +224,7 @@ export type {
 // Investor flows (수급) — pure domain functions and types (server-only `runInvestorFlowsAnalysis`
 // is omitted from the browser entry, mirroring congress above).
 export { evaluateInvestorFlows } from './domain/investorFlows/evaluateInvestorFlows';
+export { evaluateSqueezeRisk } from './domain/investorFlows/squeezeRisk';
 export { normalizeInvestorFlowsAnalysisResponse } from './domain/analysis/normalizeInvestorFlows';
 export { INVESTOR_FLOWS_AXES } from './domain/investorFlows/constants';
 export type { InvestorFlowsDataProvider } from './domain/ports/investorFlowsDataProvider';
@@ -267,6 +268,30 @@ export type {
     EvaluateInvestorFlowsOptions,
     InvestorFlowsAnalysisResponse,
     InvestorFlowsAxisInterpretation,
+    InstitutionalOptionsQuarter,
+    FailsToDeliverPoint,
+    ProposedSale,
+    OfferingKind,
+    OfferingFiling,
+    ThresholdListStatus,
+    InvestorFlowsMarket,
+    KrMajorHolderReportForm,
+    KrMajorHolderReport,
+    KrInsiderReport,
+    KrTradingPlan,
+    KrDisclosureSnapshot,
+    KrInsiderMetrics,
+    KrMajorHolderMetrics,
+    DilutionMetrics,
+    DilutionAxis,
+    SqueezeRiskBar,
+    SqueezeRiskContext,
+    EvaluateSqueezeRiskOptions,
+    SqueezeRiskLevel,
+    SqueezeRiskComponentId,
+    SqueezeRiskComponent,
+    SqueezeRiskSufficiency,
+    SqueezeRiskScore,
 } from './domain/types';
 
 // Model spec helpers

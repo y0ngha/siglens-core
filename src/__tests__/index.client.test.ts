@@ -128,7 +128,28 @@ describe('browser public API exports', () => {
             'insider',
             'largeHolders',
             'short',
+            'dilution',
         ]);
+        expect(typeof clientApi.evaluateSqueezeRisk).toBe('function');
+        expect(
+            clientApi.evaluateSqueezeRisk(
+                {
+                    asOf: '2026-10-15',
+                    sharesOutstanding: null,
+                    floatShares: null,
+                    institutional: {
+                        quarters: [],
+                        topHolders: [],
+                        topHoldersPeriod: null,
+                    },
+                    insider: { transactions: [] },
+                    largeHolders: null,
+                    shortInterest: null,
+                    shortVolume: null,
+                },
+                { dailyBars: [] }
+            ).sufficiency
+        ).toBe('insufficient');
         expect('runInvestorFlowsAnalysis' in clientApi).toBe(false);
         expect('buildInvestorFlowsAnalysisPrompt' in clientApi).toBe(false);
 

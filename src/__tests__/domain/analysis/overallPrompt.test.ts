@@ -3,6 +3,9 @@ import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/d
 import { evaluateInvestorFlows } from '@/domain/investorFlows/evaluateInvestorFlows';
 import {
     emptySnapshot,
+    krInsiderReport,
+    krMajorHolderReport,
+    offeringFiling,
     insiderTx,
     quarter,
     shortInterestSeries,
@@ -1775,4 +1778,89 @@ describe('buildOverallAnalysisPrompt — investor flows (수급) section', () =>
             );
         }
     );
+});
+
+describe('buildOverallAnalysisPrompt — investor flows by market', () => {
+    const build = (
+        flows: InvestorFlowsScorecard | null,
+        currency: 'USD' | 'KRW'
+    ): string =>
+        buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'equity',
+            'ko',
+            undefined,
+            undefined,
+            currency,
+            flows
+        );
+    const section = (prompt: string): string =>
+        prompt.slice(
+            prompt.indexOf('## Investor Flows (supplementary axis)'),
+            prompt.indexOf('## Axis Weighting (computed')
+        );
+    const krCard = evaluateInvestorFlows(
+        emptySnapshot({
+            market: 'kr',
+            kr: {
+                majorHolders: [krMajorHolderReport()],
+                insiders: [krInsiderReport({ sharesChange: 400_000 })],
+                tradingPlans: [],
+            },
+        })
+    );
+
+    it('renders a Korean scorecard with DART guidance and no US source names', () => {
+        const flows = section(build(krCard, 'KRW'));
+        expect(flows).toContain('DART 5%+ major-holder reports');
+        expect(flows).toContain(
+            'Institutional / foreign net buying is not provided for Korean listings'
+        );
+        for (const word of ['13F', 'FINRA', 'Form 4', '13D']) {
+            expect(flows).not.toContain(word);
+        }
+    });
+
+    it('says the Korean NO DATA line for a null scorecard on a KRW listing', () => {
+        const flows = section(build(null, 'KRW'));
+        expect(flows).toContain('NO DATA — Korean investor-flows data (DART');
+        expect(flows).not.toContain('13F');
+    });
+
+    it('keeps the US NO DATA line, now naming the new sources, for a USD listing', () => {
+        const flows = section(build(null, 'USD'));
+        expect(flows).toContain(
+            'NO DATA — investor-flows data (13F institutional, Form 4 / Form 144 insider, 13D/13G, FINRA / SEC short, SEC offering filings)'
+        );
+    });
+
+    it('uses the Korean schema example for Korean flows', () => {
+        expect(build(krCard, 'KRW')).toContain(
+            '수급(대량보유·임원·주요주주) 요약 bullet 1 (한국어)'
+        );
+        expect(build(null, 'USD')).toContain(
+            '수급(기관·내부자·공매도) 요약 bullet 1 (한국어)'
+        );
+    });
+
+    it('adds the dilution and fails-to-deliver guidance and the dilution axis for US flows', () => {
+        const usCard = evaluateInvestorFlows(
+            emptySnapshot({ offerings: [offeringFiling()] })
+        );
+        const flows = section(build(usCard, 'USD'));
+        expect(flows).toContain('dilution filings are EVENT-level supply');
+        expect(flows).toContain('not evidence of naked short selling');
+        expect(flows).toContain(
+            '- dilution — SEC registration and offering filings'
+        );
+    });
 });

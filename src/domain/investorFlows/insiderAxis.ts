@@ -7,6 +7,10 @@ import {
     INSIDER_CLUSTER_WINDOW_DAYS,
     INSIDER_LARGE_SELL_FRACTION,
     INSIDER_LARGE_SELL_STRONG_INSIDERS,
+    INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS,
+    INSIDER_PROPOSED_SALE_MODERATE_USD,
+    INSIDER_PROPOSED_SALE_PLAN_MAJORITY,
+    INSIDER_PROPOSED_SALE_WEAK_USD,
     INSIDER_ROLE_WEIGHTS,
     INSIDER_SELL_MIN_USD,
     INSIDER_WINDOW_DAYS,
@@ -29,6 +33,8 @@ import type {
     InsiderSnapshot,
     InsiderTransaction,
     InvestorFlowsSignal,
+    InvestorFlowsSignalStrength,
+    ProposedSale,
 } from '@/domain/investorFlows/types';
 
 type InsiderRoleClass = keyof typeof INSIDER_ROLE_WEIGHTS;
@@ -87,23 +93,31 @@ function sumValue(
     }, 0);
 }
 
+/** A dated event attributed to one person, for the cluster sweep. */
+export interface ClusterEvent {
+    readonly day: number;
+    readonly key: string;
+}
+
 /**
- * Largest number of distinct insiders whose buys fall within one cluster span.
- * `buys` must be sorted by day ascending; a two-pointer sweep keeps it linear.
- * The mutable `start`/`best` cursors are deliberate: a reduce over every
- * window start would be O(n²), and this runs once per symbol per snapshot.
+ * Largest number of distinct people whose events fall within one
+ * {@link INSIDER_CLUSTER_WINDOW_DAYS} span. `events` must be sorted by day
+ * ascending; a two-pointer sweep keeps it linear. The mutable `start`/`best`
+ * cursors are deliberate: a reduce over every window start would be O(n²), and
+ * this runs once per symbol per snapshot. Shared by the Form 4 buy cluster, the
+ * Form 144 cluster and the Korean insider cluster so the span rule is one rule.
  */
-function largestBuyCluster(buys: readonly DatedTransaction[]): number {
+export function largestCluster(events: readonly ClusterEvent[]): number {
     const counts = new Map<string, number>();
     let start = 0;
     let best = 0;
-    for (const buy of buys) {
-        const key = personKey(buy.tx);
-        counts.set(key, (counts.get(key) ?? 0) + 1);
+    for (const event of events) {
+        counts.set(event.key, (counts.get(event.key) ?? 0) + 1);
         while (
-            daysBetween(buys[start].day, buy.day) > INSIDER_CLUSTER_WINDOW_DAYS
+            daysBetween(events[start].day, event.day) >
+            INSIDER_CLUSTER_WINDOW_DAYS
         ) {
-            const startKey = personKey(buys[start].tx);
+            const startKey = events[start].key;
             const remaining = (counts.get(startKey) ?? 1) - 1;
             if (remaining === 0) counts.delete(startKey);
             else counts.set(startKey, remaining);
@@ -112,6 +126,145 @@ function largestBuyCluster(buys: readonly DatedTransaction[]): number {
         best = Math.max(best, counts.size);
     }
     return best;
+}
+
+function largestBuyCluster(buys: readonly DatedTransaction[]): number {
+    return largestCluster(
+        buys.map(({ tx, day }) => ({ day, key: personKey(tx) }))
+    );
+}
+
+interface DatedProposedSale {
+    readonly sale: ProposedSale;
+    readonly day: number;
+    readonly valueUsd: number;
+    readonly planned: boolean;
+}
+
+/** One step weaker, never below weak: the 10b5-1 damping. */
+function stepDown(
+    strength: InvestorFlowsSignalStrength
+): InvestorFlowsSignalStrength {
+    return strength === 'strong' ? 'moderate' : 'weak';
+}
+
+interface ProposedSaleSummary {
+    readonly valueUsd: number;
+    readonly plannedValueUsd: number;
+    readonly filers: number;
+}
+
+function proposedSaleKey(sale: ProposedSale): string {
+    return sale.filer.trim().toLowerCase();
+}
+
+function summarizeProposedSales(
+    sales: readonly DatedProposedSale[]
+): ProposedSaleSummary {
+    return {
+        valueUsd: roundValue(sales.reduce((sum, s) => sum + s.valueUsd, 0)),
+        plannedValueUsd: roundValue(
+            sales.filter(s => s.planned).reduce((sum, s) => sum + s.valueUsd, 0)
+        ),
+        filers: new Set(sales.map(s => proposedSaleKey(s.sale))).size,
+    };
+}
+
+function damped(
+    strength: InvestorFlowsSignalStrength,
+    summary: ProposedSaleSummary
+): InvestorFlowsSignalStrength {
+    return summary.valueUsd > 0 &&
+        summary.plannedValueUsd / summary.valueUsd >=
+            INSIDER_PROPOSED_SALE_PLAN_MAJORITY
+        ? stepDown(strength)
+        : strength;
+}
+
+/** Form 144 notices filed inside the insider window, sorted by filing day. */
+function windowedProposedSales(
+    sales: readonly ProposedSale[],
+    asOfDay: number
+): DatedProposedSale[] {
+    return sales
+        .flatMap(sale => {
+            const day = parseDay(sale.filingDate);
+            if (day === null) return [];
+            const age = daysBetween(day, asOfDay);
+            if (age < 0 || age > INSIDER_WINDOW_DAYS) return [];
+            const valueUsd =
+                isFiniteNumber(sale.valueUsd) && sale.valueUsd > 0
+                    ? sale.valueUsd
+                    : 0;
+            return [
+                {
+                    sale,
+                    day,
+                    valueUsd,
+                    planned: sale.planAdoptionDate !== null,
+                },
+            ];
+        })
+        .sort((a, b) => a.day - b.day);
+}
+
+/** Bearish Form 144 signals: aggregate notice value and a multi-filer cluster, both damped for 10b5-1 plans. */
+function proposedSaleSignals(
+    sales: readonly DatedProposedSale[],
+    summary: ProposedSaleSummary
+): InvestorFlowsSignal[] {
+    const { valueUsd, plannedValueUsd, filers } = summary;
+    const signals: InvestorFlowsSignal[] = [];
+    const valueStrength = strengthOf(valueUsd, {
+        weak: INSIDER_PROPOSED_SALE_WEAK_USD,
+        moderate: INSIDER_PROPOSED_SALE_MODERATE_USD,
+    });
+    if (valueStrength !== null) {
+        signals.push(
+            makeSignal(
+                'insider',
+                'insider_proposed_sale',
+                'bearish',
+                damped(valueStrength, summary),
+                {
+                    valueUsd,
+                    plannedValueUsd,
+                    filers,
+                    notices: sales.length,
+                }
+            )
+        );
+    }
+    const cluster = largestCluster(
+        sales.map(s => ({ day: s.day, key: proposedSaleKey(s.sale) }))
+    );
+    if (cluster >= INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS) {
+        signals.push(
+            makeSignal(
+                'insider',
+                'insider_proposed_sale_cluster',
+                'bearish',
+                damped('moderate', summary),
+                {
+                    filers: cluster,
+                    windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
+                    valueUsd,
+                }
+            )
+        );
+    }
+    return signals;
+}
+
+/** Whether any Form 144 notice is dated on or before the reference day (coverage). */
+function hasVisibleProposedSale(
+    sales: readonly ProposedSale[],
+    asOfDay: number | null
+): boolean {
+    return sales.some(sale => {
+        const day = parseDay(sale.filingDate);
+        return day !== null && isVisibleAsOf(day, asOfDay);
+    });
 }
 
 /** Sold shares as a fraction of the position before the sale; `null` when holdings are unknown. */
@@ -128,20 +281,30 @@ function distinctPeople(items: readonly DatedTransaction[]): number {
 }
 
 /**
- * Insider (Form 4) axis over the trailing {@link INSIDER_WINDOW_DAYS} days.
+ * Insider (Form 4 + Form 144) axis over the trailing {@link INSIDER_WINDOW_DAYS} days.
  *
  * Open-market buys are the signal; sells are discounted to weak evidence
  * (scheduled and tax-driven selling is routine) unless they are large relative
  * to the seller's holdings. The axis is insufficient when the snapshot holds no
  * usable transaction at all — a quiet window with older history is real data.
  * Sufficient therefore means a directional input exists: at least one dated
- * transaction in the snapshot dated on or before the reference date;
- * transactions dated after it are dropped, so a snapshot of only future-dated
- * transactions is insufficient.
+ * transaction or Form 144 notice in the snapshot dated on or before the
+ * reference date; rows dated after it are dropped, so a snapshot of only
+ * future-dated rows is insufficient.
+ *
+ * Form 144 notices (filing date in the window) add two bearish signals:
+ * `insider_proposed_sale` on their aggregate value (weak from
+ * {@link INSIDER_PROPOSED_SALE_WEAK_USD}, capped at moderate — a notice is
+ * intent, and the sale shows up again as a Form 4) and
+ * `insider_proposed_sale_cluster` when {@link INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS}
+ * or more distinct filers file within one cluster span. When at least
+ * {@link INSIDER_PROPOSED_SALE_PLAN_MAJORITY} of the notice value is under a
+ * Rule 10b5-1 plan, both drop one strength step (never below weak).
  */
 export function evaluateInsiderAxis(
     snapshot: InsiderSnapshot,
-    asOfDay: number | null
+    asOfDay: number | null,
+    proposedSales: readonly ProposedSale[] = []
 ): InsiderAxis {
     // Sorted by day once: the cluster sweep relies on it.
     const dated: DatedTransaction[] = snapshot.transactions
@@ -152,7 +315,10 @@ export function evaluateInsiderAxis(
                 : [{ tx, day }];
         })
         .sort((a, b) => a.day - b.day);
-    if (asOfDay === null || dated.length === 0) {
+    if (
+        asOfDay === null ||
+        (dated.length === 0 && !hasVisibleProposedSale(proposedSales, asOfDay))
+    ) {
         return {
             id: 'insider',
             score: null,
@@ -187,6 +353,8 @@ export function evaluateInsiderAxis(
     const routineSellValue = roundValue(sumValue(routineSells, false));
     const cluster = largestBuyCluster(buys);
     const clusterBuy = cluster >= INSIDER_CLUSTER_MIN_INSIDERS;
+    const sales144 = windowedProposedSales(proposedSales, asOfDay);
+    const sales144Summary = summarizeProposedSales(sales144);
 
     const signals: InvestorFlowsSignal[] = [];
 
@@ -262,7 +430,8 @@ export function evaluateInsiderAxis(
             )
         );
     }
-    if (inWindow.length === 0) {
+    signals.push(...proposedSaleSignals(sales144, sales144Summary));
+    if (inWindow.length === 0 && sales144.length === 0) {
         signals.push(
             makeSignal('insider', 'insider_quiet', 'neutral', 'weak', {
                 transactionsInWindow: 0,
@@ -283,6 +452,10 @@ export function evaluateInsiderAxis(
         largestBuyCluster: cluster,
         clusterBuy,
         largeSellCount: largeSells.length,
+        proposedSaleCount: sales144.length,
+        proposedSaleFilerCount: sales144Summary.filers,
+        proposedSaleValueUsd: sales144Summary.valueUsd,
+        proposedSalePlannedValueUsd: sales144Summary.plannedValueUsd,
     };
     const score = scoreFromSignals(signals);
     return {

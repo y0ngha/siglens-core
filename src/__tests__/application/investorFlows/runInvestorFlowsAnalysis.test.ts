@@ -19,7 +19,10 @@ import {
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import {
+    dailyBars,
+    daysBeforeAsOf,
     emptySnapshot,
+    krMajorHolderReport,
     quarter,
     shortInterestSeries,
     shortVolumeSeries,
@@ -368,6 +371,127 @@ describe('runInvestorFlowsAnalysis', () => {
             expect(mockCacheGet).toHaveBeenCalledWith(
                 expect.stringContaining(':finra=off')
             );
+        });
+    });
+
+    describe('expansion inputs', () => {
+        const LISTED = {
+            listed: true,
+            consecutiveDays: 9,
+            firstListedDate: daysBeforeAsOf(12),
+            markets: ['Nasdaq'],
+        };
+
+        it('drops the threshold list from the scorecard and the prompt when includeExchangeLists is false', async () => {
+            mockGetSnapshot.mockResolvedValue({
+                ...SNAPSHOT,
+                thresholdList: LISTED,
+            });
+            const on = await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                force: true,
+            });
+            expect(sentCall().prompt).toContain(
+                'listed for 9 consecutive trading days'
+            );
+            const off = await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                force: true,
+                includeExchangeLists: false,
+            });
+            const prompt = sentCall().prompt;
+            expect(prompt).not.toContain('listed for 9 consecutive');
+            expect(prompt).toContain(
+                'Reg SHO threshold-list data is not included'
+            );
+            expect(prompt).not.toContain('reg_sho_threshold_listed');
+            expect(
+                on.status === 'done' &&
+                    on.scorecard.short.metrics.thresholdListed
+            ).toBe(true);
+            expect(
+                off.status === 'done' &&
+                    off.scorecard.short.metrics.thresholdListed
+            ).toBeNull();
+        });
+
+        it('keeps exchange-lists-off generations on their own cache key', async () => {
+            await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                includeExchangeLists: false,
+            });
+            expect(mockCacheGet).toHaveBeenCalledWith(
+                expect.stringContaining(':regsho=off')
+            );
+        });
+
+        it('computes the squeeze score from squeezeContext and puts it in the prompt', async () => {
+            const result = await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                squeezeContext: { dailyBars: dailyBars({ count: 25 }) },
+            });
+            expect(result.status).toBe('done');
+            const scorecard =
+                result.status === 'done' ? result.scorecard : null;
+            expect(scorecard?.squeezeRisk?.score).not.toBeNull();
+            expect(sentCall().prompt).toContain(
+                `Short squeeze risk (computed): score=${scorecard?.squeezeRisk?.score}/100`
+            );
+        });
+
+        it('keeps generations with and without a squeeze context on different cache keys', async () => {
+            await runInvestorFlowsAnalysis(BASE_OPTIONS);
+            const withoutKey = mockCacheGet.mock.calls.at(-1)![0] as string;
+            await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                squeezeContext: { dailyBars: dailyBars({ count: 25 }) },
+            });
+            const withKey = mockCacheGet.mock.calls.at(-1)![0] as string;
+            expect(withoutKey).not.toBe(withKey);
+            expect(withKey).toBe(`${withoutKey}:squeeze=on`);
+            expect(withoutKey).not.toContain(':squeeze');
+        });
+
+        it('leaves the squeeze score out without a context', async () => {
+            const result = await runInvestorFlowsAnalysis(BASE_OPTIONS);
+            expect(
+                result.status === 'done' && result.scorecard.squeezeRisk
+            ).toBeNull();
+            expect(sentCall().prompt).not.toContain(
+                'Short squeeze risk (computed)'
+            );
+        });
+
+        it('uses the DART prompt and persona for a Korean snapshot', async () => {
+            mockGetSnapshot.mockResolvedValue(
+                emptySnapshot({
+                    market: 'kr',
+                    kr: {
+                        majorHolders: [krMajorHolderReport()],
+                        insiders: [],
+                        tradingPlans: [],
+                    },
+                })
+            );
+            const result = await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                symbol: '005930.KS',
+            });
+            expect(result.status).toBe('done');
+            const { prompt, system } = sentCall();
+            expect(system).toContain('Korean listings as disclosed to DART');
+            expect(prompt).toContain(
+                'Institutional / foreign net buying is not provided'
+            );
+            expect(prompt).not.toContain('13F');
+            expect(prompt).not.toContain('FINRA');
+        });
+
+        it('returns no_data for a Korean snapshot without directional DART data', async () => {
+            mockGetSnapshot.mockResolvedValue(emptySnapshot({ market: 'kr' }));
+            const result = await runInvestorFlowsAnalysis(BASE_OPTIONS);
+            expect(result).toEqual({ status: 'no_data' });
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
         });
     });
 

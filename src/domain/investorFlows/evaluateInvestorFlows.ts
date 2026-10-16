@@ -1,10 +1,16 @@
 import {
     COMPOSITE_MIN_AXES,
     COMPOSITE_WEIGHTS,
+    DILUTION_WINDOW_DAYS,
     INSIDER_WINDOW_DAYS,
+    KR_WINDOW_DAYS,
     LARGE_HOLDER_WINDOW_DAYS,
     INVESTOR_FLOWS_AXES,
 } from '@/domain/investorFlows/constants';
+import { evaluateDilutionAxis } from '@/domain/investorFlows/dilutionAxis';
+import { evaluateKrInsiderAxis } from '@/domain/investorFlows/krInsiderAxis';
+import { evaluateKrMajorHolderAxis } from '@/domain/investorFlows/krMajorHolderAxis';
+import { evaluateSqueezeRisk } from '@/domain/investorFlows/squeezeRisk';
 import {
     evaluateInstitutionalAxis,
     usableQuarters,
@@ -16,6 +22,7 @@ import {
 import { evaluateLargeHolderAxis } from '@/domain/investorFlows/largeHolderAxis';
 import {
     clampScore,
+    daysBetween,
     formatDay,
     isVisibleAsOf,
     labelForScore,
@@ -25,12 +32,15 @@ import {
 import { evaluateShortAxis } from '@/domain/investorFlows/shortAxis';
 import type {
     EvaluateInvestorFlowsOptions,
+    InsiderAxis,
     InvestorFlowsAxisBase,
     InvestorFlowsComposite,
     InvestorFlowsFreshness,
     InvestorFlowsScorecard,
     InvestorFlowsSnapshot,
     InvestorFlowsWindow,
+    KrDisclosureSnapshot,
+    LargeHolderAxis,
     ShortInterestPoint,
     ShortVolumePoint,
 } from '@/domain/investorFlows/types';
@@ -87,11 +97,105 @@ function latestDate(
         : valid.reduce((a, b) => (b > a ? b : a)).slice(0, 10);
 }
 
+const EMPTY_KR: KrDisclosureSnapshot = {
+    majorHolders: [],
+    insiders: [],
+    tradingPlans: [],
+};
+
+/** Newest DART receipt date on or before the reference day. */
+function krLatestDate(
+    kr: KrDisclosureSnapshot,
+    asOfDay: number | null
+): string | null {
+    return latestDate(
+        [
+            ...kr.majorHolders.map(r => r.receiptDate),
+            ...kr.insiders.map(r => r.receiptDate),
+            ...kr.tradingPlans.map(r => r.receiptDate),
+        ],
+        asOfDay
+    );
+}
+
+/** Number of KR insider reports and trading plans inside the window (freshness metadata). */
+function countKrInsiderRowsInWindow(
+    kr: KrDisclosureSnapshot,
+    asOfDay: number | null
+): number {
+    if (asOfDay === null) return 0;
+    return [...kr.insiders, ...kr.tradingPlans].filter(r => {
+        const day = parseDay(r.receiptDate);
+        if (day === null) return false;
+        const age = daysBetween(day, asOfDay);
+        return age >= 0 && age <= KR_WINDOW_DAYS;
+    }).length;
+}
+
+/**
+ * Korean scorecard: DART reports fill the `largeHolders` and `insider` slots;
+ * the US-only axes (13F, FINRA / SEC short, SEC offerings) have no Korean
+ * source and are insufficient, so they abstain from the composite.
+ */
+function evaluateKrScorecard(
+    snapshot: InvestorFlowsSnapshot,
+    asOfDay: number | null
+): InvestorFlowsScorecard {
+    const kr = snapshot.kr ?? EMPTY_KR;
+    const largeHolders: LargeHolderAxis = evaluateKrMajorHolderAxis(
+        kr.majorHolders,
+        asOfDay
+    );
+    const insider: InsiderAxis = evaluateKrInsiderAxis(
+        kr,
+        snapshot.sharesOutstanding,
+        asOfDay
+    );
+    const institutional = evaluateInstitutionalAxis(
+        { quarters: [], topHolders: [], topHoldersPeriod: null },
+        null,
+        asOfDay
+    );
+    const short = evaluateShortAxis(null, null, null, asOfDay);
+    const dilution = evaluateDilutionAxis(undefined, asOfDay);
+    const freshness: InvestorFlowsFreshness = {
+        asOf: asOfDay === null ? null : formatDay(asOfDay),
+        institutionalPeriod: null,
+        latestInstitutionalPeriod: null,
+        latestInstitutionalPeriodComplete: null,
+        shortInterestSettlementDate: null,
+        shortVolumeLatestDate: null,
+        insiderWindow: windowOf(asOfDay, KR_WINDOW_DAYS),
+        insiderTransactionsInWindow: countKrInsiderRowsInWindow(kr, asOfDay),
+        largeHolderWindow: windowOf(asOfDay, KR_WINDOW_DAYS),
+        failsToDeliverLatestDate: null,
+        dilutionWindow: windowOf(asOfDay, DILUTION_WINDOW_DAYS),
+        krDisclosureLatestDate: krLatestDate(kr, asOfDay),
+    };
+    return {
+        institutional,
+        insider,
+        largeHolders,
+        short,
+        dilution,
+        market: 'kr',
+        squeezeRisk: null,
+        composite: compositeOf([
+            institutional,
+            insider,
+            largeHolders,
+            short,
+            dilution,
+        ]),
+        freshness,
+    };
+}
+
 /**
  * Turn an investor flows snapshot into the deterministic investor-flows scorecard.
  *
- * Four axes (13F institutional, Form 4 insider, 13D/G large holders, FINRA
- * short) each get a -100..100 score, a label, a sufficiency flag and signals
+ * Five axes (13F institutional, Form 4 / Form 144 insider, 13D/G large holders,
+ * FINRA / SEC short, SEC offering dilution) each get a -100..100 score, a label, a sufficiency flag and signals
  * with numeric evidence; a composite averages the axes that had data. Missing
  * data degrades an axis to `insufficient` with a `null` score — it is never
  * scored as zero — and an insufficient axis abstains from the composite.
@@ -113,8 +217,18 @@ function latestDate(
  * `insufficient`, and an insufficient axis abstains from the composite. Every threshold is a named
  * constant in `domain/investorFlows/constants.ts`.
  *
+ * **Korean snapshots** (`market: 'kr'`) are scored from `snapshot.kr` only:
+ * DART major-holder reports fill `largeHolders`, executive / major-shareholder
+ * and trading-plan reports fill `insider` (share- and ratio-based thresholds,
+ * `kr_*` signals), and institutional, short and dilution are insufficient. No
+ * squeeze score is computed for them.
+ *
+ * **Squeeze score:** with `options.squeezeContext` the scorecard carries
+ * `evaluateSqueezeRisk`'s result and the `short_squeeze_risk` signal follows
+ * it; without it `squeezeRisk` is `null` and the signal keeps the price-free rule.
+ *
  * @param snapshot - InvestorFlows data assembled by the consumer's provider.
- * @param options - Optional reference-date override and FINRA switch.
+ * @param options - Reference-date override, data switches and squeeze context.
  * @returns The scorecard to inject into prompts and render in UIs.
  * @example
  * ```ts
@@ -128,7 +242,9 @@ export function evaluateInvestorFlows(
 ): InvestorFlowsScorecard {
     const asOf = options.asOf ?? snapshot.asOf;
     const asOfDay = parseAsOfDay(asOf);
+    if (snapshot.market === 'kr') return evaluateKrScorecard(snapshot, asOfDay);
     const includeFinra = options.includeFinraData ?? true;
+    const includeLists = options.includeExchangeLists ?? true;
     const shortInterest: readonly ShortInterestPoint[] | null = includeFinra
         ? snapshot.shortInterest
         : null;
@@ -141,17 +257,38 @@ export function evaluateInvestorFlows(
         snapshot.sharesOutstanding,
         asOfDay
     );
-    const insider = evaluateInsiderAxis(snapshot.insider, asOfDay);
+    const insider = evaluateInsiderAxis(
+        snapshot.insider,
+        asOfDay,
+        snapshot.proposedSales ?? []
+    );
     const largeHolders = evaluateLargeHolderAxis(
         snapshot.largeHolders,
         asOfDay
     );
+    const squeezeRisk =
+        options.squeezeContext === undefined
+            ? null
+            : evaluateSqueezeRisk(snapshot, options.squeezeContext, {
+                  asOf,
+                  includeFinraData: includeFinra,
+                  includeExchangeLists: includeLists,
+              });
     const short = evaluateShortAxis(
         shortInterest,
         shortVolume,
         snapshot.floatShares,
-        asOfDay
+        asOfDay,
+        {
+            failsToDeliver: snapshot.failsToDeliver ?? null,
+            sharesOutstanding: snapshot.sharesOutstanding,
+            thresholdList: includeLists
+                ? (snapshot.thresholdList ?? null)
+                : null,
+            ...(squeezeRisk === null ? {} : { squeeze: squeezeRisk }),
+        }
     );
+    const dilution = evaluateDilutionAxis(snapshot.offerings, asOfDay);
 
     // The same usable-quarter predicate the axis uses, so both agree on "latest".
     const latestQuarter = usableQuarters(
@@ -177,6 +314,12 @@ export function evaluateInvestorFlows(
             asOfDay
         ),
         largeHolderWindow: windowOf(asOfDay, LARGE_HOLDER_WINDOW_DAYS),
+        failsToDeliverLatestDate: latestDate(
+            (snapshot.failsToDeliver ?? []).map(p => p.settlementDate),
+            asOfDay
+        ),
+        dilutionWindow: windowOf(asOfDay, DILUTION_WINDOW_DAYS),
+        krDisclosureLatestDate: null,
     };
 
     return {
@@ -184,7 +327,16 @@ export function evaluateInvestorFlows(
         insider,
         largeHolders,
         short,
-        composite: compositeOf([institutional, insider, largeHolders, short]),
+        dilution,
+        market: 'us',
+        squeezeRisk,
+        composite: compositeOf([
+            institutional,
+            insider,
+            largeHolders,
+            short,
+            dilution,
+        ]),
         freshness,
     };
 }

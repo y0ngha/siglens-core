@@ -6,6 +6,7 @@ import type {
     ModelId,
     InvestorFlowsAnalysisResponse,
     InvestorFlowsScorecard,
+    SqueezeRiskContext,
     Tier,
 } from '@/domain/types';
 
@@ -17,7 +18,7 @@ import type {
  * congress. `userApiKey` is forwarded to the AI call unchanged.
  */
 export interface RunInvestorFlowsAnalysisOptions extends BackgroundTaskOptions {
-    /** U.S. equity ticker (e.g. `"AAPL"`). */
+    /** Ticker (`"AAPL"`, or a Korean listing such as `"005930.KS"` whose snapshot is `market: 'kr'`). */
     symbol: string;
     /** LLM model identifier used for the analysis and cache scoping. */
     modelId: ModelId;
@@ -57,6 +58,19 @@ export interface RunInvestorFlowsAnalysisOptions extends BackgroundTaskOptions {
      * Default `true`.
      */
     includeFinraData?: boolean;
+    /**
+     * `false` drops the Reg SHO threshold-list status from the scorecard, the
+     * squeeze score and the prompt (the exchange lists are licensed for
+     * non-commercial use only). Folded into the cache key. Default `true`.
+     */
+    includeExchangeLists?: boolean;
+    /**
+     * Daily bars for the price-aware squeeze score (see `evaluateSqueezeRisk`).
+     * Its presence is folded into the cache key (`:squeeze=on`) because it adds
+     * the squeeze block to the prompt; the bars themselves are not hashed. Omit
+     * to keep the price-free squeeze rule.
+     */
+    squeezeContext?: SqueezeRiskContext;
 }
 
 /**

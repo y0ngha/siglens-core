@@ -214,6 +214,7 @@ export { normalizeCongressTrendResponse } from './domain/analysis/normalizeCongr
 
 // Investor flows (수급) domain building blocks (pure; the same set is in index.client.ts)
 export { evaluateInvestorFlows } from './domain/investorFlows/evaluateInvestorFlows';
+export { evaluateSqueezeRisk } from './domain/investorFlows/squeezeRisk';
 export { normalizeInvestorFlowsAnalysisResponse } from './domain/analysis/normalizeInvestorFlows';
 
 // Economy domain building blocks (normalization + 2s10s spread)
@@ -1201,5 +1202,29 @@ export type {
     EvaluateInvestorFlowsOptions,
     InvestorFlowsAnalysisResponse,
     InvestorFlowsAxisInterpretation,
+    InstitutionalOptionsQuarter,
+    FailsToDeliverPoint,
+    ProposedSale,
+    OfferingKind,
+    OfferingFiling,
+    ThresholdListStatus,
+    InvestorFlowsMarket,
+    KrMajorHolderReportForm,
+    KrMajorHolderReport,
+    KrInsiderReport,
+    KrTradingPlan,
+    KrDisclosureSnapshot,
+    KrInsiderMetrics,
+    KrMajorHolderMetrics,
+    DilutionMetrics,
+    DilutionAxis,
+    SqueezeRiskBar,
+    SqueezeRiskContext,
+    EvaluateSqueezeRiskOptions,
+    SqueezeRiskLevel,
+    SqueezeRiskComponentId,
+    SqueezeRiskComponent,
+    SqueezeRiskSufficiency,
+    SqueezeRiskScore,
 } from './domain/types';
 export { INVESTOR_FLOWS_AXES } from './domain/investorFlows/constants';

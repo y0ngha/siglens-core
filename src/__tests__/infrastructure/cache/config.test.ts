@@ -562,6 +562,58 @@ describe('buildCongressTrendCacheKey', () => {
 describe('buildInvestorFlowsCacheKey', () => {
     const base = `v1:analysis:investorFlows:AAPL:gemini-3.6-flash:${INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION}`;
 
+    it('is on template version p2 (five axes, DART variant)', () => {
+        expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p2');
+    });
+
+    it('a squeeze context appends :squeeze=on last; false and omitted match the base key', () => {
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                undefined,
+                undefined,
+                false,
+                false,
+                true
+            )
+        ).toBe(`${base}:finra=off:regsho=off:squeeze=on`);
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                false
+            )
+        ).toBe(base);
+    });
+
+    it('exchange lists off appends :regsho=off after the FINRA suffix; on and omitted match', () => {
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                undefined,
+                undefined,
+                false,
+                false
+            )
+        ).toBe(`${base}:finra=off:regsho=off`);
+        expect(
+            buildInvestorFlowsCacheKey(
+                'AAPL',
+                'gemini-3.6-flash',
+                undefined,
+                undefined,
+                undefined,
+                true
+            )
+        ).toBe(base);
+    });
+
     it('has no skill fingerprint or input hash, so the lookup precedes the snapshot fetch', () => {
         expect(buildInvestorFlowsCacheKey('AAPL', 'gemini-3.6-flash')).toBe(
             base
