@@ -199,12 +199,8 @@ export function investorFlowsInterpretationRules(
     ].join('\n');
 }
 
-/**
- * Korean FTD caveat: the whole caveat, both parts in one sentence. Prompt wording.
- *
- * @internal
- */
-export const FTD_CAVEAT_KO_SENTENCE =
+/** Korean FTD caveat: the whole caveat, both parts in one sentence. Prompt wording. */
+const FTD_CAVEAT_KO_SENTENCE =
     '결제불이행은 결제 시점·청산·운영 지연 등 여러 원인으로 생기며 무차입(불법) 공매도의 증거가 아닙니다';
 
 /** The FTD caveat rule, one sentence per locale (see {@link investorFlowsOutputRules}). */
