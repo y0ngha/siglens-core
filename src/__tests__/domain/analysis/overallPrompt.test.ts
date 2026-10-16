@@ -1790,7 +1790,8 @@ describe('buildOverallAnalysisPrompt — investor flows (수급) section', () =>
 describe('buildOverallAnalysisPrompt — investor flows by market', () => {
     const build = (
         flows: InvestorFlowsScorecard | null,
-        currency: 'USD' | 'KRW'
+        currency: 'USD' | 'KRW',
+        locale: Parameters<typeof buildOverallAnalysisPromptRaw>[11] = 'ko'
     ): string =>
         buildOverallAnalysisPrompt(
             TEST_SYMBOL,
@@ -1804,7 +1805,7 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
             undefined,
             undefined,
             'equity',
-            'ko',
+            locale,
             undefined,
             undefined,
             currency,
@@ -1883,8 +1884,15 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
             'quote an FTD quantity only with its own settlement date'
         );
         expect(prompt).toContain(
-            'the same bullet or sentence must also say that fails have many operational causes'
+            'the same bullet or sentence must also carry the fails-to-deliver caveat, written as exactly this one Korean sentence: "결제불이행은 결제 시점·청산·운영 지연 등 여러 원인으로 생기며 무차입(불법) 공매도의 증거가 아닙니다".'
         );
+        expect(prompt).not.toContain('say it in those words');
+
+        const en = build(usCard, 'USD', 'en');
+        expect(en).toContain(
+            'the same bullet or sentence must also carry the fails-to-deliver caveat: one sentence saying that fails have many operational causes (settlement timing, clearing and operational delays) and are not evidence of naked (illegal) short selling — say it in those words, and never add a second sentence restating either part.'
+        );
+        expect(en).not.toContain('무차입');
         expect(prompt).toContain('An active at-the-market (ATM) program');
         expect(prompt).toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
         expect(prompt).toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);

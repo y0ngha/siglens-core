@@ -483,14 +483,34 @@ describe('investor-flows prompt — real-LLM A/B fixes', () => {
             'never with the latest fails-to-deliver file date'
         );
         expect(prompt).toContain(
-            'Whenever the output mentions fails to deliver at all, risksKo or dataNotesKo must also say that fails have many operational causes'
+            'Whenever the output mentions fails to deliver at all, risksKo or dataNotesKo must also carry the fails-to-deliver caveat, written as exactly this one Korean sentence: "결제불이행은 결제 시점·청산·운영 지연 등 여러 원인으로 생기며 무차입(불법) 공매도의 증거가 아닙니다".'
         );
         expect(prompt).toContain(
-            'are not evidence of naked (illegal) short selling'
+            'That sentence is the whole caveat: never add a second sentence that restates either part'
         );
         expect(prompt).toContain(
-            '"결제불이행은 무차입(불법) 공매도의 증거가 아닙니다"'
+            'State this caveat at most once per output field'
         );
+        // Korean output gets no English-worded caveat to translate alongside
+        // the Korean sentence — that pairing made the model write it twice.
+        expect(prompt).not.toContain('say it in those words');
+        expect(prompt).not.toContain(
+            'fails have many operational causes (settlement timing'
+        );
+    });
+
+    it('asks non-Korean output for the English-worded caveat as one sentence, with no Korean sentence', () => {
+        const en = buildInvestorFlowsAnalysisPrompt(
+            'ACME',
+            US,
+            evaluateInvestorFlows(US),
+            'en'
+        ).dynamic;
+        expect(en).toContain(
+            'risksKo or dataNotesKo must also carry the fails-to-deliver caveat: one sentence saying that fails have many operational causes (settlement timing, clearing and operational delays) and are not evidence of naked (illegal) short selling — say it in those words, and never add a second sentence restating either part.'
+        );
+        expect(en).toContain('State this caveat at most once per output field');
+        expect(en).not.toContain('무차입');
     });
 
     it('renders percent figures with their unit', () => {

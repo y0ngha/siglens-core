@@ -1799,9 +1799,15 @@ export function buildCongressTrendCacheKey(
  * is not bumped: its `inputHash` folds in the scorecard, which changes for
  * every affected symbol, and the new rendering only appears with the new signal.
  *
+ * **`p5`** — the FTD caveat is one sentence per locale (2026-10-17). The rule
+ * asked for English-worded content and, separately, a Korean sentence, so
+ * Korean output wrote the caveat twice in one bullet (AAPL). Korean output now
+ * gets one Korean sentence that holds both parts; other locales keep the
+ * English wording as one sentence.
+ *
  * @internal
  */
-export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * @internal TTL for investor-flows analysis cache results. Default: 12 hours —
@@ -2088,9 +2094,14 @@ export function buildNewsCacheKey(
  * guidance is not folded into `inputHash`, so every entry is bumped, as for
  * `p5`.
  *
+ * **`p7`** — the FTD caveat rule in the `## Investor Flows` section is one
+ * sentence per locale (2026-10-17; see
+ * {@link INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION} `p5`). Only prompts with a
+ * US scorecard change, but the guidance is not folded into `inputHash`.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p6' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p7' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.
