@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.22.0](https://github.com/y0ngha/siglens-core/compare/v2.21.1...v2.22.0) (2026-10-16)
+
+### Features
+
+* 한국 임원 군집 판정 보정 — 신고별 의미 크기, 정기 대량 신고 구분, 반대 군집 상계 ([#280](https://github.com/y0ngha/siglens-core/issues/280)) ([3a761f0](https://github.com/y0ngha/siglens-core/commit/3a761f00954c093bb7e0f2569cb5f2b573f3a1ac))
+
 ## [2.21.1](https://github.com/y0ngha/siglens-core/compare/v2.21.0...v2.21.1) (2026-10-16)
 
 ### Bug Fixes
