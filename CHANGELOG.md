@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.19.0](https://github.com/y0ngha/siglens-core/compare/v2.18.1...v2.19.0) (2026-10-16)
+
+### Features
+
+* 수급 확장 — 증자·희석 축, 공매도·13F 신호, 숏스퀴즈 점수 ([#276](https://github.com/y0ngha/siglens-core/issues/276)) ([28a1f12](https://github.com/y0ngha/siglens-core/commit/28a1f124eb2faeb770991fcee162e314f58ac28c))
+
 ## [2.18.1](https://github.com/y0ngha/siglens-core/compare/v2.18.0...v2.18.1) (2026-10-15)
 
 ### Bug Fixes
