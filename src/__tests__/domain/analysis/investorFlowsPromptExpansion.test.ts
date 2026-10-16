@@ -1063,6 +1063,31 @@ describe('investor-flows prompt — render audit', () => {
         );
     });
 
+    it('renders the routine median in %p when shares outstanding is unknown', () => {
+        const text = build(
+            emptySnapshot({
+                market: 'kr',
+                sharesOutstanding: null,
+                kr: {
+                    majorHolders: [],
+                    insiders: Array.from({ length: 40 }, (_, i) =>
+                        krInsiderReport({
+                            reporter: `임원${i}`,
+                            sharesChange: 100,
+                            ratioChangePct: 0,
+                            receiptDate: daysBeforeAsOf(5 + (i % 20)),
+                        })
+                    ),
+                    tradingPlans: [],
+                },
+            })
+        );
+        expect(text).toContain(
+            '(reporters=40, reports=40, medianRatioChangePct=0%p, windowDays=30)'
+        );
+        expect(text).not.toContain('medianChangePctOutstanding');
+    });
+
     it('tags Korean and 13D/13G rows outside the scoring window', () => {
         const tag = 'scoring window, not in the metrics)';
         const kr = build(

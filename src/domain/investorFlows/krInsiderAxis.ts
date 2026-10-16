@@ -210,7 +210,9 @@ function routineMassFiling(
     if (reporters <= KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS) return null;
     const middle = median(members.map(r => r.magnitude ?? 0)) ?? 0;
     if (middle >= memberFloor(sharesOutstanding)) return null;
-    // The key names the unit the renderer prints (% of shares outstanding / %p).
+    // Two keys on purpose: `unitOfFigure` reads the unit from the key
+    // (`…PctOutstanding` → "% of shares outstanding", `…RatioChangePct` → "%p"),
+    // so evidence stays numeric-only and each figure carries its own basis.
     const medianKey = hasSharesOutstanding(sharesOutstanding)
         ? 'medianChangePctOutstanding'
         : 'medianRatioChangePct';
@@ -262,9 +264,9 @@ function routineMassFiling(
  * - `kr_trading_plan`: neutral context — a pre-announced trade, direction unknown.
  *
  * **Sufficient means at least one directional signal**; trading plans or a
- * routine mass filing alone, or reports that net to nothing, leave the axis insufficient (`krMetrics` still
- * counts them). Rows dated after the reference day, outside the window or with
- * a non-finite share change are dropped.
+ * routine mass filing alone, or reports that net to nothing, leave the axis
+ * insufficient (`krMetrics` still counts them). Rows dated after the reference
+ * day, outside the window or with a non-finite share change are dropped.
  */
 export function evaluateKrInsiderAxis(
     kr: Pick<KrDisclosureSnapshot, 'insiders' | 'tradingPlans'>,
