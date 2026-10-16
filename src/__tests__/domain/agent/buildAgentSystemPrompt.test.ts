@@ -427,7 +427,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-15.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-16.1');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
@@ -490,6 +490,126 @@ describe('buildAgentSystemPrompt', () => {
             expect(prompt).toContain(
                 'call get_investor_flows alongside the outlook tools'
             );
+            expect(prompt).toContain(
+                'question about a US or Korean stock, call get_investor_flows'
+            );
+        });
+
+        /**
+         * Each new question type has its own row with its own trigger words, so
+         * the model can match the user's wording to the tool (tool-selection
+         * accuracy over prompt length — user decision).
+         */
+        const rowOf = (marker: string): string =>
+            prompt.split('\n').find(line => line.includes(marker)) ?? '';
+
+        it.each([
+            [
+                'Share dilution or offerings of a US stock',
+                [
+                    '유상증자',
+                    '증자',
+                    '희석',
+                    '공모',
+                    'ATM 발행',
+                    '선반 등록',
+                    'shelf registration',
+                    'S-3',
+                    '424B5',
+                    'private placement or Form D',
+                    'Give each filing date',
+                ],
+            ],
+            [
+                'Planned insider sales of a US stock',
+                [
+                    'Form 144',
+                    '매도 예정',
+                    '내부자 매도 계획',
+                    '10b5-1 계획 매도',
+                    'notice of intent to sell, so the sale may not happen',
+                ],
+            ],
+            [
+                'Fails to deliver of a US stock',
+                [
+                    '결제 불이행',
+                    'FTD',
+                    '무차입 공매도 의혹',
+                    'about two weeks after each half-month',
+                    'not evidence of naked short selling (SEC)',
+                ],
+            ],
+            [
+                'Reg SHO threshold list',
+                ['공매도 과열 종목', 'threshold list', 'The list is daily'],
+            ],
+            [
+                "Institutions' put or call option positions",
+                [
+                    '기관 풋·콜 포지션',
+                    '~45 days late',
+                    'often hedges',
+                    'weak signal',
+                ],
+            ],
+            [
+                'Short-squeeze score or likelihood',
+                [
+                    '숏스퀴즈 점수',
+                    '숏스퀴즈 가능성',
+                    'top components',
+                    'reweighted over the inputs that were present',
+                    'capped level',
+                ],
+            ],
+            [
+                'stake changes of a Korean stock',
+                [
+                    '대주주 지분 변동',
+                    '최대주주 지분',
+                    '5% 공시',
+                    '임원이 주식 샀어?',
+                    '대량보유 상황보고',
+                    '임원·주요주주 소유보고',
+                    '거래계획보고서',
+                    'insufficient for Korean stocks, which is no data, not neutral',
+                ],
+            ],
+        ] as const)(
+            'routes "%s" questions to get_investor_flows in their own row',
+            (marker, terms) => {
+                const row = rowOf(marker);
+                expect(row).toContain('→ get_investor_flows');
+                for (const term of terms) expect(row).toContain(term);
+            }
+        );
+
+        it('says Korean institutional/foreign net buying is not available and points at no tool', () => {
+            const row = rowOf('Korean institutional or foreign net buying');
+            expect(row).toContain('기관·외국인 순매수');
+            expect(row).toContain('→ no tool: SIGLENS does not have this data');
+            expect(row).toContain('never estimate it');
+            expect(row).toContain(
+                'never suggest that get_investor_flows or any other SIGLENS tool holds it'
+            );
+            expect(row).toContain(
+                'Do not call get_investor_flows for this question'
+            );
+        });
+
+        it('drops every investor-flows row together with the tool', () => {
+            for (const marker of [
+                'Share dilution or offerings',
+                'Planned insider sales',
+                'Fails to deliver',
+                'Reg SHO threshold list',
+                "Institutions' put or call",
+                'Short-squeeze score',
+                'stake changes of a Korean stock',
+                'Korean institutional or foreign net buying',
+            ])
+                expect(without).not.toContain(marker);
         });
 
         it('drops the broad-question pairing when get_cached_analysis is not available', () => {
@@ -564,7 +684,7 @@ describe('buildAgentSystemPrompt', () => {
                     guest: true,
                 });
             expect(guestOf(AGENT_TOOL_SPECS)).toContain(
-                'congress trades, investor flows (수급), web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, web search'
             );
             expect(
                 guestOf(
@@ -598,7 +718,7 @@ describe('buildAgentSystemPrompt', () => {
                 guest: true,
             });
             expect(guest).toContain(
-                'congress trades, investor flows (수급), web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, web search'
             );
         });
     });

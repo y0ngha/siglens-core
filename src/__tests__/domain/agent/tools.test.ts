@@ -108,6 +108,41 @@ describe('AGENT_TOOL_SPECS', () => {
             '13D',
             'short interest',
             'Form 4',
+            // dilution / offerings
+            '유상증자',
+            '증자',
+            '희석',
+            '공모',
+            'ATM 발행',
+            '선반 등록',
+            'shelf registration',
+            'S-3',
+            '424B5',
+            'private placement',
+            'Form D',
+            // planned insider sales
+            'Form 144',
+            '매도 예정',
+            '내부자 매도 계획',
+            '10b5-1 계획 매도',
+            // fails to deliver and the threshold list
+            '결제 불이행',
+            'FTD',
+            '무차입 공매도 의혹',
+            '공매도 과열 종목',
+            'threshold list',
+            // institutional options and the squeeze score
+            '기관 풋·콜 포지션',
+            '숏스퀴즈 점수',
+            '숏스퀴즈 가능성',
+            // Korean DART disclosures
+            '대량보유 상황보고',
+            '임원·주요주주 소유보고',
+            '거래계획보고서',
+            '대주주 지분 변동',
+            '최대주주 지분',
+            '5% 공시',
+            '임원이 주식 샀어?',
         ])('names the trigger "%s" so the model reaches for it', term => {
             expect(spec?.description).toContain(term);
         });
@@ -119,6 +154,45 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(description).toContain('off-exchange trades only');
             expect(description).toContain('as-of dates');
             expect(description).toContain('never call it neutral');
+            expect(description).toContain(
+                'published about two weeks after each half-month'
+            );
+            expect(description).toContain('the threshold list is daily');
+            expect(description).toContain('offering filings are dated filings');
+            expect(description).toContain(
+                '13F (holdings and options) is quarterly'
+            );
+        });
+
+        it('tells the model how to read the new US sources', () => {
+            const description = spec?.description ?? '';
+            expect(description).toContain(
+                'not evidence of naked short selling (SEC)'
+            );
+            expect(description).toContain(
+                'A Form 144 is a notice of intent to sell, so the sale may not happen'
+            );
+            expect(description).toContain('underlying notional, not premium');
+            expect(description).toContain('often hedges');
+            expect(description).toContain('a weak signal');
+            expect(description).toContain('0–100 short-squeeze risk score');
+            expect(description).toContain('top components');
+            expect(description).toContain('sufficiency partial');
+            expect(description).toContain('levelCapped');
+        });
+
+        it('covers Korean stocks without promising institutional/foreign net buying', () => {
+            const description = spec?.description ?? '';
+            expect(description).toContain('US or Korean stock');
+            expect(description).not.toContain('US stocks only');
+            expect(description).toContain('DART ownership disclosures');
+            expect(description).toContain(
+                'A Korean result has no 13F, FINRA short or dilution data, so those axes are insufficient'
+            );
+            expect(description).toContain(
+                'Korean institutional/foreign net buying (기관·외국인 순매수) is not available'
+            );
+            expect(description).toContain('never estimate it');
         });
 
         it('is selected when siglens provides it and left out when it does not', () => {
