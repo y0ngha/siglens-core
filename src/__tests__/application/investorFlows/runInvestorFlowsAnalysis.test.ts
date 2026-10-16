@@ -435,7 +435,7 @@ describe('runInvestorFlowsAnalysis', () => {
                 result.status === 'done' ? result.scorecard : null;
             expect(scorecard?.squeezeRisk?.score).not.toBeNull();
             expect(sentCall().prompt).toContain(
-                `Short squeeze risk (computed): score=${scorecard?.squeezeRisk?.score}/100`
+                `Short squeeze risk (computed): score ${scorecard?.squeezeRisk?.score}/100`
             );
         });
 

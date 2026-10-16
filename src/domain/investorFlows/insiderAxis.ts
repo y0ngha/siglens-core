@@ -8,15 +8,19 @@ import {
     INSIDER_LARGE_SELL_FRACTION,
     INSIDER_LARGE_SELL_STRONG_INSIDERS,
     INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS,
+    INSIDER_PROPOSED_SALE_MODERATE_PCT_OUTSTANDING,
     INSIDER_PROPOSED_SALE_MODERATE_USD,
     INSIDER_PROPOSED_SALE_PLAN_MAJORITY,
+    INSIDER_PROPOSED_SALE_WEAK_PCT_OUTSTANDING,
     INSIDER_PROPOSED_SALE_WEAK_USD,
     INSIDER_ROLE_WEIGHTS,
     INSIDER_SELL_MIN_USD,
     INSIDER_WINDOW_DAYS,
+    RATIO_DECIMALS,
 } from '@/domain/investorFlows/constants';
 import {
     daysBetween,
+    formatDay,
     isFiniteNumber,
     isVisibleAsOf,
     labelForScore,
@@ -108,9 +112,34 @@ export interface ClusterEvent {
  * Form 144 cluster and the Korean insider cluster so the span rule is one rule.
  */
 export function largestCluster(events: readonly ClusterEvent[]): number {
+    return largestClusterSpan(events).size;
+}
+
+/** The largest cluster and the events of its span: `events.slice(start, end)`. */
+export interface ClusterSpan {
+    /** Distinct people in the span. */
+    readonly size: number;
+    /** Index of the span's first event. */
+    readonly start: number;
+    /** Index after the span's last event. */
+    readonly end: number;
+}
+
+/**
+ * {@link largestCluster} with the span it was found in: the
+ * {@link INSIDER_CLUSTER_WINDOW_DAYS}-day span from the first event of the
+ * earliest window reaching the largest count, extended to every event within
+ * that span (no later event inside it can add a person beyond the maximum).
+ * Lets a cluster signal quote the value of its own window, not of the whole
+ * insider window. Same sorting requirement and sweep as {@link largestCluster}.
+ */
+export function largestClusterSpan(
+    events: readonly ClusterEvent[]
+): ClusterSpan {
     const counts = new Map<string, number>();
     let start = 0;
     let best = 0;
+    let bestStart = 0;
     for (const event of events) {
         counts.set(event.key, (counts.get(event.key) ?? 0) + 1);
         while (
@@ -123,9 +152,24 @@ export function largestCluster(events: readonly ClusterEvent[]): number {
             else counts.set(startKey, remaining);
             start += 1;
         }
-        best = Math.max(best, counts.size);
+        if (counts.size > best) {
+            best = counts.size;
+            bestStart = start;
+        }
     }
-    return best;
+    const spanStartDay = events.at(bestStart)?.day;
+    const end =
+        spanStartDay === undefined
+            ? 0
+            : bestStart +
+              events
+                  .slice(bestStart)
+                  .filter(
+                      e =>
+                          daysBetween(spanStartDay, e.day) <=
+                          INSIDER_CLUSTER_WINDOW_DAYS
+                  ).length;
+    return { size: best, start: bestStart, end };
 }
 
 function largestBuyCluster(buys: readonly DatedTransaction[]): number {
@@ -138,7 +182,10 @@ interface DatedProposedSale {
     readonly sale: ProposedSale;
     readonly day: number;
     readonly valueUsd: number;
+    readonly shares: number;
     readonly planned: boolean;
+    /** Filer identity (see {@link proposedSaleFilerKeys}). */
+    readonly key: string;
 }
 
 /** One step weaker, never below weak: the 10b5-1 damping. */
@@ -151,22 +198,84 @@ function stepDown(
 interface ProposedSaleSummary {
     readonly valueUsd: number;
     readonly plannedValueUsd: number;
+    readonly shares: number;
+    /** Shares as % of shares outstanding; `null` without shares outstanding. */
+    readonly pctOutstanding: number | null;
+    /** Value of the notices that carry no usable share count, USD (sized by the USD fallback). */
+    readonly unsizedValueUsd: number;
     readonly filers: number;
 }
 
-function proposedSaleKey(sale: ProposedSale): string {
-    return sale.filer.trim().toLowerCase();
+/**
+ * Filer name for identity matching: case, punctuation and spacing differ
+ * between one person's filings (`O'Brien Deirdre`, `OBRIEN DEIRDRE`).
+ */
+export function normalizeFilerName(filer: string): string {
+    return filer
+        .normalize('NFKC')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s]/gu, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+/** A CIK without padding (`0001234567` and `1234567` are one filer); `null` when blank. */
+function normalizeCik(cik: string | null | undefined): string | null {
+    if (typeof cik !== 'string') return null;
+    const digits = cik.trim().replace(/^0+(?=.)/, '');
+    return digits === '' ? null : digits;
+}
+
+/**
+ * One identity key per notice. A notice with a CIK is keyed by it. One without
+ * borrows a CIK only when its normalized name is unambiguous — every notice
+ * under that name that has a CIK has the same one; when two distinct CIKs share
+ * the name (two people), it keys by the name instead of picking one, so the
+ * result does not depend on input order. Otherwise it keys by the name. The
+ * same person files under differently spelled names (`MARK ROBINSON`,
+ * `Mark Haymond Robinson`), and only the CIK joins those.
+ */
+export function proposedSaleFilerKeys(
+    sales: readonly ProposedSale[]
+): string[] {
+    const ciksByName = sales.reduce((map, sale) => {
+        const cik = normalizeCik(sale.filerCik);
+        if (cik === null) return map;
+        const name = normalizeFilerName(sale.filer);
+        return map.set(name, new Set([...(map.get(name) ?? []), cik]));
+    }, new Map<string, ReadonlySet<string>>());
+    return sales.map(sale => {
+        const name = normalizeFilerName(sale.filer);
+        const own = normalizeCik(sale.filerCik);
+        if (own !== null) return `cik:${own}`;
+        const candidates = [...(ciksByName.get(name) ?? [])];
+        return candidates.length === 1
+            ? `cik:${candidates[0]}`
+            : `name:${name}`;
+    });
 }
 
 function summarizeProposedSales(
-    sales: readonly DatedProposedSale[]
+    sales: readonly DatedProposedSale[],
+    sharesOutstanding: number | null
 ): ProposedSaleSummary {
+    const shares = roundValue(sales.reduce((sum, s) => sum + s.shares, 0));
     return {
         valueUsd: roundValue(sales.reduce((sum, s) => sum + s.valueUsd, 0)),
         plannedValueUsd: roundValue(
             sales.filter(s => s.planned).reduce((sum, s) => sum + s.valueUsd, 0)
         ),
-        filers: new Set(sales.map(s => proposedSaleKey(s.sale))).size,
+        shares,
+        unsizedValueUsd: roundValue(
+            sales
+                .filter(s => s.shares === 0)
+                .reduce((sum, s) => sum + s.valueUsd, 0)
+        ),
+        pctOutstanding:
+            isFiniteNumber(sharesOutstanding) && sharesOutstanding > 0
+                ? roundValue((shares / sharesOutstanding) * 100, RATIO_DECIMALS)
+                : null,
+        filers: new Set(sales.map(s => s.key)).size,
     };
 }
 
@@ -181,44 +290,87 @@ function damped(
         : strength;
 }
 
+function positiveOrZero(value: number): number {
+    return isFiniteNumber(value) && value > 0 ? value : 0;
+}
+
 /** Form 144 notices filed inside the insider window, sorted by filing day. */
 function windowedProposedSales(
     sales: readonly ProposedSale[],
     asOfDay: number
 ): DatedProposedSale[] {
-    return sales
-        .flatMap(sale => {
-            const day = parseDay(sale.filingDate);
-            if (day === null) return [];
-            const age = daysBetween(day, asOfDay);
-            if (age < 0 || age > INSIDER_WINDOW_DAYS) return [];
-            const valueUsd =
-                isFiniteNumber(sale.valueUsd) && sale.valueUsd > 0
-                    ? sale.valueUsd
-                    : 0;
-            return [
-                {
-                    sale,
-                    day,
-                    valueUsd,
-                    planned: sale.planAdoptionDate !== null,
-                },
-            ];
-        })
+    const inWindow = sales.flatMap(sale => {
+        const day = parseDay(sale.filingDate);
+        if (day === null) return [];
+        const age = daysBetween(day, asOfDay);
+        return age < 0 || age > INSIDER_WINDOW_DAYS ? [] : [{ sale, day }];
+    });
+    const keys = proposedSaleFilerKeys(inWindow.map(({ sale }) => sale));
+    return inWindow
+        .map(({ sale, day }, i) => ({
+            sale,
+            day,
+            valueUsd: positiveOrZero(sale.valueUsd),
+            shares: positiveOrZero(sale.shares),
+            planned: sale.planAdoptionDate !== null,
+            key: keys[i],
+        }))
         .sort((a, b) => a.day - b.day);
 }
 
-/** Bearish Form 144 signals: aggregate notice value and a multi-filer cluster, both damped for 10b5-1 plans. */
-function proposedSaleSignals(
-    sales: readonly DatedProposedSale[],
-    summary: ProposedSaleSummary
-): InvestorFlowsSignal[] {
-    const { valueUsd, plannedValueUsd, filers } = summary;
-    const signals: InvestorFlowsSignal[] = [];
-    const valueStrength = strengthOf(valueUsd, {
+const STRENGTH_RANK: Readonly<Record<InvestorFlowsSignalStrength, number>> = {
+    weak: 1,
+    moderate: 2,
+    strong: 3,
+};
+
+function strongerOf(
+    a: InvestorFlowsSignalStrength | null,
+    b: InvestorFlowsSignalStrength | null
+): InvestorFlowsSignalStrength | null {
+    if (a === null) return b;
+    if (b === null) return a;
+    return STRENGTH_RANK[b] > STRENGTH_RANK[a] ? b : a;
+}
+
+function usdStrength(valueUsd: number): InvestorFlowsSignalStrength | null {
+    return strengthOf(valueUsd, {
         weak: INSIDER_PROPOSED_SALE_WEAK_USD,
         moderate: INSIDER_PROPOSED_SALE_MODERATE_USD,
     });
+}
+
+/**
+ * Strength of the aggregate notice size (see the constants for why).
+ *
+ * - No shares outstanding: USD value of every notice.
+ * - Otherwise: % of shares outstanding over the notices that carry a share
+ *   count, and — when some notices carry none — the USD fallback over those
+ *   notices alone; the stronger of the two wins. A window mixing sized and
+ *   unsized notices would otherwise understate the percent (the unsized ones
+ *   add 0 shares) or drop the sized ones' scale.
+ */
+function proposedSaleStrength(
+    summary: ProposedSaleSummary
+): InvestorFlowsSignalStrength | null {
+    if (summary.pctOutstanding === null) return usdStrength(summary.valueUsd);
+    const pctStrength = strengthOf(summary.pctOutstanding, {
+        weak: INSIDER_PROPOSED_SALE_WEAK_PCT_OUTSTANDING,
+        moderate: INSIDER_PROPOSED_SALE_MODERATE_PCT_OUTSTANDING,
+    });
+    return strongerOf(pctStrength, usdStrength(summary.unsizedValueUsd));
+}
+
+/** Bearish Form 144 signals: aggregate notice size and a multi-filer cluster (figures of its own span), each damped when most of its value is under 10b5-1 plans. */
+function proposedSaleSignals(
+    sales: readonly DatedProposedSale[],
+    summary: ProposedSaleSummary,
+    sharesOutstanding: number | null
+): InvestorFlowsSignal[] {
+    const { valueUsd, plannedValueUsd, shares, pctOutstanding, filers } =
+        summary;
+    const signals: InvestorFlowsSignal[] = [];
+    const valueStrength = proposedSaleStrength(summary);
     if (valueStrength !== null) {
         signals.push(
             makeSignal(
@@ -229,27 +381,40 @@ function proposedSaleSignals(
                 {
                     valueUsd,
                     plannedValueUsd,
+                    shares,
+                    pctOfSharesOutstanding: pctOutstanding,
                     filers,
                     notices: sales.length,
                 }
             )
         );
     }
-    const cluster = largestCluster(
-        sales.map(s => ({ day: s.day, key: proposedSaleKey(s.sale) }))
+    const span = largestClusterSpan(
+        sales.map(s => ({ day: s.day, key: s.key }))
     );
-    if (cluster >= INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS) {
+    if (span.size >= INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS) {
+        // Figures of the cluster's own span, not of the whole insider window:
+        // `windowDays` next to a 90-day total misreads as a 30-day total.
+        const members = sales.slice(span.start, span.end);
+        const clusterSummary = summarizeProposedSales(
+            members,
+            sharesOutstanding
+        );
         signals.push(
             makeSignal(
                 'insider',
                 'insider_proposed_sale_cluster',
                 'bearish',
-                damped('moderate', summary),
+                damped('moderate', clusterSummary),
                 {
-                    filers: cluster,
+                    filers: span.size,
                     windowDays: INSIDER_CLUSTER_WINDOW_DAYS,
-                    valueUsd,
-                }
+                    clusterNotices: members.length,
+                    clusterValueUsd: clusterSummary.valueUsd,
+                    clusterPlannedValueUsd: clusterSummary.plannedValueUsd,
+                    clusterShares: clusterSummary.shares,
+                },
+                `${formatDay(members[0].day)} to ${formatDay(members[members.length - 1].day)}`
             )
         );
     }
@@ -293,18 +458,23 @@ function distinctPeople(items: readonly DatedTransaction[]): number {
  * future-dated rows is insufficient.
  *
  * Form 144 notices (filing date in the window) add two bearish signals:
- * `insider_proposed_sale` on their aggregate value (weak from
- * {@link INSIDER_PROPOSED_SALE_WEAK_USD}, capped at moderate — a notice is
- * intent, and the sale shows up again as a Form 4) and
- * `insider_proposed_sale_cluster` when {@link INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS}
- * or more distinct filers file within one cluster span. When at least
+ * `insider_proposed_sale` on their aggregate size — shares as % of
+ * `sharesOutstanding` (weak from {@link INSIDER_PROPOSED_SALE_WEAK_PCT_OUTSTANDING}),
+ * or USD value (weak from {@link INSIDER_PROPOSED_SALE_WEAK_USD}) when
+ * shares outstanding is unknown or for the notices without a share count (the
+ * stronger reading wins); capped at moderate — a notice is intent, and
+ * the sale shows up again as a Form 4 — and `insider_proposed_sale_cluster`
+ * when {@link INSIDER_PROPOSED_SALE_CLUSTER_MIN_FILERS} or more distinct filers
+ * (by CIK, else normalized name; see {@link proposedSaleFilerKeys}) file
+ * within one cluster span. When at least
  * {@link INSIDER_PROPOSED_SALE_PLAN_MAJORITY} of the notice value is under a
  * Rule 10b5-1 plan, both drop one strength step (never below weak).
  */
 export function evaluateInsiderAxis(
     snapshot: InsiderSnapshot,
     asOfDay: number | null,
-    proposedSales: readonly ProposedSale[] = []
+    proposedSales: readonly ProposedSale[] = [],
+    sharesOutstanding: number | null = null
 ): InsiderAxis {
     // Sorted by day once: the cluster sweep relies on it.
     const dated: DatedTransaction[] = snapshot.transactions
@@ -354,7 +524,7 @@ export function evaluateInsiderAxis(
     const cluster = largestBuyCluster(buys);
     const clusterBuy = cluster >= INSIDER_CLUSTER_MIN_INSIDERS;
     const sales144 = windowedProposedSales(proposedSales, asOfDay);
-    const sales144Summary = summarizeProposedSales(sales144);
+    const sales144Summary = summarizeProposedSales(sales144, sharesOutstanding);
 
     const signals: InvestorFlowsSignal[] = [];
 
@@ -430,7 +600,9 @@ export function evaluateInsiderAxis(
             )
         );
     }
-    signals.push(...proposedSaleSignals(sales144, sales144Summary));
+    signals.push(
+        ...proposedSaleSignals(sales144, sales144Summary, sharesOutstanding)
+    );
     if (inWindow.length === 0 && sales144.length === 0) {
         signals.push(
             makeSignal('insider', 'insider_quiet', 'neutral', 'weak', {
@@ -455,6 +627,8 @@ export function evaluateInsiderAxis(
         proposedSaleCount: sales144.length,
         proposedSaleFilerCount: sales144Summary.filers,
         proposedSaleValueUsd: sales144Summary.valueUsd,
+        proposedSaleShares: sales144Summary.shares,
+        proposedSalePctOutstanding: sales144Summary.pctOutstanding,
         proposedSalePlannedValueUsd: sales144Summary.plannedValueUsd,
     };
     const score = scoreFromSignals(signals);

@@ -1781,9 +1781,27 @@ export function buildCongressTrendCacheKey(
  * score block; and a Korean (DART) prompt variant. A `p1` entry has four axis
  * interpretations and would render without the dilution axis.
  *
+ * **`p3`** = real-LLM A/B fixes (2026-10-16): the scorecard renders the FTD
+ * peak settlement date, the Form 144 share of outstanding and units on percent
+ * figures and squeeze inputs; Form 144 strength is relative to shares
+ * outstanding and filers are matched by CIK; the rules add the FTD date and
+ * naked-shorting caveat, the active-ATM reading, the no-identifiers rule and
+ * (Korean output) the terminology rule. A second A/B round, before release,
+ * folded into the same bump: listed Form 4 / Form 144 rows outside the scoring
+ * window are tagged, the cluster signal quotes its own span's value, z-scores
+ * render in words, and the rules add count-from-metrics, no price-impact
+ * prediction, no undated present-tense claim, no "routine" FTD at 2x baseline
+ * and the explicit naked-shorting sentence; a third round adds the basis of
+ * percent figures (float / shares outstanding), a null FTD multiple on a
+ * near-zero baseline, and the Korean number-style and term additions; later
+ * rounds add endpoints next to every change metric (short-interest window and
+ * latest settlement change, 13F scored quarter) and copy-digits-exactly, then
+ * thousands commas in the data and locale display names for labels and axes. A `p2` entry can quote an FTD peak
+ * under the wrong date and a mega cap's plan sales as a bearish signal.
+ *
  * @internal
  */
-export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * @internal TTL for investor-flows analysis cache results. Default: 12 hours —
@@ -2064,9 +2082,18 @@ export function buildNewsCacheKey(
  * prompt without investor flows is byte-identical, but the guidance text is not
  * folded into `inputHash`, so the segment is bumped for every entry.
  *
+ * **`p6`** — investor-flows A/B fixes (2026-10-16). Again only prompts with the
+ * `## Investor Flows` section change: the shared scorecard rendering (FTD peak
+ * date, units, Form 144 share of outstanding), the FTD / ATM weighting lines,
+ * and the section rules (labels in plain words, FTD date and caveat, active
+ * ATM, no identifiers, Korean terminology, and — second A/B round, same
+ * unreleased bump — no price-impact prediction or undated present-tense claim
+ * in the investor-flows bullets). Bumped for every entry for the
+ * same reason as `p5`.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

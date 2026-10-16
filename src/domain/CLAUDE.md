@@ -272,6 +272,20 @@ computing derived values, so a recomputation from the rendered text matches.
 - Any change to rendered bytes also bumps the cache version
   (`src/infrastructure/CLAUDE.md#INF-4`).
 
+<a id="DOM-11"></a>
+#### DOM-11 — Render prompt data in the form you want the model to print
+
+A model copies whatever shape the prompt data has. Ungrouped integers come back ungrouped,
+internal English label ids come back as English in a localized answer, and statistical forms
+such as `z=1.8` come back as jargon. Fix the rendering (grouped digits, localized or
+human-readable labels, plain-language wording) rather than adding a rule that asks the model
+to reformat.
+
+```typescript
+// ❌ `flow: 1234567890, label: net_buy, z=1.8`   // the answer repeats all three
+// ✅ `flow: 1,234,567,890 (net buying, well above its usual range)`
+```
+
 ## Overall axis weighting (`analysis/overallScore.ts`)
 
 The overall prompt hands five axis reports to one model and asks it to synthesize. The only

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     FTD_BASELINE_TRADING_DAYS,
     FTD_MAX_AGE_DAYS,
+    FTD_MIN_BASELINE_DAILY_AVERAGE,
     THRESHOLD_LIST_MAX_AGE_DAYS,
     FTD_MIN_QTY,
     FTD_RECENT_WINDOW_DAYS,
@@ -55,13 +56,13 @@ function baseline(qty: number): FailsToDeliverPoint[] {
 describe('evaluateShortAxis — fails to deliver', () => {
     it('reads a 250,000-share spike on a 40M-share stock as moderate, neutral context', () => {
         const axis = axisWith([
-            ...baseline(20_000),
+            ...baseline(60_000),
             ftdPoint({ settlementDate: daysBeforeAsOf(18), failsQty: 250_000 }),
             ftdPoint({ settlementDate: daysBeforeAsOf(17), failsQty: 90_000 }),
         ]);
         const multiple =
             Math.round(
-                (250_000 / ((10 * 20_000) / FTD_BASELINE_TRADING_DAYS)) * 100
+                (250_000 / ((10 * 60_000) / FTD_BASELINE_TRADING_DAYS)) * 100
             ) / 100;
         expect(signalOf(axis.signals, 'fails_to_deliver_elevated')).toEqual({
             id: 'fails_to_deliver_elevated',
@@ -74,9 +75,65 @@ describe('evaluateShortAxis — fails to deliver', () => {
                 baselineMultiple: multiple,
                 recentWindowDays: FTD_RECENT_WINDOW_DAYS,
             },
+            subject: daysBeforeAsOf(18),
         });
         expect(axis.metrics.failsToDeliverPeakQty).toBe(250_000);
+        expect(axis.metrics.failsToDeliverPeakDate).toBe(daysBeforeAsOf(18));
         expect(axis.metrics.failsToDeliverMultiple).toBe(multiple);
+    });
+
+    it('has no multiple against a near-zero baseline (AAPL A/B: 240x on ~3,700 shares a day)', () => {
+        // 10 baseline days of 15,000 fails over 42 trading days: ~3,571 a day,
+        // under the minimum, so the multiple is noise and is not reported.
+        const axis = axisWith([
+            ...baseline(15_000),
+            ftdPoint({ settlementDate: daysBeforeAsOf(18), failsQty: 250_000 }),
+        ]);
+        expect((10 * 15_000) / 42).toBeLessThan(FTD_MIN_BASELINE_DAILY_AVERAGE);
+        expect(axis.metrics.failsToDeliverMultiple).toBeNull();
+        const signal = signalOf(axis.signals, 'fails_to_deliver_elevated');
+        expect(signal?.evidence.baselineMultiple).toBeNull();
+        // Level strength only: 0.625% of outstanding, not held at weak by a multiple.
+        expect(signal?.strength).toBe('moderate');
+    });
+
+    it('reports the multiple once the baseline average reaches the minimum', () => {
+        const qty = Math.ceil((FTD_MIN_BASELINE_DAILY_AVERAGE * 42) / 10);
+        const axis = axisWith([
+            ...baseline(qty),
+            ftdPoint({ settlementDate: daysBeforeAsOf(18), failsQty: 250_000 }),
+        ]);
+        expect(axis.metrics.failsToDeliverMultiple).not.toBeNull();
+    });
+
+    it('dates the peak with its own settlement day, not the newest fail day (GME A/B case)', () => {
+        // A 521,614-share peak on one day, then small fails on the newer days: the
+        // newest day (daysBeforeAsOf(16)) is the latest file date, not the peak's.
+        const axis = axisWith([
+            ftdPoint({ settlementDate: daysBeforeAsOf(16), failsQty: 195 }),
+            ftdPoint({ settlementDate: daysBeforeAsOf(17), failsQty: 552 }),
+            ftdPoint({ settlementDate: daysBeforeAsOf(24), failsQty: 521_614 }),
+            ftdPoint({ settlementDate: daysBeforeAsOf(25), failsQty: 2_381 }),
+        ]);
+        expect(axis.metrics.failsToDeliverPeakDate).toBe(daysBeforeAsOf(24));
+        expect(
+            signalOf(axis.signals, 'fails_to_deliver_elevated')?.subject
+        ).toBe(daysBeforeAsOf(24));
+    });
+
+    it('dates a tied peak with the newest of the tied days, whatever the input order', () => {
+        const axis = axisWith([
+            ftdPoint({ settlementDate: daysBeforeAsOf(20), failsQty: 80_000 }),
+            ftdPoint({ settlementDate: daysBeforeAsOf(10), failsQty: 80_000 }),
+            ftdPoint({ settlementDate: daysBeforeAsOf(15), failsQty: 80_000 }),
+        ]);
+        expect(axis.metrics.failsToDeliverPeakDate).toBe(daysBeforeAsOf(10));
+    });
+
+    it('has no peak date when the recent window holds no fail day', () => {
+        const axis = axisWith([]);
+        expect(axis.metrics.failsToDeliverPeakQty).toBe(0);
+        expect(axis.metrics.failsToDeliverPeakDate).toBeNull();
     });
 
     it('keeps a weak level (0.1–0.5% of outstanding) weak', () => {

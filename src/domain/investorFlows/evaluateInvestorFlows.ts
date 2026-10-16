@@ -260,7 +260,8 @@ export function evaluateInvestorFlows(
     const insider = evaluateInsiderAxis(
         snapshot.insider,
         asOfDay,
-        snapshot.proposedSales ?? []
+        snapshot.proposedSales ?? [],
+        snapshot.sharesOutstanding
     );
     const largeHolders = evaluateLargeHolderAxis(
         snapshot.largeHolders,

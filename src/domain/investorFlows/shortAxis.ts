@@ -90,7 +90,10 @@ function failsToDeliverSignal(
                 pctOfSharesOutstanding: reading.pctOutstanding,
                 baselineMultiple: reading.multiple,
                 recentWindowDays: FTD_RECENT_WINDOW_DAYS,
-            }
+            },
+            // The peak's own settlement date: evidence is numeric, and quoting the
+            // peak with the latest file date misdates it.
+            reading.peakDate ?? undefined
         ),
     ];
 }
@@ -200,7 +203,7 @@ function priceFreeSqueezeSignal(
  *
  * **SEC fails to deliver and Reg SHO lists** add neutral context signals:
  * `fails_to_deliver_elevated` (peak recent fails as % of shares outstanding,
- * held at weak when the peak is under {@link FTD_SPIKE_MIN_MULTIPLE}x the
+ * with the peak's settlement date as `subject`, held at weak when the peak is under {@link FTD_SPIKE_MIN_MULTIPLE}x the
  * baseline; capped at moderate because fails are not evidence of naked short
  * selling) and `reg_sho_threshold_listed`. Being neutral, they never make the
  * axis sufficient, but they are reported even when it is insufficient (for
@@ -280,7 +283,10 @@ export function evaluateShortAxis(
                     fromShortQty: trend.fromQty,
                     toShortQty: trend.toQty,
                     settlements: SHORT_INTEREST_TREND_POINTS,
-                }
+                },
+                // The window's endpoints: a change quoted without them gets
+                // attributed to the previous settlement alone.
+                `${trend.fromDate} to ${trend.toDate}`
             )
         );
     }
@@ -336,6 +342,14 @@ export function evaluateShortAxis(
         shortInterestPctFloat: pctFloat,
         daysToCover: dtc,
         shortInterestChangePct: trend?.changePct ?? null,
+        shortInterestChangeFromDate: trend?.fromDate ?? null,
+        shortInterestChangeToDate: trend?.toDate ?? null,
+        shortInterestLatestChangePct:
+            positioning.latestChange?.changePct ?? null,
+        shortInterestLatestChangeFromDate:
+            positioning.latestChange?.fromDate ?? null,
+        shortInterestLatestChangeToDate:
+            positioning.latestChange?.toDate ?? null,
         shortInterestTrend: trend?.trend ?? null,
         shortVolumeRatio: volumeReading?.ratio ?? null,
         shortVolumeRatioZ: z,
@@ -343,6 +357,7 @@ export function evaluateShortAxis(
             z === null ? null : (volumeReading?.baselineDays ?? null),
         squeezeRisk,
         failsToDeliverPeakQty: ftd?.peakQty ?? null,
+        failsToDeliverPeakDate: ftd?.peakDate ?? null,
         failsToDeliverPctOutstanding: ftd?.pctOutstanding ?? null,
         failsToDeliverMultiple: ftd?.multiple ?? null,
         thresholdListed: thresholdList?.listed ?? null,

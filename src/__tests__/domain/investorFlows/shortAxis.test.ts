@@ -278,6 +278,50 @@ describe('evaluateShortAxis — short-interest trend', () => {
         expect(four.metrics.shortInterestChangePct).toBe(20);
     });
 
+    it('reports the trend window endpoints and the latest one-settlement change', () => {
+        // 10.0M → 11.0M → 12.0M at 40, 25 and 10 days back.
+        const axis = evaluateShortAxis(
+            shortInterestSeries(10_000_000, 12_000_000),
+            null,
+            FLOAT
+        );
+        expect(axis.metrics.shortInterestChangeFromDate).toBe(
+            daysBeforeAsOf(40)
+        );
+        expect(axis.metrics.shortInterestChangeToDate).toBe(daysBeforeAsOf(10));
+        expect(axis.metrics.shortInterestLatestChangePct).toBe(9.09);
+        expect(axis.metrics.shortInterestLatestChangeFromDate).toBe(
+            daysBeforeAsOf(25)
+        );
+        expect(axis.metrics.shortInterestLatestChangeToDate).toBe(
+            daysBeforeAsOf(10)
+        );
+        expect(signalOf(axis.signals, 'short_interest_trend')?.subject).toBe(
+            `${daysBeforeAsOf(40)} to ${daysBeforeAsOf(10)}`
+        );
+    });
+
+    it('reports the latest change with two settlements, before a trend exists', () => {
+        const two = evaluateShortAxis(
+            shortInterestSeries(10_000_000, 15_000_000).slice(1),
+            null,
+            FLOAT
+        );
+        // 12.5M → 15.0M.
+        expect(two.metrics.shortInterestLatestChangePct).toBe(20);
+        expect(two.metrics.shortInterestChangeFromDate).toBeNull();
+    });
+
+    it('has no latest change with one settlement', () => {
+        const one = evaluateShortAxis(
+            shortInterestSeries(10_000_000, 15_000_000).slice(2),
+            null,
+            FLOAT
+        );
+        expect(one.metrics.shortInterestLatestChangePct).toBeNull();
+        expect(one.metrics.shortInterestLatestChangeFromDate).toBeNull();
+    });
+
     it('sorts settlements itself, so input order does not matter', () => {
         const axis = evaluateShortAxis(
             shortInterestSeries(10_000_000, 12_000_000).toReversed(),

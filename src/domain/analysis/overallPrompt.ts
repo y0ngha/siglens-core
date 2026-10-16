@@ -21,7 +21,13 @@ import {
     priceDecimalPlaces,
     sharedPriceDecimalPlaces,
 } from '@/domain/analysis/promptFormat';
-import { formatInvestorFlowsScorecard } from '@/domain/investorFlows/formatScorecard';
+import {
+    formatInvestorFlowsScorecard,
+    INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
+    INVESTOR_FLOWS_PLAIN_TEXT_RULE,
+    investorFlowsInterpretationRules,
+    investorFlowsOutputRules,
+} from '@/domain/investorFlows/formatScorecard';
 import type {
     AnalysisResponse,
     AssembledPrompt,
@@ -413,7 +419,8 @@ function formatFinancials(
  */
 function formatInvestorFlows(
     scorecard: InvestorFlowsScorecard | null,
-    market: InvestorFlowsMarket
+    market: InvestorFlowsMarket,
+    locale: AnalysisLocale
 ): string {
     const kr = market === 'kr';
     const body =
@@ -421,7 +428,7 @@ function formatInvestorFlows(
             ? kr
                 ? 'NO DATA — Korean investor-flows data (DART 5%+ major-holder and executive / major-shareholder reports) was not available for this symbol. Institutional / foreign net buying is not provided for Korean listings. This is missing information, not a neutral reading. Leave investorFlowsBulletsKo empty.'
                 : 'NO DATA — investor-flows data (13F institutional, Form 4 / Form 144 insider, 13D/13G, FINRA / SEC short, SEC offering filings) was not available for this symbol. This is missing information, not a neutral reading. Leave investorFlowsBulletsKo empty.'
-            : `${kr ? KR_INVESTOR_FLOWS_WEIGHTING_GUIDANCE : INVESTOR_FLOWS_WEIGHTING_GUIDANCE}\n\n${formatInvestorFlowsScorecard(scorecard)}`;
+            : `${kr ? KR_INVESTOR_FLOWS_WEIGHTING_GUIDANCE : INVESTOR_FLOWS_WEIGHTING_GUIDANCE}\n\n${formatInvestorFlowsScorecard(scorecard, locale, { axisIds: false })}`;
     return `## Investor Flows (supplementary axis)\n${body}`;
 }
 
@@ -447,8 +454,8 @@ const INVESTOR_FLOWS_WEIGHTING_GUIDANCE = [
     'How much each source carries:',
     '- institutional (13F) is quarterly and filed up to ~45 days after quarter end — it supports or questions the STRUCTURAL thesis (who owns the stock over quarters), not near-term timing. An in-progress quarter is partial and not scored.',
     '- insider cluster buys, open-market buys by officers/directors and new or larger 13D filings are EVENT-level: recent and specific, but each is one input, not a verdict. Insider sales and 13G filings are weak evidence.',
-    '- short squeeze risk and the off-exchange short-volume z-score are SHORT-TERM and volatile; short volume covers off-exchange trades only, and short interest is a snapshot published ~8 business days after its settlement date. Fails to deliver and Reg SHO threshold listings are delivery-stress context, not evidence of naked short selling.',
-    '- dilution filings are EVENT-level supply: an at-the-market program or a priced offering sells new shares, a shelf or registration only makes a sale possible. Form 144 notices are intent to sell and weaker under a 10b5-1 plan.',
+    '- short squeeze risk and the off-exchange short-volume z-score are SHORT-TERM and volatile; short volume covers off-exchange trades only, and short interest is a snapshot published ~8 business days after its settlement date. Fails to deliver and Reg SHO threshold listings are delivery-stress context, not evidence of naked short selling; each FTD figure belongs to its own settlement date.',
+    '- dilution filings are EVENT-level supply: an active at-the-market (ATM) program may be selling new shares into the market now and a priced offering sells a block of new shares, while a shelf or registration only makes a sale possible later. Form 144 notices are intent to sell and weaker under a 10b5-1 plan.',
     'Cite the as-of date of every investor-flows source you use (13F quarter, short-interest settlement date, latest short-volume date, latest fails-to-deliver date, insider, 13D/13G and offering windows). An axis marked NO DATA is missing information — never read it as neutral, quiet or supportive.',
 ].join('\n');
 
@@ -731,13 +738,13 @@ export function buildOverallAnalysisPrompt(
             ? 'us'
             : investorFlowsMarketOf(investorFlows, currency);
     const investorFlowsBlock = investorFlowsIntegrated
-        ? `\n\n${formatInvestorFlows(investorFlows, investorFlowsMarket)}`
+        ? `\n\n${formatInvestorFlows(investorFlows, investorFlowsMarket, locale)}`
         : '';
     const investorFlowsSchemaEntry = investorFlowsIntegrated
         ? `\n  "investorFlowsBulletsKo": [\n    "${investorFlowsMarket === 'kr' ? '수급(대량보유·임원·주요주주)' : '수급(기관·내부자·공매도)'} 요약 bullet 1 (${schemaLanguage})",\n    "수급 요약 bullet 2 (${schemaLanguage})"\n  ],`
         : '';
     const investorFlowsRules = investorFlowsIntegrated
-        ? `\n- investorFlowsBulletsKo: provide 2–4 bullets from the Investor Flows section, citing the as-of date of each source used and weighting sources as that section describes; when an axis is marked NO DATA say so explicitly and never describe it as neutral. Leave the array empty when the section says there is no data.\n- When the Investor Flows section is present, attribute investor-flows claims in integratedConclusionKo to it (e.g. "수급 분석에서는…") and keep them proportional to the section's weighting guidance. Quote its labels and scores as given.`
+        ? `\n- investorFlowsBulletsKo: provide 2–4 bullets from the Investor Flows section, citing the as-of date of each source used and weighting sources as that section describes; when an axis is marked NO DATA say so explicitly and never describe it as neutral. Leave the array empty when the section says there is no data.\n- When the Investor Flows section is present, attribute investor-flows claims in integratedConclusionKo to it (e.g. "수급 분석에서는…") and keep them proportional to the section's weighting guidance. Quote its scores as given and state its labels in plain words.\n${investorFlowsInterpretationRules('investorFlowsBulletsKo and the investor-flows claims in integratedConclusionKo')}\n${investorFlowsMarket === 'kr' ? INVESTOR_FLOWS_PLAIN_TEXT_RULE : investorFlowsOutputRules('the same bullet or sentence')}${locale === 'ko' && investorFlowsMarket !== 'kr' ? `\n${INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}` : ''}`
         : '';
 
     const dynamic = `${roleAndAxisLine}

@@ -218,9 +218,30 @@ export const INSIDER_LARGE_SELL_STRONG_INSIDERS = 3;
 // ─── Insider (Form 144) ──────────────────────────────
 
 /**
- * Aggregate Form 144 value (USD) in the insider window for a weak
- * proposed-sale signal. Form 144 is required above $50k in three months, so
- * small notices are routine; $1M is four times the Form 4 routine-sell floor.
+ * Aggregate Form 144 shares in the insider window, as % of shares outstanding,
+ * for a weak proposed-sale signal. This is the primary scale: a fixed dollar
+ * floor reads a mega cap's routine plan sales (Apple executives' ~$40M a
+ * quarter is ~0.003% of the company) as a bearish event and misses a small
+ * cap's meaningful one. Anchored on Rule 144(e): one affiliate may sell at most
+ * 1% of shares outstanding (or the average weekly volume) per three months, so
+ * 0.05% is a twentieth of a single affiliate's cap. Same scale as the Korean
+ * insider net-change thresholds. Judgment, not a measurement.
+ */
+export const INSIDER_PROPOSED_SALE_WEAK_PCT_OUTSTANDING = 0.05;
+/**
+ * See {@link INSIDER_PROPOSED_SALE_WEAK_PCT_OUTSTANDING}: a quarter of one
+ * affiliate's Rule 144(e) three-month cap. Capped at moderate: a notice is
+ * intent, and the sale reappears later as a Form 4.
+ */
+export const INSIDER_PROPOSED_SALE_MODERATE_PCT_OUTSTANDING = 0.25;
+
+/**
+ * Fallback only: aggregate Form 144 value (USD) in the insider window for a
+ * weak proposed-sale signal, applied to every notice when the snapshot has no
+ * shares outstanding, and otherwise only to the notices that carry no share
+ * count (the stronger of that and the percent reading wins).
+ * Form 144 is required above $50k in three months, so small notices are
+ * routine; $1M is four times the Form 4 routine-sell floor.
  */
 export const INSIDER_PROPOSED_SALE_WEAK_USD = 1_000_000;
 /** See {@link INSIDER_PROPOSED_SALE_WEAK_USD}. Capped at moderate: a notice is intent, and the sale reappears later as a Form 4. */
@@ -313,6 +334,16 @@ export const FTD_MIN_QTY = 10_000;
 export const FTD_PCT_OUTSTANDING_WEAK = 0.1;
 /** Reg SHO's threshold-security level (0.5% of shares outstanding) — moderate, the cap: fails are not evidence of naked shorting (SEC). */
 export const FTD_PCT_OUTSTANDING_MODERATE = 0.5;
+
+/**
+ * Smallest baseline average daily fails a peak is compared against. Below it
+ * the baseline is near zero and the multiple explodes into noise (AAPL read
+ * 240x on a ~3,700-share daily average), so `failsToDeliverMultiple` is `null`
+ * and no multiple-based strength applies. Set at {@link FTD_MIN_QTY}, Reg SHO's
+ * own floor for fails worth noticing: a baseline under the level a single day
+ * must reach to count is no baseline.
+ */
+export const FTD_MIN_BASELINE_DAILY_AVERAGE = FTD_MIN_QTY;
 
 /** A peak below this multiple of the baseline daily average is chronic, not new; such a signal is held at weak. */
 export const FTD_SPIKE_MIN_MULTIPLE = 2;

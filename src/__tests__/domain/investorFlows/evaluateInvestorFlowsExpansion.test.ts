@@ -94,10 +94,15 @@ describe('evaluateInvestorFlows — snapshots built before the expansion', () =>
 
 describe('evaluateInvestorFlows — new US inputs', () => {
     it('feeds Form 144 notices into the insider axis', () => {
+        // 10,000 shares of a 10M-share company: 0.1% of outstanding, weak.
         const card = evaluateInvestorFlows(
-            emptySnapshot({ proposedSales: [proposedSale()] })
+            emptySnapshot({
+                sharesOutstanding: 10_000_000,
+                proposedSales: [proposedSale()],
+            })
         );
         expect(ids(card.insider)).toContain('insider_proposed_sale');
+        expect(card.insider.metrics?.proposedSalePctOutstanding).toBe(0.1);
     });
 
     it('feeds fails to deliver into the short axis and the freshness block', () => {
