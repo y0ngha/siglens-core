@@ -13,7 +13,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-15.1';
+export const AGENT_PROMPT_VERSION = '2026-10-16.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -149,10 +149,46 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         requires: ['get_investor_flows'],
         text: available => {
             const broad = available.has('get_cached_analysis')
-                ? ' For a broad "how is it overall / 종합적으로 어때" question about a US stock, call get_investor_flows alongside the outlook tools and weigh it with the source notes that end this row.'
+                ? ' For a broad "how is it overall / 종합적으로 어때" question about a US or Korean stock, call get_investor_flows alongside the outlook tools and weigh it with the source notes that end this row.'
                 : '';
             return `Who is buying or selling a US stock — institutional buying/selling or holdings (기관 매수/매도, 13F), insider trades (내부자), 5% holders or activists (13D/13G), short selling or short squeeze (공매도, 숏스퀴즈) → get_investor_flows.${broad} Its 13F part is quarterly and ~45 days late (structural, not today's positioning); insider clusters and new 13D filings are event-level; squeeze risk and short-volume z-scores are short-term. Always give the as-of dates it returns, and report an axis marked insufficient as no data, never as neutral.`;
         },
+    },
+    // One row per question type rather than one long row: the model routes by
+    // matching the user's words, so each type keeps its own trigger keywords
+    // and the reading note that belongs to it (tool-selection accuracy over
+    // prompt length — never merge these to save tokens).
+    {
+        requires: ['get_investor_flows'],
+        text: 'Share dilution or offerings of a US stock — 유상증자, 증자, 희석, 공모, ATM 발행, 선반 등록, shelf registration, S-3, 424B5, private placement or Form D → get_investor_flows. Give each filing date it returns, and say that an at-the-market program or a priced offering sells new shares while a shelf or registration only makes a sale possible.',
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: 'Planned insider sales of a US stock — Form 144, 매도 예정, 내부자 매도 계획, 10b5-1 계획 매도 → get_investor_flows. A Form 144 is a notice of intent to sell, so the sale may not happen; the executed sale later shows as a Form 4, so never count the two as separate selling.',
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: 'Fails to deliver of a US stock, or suspected naked short selling — 결제 불이행, FTD, 무차입 공매도 의혹 → get_investor_flows. Fails are published about two weeks after each half-month, and every answer that mentions them says they are not evidence of naked short selling (SEC).',
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: 'Whether a US stock is on the Reg SHO threshold list — 공매도 과열 종목, threshold list → get_investor_flows. The list is daily; give the list date and the consecutive days it returns.',
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: "Institutions' put or call option positions in a US stock — 기관 풋·콜 포지션, 13F options → get_investor_flows. They are quarterly 13F notional values (~45 days late), often hedges against long stock, so call a put/call tilt a weak signal.",
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: 'Short-squeeze score or likelihood of a US stock — 숏스퀴즈 점수, 숏스퀴즈 가능성, squeeze risk → get_investor_flows. Quote the score and level with the top components it lists; a partial score was reweighted over the inputs that were present, and a capped level means no short-positioning input was available.',
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: 'Investor flows (수급), major-holder or insider stake changes of a Korean stock — 삼성전자 수급 어때?, 대주주 지분 변동, 최대주주 지분, 5% 공시, 대량보유, 임원이 주식 샀어?, 임원·주요주주 소유보고 → get_investor_flows (DART disclosures: 대량보유 상황보고, 임원·주요주주 소유보고, 거래계획보고서). Give the receipt dates it returns; its 13F, short-selling and dilution axes are insufficient for Korean stocks, which is no data, not neutral.',
+    },
+    {
+        requires: ['get_investor_flows'],
+        text: 'Korean institutional or foreign net buying asked for specifically — 기관·외국인 순매수, 외국인이 사고 있어?, 기관 매매 동향 → no tool: SIGLENS does not have this data. Say so plainly; never estimate it, never suggest that get_investor_flows or any other SIGLENS tool holds it, and never offer it as a follow-up question. Do not call get_investor_flows for this question: for a Korean stock it holds only DART stake filings, never net buying. A general 수급 question about a Korean stock is not this row: follow the Korean stake-changes row above (call get_investor_flows) and add that institutional/foreign net buying is not available.',
     },
     {
         requires: ['get_market_overview'],
@@ -356,7 +392,7 @@ ${AGENT_WRITING_STYLE}
 ## User
 ${
     input.guest
-        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급), ' : ''}web search) works without it.`
+        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}web search) works without it.`
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'
