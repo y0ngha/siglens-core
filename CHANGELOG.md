@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.22.1](https://github.com/y0ngha/siglens-core/compare/v2.22.0...v2.22.1) (2026-10-16)
+
+### Bug Fixes
+
+* 결제불이행 주의 문구를 로케일별 한 문장으로(중복 서술 방지) ([#281](https://github.com/y0ngha/siglens-core/issues/281)) ([c35647b](https://github.com/y0ngha/siglens-core/commit/c35647b3a7a200d66d5f2fca8f39999abb8dc9c7))
+
 # [2.22.0](https://github.com/y0ngha/siglens-core/compare/v2.21.1...v2.22.0) (2026-10-16)
 
 ### Features
