@@ -138,7 +138,9 @@ describe('buildAgentSystemPrompt', () => {
     });
 
     it('전망 질문 행은 두 툴 중 하나만 가용해도 남은 툴로 안내한다', () => {
-        const outlook = /Outlook, "how is it doing".*→ ([^\n]+)\./;
+        // Captures only the tool list: the row may go on with a second
+        // sentence (the buy/sell-decision pointer to get_investor_flows).
+        const outlook = /Outlook, "how is it doing".*?→ ([^\n]+?)\.(?: |$)/m;
         expect(prompt.match(outlook)?.[1]).toBe(
             'get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
         );
@@ -427,7 +429,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-16.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-16.2');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
@@ -491,8 +493,23 @@ describe('buildAgentSystemPrompt', () => {
                 'call get_investor_flows alongside the outlook tools'
             );
             expect(prompt).toContain(
-                'question about a US or Korean stock, call get_investor_flows'
+                '), about a US or Korean stock, call get_investor_flows alongside the outlook tools'
             );
+        });
+
+        /**
+         * Measured 2026-10-16: buy/sell-decision asks ("AAPL 지금 사도 될까?")
+         * called get_investor_flows 0/4 while broad "종합" asks did 12/12, so
+         * both the outlook row and the flows row name the decision wording.
+         */
+        it('pairs it with the outlook tools for a buy, sell or hold decision', () => {
+            expect(prompt).toContain(
+                'For a buy, sell or hold decision about a US or Korean stock (지금 사도 될까?, 매수해도 돼?, 팔아야 해?, 들고 가도 돼?, entry timing), also call get_investor_flows in the same step.'
+            );
+            expect(prompt).toContain(
+                'or a buy, sell or hold decision (지금 사도 될까?, 매수해도 돼?, 팔아야 해?, 들고 가도 돼?), about a US or Korean stock'
+            );
+            expect(without).not.toContain('buy, sell or hold decision');
         });
 
         /**

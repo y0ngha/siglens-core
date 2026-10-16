@@ -13,7 +13,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-16.1';
+export const AGENT_PROMPT_VERSION = '2026-10-16.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -105,9 +105,17 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
                       : hasAnalysis
                         ? 'get_cached_analysis'
                         : '';
+            // Buy/sell/hold-decision questions also need the flows tool
+            // (measured: 0/4 called it from this row alone, while broad
+            // "종합" asks did 12/12), so the pointer sits on the row the
+            // model matches those questions to. Gated on the tool so the
+            // row never names a tool the model cannot call.
+            const flows = available.has('get_investor_flows')
+                ? ' For a buy, sell or hold decision about a US or Korean stock (지금 사도 될까?, 매수해도 돼?, 팔아야 해?, 들고 가도 돼?, entry timing), also call get_investor_flows in the same step.'
+                : '';
             return tools === ''
                 ? ''
-                : `Outlook, "how is it doing", "should I buy / is it a good time", rebound, top/bottom, trading-setup or "analyze it" questions about a symbol → ${tools}.`;
+                : `Outlook, "how is it doing", "should I buy / is it a good time", rebound, top/bottom, trading-setup or "analyze it" questions about a symbol → ${tools}.${flows}`;
         },
     },
     {
@@ -149,7 +157,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         requires: ['get_investor_flows'],
         text: available => {
             const broad = available.has('get_cached_analysis')
-                ? ' For a broad "how is it overall / 종합적으로 어때" question about a US or Korean stock, call get_investor_flows alongside the outlook tools and weigh it with the source notes that end this row.'
+                ? ' For a broad "how is it overall / 종합적으로 어때" question, or a buy, sell or hold decision (지금 사도 될까?, 매수해도 돼?, 팔아야 해?, 들고 가도 돼?), about a US or Korean stock, call get_investor_flows alongside the outlook tools and weigh it with the source notes that end this row.'
                 : '';
             return `Who is buying or selling a US stock — institutional buying/selling or holdings (기관 매수/매도, 13F), insider trades (내부자), 5% holders or activists (13D/13G), short selling or short squeeze (공매도, 숏스퀴즈) → get_investor_flows.${broad} Its 13F part is quarterly and ~45 days late (structural, not today's positioning); insider clusters and new 13D filings are event-level; squeeze risk and short-volume z-scores are short-term. Always give the as-of dates it returns, and report an axis marked insufficient as no data, never as neutral.`;
         },
