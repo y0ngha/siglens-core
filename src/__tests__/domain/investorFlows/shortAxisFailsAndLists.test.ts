@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
     FTD_BASELINE_TRADING_DAYS,
+    FTD_MAX_AGE_DAYS,
+    THRESHOLD_LIST_MAX_AGE_DAYS,
     FTD_MIN_QTY,
     FTD_RECENT_WINDOW_DAYS,
     THRESHOLD_LIST_CLOSE_OUT_DAYS,
@@ -133,6 +135,20 @@ describe('evaluateShortAxis — fails to deliver', () => {
         expect(axis.metrics.failsToDeliverPeakQty).toBe(0);
     });
 
+    it('treats a feed whose newest fail day is over FTD_MAX_AGE_DAYS old as stale (null metrics)', () => {
+        const axis = axisWith([
+            ftdPoint({
+                settlementDate: daysBeforeAsOf(FTD_MAX_AGE_DAYS + 1),
+                failsQty: 400_000,
+            }),
+        ]);
+        expect(axis.metrics.failsToDeliverPeakQty).toBeNull();
+    });
+
+    it('reads an empty feed as present with no fails', () => {
+        expect(axisWith([]).metrics.failsToDeliverPeakQty).toBe(0);
+    });
+
     it('has no FTD metrics when the feed is unavailable', () => {
         const axis = axisWith(null);
         expect(axis.metrics.failsToDeliverPeakQty).toBeNull();
@@ -217,6 +233,25 @@ describe('evaluateShortAxis — Reg SHO threshold list', () => {
         expect(
             signalOf(axis.signals, 'reg_sho_threshold_listed')?.subject
         ).toBeUndefined();
+    });
+
+    it('drops a list dated more than THRESHOLD_LIST_MAX_AGE_DAYS before the reference day', () => {
+        const axis = axisWith(null, {
+            ...listed(6),
+            asOf: daysBeforeAsOf(THRESHOLD_LIST_MAX_AGE_DAYS + 1),
+        });
+        expect(
+            signalOf(axis.signals, 'reg_sho_threshold_listed')
+        ).toBeUndefined();
+        expect(axis.metrics.thresholdListed).toBeNull();
+    });
+
+    it('keeps a list dated within the max age', () => {
+        const axis = axisWith(null, {
+            ...listed(6),
+            asOf: daysBeforeAsOf(1),
+        });
+        expect(axis.metrics.thresholdListed).toBe(true);
     });
 
     it('has null list metrics when the lists are excluded', () => {

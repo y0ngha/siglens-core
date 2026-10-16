@@ -28,15 +28,21 @@ export const INVESTOR_FLOWS_AXIS_HEADINGS: Readonly<
         'dilution — SEC registration and offering filings (S-1/F-1, S-3/F-3 shelves, 424B prospectus supplements, Form D) over the last 180 days',
 };
 
+/** An axis scored for Korean listings (DART fills these slots). */
+export type KrScoredAxisId = Extract<
+    InvestorFlowsAxisId,
+    'insider' | 'largeHolders'
+>;
+
 /** Axes scored for Korean listings, in canonical order. */
-export const KR_SCORED_AXES: readonly InvestorFlowsAxisId[] = [
+export const KR_SCORED_AXES: readonly KrScoredAxisId[] = [
     'insider',
     'largeHolders',
 ];
 
 /** Prompt heading per Korean-scored axis. */
 export const KR_INVESTOR_FLOWS_AXIS_HEADINGS: Readonly<
-    Record<'insider' | 'largeHolders', string>
+    Record<KrScoredAxisId, string>
 > = {
     insider:
         'insider — DART executive / major-shareholder ownership reports (임원·주요주주 소유상황보고; no trade cause is reported) and trading-plan reports (거래계획보고서)',
@@ -155,15 +161,7 @@ function compositeLineOf(scorecard: InvestorFlowsScorecard): string {
 
 function formatKrScorecard(scorecard: InvestorFlowsScorecard): string {
     const axes = KR_SCORED_AXES.map(id =>
-        id === 'insider'
-            ? formatAxis(
-                  scorecard.insider,
-                  KR_INVESTOR_FLOWS_AXIS_HEADINGS.insider
-              )
-            : formatAxis(
-                  scorecard.largeHolders,
-                  KR_INVESTOR_FLOWS_AXIS_HEADINGS.largeHolders
-              )
+        formatAxis(scorecard[id], KR_INVESTOR_FLOWS_AXIS_HEADINGS[id])
     ).join('\n');
     return `${compositeLineOf(scorecard)}\n${axes}\n${KR_NOT_PROVIDED_LINE}\n\nData freshness:\n${formatKrInvestorFlowsFreshness(scorecard.freshness)}`;
 }

@@ -317,6 +317,19 @@ export const FTD_PCT_OUTSTANDING_MODERATE = 0.5;
 /** A peak below this multiple of the baseline daily average is chronic, not new; such a signal is held at weak. */
 export const FTD_SPIKE_MIN_MULTIPLE = 2;
 
+/**
+ * Newest FTD row older than this many days before the reference day makes the
+ * feed stale (dropped, like a stale FINRA feed). SEC publishes each half-month
+ * about two weeks after it ends, so a live feed's newest fail day is normally
+ * under ~30 days old; 45 tolerates one late file. Rows exist only on fail days,
+ * so a symbol that stopped failing more than 45 days ago also reads as stale —
+ * the conservative side: missing, not "no fails".
+ */
+export const FTD_MAX_AGE_DAYS = 45;
+
+/** A threshold-list status dated more than this many days before the reference day is stale: lists publish every trading day, so a week covers a long weekend plus a holiday. */
+export const THRESHOLD_LIST_MAX_AGE_DAYS = 7;
+
 /** Consecutive threshold-list days at which Rule 203(b)(3) mandates a close-out — the listing signal becomes moderate. */
 export const THRESHOLD_LIST_CLOSE_OUT_DAYS = 13;
 
@@ -360,6 +373,9 @@ export const SQUEEZE_COMPONENTS: Readonly<
     volume_ratio: { weight: 0.1, scale: { floor: 1, cap: 3 } },
 };
 
+/** Squeeze-score inputs quoted in the `short_squeeze_risk` signal evidence, largest contribution first. */
+export const SQUEEZE_SIGNAL_EVIDENCE_COMPONENTS = 3;
+
 /** Inputs that measure short positioning itself; without any of them the level is capped. */
 export const SQUEEZE_POSITIONING_COMPONENTS: readonly SqueezeRiskComponentId[] =
     [
@@ -369,13 +385,17 @@ export const SQUEEZE_POSITIONING_COMPONENTS: readonly SqueezeRiskComponentId[] =
         'off_exchange_short_ratio_z',
     ];
 
-/** Inputs that are about short sellers at all; with none of them there is no squeeze score. */
-export const SQUEEZE_SHORT_SIDE_COMPONENTS: readonly SqueezeRiskComponentId[] =
-    [
-        ...SQUEEZE_POSITIONING_COMPONENTS,
-        'fails_to_deliver_pct',
-        'threshold_list_days',
-    ];
+/**
+ * Delivery-stress inputs. They count toward "is there a short side at all"
+ * only when non-zero: an empty FTD feed or a not-listed status is the absence
+ * of stress, not evidence about short sellers, so on its own it must not let
+ * price and volume produce a squeeze score. Once another input passes the
+ * gate, a zero still contributes 0 to the score.
+ */
+export const SQUEEZE_STRESS_COMPONENTS: readonly SqueezeRiskComponentId[] = [
+    'fails_to_deliver_pct',
+    'threshold_list_days',
+];
 
 /** Score from which each level starts (ascending). */
 export const SQUEEZE_LEVEL_CUTOFFS: Readonly<

@@ -6,7 +6,7 @@ import {
     SQUEEZE_MAX_BAR_AGE_DAYS,
     SQUEEZE_POSITIONING_COMPONENTS,
     SQUEEZE_PRICE_CHANGE_SESSIONS,
-    SQUEEZE_SHORT_SIDE_COMPONENTS,
+    SQUEEZE_STRESS_COMPONENTS,
     SQUEEZE_VOLUME_BASELINE_SESSIONS,
     SQUEEZE_VOLUME_RECENT_SESSIONS,
 } from '@/domain/investorFlows/constants';
@@ -21,6 +21,7 @@ import {
 import {
     readFailsToDeliver,
     readShortPositioning,
+    readThresholdList,
 } from '@/domain/investorFlows/shortReadings';
 import type {
     EvaluateSqueezeRiskOptions,
@@ -61,22 +62,25 @@ function completedBars(
     asOfDay: number | null
 ): DatedBar[] {
     if (asOfDay === null) return [];
-    // A Map keyed by day dedupes in one pass; the loop mutates only this local.
-    const byDay = new Map<number, DatedBar>();
-    for (const bar of context.dailyBars) {
-        const day = parseDay(bar.date);
-        if (
-            day === null ||
-            day >= asOfDay ||
-            !isFiniteNumber(bar.close) ||
-            bar.close <= 0 ||
-            !isFiniteNumber(bar.volume) ||
-            bar.volume < 0
-        ) {
-            continue;
-        }
-        byDay.set(day, { day, close: bar.close, volume: bar.volume });
-    }
+    // Map construction dedupes by day; for repeated keys the later entry wins.
+    const byDay = new Map(
+        context.dailyBars.flatMap(bar => {
+            const day = parseDay(bar.date);
+            return day === null ||
+                day >= asOfDay ||
+                !isFiniteNumber(bar.close) ||
+                bar.close <= 0 ||
+                !isFiniteNumber(bar.volume) ||
+                bar.volume < 0
+                ? []
+                : [
+                      [
+                          day,
+                          { day, close: bar.close, volume: bar.volume },
+                      ] as const,
+                  ];
+        })
+    );
     const bars = [...byDay.values()].sort((a, b) => a.day - b.day);
     const newest = bars.at(-1);
     return newest !== undefined &&
@@ -147,9 +151,15 @@ const LEVEL_RANK: Readonly<Record<SqueezeRiskLevel, number>> = {
  * - **Missing inputs renormalize.** An input that is unavailable, stale or
  *   switched off (`includeFinraData`, `includeExchangeLists`) is listed in
  *   `missing` and the others' weights are scaled to sum to 1 (`partial`).
- * - **No short side, no score.** Without any short-side input (FINRA, FTD or
- *   threshold list) the score is `insufficient`: price and volume alone do not
- *   describe a squeeze.
+ * - **No short side, no score.** Without a FINRA positioning input or a
+ *   non-zero fails / threshold-list input the score is `insufficient`: price and
+ *   volume alone do not describe a squeeze, and an empty FTD feed or a
+ *   not-listed status is no evidence about short sellers. A zero still
+ *   contributes 0 once another input passes the gate.
+ * - **Stale feeds drop out.** FTD whose newest fail day is older than
+ *   `FTD_MAX_AGE_DAYS`, a threshold list dated outside
+ *   `THRESHOLD_LIST_MAX_AGE_DAYS`, and bars older than `SQUEEZE_MAX_BAR_AGE_DAYS`
+ *   are listed in `missing`.
  * - **No positioning, capped level.** Without a FINRA positioning input the
  *   level is held at `elevated` (`levelCapped`), because fails and a rally do
  *   not show how crowded the short side is.
@@ -179,7 +189,7 @@ export function evaluateSqueezeRisk(
         asOfDay
     );
     const thresholdList = includeLists
-        ? (snapshot.thresholdList ?? null)
+        ? readThresholdList(snapshot.thresholdList ?? null, asOfDay)
         : null;
     const bars = completedBars(context, asOfDay);
 
@@ -211,7 +221,11 @@ export function evaluateSqueezeRisk(
             bars.length === 0 ? null : formatDay(bars[bars.length - 1].day),
     };
 
-    if (!has(SQUEEZE_SHORT_SIDE_COMPONENTS)) {
+    // A positioning input counts when present; a stress input only when non-zero.
+    const shortSide =
+        base.includesFinra ||
+        SQUEEZE_STRESS_COMPONENTS.some(id => (raw[id] ?? 0) > 0);
+    if (!shortSide) {
         return {
             ...base,
             score: null,

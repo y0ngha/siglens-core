@@ -6,7 +6,6 @@ import {
     FTD_PCT_OUTSTANDING_WEAK,
     FTD_RECENT_WINDOW_DAYS,
     FTD_SPIKE_MIN_MULTIPLE,
-    PROMPT_MAX_SQUEEZE_COMPONENTS,
     SHORT_INTEREST_PCT_FLOAT_MODERATE,
     SHORT_INTEREST_PCT_FLOAT_WEAK,
     SHORT_INTEREST_TREND_MIN_CHANGE_PCT,
@@ -17,6 +16,7 @@ import {
     SHORT_VOLUME_Z_WEAK,
     SQUEEZE_MIN_DAYS_TO_COVER,
     SQUEEZE_MIN_SHORT_INTEREST_PCT_FLOAT,
+    SQUEEZE_SIGNAL_EVIDENCE_COMPONENTS,
     SQUEEZE_STRONG_DAYS_TO_COVER,
     SQUEEZE_STRONG_SHORT_INTEREST_PCT_FLOAT,
     THRESHOLD_LIST_CLOSE_OUT_DAYS,
@@ -31,6 +31,7 @@ import {
 import {
     readFailsToDeliver,
     readShortPositioning,
+    readThresholdList,
     type FailsToDeliverReading,
     type ShortPositioning,
 } from '@/domain/investorFlows/shortReadings';
@@ -127,7 +128,7 @@ function scoredSqueezeSignal(
         return null;
     }
     const top = squeeze.components
-        .slice(0, PROMPT_MAX_SQUEEZE_COMPONENTS)
+        .slice(0, SQUEEZE_SIGNAL_EVIDENCE_COMPONENTS)
         .map(c => [c.id, c.value] as const);
     return makeSignal(
         'short',
@@ -232,7 +233,10 @@ export function evaluateShortAxis(
         extras.sharesOutstanding ?? null,
         asOfDay
     );
-    const thresholdList = extras.thresholdList ?? null;
+    const thresholdList = readThresholdList(
+        extras.thresholdList ?? null,
+        asOfDay
+    );
 
     const signals: InvestorFlowsSignal[] = [];
 

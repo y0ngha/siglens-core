@@ -5,6 +5,7 @@ import type { InvestorFlowsDataProvider } from '@/domain/ports/investorFlowsData
 import type {
     ModelId,
     InvestorFlowsAnalysisResponse,
+    InvestorFlowsMarket,
     InvestorFlowsScorecard,
     SqueezeRiskContext,
     Tier,
@@ -71,6 +72,15 @@ export interface RunInvestorFlowsAnalysisOptions extends BackgroundTaskOptions {
      * to keep the price-free squeeze rule.
      */
     squeezeContext?: SqueezeRiskContext;
+    /**
+     * Market of the symbol, as the provider will report it in
+     * `snapshot.market`. Only shapes the cache key, which is built before the
+     * snapshot is fetched: for `'kr'` the FINRA, exchange-list and squeeze
+     * suffixes are left off because those sources do not exist for Korean
+     * listings and cannot change the output. Core never infers the market from
+     * the symbol. Default `'us'`.
+     */
+    market?: InvestorFlowsMarket;
 }
 
 /**

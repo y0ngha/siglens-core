@@ -5,6 +5,7 @@
 import {
     FTD_BASELINE_TRADING_DAYS,
     FTD_BASELINE_WINDOW_DAYS,
+    FTD_MAX_AGE_DAYS,
     FTD_RECENT_WINDOW_DAYS,
     RATIO_DECIMALS,
     SHORT_INTEREST_MAX_AGE_DAYS,
@@ -13,6 +14,7 @@ import {
     SHORT_VOLUME_BASELINE_DAYS,
     SHORT_VOLUME_MAX_AGE_DAYS,
     SHORT_VOLUME_MIN_BASELINE_DAYS,
+    THRESHOLD_LIST_MAX_AGE_DAYS,
 } from '@/domain/investorFlows/constants';
 import {
     daysBetween,
@@ -28,6 +30,7 @@ import type {
     ShortInterestPoint,
     ShortInterestTrend,
     ShortVolumePoint,
+    ThresholdListStatus,
 } from '@/domain/investorFlows/types';
 
 /** Standard deviation below which a baseline is treated as constant (no z-score). */
@@ -271,7 +274,9 @@ export interface FailsToDeliverReading {
  * Read the SEC fails-to-deliver feed. Rows exist only on fail days, so a feed
  * that is present but has no row in the recent window means no fails (peak 0),
  * and the baseline average divides by trading days, not by row count. `null`
- * when the feed itself is unavailable or the reference day is unusable.
+ * when the feed itself is unavailable, the reference day is unusable, or the
+ * newest fail day is more than {@link FTD_MAX_AGE_DAYS} days old (stale). An
+ * empty feed (`[]`) is present with no fails.
  */
 export function readFailsToDeliver(
     points: readonly FailsToDeliverPoint[] | null,
@@ -287,6 +292,11 @@ export function readFailsToDeliver(
         const age = daysBetween(day, asOfDay);
         return age < 0 ? [] : [{ qty: p.failsQty, age }];
     });
+    const newestAge = aged.reduce<number | null>(
+        (min, p) => (min === null || p.age < min ? p.age : min),
+        null
+    );
+    if (newestAge !== null && newestAge > FTD_MAX_AGE_DAYS) return null;
     const recent = aged.filter(p => p.age <= FTD_RECENT_WINDOW_DAYS);
     const baselineSum = aged
         .filter(
@@ -311,4 +321,21 @@ export function readFailsToDeliver(
                 ? roundValue(peakQty / baselineDailyAverage)
                 : null,
     };
+}
+
+/**
+ * The threshold-list status as of the reference day: `null` when unavailable,
+ * when its `asOf` is unparsable, after the reference day, or more than
+ * {@link THRESHOLD_LIST_MAX_AGE_DAYS} days before it. A status without `asOf` is
+ * taken as current (see `ThresholdListStatus`).
+ */
+export function readThresholdList(
+    status: ThresholdListStatus | null,
+    asOfDay: number | null
+): ThresholdListStatus | null {
+    if (status === null || status.asOf === undefined) return status;
+    const day = parseDay(status.asOf);
+    if (day === null || asOfDay === null) return null;
+    const age = daysBetween(day, asOfDay);
+    return age >= 0 && age <= THRESHOLD_LIST_MAX_AGE_DAYS ? status : null;
 }

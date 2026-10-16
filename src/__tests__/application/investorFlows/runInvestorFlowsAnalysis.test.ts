@@ -487,6 +487,32 @@ describe('runInvestorFlowsAnalysis', () => {
             expect(prompt).not.toContain('FINRA');
         });
 
+        it('leaves the US-source suffixes off the key for a Korean listing', async () => {
+            await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                symbol: '005930.KS',
+                market: 'kr',
+                includeFinraData: false,
+                includeExchangeLists: false,
+                squeezeContext: { dailyBars: dailyBars({ count: 25 }) },
+            });
+            expect(mockCacheGet).toHaveBeenLastCalledWith(
+                buildInvestorFlowsCacheKey('005930.KS', 'gemini-3.6-flash')
+            );
+        });
+
+        it('keeps the suffixes for a US listing given the same switches', async () => {
+            await runInvestorFlowsAnalysis({
+                ...BASE_OPTIONS,
+                market: 'us',
+                includeFinraData: false,
+                includeExchangeLists: false,
+            });
+            expect(mockCacheGet).toHaveBeenLastCalledWith(
+                expect.stringContaining(':finra=off:regsho=off')
+            );
+        });
+
         it('returns no_data for a Korean snapshot without directional DART data', async () => {
             mockGetSnapshot.mockResolvedValue(emptySnapshot({ market: 'kr' }));
             const result = await runInvestorFlowsAnalysis(BASE_OPTIONS);

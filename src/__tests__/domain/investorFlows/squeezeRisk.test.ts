@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+    FTD_MAX_AGE_DAYS,
     SQUEEZE_COMPONENTS,
     SQUEEZE_LEVEL_CUTOFFS,
     SQUEEZE_MAX_BAR_AGE_DAYS,
+    THRESHOLD_LIST_MAX_AGE_DAYS,
 } from '@/domain/investorFlows/constants';
 import { evaluateSqueezeRisk } from '@/domain/investorFlows/squeezeRisk';
 import type {
@@ -161,6 +163,115 @@ describe('evaluateSqueezeRisk — completed bars only', () => {
     });
 });
 
+describe('evaluateSqueezeRisk — short-side gate ignores zero stress inputs', () => {
+    const quiet = {
+        failsToDeliver: [],
+        thresholdList: {
+            listed: false,
+            consecutiveDays: 0,
+            firstListedDate: null,
+            markets: [],
+        },
+    };
+
+    it('is insufficient with FINRA off when FTD is empty and the symbol is not listed, however hard it rallies', () => {
+        const score = evaluateSqueezeRisk(
+            crowded(quiet),
+            { dailyBars: RALLY },
+            { includeFinraData: false }
+        );
+        expect(score.sufficiency).toBe('insufficient');
+        expect(score.score).toBeNull();
+    });
+
+    it('still lets the zero inputs contribute 0 once positioning passes the gate', () => {
+        const score = evaluateSqueezeRisk(crowded(quiet), { dailyBars: RALLY });
+        expect(component(score, 'fails_to_deliver_pct')?.contribution).toBe(0);
+        expect(component(score, 'threshold_list_days')?.contribution).toBe(0);
+    });
+
+    it('passes the gate on a non-zero threshold listing alone', () => {
+        const score = evaluateSqueezeRisk(
+            crowded({
+                ...quiet,
+                thresholdList: {
+                    ...quiet.thresholdList,
+                    listed: true,
+                    consecutiveDays: 2,
+                },
+            }),
+            { dailyBars: RALLY },
+            { includeFinraData: false }
+        );
+        expect(score.sufficiency).toBe('partial');
+        expect(score.levelCapped).toBe(true);
+    });
+});
+
+describe('evaluateSqueezeRisk — stale fails and lists', () => {
+    it('drops an FTD feed whose newest fail day is older than FTD_MAX_AGE_DAYS', () => {
+        const stale = evaluateSqueezeRisk(
+            crowded({
+                failsToDeliver: [
+                    ftdPoint({
+                        settlementDate: daysBeforeAsOf(FTD_MAX_AGE_DAYS + 1),
+                    }),
+                ],
+            }),
+            { dailyBars: RALLY }
+        );
+        expect(stale.missing).toContain('fails_to_deliver_pct');
+        const edge = evaluateSqueezeRisk(
+            crowded({
+                failsToDeliver: [
+                    ftdPoint({
+                        settlementDate: daysBeforeAsOf(FTD_MAX_AGE_DAYS),
+                    }),
+                ],
+            }),
+            { dailyBars: RALLY }
+        );
+        expect(edge.missing).not.toContain('fails_to_deliver_pct');
+    });
+
+    const listed = (asOf?: string) => ({
+        thresholdList: {
+            listed: true,
+            consecutiveDays: 5,
+            firstListedDate: daysBeforeAsOf(9),
+            markets: ['NYSE'],
+            ...(asOf === undefined ? {} : { asOf }),
+        },
+    });
+
+    it('uses a threshold list dated within THRESHOLD_LIST_MAX_AGE_DAYS', () => {
+        const score = evaluateSqueezeRisk(
+            crowded(listed(daysBeforeAsOf(THRESHOLD_LIST_MAX_AGE_DAYS))),
+            { dailyBars: RALLY }
+        );
+        expect(component(score, 'threshold_list_days')?.value).toBe(5);
+    });
+
+    it.each([
+        ['one day too old', daysBeforeAsOf(THRESHOLD_LIST_MAX_AGE_DAYS + 1)],
+        ['after the reference day', '2026-10-16'],
+        ['unparsable', 'yesterday'],
+    ])('drops a threshold list dated %s', (_label, asOf) => {
+        const score = evaluateSqueezeRisk(crowded(listed(asOf)), {
+            dailyBars: RALLY,
+        });
+        expect(score.missing).toContain('threshold_list_days');
+        expect(score.includesExchangeLists).toBe(false);
+    });
+
+    it('takes an undated threshold list as current', () => {
+        const score = evaluateSqueezeRisk(crowded(listed()), {
+            dailyBars: RALLY,
+        });
+        expect(component(score, 'threshold_list_days')?.value).toBe(5);
+    });
+});
+
 describe('evaluateSqueezeRisk — stale bars', () => {
     /** The RALLY bars shifted so the newest completed bar is `age` days before the reference day. */
     function barsAged(age: number) {
@@ -220,8 +331,9 @@ describe('evaluateSqueezeRisk — missing data', () => {
     });
 
     it('does not mark a low score as capped', () => {
+        // 20,000 fails on 40M shares (0.05%) into a flat tape.
         const score = evaluateSqueezeRisk(
-            crowded({ failsToDeliver: [] }),
+            crowded({ failsToDeliver: [ftdPoint({ failsQty: 20_000 })] }),
             { dailyBars: dailyBars({ count: 25 }) },
             { includeFinraData: false }
         );

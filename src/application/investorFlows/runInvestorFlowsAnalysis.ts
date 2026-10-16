@@ -76,7 +76,8 @@ async function fetchSnapshot(
  * context changes the prompt's structure), and the seed folds `reasoning` (so
  * the toggles never share an entry). The bars themselves are input data like
  * the snapshot and are not hashed into the key; the 12-hour TTL bounds how
- * stale they get.
+ * stale they get. With `options.market: 'kr'` those three US-source suffixes
+ * are omitted (the key is built before the snapshot reveals its market).
  * A Korean snapshot (`market: 'kr'`) gets the DART prompt and persona.
  *
  * Concurrent calls for the same cache key are deduplicated via
@@ -100,14 +101,17 @@ export async function runInvestorFlowsAnalysis(
     const includeFinraData = options.includeFinraData ?? true;
     const includeExchangeLists = options.includeExchangeLists ?? true;
 
+    // Korean listings have no FINRA, exchange-list or price-squeeze input, so
+    // those switches cannot change the output and stay out of the key.
+    const usSources = options.market !== 'kr';
     const cacheKey = buildInvestorFlowsCacheKey(
         symbol,
         modelId,
         options.reasoning,
         options.locale,
-        includeFinraData,
-        includeExchangeLists,
-        options.squeezeContext !== undefined
+        usSources ? includeFinraData : undefined,
+        usSources ? includeExchangeLists : undefined,
+        usSources && options.squeezeContext !== undefined
     );
     const cache = createCacheProvider();
 

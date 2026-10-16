@@ -227,7 +227,15 @@ export interface OfferingFiling {
     readonly url: string;
 }
 
-/** Reg SHO threshold-list status (Nasdaq / NYSE / Cboe lists). */
+/**
+ * Reg SHO threshold-list status (Nasdaq / NYSE / Cboe lists).
+ *
+ * With `asOf`, a status whose list date is more than
+ * `THRESHOLD_LIST_MAX_AGE_DAYS` days before the reference day (or after it) is
+ * treated as unavailable, like a switched-off feed. Without `asOf` the status is
+ * taken as current — a provider that cannot date it should send `null` once its
+ * lists stop updating.
+ */
 export interface ThresholdListStatus {
     /** Whether the symbol is on a threshold list as of the latest list date. */
     readonly listed: boolean;
@@ -237,6 +245,8 @@ export interface ThresholdListStatus {
     readonly firstListedDate: string | null;
     /** Markets whose list carries the symbol (`Nasdaq`, `NYSE`, ...). */
     readonly markets: readonly string[];
+    /** Trade date of the latest list this status reflects; optional for older providers. */
+    readonly asOf?: string;
 }
 
 /** Market the snapshot describes; it selects the axis evaluators and the prompt wording. */
@@ -699,7 +709,7 @@ export interface ShortMetrics {
     readonly thresholdConsecutiveDays: number | null;
 }
 
-/** Short-selling axis (FINRA data). */
+/** Short-selling axis: FINRA short interest and short volume, plus SEC fails to deliver and Reg SHO threshold lists as neutral context. */
 export interface ShortAxis extends InvestorFlowsAxisBase {
     readonly id: 'short';
     /** Computed figures. */
@@ -762,7 +772,7 @@ export interface InvestorFlowsScorecard {
     readonly insider: InsiderAxis;
     /** 13D/13G axis. */
     readonly largeHolders: LargeHolderAxis;
-    /** FINRA short axis. */
+    /** Short axis (FINRA short data, SEC fails to deliver, Reg SHO threshold lists). */
     readonly short: ShortAxis;
     /** Registration / offering (dilution) axis. */
     readonly dilution: DilutionAxis;
