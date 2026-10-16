@@ -184,11 +184,11 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_investor_flows'],
-        text: 'Investor flows (수급), major-holder or insider stake changes of a Korean stock — 대주주 지분 변동, 최대주주 지분, 5% 공시, 대량보유, 임원이 주식 샀어?, 임원·주요주주 소유보고 → get_investor_flows (DART disclosures: 대량보유 상황보고, 임원·주요주주 소유보고, 거래계획보고서). Give the receipt dates it returns; its 13F, short-selling and dilution axes are insufficient for Korean stocks, which is no data, not neutral.',
+        text: 'Investor flows (수급), major-holder or insider stake changes of a Korean stock — 삼성전자 수급 어때?, 대주주 지분 변동, 최대주주 지분, 5% 공시, 대량보유, 임원이 주식 샀어?, 임원·주요주주 소유보고 → get_investor_flows (DART disclosures: 대량보유 상황보고, 임원·주요주주 소유보고, 거래계획보고서). Give the receipt dates it returns; its 13F, short-selling and dilution axes are insufficient for Korean stocks, which is no data, not neutral.',
     },
     {
         requires: ['get_investor_flows'],
-        text: 'Korean institutional or foreign net buying — 기관·외국인 순매수, 외국인 수급 → no tool: SIGLENS does not have this data. Say so plainly; never estimate it and never suggest that get_investor_flows or any other SIGLENS tool holds it. Do not call get_investor_flows for this question: for a Korean stock it holds only DART stake filings, never net buying.',
+        text: 'Korean institutional or foreign net buying asked for specifically — 기관·외국인 순매수, 외국인이 사고 있어?, 기관 매매 동향 → no tool: SIGLENS does not have this data. Say so plainly; never estimate it, never suggest that get_investor_flows or any other SIGLENS tool holds it, and never offer it as a follow-up question. Do not call get_investor_flows for this question: for a Korean stock it holds only DART stake filings, never net buying. A general 수급 question about a Korean stock is not this row: follow the Korean stake-changes row above (call get_investor_flows) and add that institutional/foreign net buying is not available.',
     },
     {
         requires: ['get_market_overview'],

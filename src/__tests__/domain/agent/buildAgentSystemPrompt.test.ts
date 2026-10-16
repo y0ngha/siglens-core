@@ -593,9 +593,18 @@ describe('buildAgentSystemPrompt', () => {
             expect(row).toContain(
                 'never suggest that get_investor_flows or any other SIGLENS tool holds it'
             );
+            expect(row).toContain('never offer it as a follow-up question');
             expect(row).toContain(
                 'Do not call get_investor_flows for this question'
             );
+            // A general 수급 question must not fall into this no-tool row.
+            expect(row).not.toContain('외국인 수급');
+            expect(row).toContain(
+                'A general 수급 question about a Korean stock is not this row'
+            );
+            expect(
+                rowOf('major-holder or insider stake changes of a Korean stock')
+            ).toContain('삼성전자 수급 어때?');
         });
 
         it('drops every investor-flows row together with the tool', () => {
