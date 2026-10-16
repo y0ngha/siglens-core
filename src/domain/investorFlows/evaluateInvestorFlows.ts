@@ -30,6 +30,7 @@ import {
     parseDay,
 } from '@/domain/investorFlows/scoreHelpers';
 import { evaluateShortAxis } from '@/domain/investorFlows/shortAxis';
+import { readThresholdList } from '@/domain/investorFlows/shortReadings';
 import type {
     EvaluateInvestorFlowsOptions,
     InsiderAxis,
@@ -169,6 +170,8 @@ function evaluateKrScorecard(
         insiderTransactionsInWindow: countKrInsiderRowsInWindow(kr, asOfDay),
         largeHolderWindow: windowOf(asOfDay, KR_WINDOW_DAYS),
         failsToDeliverLatestDate: null,
+        thresholdListAsOf: null,
+        thresholdListStale: null,
         dilutionWindow: windowOf(asOfDay, DILUTION_WINDOW_DAYS),
         krDisclosureLatestDate: krLatestDate(kr, asOfDay),
     };
@@ -260,12 +263,16 @@ export function evaluateInvestorFlows(
     const insider = evaluateInsiderAxis(
         snapshot.insider,
         asOfDay,
-        snapshot.proposedSales ?? []
+        snapshot.proposedSales ?? [],
+        snapshot.sharesOutstanding
     );
     const largeHolders = evaluateLargeHolderAxis(
         snapshot.largeHolders,
         asOfDay
     );
+    const thresholdStatus = includeLists
+        ? (snapshot.thresholdList ?? null)
+        : null;
     const squeezeRisk =
         options.squeezeContext === undefined
             ? null
@@ -282,9 +289,7 @@ export function evaluateInvestorFlows(
         {
             failsToDeliver: snapshot.failsToDeliver ?? null,
             sharesOutstanding: snapshot.sharesOutstanding,
-            thresholdList: includeLists
-                ? (snapshot.thresholdList ?? null)
-                : null,
+            thresholdList: thresholdStatus,
             ...(squeezeRisk === null ? {} : { squeeze: squeezeRisk }),
         }
     );
@@ -318,6 +323,11 @@ export function evaluateInvestorFlows(
             (snapshot.failsToDeliver ?? []).map(p => p.settlementDate),
             asOfDay
         ),
+        thresholdListAsOf: thresholdStatus?.asOf ?? null,
+        thresholdListStale:
+            thresholdStatus === null
+                ? null
+                : readThresholdList(thresholdStatus, asOfDay) === null,
         dilutionWindow: windowOf(asOfDay, DILUTION_WINDOW_DAYS),
         krDisclosureLatestDate: null,
     };

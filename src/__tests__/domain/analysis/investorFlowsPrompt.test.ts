@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { scorecardWords } from '@/domain/investorFlows/formatScorecard';
 import { buildInvestorFlowsAnalysisPrompt } from '@/domain/analysis/investorFlowsPrompt';
 import {
     localizedFieldDirective,
@@ -92,10 +93,10 @@ describe('buildInvestorFlowsAnalysisPrompt', () => {
         const { dynamic } = build(snapshot);
         expect(dynamic).toContain('## Investor Flows Scorecard (computed)');
         expect(dynamic).toContain(
-            `Composite: label=${card.composite.label}, score=${card.composite.score}`
+            `Composite: label: ${scorecardWords('ko').label[card.composite.label]}, score: ${card.composite.score}`
         );
         expect(dynamic).toContain(
-            `label=${card.institutional.label}, score=${card.institutional.score}`
+            `label: ${scorecardWords('ko').label[card.institutional.label]}, score: ${card.institutional.score}`
         );
         expect(dynamic).toContain('institutional_holder_count_change');
         expect(dynamic).toContain('insider_open_market_buying');
@@ -142,7 +143,7 @@ describe('buildInvestorFlowsAnalysisPrompt', () => {
             'never describe it as "no activity", "neutral" or "stable"'
         );
         expect(dynamic).toContain(
-            'FINRA short data is not included for this symbol'
+            'FINRA short interest and off-exchange short volume are not included for this symbol'
         );
     });
 
@@ -237,7 +238,7 @@ describe('buildInvestorFlowsAnalysisPrompt', () => {
             shortVolume: null,
         });
         const { dynamic } = build(stale);
-        expect(dynamic).toContain('data_stale [2026-06-01]: neutral, weak');
+        expect(dynamic).toContain('data_stale [2026-06-01]: 중립(참고), 약함');
         expect(dynamic).toContain('NO DATA — the inputs for this axis');
     });
 

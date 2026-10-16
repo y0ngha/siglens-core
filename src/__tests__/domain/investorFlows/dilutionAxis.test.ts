@@ -188,3 +188,47 @@ describe('evaluateDilutionAxis — window boundary', () => {
         expect(axis.sufficiency).toBe('sufficient');
     });
 });
+
+describe('evaluateDilutionAxis — noFilingsOnRecord', () => {
+    it('is true only for a provided, empty list with a usable reference day', () => {
+        const axis = evaluateDilutionAxis([], AS_OF_DAY);
+        expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.noFilingsOnRecord).toBe(true);
+    });
+
+    it('is false without a list', () => {
+        expect(
+            evaluateDilutionAxis(undefined, AS_OF_DAY).noFilingsOnRecord
+        ).toBe(false);
+    });
+
+    it('is false with an unusable reference day', () => {
+        const axis = evaluateDilutionAxis([], null);
+        expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.noFilingsOnRecord).toBe(false);
+    });
+
+    it('is false when every entry has an unparseable date', () => {
+        const axis = evaluateDilutionAxis(
+            [offeringFiling({ filingDate: 'not-a-date' })],
+            AS_OF_DAY
+        );
+        expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.noFilingsOnRecord).toBe(false);
+    });
+
+    it('is false when every entry is dated after the reference day', () => {
+        const axis = evaluateDilutionAxis(
+            [offeringFiling({ filingDate: '2026-12-01' })],
+            AS_OF_DAY
+        );
+        expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.noFilingsOnRecord).toBe(false);
+    });
+
+    it('is false for a sufficient axis', () => {
+        const axis = evaluateDilutionAxis([offeringFiling()], AS_OF_DAY);
+        expect(axis.sufficiency).toBe('sufficient');
+        expect(axis.noFilingsOnRecord).toBe(false);
+    });
+});

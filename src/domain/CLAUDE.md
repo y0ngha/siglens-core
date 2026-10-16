@@ -269,8 +269,40 @@ computing derived values, so a recomputation from the rendered text matches.
   instead of instructing the model not to mention them; listed text gets narrated.
 - When content is split into stable and dynamic halves, each half reads on its own (a moved
   bullet list keeps a heading).
+- A rule that enumerates markers or values the renderer emits is built from the renderer's
+  single exported list, never retyped; otherwise it silently covers only the first marker
+  once the renderer grows another.
 - Any change to rendered bytes also bumps the cache version
   (`src/infrastructure/CLAUDE.md#INF-4`).
+
+<a id="DOM-11"></a>
+#### DOM-11 — Render prompt data in the form you want the model to print
+
+A model copies whatever shape the prompt data has. Ungrouped integers come back ungrouped,
+internal English label ids come back as English in a localized answer, and statistical forms
+such as `z=1.8` come back as jargon. Fix the rendering (grouped digits, localized or
+human-readable labels, plain-language wording) rather than adding a rule that asks the model
+to reformat.
+
+```typescript
+// ❌ `flow: 1234567890, label: net_buy, z=1.8`   // the answer repeats all three
+// ✅ `flow: 1,234,567,890 (net buying, well above its usual range)`
+```
+
+<a id="DOM-12"></a>
+#### DOM-12 — A flag or rendered claim states only what the code proved
+
+A boolean field, a parameter, or a sentence a renderer emits asserts exactly what the code
+established. Do not infer a cause from absence (null metrics do not prove "source
+unavailable"): the caller that knows passes an explicit flag, and the renderer reads it.
+Name the flag after the fact proven, not the conclusion you hope for.
+
+```typescript
+// ❌ metrics === null ? 'FINRA unavailable' : ...   // null also means "nothing reported"
+// ❌ offeringsProvided: boolean                     // implies more than "no filings found"
+// ✅ renderShortInterest(metrics, { finraUnavailable })   // explicit caller flag
+// ✅ noFilingsOnRecord: boolean
+```
 
 ## Overall axis weighting (`analysis/overallScore.ts`)
 

@@ -389,7 +389,9 @@ export function evaluateInstitutionalAxis(
                     holders: scored.holders,
                     priorHolders,
                     changePct: holderCountChangePct,
-                }
+                },
+                // The scored quarter: a QoQ change needs its endpoint.
+                scored.period
             )
         );
     }
@@ -422,7 +424,8 @@ export function evaluateInstitutionalAxis(
                         [onOutstanding
                             ? 'pctOfSharesOutstanding'
                             : 'pctOfPriorHoldings']: netSharePct,
-                    }
+                    },
+                    scored.period
                 )
             );
         }

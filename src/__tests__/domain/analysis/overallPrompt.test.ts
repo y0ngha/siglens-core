@@ -2,6 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/domain/analysis/overallPrompt';
 import { evaluateInvestorFlows } from '@/domain/investorFlows/evaluateInvestorFlows';
 import {
+    INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
+    INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
+    INVESTOR_FLOWS_PLAIN_TEXT_RULE,
+    notScoredAxisPhrase,
+    scorecardWords,
+} from '@/domain/investorFlows/formatScorecard';
+import {
     emptySnapshot,
     krInsiderReport,
     krMajorHolderReport,
@@ -1673,10 +1680,10 @@ describe('buildOverallAnalysisPrompt — investor flows (수급) section', () =>
         const prompt = build(scorecard);
         expect(prompt).toContain('## Investor Flows (supplementary axis)');
         expect(prompt).toContain(
-            `Composite: label=${scorecard.composite.label}, score=${scorecard.composite.score}`
+            `Composite: label: ${scorecardWords('ko').label[scorecard.composite.label]}, score: ${scorecard.composite.score}`
         );
         expect(prompt).toContain(
-            `label=${scorecard.institutional.label}, score=${scorecard.institutional.score}`
+            `label: ${scorecardWords('ko').label[scorecard.institutional.label]}, score: ${scorecard.institutional.score}`
         );
         expect(prompt).toContain('insider_open_market_buying');
         expect(prompt).toContain('holderCountChangePct=');
@@ -1860,7 +1867,126 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
         expect(flows).toContain('dilution filings are EVENT-level supply');
         expect(flows).toContain('not evidence of naked short selling');
         expect(flows).toContain(
-            '- dilution — SEC registration and offering filings'
+            '- 증자·희석 — SEC registration and offering filings'
         );
+    });
+
+    it('adds the A/B output rules: FTD date and caveat, active ATM, no identifiers, Korean terms', () => {
+        const usCard = evaluateInvestorFlows(
+            emptySnapshot({ offerings: [offeringFiling()] })
+        );
+        const prompt = build(usCard, 'USD');
+        expect(prompt).toContain(
+            'Quote its scores as given and state its labels in plain words.'
+        );
+        expect(prompt).toContain(
+            'quote an FTD quantity only with its own settlement date'
+        );
+        expect(prompt).toContain(
+            'the same bullet or sentence must also say that fails have many operational causes'
+        );
+        expect(prompt).toContain('An active at-the-market (ATM) program');
+        expect(prompt).toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
+        expect(prompt).toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);
+        expect(prompt).toContain(
+            'In investorFlowsBulletsKo and the investor-flows claims in integratedConclusionKo, describe supply and positioning facts only'
+        );
+    });
+
+    it('renders the investor-flows section with grouped digits and Korean display names', () => {
+        const usCard = evaluateInvestorFlows(
+            emptySnapshot({
+                offerings: [offeringFiling()],
+                shortInterest: shortInterestSeries(12_000_000, 9_000_000),
+            })
+        );
+        const flows = section(build(usCard, 'USD'));
+        const bare =
+            flows
+                .replace(/\d{4}-\d{2}-\d{2}/g, '')
+                .match(/(?<![\d,.])\d{4,}(?![\d,])/g) ?? [];
+        expect(bare).toEqual([]);
+        expect(flows).toContain('9,000,000');
+        expect(flows).toMatch(/Composite: label: [가-힣 ]+, score: /);
+        expect(flows).not.toContain('label=');
+    });
+
+    it('shows no axis id in the overall prompt, which has no axis field', () => {
+        const usCard = evaluateInvestorFlows(
+            emptySnapshot({ offerings: [offeringFiling()] })
+        );
+        expect(build(usCard, 'USD')).not.toContain('(axis "');
+        expect(build(krCard, 'KRW')).not.toContain('(axis "');
+        expect(section(build(usCard, 'USD'))).toContain(
+            '- 증자·희석 — SEC registration and offering filings'
+        );
+    });
+
+    it('skips the interpretation, FTD, ATM and terminology rules for a null scorecard', () => {
+        const prompt = build(null, 'USD');
+        expect(prompt).toContain('Leave investorFlowsBulletsKo empty');
+        expect(prompt).not.toContain('quote an FTD quantity');
+        expect(prompt).not.toContain('An active at-the-market (ATM) program');
+        expect(prompt).not.toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);
+        expect(prompt).not.toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
+        expect(prompt).not.toContain(
+            'describe supply and positioning facts only'
+        );
+    });
+
+    it('keeps short-interest wording out of the Korean investor-flows section and rules', () => {
+        const prompt = build(krCard, 'KRW');
+        const flows = prompt.slice(
+            prompt.indexOf('## Investor Flows (supplementary axis)'),
+            prompt.indexOf('## Axis Weighting (computed')
+        );
+        expect(flows).not.toMatch(/short interest/i);
+        const rules = prompt.slice(prompt.indexOf('- investorFlowsBulletsKo:'));
+        const flowRules = rules.slice(0, rules.indexOf('- riskFactorsKo:'));
+        expect(flowRules).not.toMatch(/short interest|shorts are covering/i);
+        expect(flowRules).toContain("a 5%+ holder's ratio rose 1.2%p");
+    });
+
+    it('says NO FILINGS in the overall section for an empty offering list', () => {
+        const card = evaluateInvestorFlows(
+            emptySnapshot({
+                insider: { transactions: [insiderTx()] },
+                offerings: [],
+            })
+        );
+        expect(section(build(card, 'USD'))).toContain(
+            'NO FILINGS (no offering or registration filings on record)'
+        );
+    });
+
+    it('applies the not-scored rule to every heading marker in the bullets rule and the guidance', () => {
+        for (const [prompt, market] of [
+            [
+                build(
+                    evaluateInvestorFlows(
+                        emptySnapshot({ offerings: [offeringFiling()] })
+                    ),
+                    'USD'
+                ),
+                'us',
+            ],
+            [build(krCard, 'KRW'), 'kr'],
+        ] as const) {
+            expect(prompt).toContain(
+                `for ${notScoredAxisPhrase(market)}, say why it is not scored, as its heading says, and never describe it as neutral.`
+            );
+            expect(prompt).toContain(
+                'is missing or unscorable information — never read it as neutral, quiet or supportive.'
+            );
+            expect(prompt).not.toContain('An axis marked NO DATA');
+            expect(prompt).not.toContain('when an axis is marked NO DATA');
+        }
+    });
+
+    it('gives Korean flows only the identifier rule', () => {
+        const prompt = build(krCard, 'KRW');
+        expect(prompt).toContain(INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE);
+        expect(prompt).not.toContain('quote an FTD quantity');
+        expect(prompt).not.toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);
     });
 });

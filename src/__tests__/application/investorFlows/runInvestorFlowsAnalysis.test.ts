@@ -358,7 +358,7 @@ describe('runInvestorFlowsAnalysis', () => {
             const without = sentCall().prompt;
             expect(without).not.toContain('Short interest settlements');
             expect(without).toContain(
-                'FINRA short data is not included for this symbol'
+                'FINRA short interest and off-exchange short volume are not included for this symbol'
             );
             expect(without).toContain('NO DATA — the inputs for this axis');
         });
@@ -435,7 +435,7 @@ describe('runInvestorFlowsAnalysis', () => {
                 result.status === 'done' ? result.scorecard : null;
             expect(scorecard?.squeezeRisk?.score).not.toBeNull();
             expect(sentCall().prompt).toContain(
-                `Short squeeze risk (computed): score=${scorecard?.squeezeRisk?.score}/100`
+                `Short squeeze risk (computed): score ${scorecard?.squeezeRisk?.score}/100`
             );
         });
 

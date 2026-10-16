@@ -184,6 +184,13 @@ export interface ProposedSale {
     readonly filingDate: string;
     /** Person for whose account the shares are to be sold. */
     readonly filer: string;
+    /**
+     * SEC CIK of that person, when the consumer has it. The same person files
+     * under differently spelled names (`MARK ROBINSON`, `Mark Haymond Robinson`),
+     * so distinct filers are counted by CIK when present and by a normalized
+     * name otherwise. Optional for older snapshots.
+     */
+    readonly filerCik?: string | null;
     /** Relationships to the issuer as filed (`Officer`, `Director`, ...). */
     readonly relationships: readonly string[];
     /** Shares to be sold. */
@@ -591,6 +598,10 @@ export interface InsiderMetrics {
     readonly proposedSaleFilerCount: number;
     /** Aggregate value of the window's Form 144 notices, USD. */
     readonly proposedSaleValueUsd: number;
+    /** Aggregate shares of the window's Form 144 notices. */
+    readonly proposedSaleShares: number;
+    /** {@link InsiderMetrics.proposedSaleShares} as % of shares outstanding; `null` without shares outstanding. */
+    readonly proposedSalePctOutstanding: number | null;
     /** Part of {@link InsiderMetrics.proposedSaleValueUsd} under a Rule 10b5-1 plan, USD. */
     readonly proposedSalePlannedValueUsd: number;
 }
@@ -666,12 +677,27 @@ export interface DilutionMetrics {
 /** Dilution (registration / offering filings) axis. */
 export interface DilutionAxis extends InvestorFlowsAxisBase {
     readonly id: 'dilution';
+    /**
+     * `true` only when the snapshot provided an offering list, the reference
+     * day is usable, and the list is empty — no filing exists for the issuer,
+     * so an insufficient axis renders "no filings". A missing list, an unusable
+     * reference day, or a list whose entries are all unparseable or future-dated
+     * is `false` and renders "no data": those are unusable inputs, not proof
+     * that nothing was filed. Rendering only — sufficiency is unchanged.
+     */
+    readonly noFilingsOnRecord: boolean;
     /** Computed figures; `null` when the axis is insufficient. */
     readonly metrics: DilutionMetrics | null;
 }
 
-/** Direction of the last short-interest settlements. */
-export type ShortInterestTrend = 'rising' | 'falling' | 'flat';
+/**
+ * Direction of the last short-interest settlements: `rising` / `falling` when
+ * every step moved that way and the net change is material, `mixed` when the
+ * steps reversed direction (one up, one down) and the net change is material
+ * (e.g. 57.0M → 39.1M → 42.7M — calling that flat hid a -25% move), `flat`
+ * otherwise (a net change under the minimum, or an unchanged step).
+ */
+export type ShortInterestTrend = 'rising' | 'falling' | 'flat' | 'mixed';
 
 /** Computed short-selling figures; `null` where the input was missing. */
 export interface ShortMetrics {
@@ -681,6 +707,16 @@ export interface ShortMetrics {
     readonly daysToCover: number | null;
     /** Short-interest change across the last 3 settlements, percent. */
     readonly shortInterestChangePct: number | null;
+    /** First settlement of {@link ShortMetrics.shortInterestChangePct}'s window; `null` with it. */
+    readonly shortInterestChangeFromDate: string | null;
+    /** Last (latest) settlement of that window; `null` with it. */
+    readonly shortInterestChangeToDate: string | null;
+    /** Change from the previous settlement to the latest one, percent; `null` with fewer than 2 points. */
+    readonly shortInterestLatestChangePct: number | null;
+    /** Previous settlement date of {@link ShortMetrics.shortInterestLatestChangePct}. */
+    readonly shortInterestLatestChangeFromDate: string | null;
+    /** Latest settlement date of {@link ShortMetrics.shortInterestLatestChangePct}. */
+    readonly shortInterestLatestChangeToDate: string | null;
     /** Trend over the last 3 settlements; `null` with fewer than 3 points. */
     readonly shortInterestTrend: ShortInterestTrend | null;
     /** Latest off-exchange short volume ratio (short / total), 0..1. */
@@ -699,9 +735,15 @@ export interface ShortMetrics {
     readonly squeezeRisk: boolean;
     /** Largest fails-to-deliver quantity in the recent FTD window. */
     readonly failsToDeliverPeakQty: number | null;
+    /**
+     * Settlement date of that peak (the newest such day on a tie); `null` when
+     * the recent window had no fail day or the feed is unavailable. Not the
+     * latest FTD file date — a peak quoted with the latest date misdates it.
+     */
+    readonly failsToDeliverPeakDate: string | null;
     /** That peak as percent of shares outstanding. */
     readonly failsToDeliverPctOutstanding: number | null;
-    /** That peak divided by the baseline's average daily fails; `null` without a baseline. */
+    /** That peak divided by the baseline's average daily fails; `null` when that average is under `FTD_MIN_BASELINE_DAILY_AVERAGE` (near-zero baselines make the multiple noise). */
     readonly failsToDeliverMultiple: number | null;
     /** Reg SHO threshold-list status; `null` when the lists are excluded or unavailable. */
     readonly thresholdListed: boolean | null;
@@ -758,6 +800,14 @@ export interface InvestorFlowsFreshness {
     readonly largeHolderWindow: InvestorFlowsWindow;
     /** Newest fails-to-deliver settlement date. */
     readonly failsToDeliverLatestDate: string | null;
+    /** `asOf` of the Reg SHO threshold-list status; `null` when the list is excluded, unavailable or undated. */
+    readonly thresholdListAsOf: string | null;
+    /**
+     * Whether the threshold-list status was dropped as stale (dated outside
+     * `THRESHOLD_LIST_MAX_AGE_DAYS`, so not scored); `null` when there is no
+     * status (excluded or unavailable).
+     */
+    readonly thresholdListStale: boolean | null;
     /** Window offering filings were measured over. */
     readonly dilutionWindow: InvestorFlowsWindow;
     /** Newest DART receipt date (major-holder, insider or trading-plan report); `null` for US snapshots. */

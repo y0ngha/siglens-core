@@ -1781,9 +1781,18 @@ export function buildCongressTrendCacheKey(
  * score block; and a Korean (DART) prompt variant. A `p1` entry has four axis
  * interpretations and would render without the dilution axis.
  *
+ * **`p3`** = real-LLM A/B fixes (2026-10-16). The scorecard data changed —
+ * Form 144 strength is relative to shares outstanding and filers are matched
+ * by CIK, FTD peaks carry their own date, change metrics carry their endpoints,
+ * numbers are comma-grouped and labels / axes render as display names — and so
+ * did the rules (FTD caveat, active ATM, no identifiers, no price-impact
+ * prediction, Korean terms). A `p2` entry can misdate an FTD peak or read a
+ * mega cap's plan sales as bearish. Round-by-round detail lives in
+ * `docs/PUBLIC_API.md`.
+ *
  * @internal
  */
-export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p2' as const;
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
 
 /**
  * @internal TTL for investor-flows analysis cache results. Default: 12 hours —
@@ -2064,9 +2073,15 @@ export function buildNewsCacheKey(
  * prompt without investor flows is byte-identical, but the guidance text is not
  * folded into `inputHash`, so the segment is bumped for every entry.
  *
+ * **`p6`** — investor-flows A/B fixes (2026-10-16). Only prompts with the
+ * `## Investor Flows` section change (the shared scorecard rendering and the
+ * section's rules; see {@link INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION}), but the
+ * guidance is not folded into `inputHash`, so every entry is bumped, as for
+ * `p5`.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

@@ -6,6 +6,7 @@ import {
     FTD_BASELINE_TRADING_DAYS,
     FTD_BASELINE_WINDOW_DAYS,
     FTD_MAX_AGE_DAYS,
+    FTD_MIN_BASELINE_DAILY_AVERAGE,
     FTD_RECENT_WINDOW_DAYS,
     RATIO_DECIMALS,
     SHORT_INTEREST_MAX_AGE_DAYS,
@@ -18,6 +19,7 @@ import {
 } from '@/domain/investorFlows/constants';
 import {
     daysBetween,
+    formatDay,
     isFiniteNumber,
     isVisibleAsOf,
     makeStaleSignal,
@@ -41,6 +43,17 @@ export interface TrendReading {
     readonly changePct: number;
     readonly fromQty: number;
     readonly toQty: number;
+    /** Settlement date of the first point of the trend window. */
+    readonly fromDate: string;
+    /** Settlement date of the last (latest) point. */
+    readonly toDate: string;
+}
+
+/** Short-interest change from the previous settlement to the latest one. */
+export interface LatestChangeReading {
+    readonly changePct: number;
+    readonly fromDate: string;
+    readonly toDate: string;
 }
 
 export interface VolumeReading {
@@ -114,13 +127,50 @@ function readTrend(points: readonly ShortInterestPoint[]): TrendReading | null {
     const falling = window.every(
         (p, i) => i === 0 || p.shortQty < window[i - 1].shortQty
     );
-    const trend: ShortInterestTrend =
-        rising && changePct >= SHORT_INTEREST_TREND_MIN_CHANGE_PCT
-            ? 'rising'
-            : falling && changePct <= -SHORT_INTEREST_TREND_MIN_CHANGE_PCT
-              ? 'falling'
+    const material = Math.abs(changePct) >= SHORT_INTEREST_TREND_MIN_CHANGE_PCT;
+    // A reversal needs a step each way; an unchanged step alone is not one.
+    const reversed =
+        window.some((p, i) => i > 0 && p.shortQty > window[i - 1].shortQty) &&
+        window.some((p, i) => i > 0 && p.shortQty < window[i - 1].shortQty);
+    const trend: ShortInterestTrend = !material
+        ? 'flat'
+        : rising
+          ? 'rising'
+          : falling
+            ? 'falling'
+            : reversed
+              ? 'mixed'
               : 'flat';
-    return { trend, changePct, fromQty: first.shortQty, toQty: last.shortQty };
+    return {
+        trend,
+        changePct,
+        fromQty: first.shortQty,
+        toQty: last.shortQty,
+        fromDate: first.settlementDate,
+        toDate: last.settlementDate,
+    };
+}
+
+/**
+ * One-settlement change (previous → latest). Rendered beside the multi-settlement
+ * trend so the model does not attribute the trend's change to the previous
+ * settlement alone (the GME A/B read -25.12% over three settlements as
+ * "직전 정산일 대비").
+ */
+function readLatestChange(
+    points: readonly ShortInterestPoint[]
+): LatestChangeReading | null {
+    if (points.length < 2) return null;
+    const previous = points[points.length - 2];
+    const latest = points[points.length - 1];
+    if (previous.shortQty <= 0) return null;
+    return {
+        changePct: roundValue(
+            ((latest.shortQty - previous.shortQty) / previous.shortQty) * 100
+        ),
+        fromDate: previous.settlementDate,
+        toDate: latest.settlementDate,
+    };
 }
 
 /** Latest short-volume ratio and its z-score against the preceding baseline. */
@@ -197,6 +247,8 @@ export interface ShortPositioning {
     readonly dtc: number | null;
     /** Trend over the last settlements. */
     readonly trend: TrendReading | null;
+    /** Change from the previous settlement to the latest one. */
+    readonly latestChange: LatestChangeReading | null;
     /** Latest short-volume ratio and its z-score. */
     readonly volume: VolumeReading | null;
     /** Neutral `data_stale` signals for feeds too old to score. */
@@ -255,6 +307,7 @@ export function readShortPositioning(
                 : null,
         dtc: latest === undefined ? null : daysToCover(latest),
         trend: readTrend(interest),
+        latestChange: readLatestChange(interest),
         volume: readVolume(volume),
         staleSignals,
     };
@@ -264,9 +317,11 @@ export function readShortPositioning(
 export interface FailsToDeliverReading {
     /** Largest fails quantity in the recent window (0 when the window has no fail day). */
     readonly peakQty: number;
+    /** Settlement date of the peak (the newest on a tie); `null` when the recent window has no fail day. */
+    readonly peakDate: string | null;
     /** {@link FailsToDeliverReading.peakQty} as % of shares outstanding; `null` without shares outstanding. */
     readonly pctOutstanding: number | null;
-    /** Peak / baseline average daily fails; `null` when the baseline had no fails. */
+    /** Peak / baseline average daily fails; `null` when that average is under {@link FTD_MIN_BASELINE_DAILY_AVERAGE}. */
     readonly multiple: number | null;
 }
 
@@ -290,7 +345,7 @@ export function readFailsToDeliver(
             return [];
         }
         const age = daysBetween(day, asOfDay);
-        return age < 0 ? [] : [{ qty: p.failsQty, age }];
+        return age < 0 ? [] : [{ qty: p.failsQty, age, day }];
     });
     const newestAge = aged.reduce<number | null>(
         (min, p) => (min === null || p.age < min ? p.age : min),
@@ -305,10 +360,21 @@ export function readFailsToDeliver(
                 p.age <= FTD_RECENT_WINDOW_DAYS + FTD_BASELINE_WINDOW_DAYS
         )
         .reduce((sum, p) => sum + p.qty, 0);
-    const peakQty = recent.reduce((max, p) => Math.max(max, p.qty), 0);
+    // The newest day wins a tie (smaller age), so the date is deterministic for any input order.
+    const peak = recent.reduce<(typeof recent)[number] | null>(
+        (best, p) =>
+            best === null ||
+            p.qty > best.qty ||
+            (p.qty === best.qty && p.age < best.age)
+                ? p
+                : best,
+        null
+    );
+    const peakQty = peak?.qty ?? 0;
     const baselineDailyAverage = baselineSum / FTD_BASELINE_TRADING_DAYS;
     return {
         peakQty,
+        peakDate: peak === null ? null : formatDay(peak.day),
         pctOutstanding:
             isFiniteNumber(sharesOutstanding) && sharesOutstanding > 0
                 ? roundValue(
@@ -317,7 +383,7 @@ export function readFailsToDeliver(
                   )
                 : null,
         multiple:
-            baselineDailyAverage > 0
+            baselineDailyAverage >= FTD_MIN_BASELINE_DAILY_AVERAGE
                 ? roundValue(peakQty / baselineDailyAverage)
                 : null,
     };

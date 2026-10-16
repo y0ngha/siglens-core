@@ -562,8 +562,8 @@ describe('buildCongressTrendCacheKey', () => {
 describe('buildInvestorFlowsCacheKey', () => {
     const base = `v1:analysis:investorFlows:AAPL:gemini-3.6-flash:${INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION}`;
 
-    it('is on template version p2 (five axes, DART variant)', () => {
-        expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p2');
+    it('is on template version p3 (A/B fixes: FTD peak date, Form 144 scale, output rules)', () => {
+        expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p3');
     });
 
     it('a squeeze context appends :squeeze=on last; false and omitted match the base key', () => {
