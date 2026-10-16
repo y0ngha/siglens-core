@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.20.0](https://github.com/y0ngha/siglens-core/compare/v2.19.0...v2.20.0) (2026-10-16)
+
+### Features
+
+* 에이전트 수급 도구 설명·라우팅 확장 — 증자·Form 144·FTD·과열 목록·옵션·숏스퀴즈, 한국 DART 지분공시 ([#277](https://github.com/y0ngha/siglens-core/issues/277)) ([cf95f49](https://github.com/y0ngha/siglens-core/commit/cf95f492b677b31a687a2adbc721e3078a38eff5))
+
 # [2.19.0](https://github.com/y0ngha/siglens-core/compare/v2.18.1...v2.19.0) (2026-10-16)
 
 ### Features
