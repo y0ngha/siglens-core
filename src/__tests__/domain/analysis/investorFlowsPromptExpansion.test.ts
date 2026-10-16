@@ -1022,7 +1022,8 @@ describe('investor-flows prompt — render audit', () => {
                     insiders: ['A', 'B', 'C'].map((reporter, i) =>
                         krInsiderReport({
                             reporter,
-                            sharesChange: 1_000,
+                            // 20,000 / 1B shares = 0.002%: material for a cluster.
+                            sharesChange: 20_000,
                             receiptDate: daysBeforeAsOf(5 + i * 10),
                         })
                     ),
@@ -1033,6 +1034,58 @@ describe('investor-flows prompt — render audit', () => {
         expect(text).toContain(
             `kr_insider_cluster [cluster span ${daysBeforeAsOf(25)} to ${daysBeforeAsOf(5)}]:`
         );
+    });
+
+    it('renders a routine mass filing as neutral context with its span, and the rule for it', () => {
+        const text = build(
+            emptySnapshot({
+                market: 'kr',
+                kr: {
+                    majorHolders: [],
+                    insiders: Array.from({ length: 40 }, (_, i) =>
+                        krInsiderReport({
+                            reporter: `임원${i}`,
+                            sharesChange: 100,
+                            ratioChangePct: 0,
+                            receiptDate: daysBeforeAsOf(5 + (i % 20)),
+                        })
+                    ),
+                    tradingPlans: [],
+                },
+            })
+        );
+        expect(text).toContain(
+            `kr_insider_routine_mass_filing [filing span ${daysBeforeAsOf(24)} to ${daysBeforeAsOf(5)}; many reporters filed together with a median change too small to count, not a coordinated move and not scored]: 중립(참고), 약함 (reporters=40, reports=40, medianChangePctOutstanding=0% of shares outstanding, windowDays=30)`
+        );
+        expect(text).not.toContain('kr_insider_cluster [');
+        expect(text).toContain(
+            '- A cluster counts only reporters whose own change is material. A routine mass filing (more than 30 reporters inside 30 days whose median change is too small to count) is neutral context'
+        );
+    });
+
+    it('renders the routine median in %p when shares outstanding is unknown', () => {
+        const text = build(
+            emptySnapshot({
+                market: 'kr',
+                sharesOutstanding: null,
+                kr: {
+                    majorHolders: [],
+                    insiders: Array.from({ length: 40 }, (_, i) =>
+                        krInsiderReport({
+                            reporter: `임원${i}`,
+                            sharesChange: 100,
+                            ratioChangePct: 0,
+                            receiptDate: daysBeforeAsOf(5 + (i % 20)),
+                        })
+                    ),
+                    tradingPlans: [],
+                },
+            })
+        );
+        expect(text).toContain(
+            '(reporters=40, reports=40, medianRatioChangePct=0%p, windowDays=30)'
+        );
+        expect(text).not.toContain('medianChangePctOutstanding');
     });
 
     it('tags Korean and 13D/13G rows outside the scoring window', () => {

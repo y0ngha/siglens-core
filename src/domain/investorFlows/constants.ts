@@ -483,8 +483,50 @@ export const KR_INSIDER_NET_CHANGE_WEAK_PCT = 0.05;
 /** See {@link KR_INSIDER_NET_CHANGE_WEAK_PCT}. */
 export const KR_INSIDER_NET_CHANGE_MODERATE_PCT = 0.25;
 
-/** Distinct reporters moving the same way within {@link INSIDER_CLUSTER_WINDOW_DAYS} days for a Korean insider cluster. */
+/**
+ * Distinct reporters moving the same way within {@link INSIDER_CLUSTER_WINDOW_DAYS}
+ * days for a Korean insider cluster. Only reports whose own change is material
+ * ({@link KR_INSIDER_CLUSTER_MEMBER_MIN_PCT_OUTSTANDING} /
+ * {@link KR_INSIDER_CLUSTER_MEMBER_MIN_RATIO_CHANGE_PCT}) count.
+ */
 export const KR_INSIDER_CLUSTER_MIN_REPORTERS = 3;
+
+/**
+ * Smallest change, as % of shares outstanding, that lets a report count toward a
+ * Korean insider cluster when shares outstanding is known. A large cap files
+ * hundreds of routine reports (stock compensation, newly appointed executives'
+ * initial holdings) of 100–3,000 shares each; on Samsung's ~5.9B shares that is
+ * well under 0.0001%, while 0.001% is ~59,000 shares there and 500 shares on a
+ * 50M-share small cap, so a real executive purchase clears it.
+ */
+export const KR_INSIDER_CLUSTER_MEMBER_MIN_PCT_OUTSTANDING = 0.001;
+
+/**
+ * Fallback for {@link KR_INSIDER_CLUSTER_MEMBER_MIN_PCT_OUTSTANDING} without
+ * shares outstanding: the report's own holding-ratio change, percentage points.
+ * DART reports the ratio to two decimals, so 0.01%p is the smallest change it
+ * can show — a `0` change is below the report's own resolution and never counts.
+ * A report with neither figure is excluded.
+ */
+export const KR_INSIDER_CLUSTER_MEMBER_MIN_RATIO_CHANGE_PCT = 0.01;
+
+/**
+ * More distinct reporters than this inside one {@link INSIDER_CLUSTER_WINDOW_DAYS}-day
+ * span, with a median change below the member floor, is a routine mass filing
+ * (a company-wide grant or reshuffle filed together), not a coordinated move.
+ * The tiny reports never count toward a cluster (they fail the member floor);
+ * when no material cluster survives, the window gets the neutral
+ * `kr_insider_routine_mass_filing` note so it does not read as "nothing filed".
+ * A coordinated insider cluster is a handful of people; 30 in a month is not.
+ */
+export const KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS = 30;
+
+/**
+ * When a buying and a selling cluster both form in the window, the one whose
+ * summed member change is at least this multiple of the other's is kept; below
+ * it neither is emitted. Opposite clusters side by side say nothing.
+ */
+export const KR_INSIDER_CLUSTER_DOMINANCE_MULTIPLE = 2;
 
 // ─── Prompt sizing ───────────────────────────────────
 

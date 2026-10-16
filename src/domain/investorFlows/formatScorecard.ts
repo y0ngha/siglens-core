@@ -322,6 +322,7 @@ const SUBJECT_LABELS: Partial<Record<InvestorFlowsSignalId, string>> = {
     fails_to_deliver_elevated: 'peak settlement date ',
     insider_proposed_sale_cluster: 'cluster span ',
     kr_insider_cluster: 'cluster span ',
+    kr_insider_routine_mass_filing: 'filing span ',
     short_interest_trend: 'settlements ',
     institutional_holder_count_change: 'quarter ending ',
     institutional_net_share_change: 'quarter ending ',
@@ -329,6 +330,8 @@ const SUBJECT_LABELS: Partial<Record<InvestorFlowsSignalId, string>> = {
 
 /** Text after a subject, when the subject alone does not name both endpoints. */
 const SUBJECT_SUFFIXES: Partial<Record<InvestorFlowsSignalId, string>> = {
+    kr_insider_routine_mass_filing:
+        '; many reporters filed together with a median change too small to count, not a coordinated move and not scored',
     institutional_holder_count_change: ' vs the quarter before',
     institutional_net_share_change: ' vs the quarter before',
 };
