@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.21.1](https://github.com/y0ngha/siglens-core/compare/v2.21.0...v2.21.1) (2026-10-16)
+
+### Bug Fixes
+
+* 매수·매도 판단 질문에도 수급 도구 호출(에이전트 라우팅) ([#279](https://github.com/y0ngha/siglens-core/issues/279)) ([e0f872e](https://github.com/y0ngha/siglens-core/commit/e0f872eea5c4649ac16ba8cc71d68a38ae9be94a))
+
 # [2.21.0](https://github.com/y0ngha/siglens-core/compare/v2.20.0...v2.21.0) (2026-10-16)
 
 ### Features
