@@ -263,28 +263,51 @@ function routineMassFiling(
  *   already says what the window shows, and the tiny reports never count).
  * - `kr_trading_plan`: neutral context — a pre-announced trade, direction unknown.
  *
- * **Sufficient means at least one directional signal**; trading plans or a
- * routine mass filing alone, or reports that net to nothing, leave the axis
- * insufficient (`krMetrics` still counts them). Rows dated after the reference
- * day, outside the window or with a non-finite share change are dropped.
+ * - `kr_insider_no_material_change`: neutral context when usable reports are in
+ *   the window, the net change is measurable and nothing above fired (and no
+ *   routine mass filing note already says so).
+ *
+ * A report is usable when its date parses, it is dated on or before the
+ * reference day and its share change is finite. Three states:
+ *
+ * - **Usable reports in the window with a measurable net change
+ *   (`netChangePct` not `null`) but no directional signal** — reports that net
+ *   to nothing, small changes, or a window of only routine mass filings:
+ *   `sufficient`, score 0, `neutral`. The reports were filed and their sizes
+ *   are known, so "no material change" is a measured fact. A routine-only
+ *   window counts here on purpose: hundreds of tiny grant filings with valid
+ *   numbers are exactly the absence of a material insider move.
+ * - **No usable report in the window, but one exists outside it**:
+ *   `insufficient`, with `krMetrics.reports === 0` and
+ *   `krMetrics.latestReceiptDate` so a renderer can say "no reports in the
+ *   window" instead of "no data". Trading plans alone never score.
+ * - **No usable report at all, or a net change that cannot be measured**
+ *   (no shares outstanding and a non-finite ratio change): `insufficient` —
+ *   the inputs cannot prove "no change", so the axis never reads as a fake zero.
  */
 export function evaluateKrInsiderAxis(
     kr: Pick<KrDisclosureSnapshot, 'insiders' | 'tradingPlans'>,
     sharesOutstanding: number | null,
     asOfDay: number | null
 ): InsiderAxis {
-    const reports: DatedInsiderReport[] =
+    const usable: DatedInsiderReport[] =
         asOfDay === null
             ? []
             : kr.insiders
                   .flatMap(report => {
-                      const day = windowDay(report.receiptDate, asOfDay);
+                      const day = parseDay(report.receiptDate);
                       return day === null ||
+                          daysBetween(day, asOfDay) < 0 ||
                           !isFiniteNumber(report.sharesChange)
                           ? []
                           : [{ report, day }];
                   })
                   .sort((a, b) => a.day - b.day);
+    const reports =
+        asOfDay === null
+            ? []
+            : usable.filter(r => daysBetween(r.day, asOfDay) <= KR_WINDOW_DAYS);
+    const latestUsable = usable.at(-1);
     const plans =
         asOfDay === null
             ? 0
@@ -339,6 +362,19 @@ export function evaluateKrInsiderAxis(
             ? routineMassFiling(sized, sharesOutstanding)
             : null;
     if (routine !== null) signals.push(routine);
+    const measuredNoChange = !directional && reports.length > 0 && pct !== null;
+    // The routine note already says the window moved nothing; one note is enough.
+    if (measuredNoChange && routine === null) {
+        signals.push(
+            makeSignal(
+                'insider',
+                'kr_insider_no_material_change',
+                'neutral',
+                'weak',
+                { reports: reports.length, reporters, netChangePct: pct }
+            )
+        );
+    }
     if (plans > 0) {
         signals.push(
             makeSignal('insider', 'kr_trading_plan', 'neutral', 'weak', {
@@ -349,7 +385,7 @@ export function evaluateKrInsiderAxis(
     }
 
     const krMetrics: KrInsiderMetrics | undefined =
-        reports.length === 0 && plans === 0
+        latestUsable === undefined && plans === 0
             ? undefined
             : {
                   reports: reports.length,
@@ -357,8 +393,23 @@ export function evaluateKrInsiderAxis(
                   netSharesChange: netShares,
                   netChangePct: pct,
                   tradingPlans: plans,
+                  latestReceiptDate:
+                      latestUsable === undefined
+                          ? null
+                          : formatDay(latestUsable.day),
               };
     const base = krMetrics === undefined ? {} : { krMetrics };
+    if (measuredNoChange) {
+        return {
+            id: 'insider',
+            score: 0,
+            label: 'neutral',
+            sufficiency: 'sufficient',
+            signals: sortSignals(signals),
+            metrics: null,
+            ...base,
+        };
+    }
     if (!directional) {
         return {
             id: 'insider',

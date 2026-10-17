@@ -1697,7 +1697,9 @@ describe('buildOverallAnalysisPrompt — investor flows (수급) section', () =>
             '2026-09-30 is IN PROGRESS (partial, not scored)'
         );
         expect(prompt).toContain('FINRA short interest settlement date:');
-        expect(prompt).toContain('Insider window:');
+        expect(prompt).toContain(
+            'Insider scoring window: transactions on or after '
+        );
     });
 
     it('tells the model how much each source carries and why', () => {
@@ -1833,6 +1835,18 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
         expect(flows).toContain(
             'Institutional / foreign net buying is not provided for Korean listings'
         );
+        // A measured neutral is not an unscored axis; the KR marker list names the DART-only marker.
+        expect(flows).toContain(
+            '- An axis scored neutral (score 0) with a no-material-change note is a measured reading'
+        );
+        expect(flows).toContain('(NO DATA, NO REPORTS IN WINDOW)');
+        const prompt = build(krCard, 'KRW');
+        expect(prompt).toContain('never write 물질적 변동.');
+        expect(prompt).toContain(
+            'Scoring windows: state a window by quoting its rendered start date'
+        );
+        expect(prompt).not.toContain('결제불이행(FTD)');
+        expect(build(krCard, 'KRW', 'en')).not.toContain('물질적 변동');
         for (const word of ['13F', 'FINRA', 'Form 4', '13D']) {
             expect(flows).not.toContain(word);
         }
@@ -1955,7 +1969,7 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
         expect(flowRules).toContain("a 5%+ holder's ratio rose 1.2%p");
     });
 
-    it('says NO FILINGS in the overall section for an empty offering list', () => {
+    it('renders an empty offering list as a measured neutral in the overall section', () => {
         const card = evaluateInvestorFlows(
             emptySnapshot({
                 insider: { transactions: [insiderTx()] },
@@ -1963,7 +1977,7 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
             })
         );
         expect(section(build(card, 'USD'))).toContain(
-            'NO FILINGS (no offering or registration filings on record)'
+            'no offering or registration filings on record over the whole lookback: a measured neutral reading'
         );
     });
 

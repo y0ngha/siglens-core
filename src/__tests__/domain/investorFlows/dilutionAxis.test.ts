@@ -18,10 +18,10 @@ describe('evaluateDilutionAxis — coverage', () => {
         expect(axis.metrics).toBeNull();
     });
 
-    it('is insufficient with no filings at all', () => {
-        expect(evaluateDilutionAxis([], AS_OF_DAY).sufficiency).toBe(
-            'insufficient'
-        );
+    it('is sufficient neutral for a provided, empty list (no filings on record)', () => {
+        const axis = evaluateDilutionAxis([], AS_OF_DAY);
+        expect(axis.sufficiency).toBe('sufficient');
+        expect(axis.score).toBe(0);
     });
 
     it('is insufficient without a usable reference day', () => {
@@ -190,10 +190,38 @@ describe('evaluateDilutionAxis — window boundary', () => {
 });
 
 describe('evaluateDilutionAxis — noFilingsOnRecord', () => {
-    it('is true only for a provided, empty list with a usable reference day', () => {
+    it('scores a provided, empty list as a measured neutral 0 (nothing filed over the lookback)', () => {
         const axis = evaluateDilutionAxis([], AS_OF_DAY);
+        expect(axis).toEqual({
+            id: 'dilution',
+            noFilingsOnRecord: true,
+            score: 0,
+            label: 'neutral',
+            sufficiency: 'sufficient',
+            signals: [],
+            metrics: {
+                filingsInWindow: 0,
+                atmFilings: 0,
+                marketedOfferingFilings: 0,
+                shelfFilings: 0,
+                registrationFilings: 0,
+                privatePlacementFilings: 0,
+                latestFilingDate: null,
+            },
+        });
+    });
+
+    it('returns a fresh metrics object per call, never a shared instance', () => {
+        const a = evaluateDilutionAxis([], AS_OF_DAY);
+        const b = evaluateDilutionAxis([], AS_OF_DAY);
+        expect(a.metrics).toEqual(b.metrics);
+        expect(a.metrics).not.toBe(b.metrics);
+    });
+
+    it('stays insufficient without a list', () => {
+        const axis = evaluateDilutionAxis(undefined, AS_OF_DAY);
         expect(axis.sufficiency).toBe('insufficient');
-        expect(axis.noFilingsOnRecord).toBe(true);
+        expect(axis.score).toBeNull();
     });
 
     it('is false without a list', () => {

@@ -23,10 +23,12 @@ import {
 } from '@/domain/analysis/promptFormat';
 import {
     formatInvestorFlowsScorecard,
+    INVESTOR_FLOWS_KO_CHANGE_TERM_RULE,
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
     INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     investorFlowsInterpretationRules,
     investorFlowsOutputRules,
+    KR_NO_MATERIAL_CHANGE_RULE,
     notScoredAxisPhrase,
 } from '@/domain/investorFlows/formatScorecard';
 import type {
@@ -472,8 +474,18 @@ const KR_INVESTOR_FLOWS_WEIGHTING_GUIDANCE = [
     'How much each source carries:',
     '- DART 5%+ major-holder reports and executive / major-shareholder ownership reports are EVENT-level: filed within days of the change, but they carry no holding purpose and no trade cause (open market, gift, inheritance, exercise), so each is one input, not a verdict.',
     '- Institutional / foreign net buying is not provided for Korean listings; never infer it or describe it as neutral.',
+    `- ${KR_NO_MATERIAL_CHANGE_RULE}`,
     `Cite the DART receipt dates and the window you use. ${notScoredSentence('kr')}`,
 ].join('\n');
+
+/** Korean terminology for the investor-flows rules: the full US rule, or only the change term for a Korean listing. */
+function koTerminologyRule(
+    locale: AnalysisLocale,
+    market: InvestorFlowsMarket
+): string {
+    if (locale !== 'ko') return '';
+    return `\n${market === 'kr' ? INVESTOR_FLOWS_KO_CHANGE_TERM_RULE : INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}`;
+}
 
 /**
  * @internal Builds the multi-axis overall-analysis LLM prompt.
@@ -762,7 +774,7 @@ export function buildOverallAnalysisPrompt(
                             'the same bullet or sentence',
                             locale
                         )
-              }${locale === 'ko' && investorFlowsMarket !== 'kr' ? `\n${INVESTOR_FLOWS_KO_TERMINOLOGY_RULE}` : ''}`;
+              }${koTerminologyRule(locale, investorFlowsMarket)}`;
     const investorFlowsRules = investorFlowsIntegrated
         ? `\n- investorFlowsBulletsKo: provide 2–4 bullets from the Investor Flows section, citing the as-of date of each source used and weighting sources as that section describes; for ${notScoredAxisPhrase(investorFlowsMarket)}, say why it is not scored, as its heading says, and never describe it as neutral. Leave the array empty when the section says there is no data.\n- When the Investor Flows section is present, attribute investor-flows claims in integratedConclusionKo to it (e.g. "수급 분석에서는…") and keep them proportional to the section's weighting guidance. Quote its scores as given and state its labels in plain words.${investorFlowsDetailRules}`
         : '';

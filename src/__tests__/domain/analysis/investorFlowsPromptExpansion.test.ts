@@ -12,7 +12,9 @@ import {
     formatInvestorFlowsScorecard,
     formatSqueezeRisk,
     groupDigits,
+    INVESTOR_FLOWS_KO_CHANGE_TERM_RULE,
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
+    INVESTOR_FLOWS_WINDOW_RULE,
     INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     INVESTOR_FLOWS_PLAIN_TEXT_RULE,
     krNotProvidedLine,
@@ -421,7 +423,7 @@ describe('investor-flows prompt fallbacks', () => {
         );
         expect(block).toContain('- Snapshot as-of: unknown');
         expect(block).toContain('- Latest DART receipt date: n/a');
-        expect(block).toContain('- DART window: n/a to n/a');
+        expect(block).toContain('- DART scoring window: n/a (');
     });
 
     it('renders unknown dates in the US freshness block', () => {
@@ -431,7 +433,7 @@ describe('investor-flows prompt fallbacks', () => {
         expect(block).toContain(
             '- SEC fails-to-deliver latest settlement date: n/a'
         );
-        expect(block).toContain('- Offering filings window: n/a to n/a');
+        expect(block).toContain('- Offering filings scoring window: n/a');
     });
 
     it('says when every squeeze input was present and when no bar was used', () => {
@@ -598,7 +600,62 @@ describe('investor-flows prompt — real-LLM A/B fixes', () => {
         expect(text).not.toContain(INVESTOR_FLOWS_PLAIN_TEXT_RULE);
         expect(INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE).not.toMatch(/short/i);
         expect(text).not.toContain('fails to deliver');
-        expect(text).not.toContain('Korean terminology');
+        // Only the change-term rule; the US terms (FTD, ATM, …) never appear.
+        expect(text).not.toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);
+        expect(text).toContain(INVESTOR_FLOWS_KO_CHANGE_TERM_RULE);
+    });
+
+    it('renders every scoring window as an inclusive start date, with the rule to quote it', () => {
+        const kr = build(
+            emptySnapshot({
+                market: 'kr',
+                kr: {
+                    majorHolders: [krMajorHolderReport()],
+                    insiders: [],
+                    tradingPlans: [],
+                },
+            })
+        );
+        expect(kr).toContain(
+            `- DART scoring window: receipts on or after ${daysBeforeAsOf(90)} (90 days to ${daysBeforeAsOf(0)}) (`
+        );
+        const us = build(US);
+        expect(us).toContain(
+            `- Insider scoring window: transactions on or after ${daysBeforeAsOf(90)} (90 days to ${daysBeforeAsOf(0)}) (`
+        );
+        expect(us).toContain(
+            `- 13D/13G scoring window: filings on or after ${daysBeforeAsOf(90)} (90 days to ${daysBeforeAsOf(0)})`
+        );
+        expect(us).toContain(
+            `- Offering filings scoring window: filings on or after ${daysBeforeAsOf(180)} (180 days to ${daysBeforeAsOf(0)})`
+        );
+        for (const text of [kr, us]) {
+            expect(text).toContain(INVESTOR_FLOWS_WINDOW_RULE);
+            expect(text).not.toMatch(/window: \d{4}-\d{2}-\d{2} to /);
+        }
+    });
+
+    it('tells Korean output to write 유의미한 변동, never 물질적 변동, in both markets', () => {
+        const rule =
+            '- Korean terminology: write 유의미한 변동 for a material change (유의미한 변동 없음 for no material change); never write 물질적 변동.';
+        expect(INVESTOR_FLOWS_KO_CHANGE_TERM_RULE).toBe(rule);
+        expect(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE).toContain(rule);
+        expect(build(US)).toContain(rule);
+        const krSnapshot = emptySnapshot({
+            market: 'kr',
+            kr: {
+                majorHolders: [krMajorHolderReport()],
+                insiders: [],
+                tradingPlans: [],
+            },
+        });
+        const en = buildInvestorFlowsAnalysisPrompt(
+            'ACME',
+            krSnapshot,
+            evaluateInvestorFlows(krSnapshot),
+            'en'
+        ).dynamic;
+        expect(en).not.toContain('유의미한 변동');
     });
 });
 
@@ -1075,7 +1132,7 @@ describe('investor-flows prompt — render audit', () => {
             })
         );
         expect(text).toContain(
-            `kr_insider_routine_mass_filing [filing span ${daysBeforeAsOf(24)} to ${daysBeforeAsOf(5)}; many reporters filed together with a median change too small to count, not a coordinated move and not scored]: 중립(참고), 약함 (reporters=40, reports=40, medianChangePctOutstanding=0% of shares outstanding, windowDays=30)`
+            `kr_insider_routine_mass_filing [filing span ${daysBeforeAsOf(24)} to ${daysBeforeAsOf(5)}; many reporters filed together with a median change too small to count, not a coordinated move and adds no points]: 중립(참고), 약함 (reporters=40, reports=40, medianChangePctOutstanding=0% of shares outstanding, windowDays=30)`
         );
         expect(text).not.toContain('kr_insider_cluster [');
         expect(text).toContain(
@@ -1204,11 +1261,18 @@ describe('investor-flows prompt — render audit', () => {
     });
 
     it('renders percent of class with its unit', () => {
-        expect(unitOfFigure('percentOfClass')).toBe('% of class');
-        expect(unitOfFigure('prevPercentOfClass')).toBe('% of class');
+        expect(unitOfFigure('percentOfClass')).toBe(
+            '% of shares outstanding (class)'
+        );
+        expect(unitOfFigure('preWindowPercentOfClass')).toBe(
+            '% of shares outstanding (class)'
+        );
+        expect(unitOfFigure('windowStartPercentOfClass')).toBe(
+            '% of shares outstanding (class)'
+        );
     });
 
-    it('says NO FILINGS for an empty offering list and notes a quiet window with older filings', () => {
+    it('scores an empty offering list neutral with its note, and notes a quiet window with older filings', () => {
         const none = build(
             emptySnapshot({
                 insider: { transactions: [insiderTx()] },
@@ -1218,8 +1282,9 @@ describe('investor-flows prompt — render audit', () => {
         const dilution = none.slice(
             none.indexOf('- 증자·희석 (axis "dilution")')
         );
-        expect(dilution.split('\n')[1]).toMatch(
-            /^  NO FILINGS \(no offering or registration filings on record\) — /
+        expect(dilution.split('\n')[1]).toMatch(/^  label: 중립, score: 0\b/);
+        expect(dilution).toContain(
+            '  signals: none (no offering or registration filings on record over the whole lookback: a measured neutral reading, not missing data — say no filings were found)'
         );
         const absent = build(
             emptySnapshot({ insider: { transactions: [insiderTx()] } })
@@ -1343,24 +1408,26 @@ describe('investor-flows prompt — re-render audit leftovers', () => {
         expect(build(US)).toContain('e.g. short interest fell 13.59%');
     });
 
-    it('says NO FILINGS from the scorecard alone when the offering list is empty', () => {
+    it('scores an empty offering list as a measured neutral, from the scorecard alone', () => {
         const card = evaluateInvestorFlows(
             emptySnapshot({
                 insider: { transactions: [insiderTx()] },
                 offerings: [],
             })
         );
-        expect(card.dilution.sufficiency).toBe('insufficient');
+        expect(card.dilution.sufficiency).toBe('sufficient');
+        expect(card.dilution.score).toBe(0);
         expect(card.dilution.noFilingsOnRecord).toBe(true);
         expect(formatInvestorFlowsScorecard(card, 'ko')).toContain(
-            '  NO FILINGS (no offering or registration filings on record) — '
+            'no offering or registration filings on record over the whole lookback'
         );
         const missing = evaluateInvestorFlows(
             emptySnapshot({ insider: { transactions: [insiderTx()] } })
         );
         expect(missing.dilution.noFilingsOnRecord).toBe(false);
+        expect(missing.dilution.sufficiency).toBe('insufficient');
         expect(formatInvestorFlowsScorecard(missing, 'ko')).not.toContain(
-            'NO FILINGS'
+            'filings on record'
         );
     });
 
@@ -1396,12 +1463,222 @@ describe('investor-flows prompt — re-render audit leftovers', () => {
     });
 });
 
+describe('investor-flows prompt — Korean no-material-change and out-of-window axes', () => {
+    const unchanged = emptySnapshot({
+        market: 'kr',
+        kr: {
+            majorHolders: [
+                krMajorHolderReport({
+                    reporter: '삼성물산',
+                    ratioPct: 19.69,
+                    ratioChangePct: 0,
+                    sharesChange: 0,
+                }),
+                krMajorHolderReport({
+                    receiptDate: daysBeforeAsOf(30),
+                    reporter: '삼성물산',
+                    ratioPct: 19.69,
+                    ratioChangePct: 0,
+                    sharesChange: 0,
+                }),
+            ],
+            insiders: [
+                krInsiderReport({
+                    receiptDate: daysBeforeAsOf(200),
+                }),
+            ],
+            tradingPlans: [],
+        },
+    });
+
+    it('renders a measured neutral with its note, and a marker for reports outside the window', () => {
+        const text = build(unchanged);
+        expect(text).toContain(
+            '  label: 중립, score: 0\n  metrics: reports=2, reporters=1, detailedReports=0, maxAbsRatioChangePct=0%p, latestReceiptDate=' +
+                daysBeforeAsOf(10)
+        );
+        expect(text).toContain(
+            "  - kr_major_holder_no_material_change: 중립(참고), 약함 (reports=2, reporters=1, maxAbsRatioChangePct=0%p) — reports were filed in the window, but no reporter's net holding ratio changed by 1%p or more or crossed 5%: no material change, a measured neutral reading, not missing data"
+        );
+        expect(text).toContain(
+            `  NO REPORTS IN WINDOW — no usable report from this source was filed in the last 90 days (latest receipt date: ${daysBeforeAsOf(200)}), so the axis is not scored.`
+        );
+        // Only the composite line may say NO DATA here (one axis is scored).
+        expect(text.match(/NO DATA —/g)).toBeNull();
+    });
+
+    it('tells the model to write "변동 없음(중립)", never 데이터 부족, for a measured neutral', () => {
+        const text = build(unchanged);
+        expect(text).toContain(
+            '- An axis scored neutral (score 0) with a no-material-change note is a measured reading'
+        );
+        expect(text).toContain(
+            'written as "변동 없음(중립)"; never call it missing data or 데이터 부족.'
+        );
+        const en = buildInvestorFlowsAnalysisPrompt(
+            'ACME',
+            unchanged,
+            evaluateInvestorFlows(unchanged),
+            'en'
+        ).dynamic;
+        expect(en).toContain(
+            'written as "no material change (neutral)"; never call it missing data.'
+        );
+        expect(en).not.toContain('데이터 부족');
+    });
+
+    it('renders an insider window of only measured small changes with its own note', () => {
+        const text = build(
+            emptySnapshot({
+                market: 'kr',
+                sharesOutstanding: 50_000_000,
+                kr: {
+                    majorHolders: [],
+                    insiders: [krInsiderReport()],
+                    tradingPlans: [],
+                },
+            })
+        );
+        expect(text).toContain(
+            '  - kr_insider_no_material_change: 중립(참고), 약함 (reports=1, reporters=1, netChangePct=0.04%) — reports were filed in the window, but their net change and any cluster are too small to count'
+        );
+    });
+});
+
+describe('investor-flows prompt — 13D/13G positions, filings and percent of class', () => {
+    const stacked = emptySnapshot({
+        largeHolders: [
+            largeHolderFiling({
+                filingDate: daysBeforeAsOf(200),
+                percentOfClass: 9.3,
+                shares: 42_082_626,
+            }),
+            ...[40, 20, 5].map((days, i) =>
+                largeHolderFiling({
+                    form: 'SC 13D/A',
+                    filingDate: daysBeforeAsOf(days),
+                    percentOfClass: [8.3, 8.7, 9.1][i],
+                    shares: 43_000_000 + i * 1_000_000,
+                })
+            ),
+        ],
+    });
+
+    it('renders positions next to filings in the words to copy, per locale', () => {
+        const ko = build(stacked);
+        expect(ko).toContain(
+            '  positions vs filings: 13D 포지션 1건 · 신고 3회; 13G 포지션 0건 · 신고 0회'
+        );
+        const en = buildInvestorFlowsAnalysisPrompt(
+            'ACME',
+            stacked,
+            evaluateInvestorFlows(stacked),
+            'en'
+        ).dynamic;
+        expect(en).toContain(
+            '  positions vs filings: 13D: 1 position · 3 filings; 13G: 0 positions · 0 filings'
+        );
+        expect(ko).toContain(
+            '- 13D/13G counts: events13d / events13g are positions'
+        );
+        expect(ko).toContain('(e.g. "13D 포지션 1건 · 신고 7회")');
+        expect(en).not.toContain('포지션');
+    });
+
+    it('renders percent of class with its basis and maps it to 발행주식의 X% in Korean', () => {
+        const ko = build(stacked);
+        expect(ko).toContain(
+            'latest filing 2026-10-10: 9.1% of shares outstanding (class), 45,000,000 shares'
+        );
+        expect(ko).toContain(
+            '9.1% of shares outstanding (class) | shares 45,000,000'
+        );
+        expect(ko).not.toMatch(/% of class/);
+        expect(ko).toContain(
+            '"9.1% of shares outstanding (class)" → "발행주식의 9.1%"'
+        );
+        // the generic "unit as rendered here (… shares …)" rule alone made the
+        // model write "411,522 shares" in Korean sentences
+        expect(ko).toContain('"411,522 shares" → "411,522주"');
+        // the window rule's quoted "on or after <date>" was copied verbatim
+        expect(ko).toContain(
+            '"on or after <date>" as "<date> 이후(당일 포함)"'
+        );
+    });
+
+    it('renders each 13D position with the filing it comes from and its date', () => {
+        // The baseline is the last filing BEFORE the window (2026-03-29, 9.3%),
+        // not the filing just before the latest (2026-09-25, 8.7%): rendered
+        // as a bare "prev" figure the model called it "직전 신고".
+        const ko = build(stacked);
+        expect(ko).toContain(
+            '  - activist_13d_increase [Activist Capital LP]: 강세, 강함 (latest filing 2026-10-10: 9.1% of shares outstanding (class), 45,000,000 shares; first filing in the window 2026-09-05: 8.3% of shares outstanding (class), 43,000,000 shares; last filing before the window 2026-03-29: 9.3% of shares outstanding (class), 42,082,626 shares — the direction compares the latest filing with this one, not with the filing just before the latest; 3 filings in the window)'
+        );
+        expect(ko).not.toMatch(/prevPercentOfClass|prevShares=/);
+    });
+
+    it('renders a lone new filing without a window start, and its missing baseline as none', () => {
+        const text = build(
+            emptySnapshot({ largeHolders: [largeHolderFiling()] })
+        );
+        expect(text).toContain(
+            '  - activist_13d_new [Activist Capital LP]: 강세, 강함 (latest filing 2026-10-05: 6.1% of shares outstanding (class), 30,500,000 shares; last filing before the window: none; 1 filing in the window)'
+        );
+    });
+
+    it('never prints NaN for a non-finite percent or share count', () => {
+        const text = build(
+            emptySnapshot({
+                largeHolders: [
+                    largeHolderFiling({
+                        form: 'SC 13G',
+                        percentOfClass: Number.NaN,
+                        shares: Number.POSITIVE_INFINITY,
+                    }),
+                ],
+            })
+        );
+        expect(text).toContain(
+            '(latest filing 2026-10-05: percent n/a, shares n/a; last filing before the window: none; 1 filing in the window)'
+        );
+        expect(text).toContain('| SC 13G | n/a | shares n/a');
+        expect(text).not.toMatch(/NaN|Infinity/);
+    });
+
+    it('explains a dilution-driven percent drop as not a reduction', () => {
+        const text = build(
+            emptySnapshot({
+                largeHolders: [
+                    largeHolderFiling({
+                        filingDate: daysBeforeAsOf(200),
+                        percentOfClass: 9.3,
+                        shares: 42_082_626,
+                    }),
+                    largeHolderFiling({
+                        form: 'SC 13D/A',
+                        percentOfClass: 8.3,
+                        shares: 42_082_626,
+                    }),
+                ],
+            })
+        );
+        expect(text).toContain(
+            ' — shares held did not change; the percent fell because the company has more shares outstanding, not because the holder sold: not a reduction'
+        );
+        expect(text).toContain('large_holder_ratio_diluted [');
+    });
+});
+
 describe('investor-flows prompt — not-scored markers', () => {
     it('lists every heading marker in one phrase, and only DART-renderable ones for Korea', () => {
-        for (const marker of Object.values(NOT_SCORED_MARKERS)) {
+        const { noReportsInWindow, ...usMarkers } = NOT_SCORED_MARKERS;
+        for (const marker of Object.values(usMarkers)) {
             expect(NOT_SCORED_AXIS_PHRASE).toContain(marker);
         }
+        // The DART-only marker never renders on a US scorecard.
+        expect(NOT_SCORED_AXIS_PHRASE).not.toContain(noReportsInWindow);
         expect(notScoredAxisPhrase('kr')).toContain(NOT_SCORED_MARKERS.noData);
+        expect(notScoredAxisPhrase('kr')).toContain(noReportsInWindow);
         expect(notScoredAxisPhrase('kr')).not.toMatch(/FINRA|FILINGS/);
     });
 
@@ -1439,9 +1716,6 @@ describe('investor-flows prompt — not-scored markers', () => {
                 offerings: [],
                 failsToDeliver: [ftdPoint({ failsQty: 250_000 })],
             })
-        );
-        expect(text).toContain(
-            `  ${NOT_SCORED_MARKERS.noFilings} (no offering`
         );
         expect(text).toContain(`  ${NOT_SCORED_MARKERS.finraUnavailable} — `);
         expect(text).toContain(`  ${NOT_SCORED_MARKERS.noData} — `);

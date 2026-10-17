@@ -292,6 +292,43 @@ describe('evaluateInvestorFlows — Korean snapshots', () => {
         expect(empty.freshness.krDisclosureLatestDate).toBeNull();
     });
 
+    it('computes the composite when both Korean axes are measured neutral or better (005930.KS)', () => {
+        // 43 unchanged 5%+ holder reports used to leave largeHolders
+        // insufficient, so the composite fell to "no data" despite a +15 insider axis.
+        const samsung = evaluateInvestorFlows(
+            emptySnapshot({
+                market: 'kr',
+                sharesOutstanding: 50_000_000,
+                kr: {
+                    majorHolders: Array.from({ length: 43 }, (_, i) =>
+                        krMajorHolderReport({
+                            receiptDate: daysBeforeAsOf(1 + (i % 80)),
+                            reporter: i % 2 === 0 ? '삼성물산' : '국민연금공단',
+                            ratioPct: i % 2 === 0 ? 19.69 : 7.5,
+                            ratioChangePct: 0,
+                            sharesChange: 0,
+                        })
+                    ),
+                    insiders: [
+                        krInsiderReport(),
+                        krInsiderReport({
+                            reporter: '김철수',
+                            sharesChange: 10_000,
+                        }),
+                    ],
+                    tradingPlans: [],
+                },
+            })
+        );
+        expect(samsung.largeHolders.sufficiency).toBe('sufficient');
+        expect(samsung.largeHolders.score).toBe(0);
+        expect(samsung.insider.score).toBe(15);
+        expect(samsung.composite.axesUsed).toEqual(['insider', 'largeHolders']);
+        const { insider: n, largeHolders: l } = COMPOSITE_WEIGHTS;
+        expect(samsung.composite.score).toBeCloseTo((15 * n) / (n + l), 2);
+        expect(samsung.composite.label).not.toBe('insufficient');
+    });
+
     it('does not let the US insider rules read Korean rows', () => {
         // The US axis would need USD values; the KR one reads shares.
         expect(card.insider.metrics).toBeNull();

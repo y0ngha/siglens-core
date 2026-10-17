@@ -149,14 +149,27 @@ export function insiderTx(
 export function largeHolderFiling(
     overrides: Partial<LargeHolderFiling> = {}
 ): LargeHolderFiling {
-    return {
+    const base = {
         filingDate: daysBeforeAsOf(10),
         filer: 'Activist Capital LP',
         form: 'SC 13D',
         percentOfClass: 6.1,
-        shares: 30_000_000,
-        url: 'https://www.sec.gov/Archives/example13d',
         ...overrides,
+    };
+    // Shares follow the percent on a fixed 500M-share class unless given, so a
+    // percent change is also a share change (direction is read from shares).
+    const filing = {
+        shares:
+            base.percentOfClass === null
+                ? null
+                : Math.round(base.percentOfClass * 5_000_000),
+        ...base,
+    };
+    // One URL per filing by default (filer, form, date), so separate fixtures
+    // are separate filings; a joint-filing test passes one shared `url`.
+    return {
+        url: `https://www.sec.gov/Archives/example13d/${encodeURIComponent(`${filing.filer}|${filing.form}|${filing.filingDate}`)}`,
+        ...filing,
     };
 }
 
