@@ -23,12 +23,12 @@ import {
 } from '@/domain/analysis/promptFormat';
 import {
     formatInvestorFlowsScorecard,
-    KR_NO_MATERIAL_CHANGE_RULE,
     INVESTOR_FLOWS_KO_CHANGE_TERM_RULE,
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
     INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     investorFlowsInterpretationRules,
     investorFlowsOutputRules,
+    KR_NO_MATERIAL_CHANGE_RULE,
     notScoredAxisPhrase,
 } from '@/domain/investorFlows/formatScorecard';
 import type {

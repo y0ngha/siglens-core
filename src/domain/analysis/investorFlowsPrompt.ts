@@ -21,15 +21,15 @@ import {
 } from '@/domain/investorFlows/constants';
 import {
     formatInvestorFlowsScorecard,
-    KR_NO_MATERIAL_CHANGE_RULE,
-    PCT_OF_CLASS,
     groupDigits,
     INVESTOR_FLOWS_KO_CHANGE_TERM_RULE,
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
     INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     investorFlowsInterpretationRules,
     investorFlowsOutputRules,
+    KR_NO_MATERIAL_CHANGE_RULE,
     notScoredAxisPhrase,
+    PCT_OF_CLASS,
     sanitizePromptText,
 } from '@/domain/investorFlows/formatScorecard';
 import type {
@@ -78,6 +78,13 @@ function formatNumber(value: number | null): string {
     return value === null || !Number.isFinite(value)
         ? 'n/a'
         : groupDigits(value);
+}
+
+/** A 13D/13G percent of class with its basis unit; `n/a` when missing or non-finite. */
+function formatPercentOfClass(value: number | null): string {
+    return value === null || !Number.isFinite(value)
+        ? 'n/a'
+        : `${groupDigits(value)}${PCT_OF_CLASS}`;
 }
 
 /** A price with adaptive decimals (2 from $1, 4 below), grouped; `n/a` when missing. */
@@ -144,7 +151,7 @@ function formatLargeHolders(
         .slice(0, PROMPT_MAX_LARGE_HOLDER_FILINGS)
         .map(
             f =>
-                `- ${f.filingDate}${windowTag(f.filingDate, window)} | ${name(f.filer)} | ${name(f.form)} | ${f.percentOfClass === null || !Number.isFinite(f.percentOfClass) ? 'n/a' : `${groupDigits(f.percentOfClass)}${PCT_OF_CLASS}`} | shares ${formatNumber(f.shares)}`
+                `- ${f.filingDate}${windowTag(f.filingDate, window)} | ${name(f.filer)} | ${name(f.form)} | ${formatPercentOfClass(f.percentOfClass)} | shares ${formatNumber(f.shares)}`
         )
         .join('\n');
 }
