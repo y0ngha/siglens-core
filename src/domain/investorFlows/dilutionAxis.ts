@@ -50,6 +50,22 @@ const DILUTION_RULES: readonly DilutionRule[] = [
     { id: 'private_placement', strength: 'weak', kinds: ['private_placement'] },
 ];
 
+/**
+ * Metrics of a provided, empty filing list: every count zero, no date. A fresh
+ * object per call, so no two scorecards share one metrics instance.
+ */
+function emptyMetrics(): DilutionMetrics {
+    return {
+        filingsInWindow: 0,
+        atmFilings: 0,
+        marketedOfferingFilings: 0,
+        shelfFilings: 0,
+        registrationFilings: 0,
+        privatePlacementFilings: 0,
+        latestFilingDate: null,
+    };
+}
+
 function countKind(
     items: readonly DatedOffering[],
     kind: OfferingKind
@@ -87,11 +103,16 @@ function ruleSignal(
  * signal however often it was filed (an ATM program files a 424B5 every few
  * weeks, which is one program, not many).
  *
- * Coverage follows the 13D/13G axis: `undefined` (a snapshot built before the
- * field existed) or no usable filing at all is insufficient; any filing dated on
- * or before the reference day — even outside the window — means the issuer is
- * covered, so a quiet window scores 0. Filings dated after the reference day
- * are dropped.
+ * Coverage: any filing dated on or before the reference day — even outside
+ * the window — means the issuer is covered, so a quiet window scores 0. A
+ * provided **empty** list (with a usable reference day) also scores 0,
+ * `sufficient`, with `noFilingsOnRecord: true`: the provider looked over its
+ * whole lookback (about two years) and found no offering or registration
+ * filing, which is real information, not a gap. Only a missing list
+ * (`undefined`, a snapshot built before the field existed), an unusable
+ * reference day, or a list whose entries are all unparseable or future-dated
+ * is `insufficient` — those prove nothing. Filings dated after the reference
+ * day are dropped.
  */
 export function evaluateDilutionAxis(
     offerings: readonly OfferingFiling[] | undefined,
@@ -103,13 +124,23 @@ export function evaluateDilutionAxis(
             ? []
             : [{ filing, day }];
     });
+    const noFilingsOnRecord =
+        offerings !== undefined && offerings.length === 0 && asOfDay !== null;
+    if (noFilingsOnRecord) {
+        return {
+            id: 'dilution',
+            noFilingsOnRecord: true,
+            score: 0,
+            label: 'neutral',
+            sufficiency: 'sufficient',
+            signals: [],
+            metrics: emptyMetrics(),
+        };
+    }
     if (asOfDay === null || visible.length === 0) {
         return {
             id: 'dilution',
-            noFilingsOnRecord:
-                offerings !== undefined &&
-                offerings.length === 0 &&
-                asOfDay !== null,
+            noFilingsOnRecord: false,
             score: null,
             label: 'insufficient',
             sufficiency: 'insufficient',

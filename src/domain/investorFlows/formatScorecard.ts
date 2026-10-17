@@ -1,6 +1,7 @@
 import {
     FTD_SPIKE_MIN_MULTIPLE,
     INVESTOR_FLOWS_AXES,
+    KR_WINDOW_DAYS,
     PROMPT_MAX_NAME_CHARS,
     PROMPT_MAX_SQUEEZE_COMPONENTS,
     SHORT_INTEREST_TREND_POINTS,
@@ -9,6 +10,8 @@ import {
     DEFAULT_ANALYSIS_LOCALE,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
+import { MS_PER_DAY } from '@/domain/constants/time';
+import { formatDay, parseDay } from '@/domain/investorFlows/scoreHelpers';
 import type {
     InvestorFlowsAxisBase,
     InvestorFlowsAxisId,
@@ -21,6 +24,8 @@ import type {
     InvestorFlowsSignalDirection,
     InvestorFlowsSignalId,
     InvestorFlowsSignalStrength,
+    InvestorFlowsWindow,
+    LargeHolderMetrics,
     SqueezeRiskComponentId,
     SqueezeRiskLevel,
     SqueezeRiskScore,
@@ -40,6 +45,12 @@ export interface ScorecardWords {
     readonly direction: Readonly<Record<InvestorFlowsSignalDirection, string>>;
     readonly strength: Readonly<Record<InvestorFlowsSignalStrength, string>>;
     readonly squeezeLevel: Readonly<Record<SqueezeRiskLevel, string>>;
+    /** One schedule's positions and filings, in the form the answer should copy. */
+    readonly positionsAndFilings: (
+        schedule: '13D' | '13G',
+        events: number,
+        filings: number
+    ) => string;
 }
 
 const EN_WORDS: ScorecardWords = {
@@ -66,6 +77,8 @@ const EN_WORDS: ScorecardWords = {
         high: 'high',
         extreme: 'extreme',
     },
+    positionsAndFilings: (schedule, events, filings) =>
+        `${schedule}: ${groupDigits(events)} ${events === 1 ? 'position' : 'positions'} · ${groupDigits(filings)} ${filings === 1 ? 'filing' : 'filings'}`,
 };
 
 const KO_WORDS: ScorecardWords = {
@@ -92,6 +105,8 @@ const KO_WORDS: ScorecardWords = {
         high: '높음',
         extreme: '매우 높음',
     },
+    positionsAndFilings: (schedule, events, filings) =>
+        `${schedule} 포지션 ${groupDigits(events)}건 · 신고 ${groupDigits(filings)}회`,
 };
 
 /** Display names for an output locale: Korean for `ko`, plain English otherwise. */
@@ -175,6 +190,13 @@ export const INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE =
     '- Never write identifiers from this prompt in the output text: no metric, evidence, signal, label or axis identifiers (camelCase such as ratioChangePct or largeHolders, snake_case such as kr_major_holder_increase or kr_insider_cluster, label values such as strong_bullish, neutral or insufficient, axis ids such as insider or largeHolders — where the output schema has an "axis" field, they appear only as its value) and no `name=value` forms. Write labels and axes with the display names the scorecard gives, and state each fact in plain words in the output language, with its number, its unit as rendered here (%, %p, days, shares, USD) and its date.';
 
 /**
+ * How the model states a scoring window: by quoting the rendered inclusive
+ * start date, never by deriving a boundary of its own. Prompt wording.
+ */
+export const INVESTOR_FLOWS_WINDOW_RULE =
+    '- Scoring windows: state a window by quoting its rendered start date as given ("on or after <date>"); that date is inside the window. Never derive a boundary of your own (no "before <date> is outside the window" with a date the data does not show).';
+
+/**
  * Interpretation limits written from the A/B: the model added price-impact
  * predictions ("주가에 부담") and present-tense claims a dated snapshot cannot
  * show ("숏이 빠르게 청산되고 있다"). Prompt wording.
@@ -195,6 +217,7 @@ export function investorFlowsInterpretationRules(
     return [
         `- In ${scope}, describe supply and positioning facts only: never predict the effect on the share price (no "weighs on the stock", "upward pressure", "주가에 부담", "상승 압력").`,
         `- In ${scope}, never claim what is happening now beyond what the dated data shows: state the change with its dates (${example}.`,
+        INVESTOR_FLOWS_WINDOW_RULE,
         '- Quote counts and totals (notices, filers, transactions, values, shares) from the scorecard metrics and evidence; never count the listed source rows yourself — the lists are capped and can include rows outside the scoring window.',
     ].join('\n');
 }
@@ -238,10 +261,33 @@ export function investorFlowsOutputRules(
         '- Fails to deliver: quote an FTD quantity only with its own settlement date — the peak with the peak settlement date shown next to it, never with the latest fails-to-deliver file date.',
         ftdCaveatRule(caveatTarget, locale),
         `- Never call fails to deliver routine, normal or usual (일상적) when the baseline multiple (failsToDeliverMultiple) is ${FTD_SPIKE_MIN_MULTIPLE} or more, even when the peak is too small to raise a signal; say the peak is elevated against its usual (baseline) level but small relative to shares outstanding. When the multiple is n/a the baseline was too thin to compare against; make no baseline comparison and use no spike or surge wording (spike, surge, 급증, 급등) — describe only the level against shares outstanding.`,
+        `- 13D/13G counts: events13d / events13g are positions — one per holder after a filer's amendments are netted and a joint filing's co-filers merged — and filings13d / filings13g are how many filings they made. Quote positions as the number of holders or positions and filings only as how often they filed, as the "positions vs filings" line renders them${locale === 'ko' ? ' (e.g. "13D 포지션 1건 · 신고 7회")' : ''}; never call the filing count positions or holders.`,
         '- An active at-the-market (ATM) program means the company may be selling new shares into the market right now, at market prices — say so. Do not describe the size or pace of ATM sales; the filings do not show it. A shelf or a full registration only creates the capacity to sell later and does not mean shares are being sold.',
         INVESTOR_FLOWS_PLAIN_TEXT_RULE,
     ].join('\n');
 }
+
+/**
+ * Percent units that name their basis. A bare `shortInterestPctFloat=0.72%`
+ * was written up as "시가총액 대비" — float and shares outstanding are share
+ * counts, not market value, and the basis changes the number's meaning.
+ */
+const PCT_OF_FLOAT = '% of float shares';
+/** See {@link PCT_OF_FLOAT}. */
+const PCT_OF_OUTSTANDING = '% of shares outstanding';
+/**
+ * A 13D/13G percent of class. A bare `% of class` was copied into Korean
+ * output ("9.4% of class"); the class is the shares outstanding of that
+ * class, and the Korean terminology rule maps it to 발행주식의 X%.
+ */
+export const PCT_OF_CLASS = '% of shares outstanding (class)';
+
+/**
+ * Korean word for a material change, rendered only for Korean output in both
+ * markets' prompts: the model wrote the literal 물질적 변동. Prompt wording.
+ */
+export const INVESTOR_FLOWS_KO_CHANGE_TERM_RULE =
+    '- Korean terminology: write 유의미한 변동 for a material change (유의미한 변동 없음 for no material change); never write 물질적 변동.';
 
 /**
  * Korean terms and number style for the investor-flows output, rendered only
@@ -254,6 +300,8 @@ export function investorFlowsOutputRules(
  */
 export const INVESTOR_FLOWS_KO_TERMINOLOGY_RULE = [
     '- Korean terminology: write 결제불이행(FTD) for fails to deliver, 매도 예정 신고(Form 144) for a Form 144 notice, 일괄신고(셸프 등록) for a shelf registration, Reg SHO 결제불이행 임계 종목 목록 for the Reg SHO threshold list, 숏스퀴즈 for a short squeeze, 시장가 상시 발행(ATM) for an at-the-market program, 유동주식 for float shares, 발행주식 for shares outstanding, 평소 수준(기준선) for a baseline and 발행 여력 for registration capacity. Never write 미결제, 실패결제, 제안 매도, 선반등록 or 자기 기준선, never write 압축 for a short squeeze, never call the threshold list 서킷브레이커 (that is Rule 201, a different rule), never call a percent of float or of shares outstanding 시가총액 대비, and leave no English word (baseline, capacity, float) in Korean sentences.',
+    INVESTOR_FLOWS_KO_CHANGE_TERM_RULE,
+    `- Korean terminology: write a figure in ${PCT_OF_CLASS} or in ${PCT_OF_OUTSTANDING} as 발행주식의 X% (e.g. "9.1${PCT_OF_CLASS}" → "발행주식의 9.1%"), a share count as N주 (e.g. "411,522 shares" → "411,522주"), a USD amount as N달러, a day count as N일 and a window start "on or after <date>" as "<date> 이후(당일 포함)"; never leave "of class", "of shares outstanding", "shares", "on or after" or any other English unit or phrase in a Korean sentence.`,
     '- Korean numbers: copy numbers digit-for-digit exactly as they appear in the data, with standard 3-digit comma grouping; do not convert share counts or dollar amounts into 만/억 forms and do not regroup digits. Never add an approximate restatement next to an exact figure, and keep share counts and dollar amounts in separate phrases (never "N달러 상당 M주").',
 ].join('\n');
 
@@ -262,15 +310,6 @@ export function sanitizePromptText(text: string, maxChars: number): string {
     const flat = text.replace(/\s+/g, ' ').trim();
     return flat.length > maxChars ? `${flat.slice(0, maxChars)}…` : flat;
 }
-
-/**
- * Percent units that name their basis. A bare `shortInterestPctFloat=0.72%`
- * was written up as "시가총액 대비" — float and shares outstanding are share
- * counts, not market value, and the basis changes the number's meaning.
- */
-const PCT_OF_FLOAT = '% of float shares';
-/** See {@link PCT_OF_FLOAT}. */
-const PCT_OF_OUTSTANDING = '% of shares outstanding';
 
 /**
  * A z-score rendered in words. A bare `z=1.26` was copied into the output
@@ -317,7 +356,7 @@ export function unitOfFigure(key: string): string {
         return PCT_OF_OUTSTANDING;
     }
     if (/pctOfPriorHoldings$/i.test(key)) return '% of prior holdings';
-    if (/percentOfClass$/i.test(key)) return '% of class';
+    if (/percentOfClass$/i.test(key)) return PCT_OF_CLASS;
     if (/pct/i.test(key)) return '%';
     return '';
 }
@@ -328,10 +367,10 @@ const PROMPT_KEY_NAMES: Readonly<Record<string, string>> = {
     shortVolumeRatioZ: 'shortVolumeRatioDeviation',
 };
 
-/** `key=value` with the value's unit; `n/a` for a missing figure. */
+/** `key=value` with the value's unit; `n/a` for a missing or non-finite figure (never `NaN`). */
 function formatFigure(key: string, value: number | null): string {
     const name = PROMPT_KEY_NAMES[key] ?? key;
-    return `${name}=${value === null ? 'n/a' : `${groupDigits(value)}${unitOfFigure(key)}`}`;
+    return `${name}=${value === null || !Number.isFinite(value) ? 'n/a' : `${groupDigits(value)}${unitOfFigure(key)}`}`;
 }
 
 function formatEvidence(evidence: InvestorFlowsEvidence): string {
@@ -354,9 +393,23 @@ const SUBJECT_LABELS: Partial<Record<InvestorFlowsSignalId, string>> = {
 /** Text after a subject, when the subject alone does not name both endpoints. */
 const SUBJECT_SUFFIXES: Partial<Record<InvestorFlowsSignalId, string>> = {
     kr_insider_routine_mass_filing:
-        '; many reporters filed together with a median change too small to count, not a coordinated move and not scored',
+        '; many reporters filed together with a median change too small to count, not a coordinated move and adds no points',
     institutional_holder_count_change: ' vs the quarter before',
     institutional_net_share_change: ' vs the quarter before',
+};
+
+/**
+ * What a neutral note means, after its evidence. The "no material change"
+ * notes sit on an axis scored neutral 0 from real reports; without the note
+ * the model read the bare neutral as missing data ("데이터 부족").
+ */
+const SIGNAL_NOTES: Partial<Record<InvestorFlowsSignalId, string>> = {
+    large_holder_ratio_diluted:
+        ' — shares held did not change; the percent fell because the company has more shares outstanding, not because the holder sold: not a reduction',
+    kr_major_holder_no_material_change:
+        " — reports were filed in the window, but no reporter's net holding ratio changed by 1%p or more or crossed 5%: no material change, a measured neutral reading, not missing data",
+    kr_insider_no_material_change:
+        ' — reports were filed in the window, but their net change and any cluster are too small to count: no material change, a measured neutral reading, not missing data',
 };
 
 type MetricRecord = Readonly<Record<string, unknown>>;
@@ -411,15 +464,94 @@ const ENDPOINT_ONLY_KEYS: ReadonlySet<string> = new Set([
     'shortInterestLatestChangeToDate',
 ]);
 
+/** US 13D/13G signals, whose evidence renders as dated positions (see {@link formatLargeHolderEvidence}). */
+const LARGE_HOLDER_POSITION_SIGNALS: ReadonlySet<InvestorFlowsSignalId> =
+    new Set<InvestorFlowsSignalId>([
+        'activist_13d_new',
+        'activist_13d_increase',
+        'activist_13d_reduction',
+        'activist_13d_exit',
+        'passive_13g_new',
+        'passive_13g_increase',
+        'passive_13g_reduction',
+        'passive_13g_exit',
+        'large_holder_amendment',
+        'large_holder_ratio_diluted',
+    ]);
+
+/** Filing date of a figure `daysAgo` days before the reference day; days ago when the day is unknown. */
+function filedOn(daysAgo: number | null, asOfDay: number | null): string {
+    if (daysAgo === null) return 'date n/a';
+    return asOfDay === null
+        ? `${groupDigits(daysAgo)} days before the as-of date`
+        : formatDay(asOfDay - daysAgo * MS_PER_DAY);
+}
+
+/** One filing's position: `9.1% of shares outstanding (class), 46,227,436 shares`. */
+function positionText(
+    evidence: InvestorFlowsEvidence,
+    percentKey: string,
+    sharesKey: string
+): string {
+    const percent = evidence[percentKey] ?? null;
+    const shares = evidence[sharesKey] ?? null;
+    const percentText =
+        percent === null
+            ? 'percent n/a'
+            : `${groupDigits(percent)}${unitOfFigure(percentKey)}`;
+    const sharesText =
+        shares === null ? 'shares n/a' : `${groupDigits(shares)} shares`;
+    return `${percentText}, ${sharesText}`;
+}
+
+/**
+ * A 13D/13G event as dated positions. The A/B rendered the pre-window
+ * baseline as `prevPercentOfClass=9.3%` beside an increase, and the model
+ * read it as the filing just before the latest ("직전 신고 대비 9.3%에서
+ * 9.1%로 낮아진") — the filing listed just before the latest was 8.9%. Each
+ * figure now says which filing it is, with that filing's date, and that the
+ * direction is measured from the pre-window baseline. The first filing in the
+ * window is omitted when it is the latest (one filing in the window).
+ */
+function formatLargeHolderEvidence(
+    evidence: InvestorFlowsEvidence,
+    asOfDay: number | null
+): string {
+    const filings = evidence.filings ?? null;
+    const latest = `latest filing ${filedOn(evidence.daysAgo ?? null, asOfDay)}: ${positionText(evidence, 'percentOfClass', 'shares')}`;
+    const windowStart =
+        filings === 1
+            ? []
+            : [
+                  `first filing in the window ${filedOn(evidence.windowStartDaysAgo ?? null, asOfDay)}: ${positionText(evidence, 'windowStartPercentOfClass', 'windowStartShares')}`,
+              ];
+    const preWindowDaysAgo = evidence.preWindowDaysAgo ?? null;
+    const baseline =
+        preWindowDaysAgo === null
+            ? 'last filing before the window: none'
+            : `last filing before the window ${filedOn(preWindowDaysAgo, asOfDay)}: ${positionText(evidence, 'preWindowPercentOfClass', 'preWindowShares')} — the direction compares the latest filing with this one, not with the filing just before the latest`;
+    const count =
+        filings === null
+            ? []
+            : [
+                  `${groupDigits(filings)} ${filings === 1 ? 'filing' : 'filings'} in the window`,
+              ];
+    return [latest, ...windowStart, baseline, ...count].join('; ');
+}
+
 function formatSignal(
     signal: InvestorFlowsSignal,
-    words: ScorecardWords
+    words: ScorecardWords,
+    asOfDay: number | null
 ): string {
+    const evidence = LARGE_HOLDER_POSITION_SIGNALS.has(signal.id)
+        ? formatLargeHolderEvidence(signal.evidence, asOfDay)
+        : formatEvidence(signal.evidence);
     const subject =
         signal.subject === undefined
             ? ''
             : ` [${SUBJECT_LABELS[signal.id] ?? ''}${sanitizePromptText(signal.subject, PROMPT_MAX_NAME_CHARS)}${SUBJECT_SUFFIXES[signal.id] ?? ''}]`;
-    return `  - ${signal.id}${subject}: ${words.direction[signal.direction]}, ${words.strength[signal.strength]} (${formatEvidence(signal.evidence)})`;
+    return `  - ${signal.id}${subject}: ${words.direction[signal.direction]}, ${words.strength[signal.strength]} (${evidence})${SIGNAL_NOTES[signal.id] ?? ''}`;
 }
 
 /**
@@ -464,11 +596,23 @@ export const NOT_SCORED_MARKERS = {
     finraTooThin: 'FINRA SHORT DATA TOO THIN TO SCORE',
     finraStale: 'FINRA SHORT DATA STALE',
     finraMissingOrThin: 'FINRA SHORT DATA MISSING OR TOO THIN TO SCORE',
-    noFilings: 'NO FILINGS',
+    noReportsInWindow: 'NO REPORTS IN WINDOW',
 } as const;
 
+/** Markers a US scorecard can render: every marker except the DART-only one. */
+const US_NOT_SCORED_MARKERS: readonly string[] = [
+    NOT_SCORED_MARKERS.noData,
+    NOT_SCORED_MARKERS.finraUnavailable,
+    NOT_SCORED_MARKERS.finraTooThin,
+    NOT_SCORED_MARKERS.finraStale,
+    NOT_SCORED_MARKERS.finraMissingOrThin,
+];
+
 /** Markers a Korean scorecard can render: its axes are DART-only, so no FINRA or filing marker. */
-const KR_NOT_SCORED_MARKERS: readonly string[] = [NOT_SCORED_MARKERS.noData];
+const KR_NOT_SCORED_MARKERS: readonly string[] = [
+    NOT_SCORED_MARKERS.noData,
+    NOT_SCORED_MARKERS.noReportsInWindow,
+];
 
 /**
  * Rule wording for an axis whose heading carries one of the markers the
@@ -478,9 +622,7 @@ export function notScoredAxisPhrase(
     market: InvestorFlowsMarket = 'us'
 ): string {
     const markers =
-        market === 'kr'
-            ? KR_NOT_SCORED_MARKERS
-            : Object.values(NOT_SCORED_MARKERS);
+        market === 'kr' ? KR_NOT_SCORED_MARKERS : US_NOT_SCORED_MARKERS;
     return `an axis whose heading line says it is not scored (${markers.join(', ')})`;
 }
 
@@ -501,12 +643,45 @@ const FINRA_STALE_TEXT = `${NOT_SCORED_MARKERS.finraStale} — the FINRA rows ar
 /** {@link FINRA_UNAVAILABLE_TEXT} when the caller cannot tell excluded from thin (no snapshot). */
 const FINRA_MISSING_OR_THIN_TEXT = `${NOT_SCORED_MARKERS.finraMissingOrThin} — this axis is not scored and has no direction. The fails-to-deliver and Reg SHO facts are still valid context; do not report them as missing.`;
 
-/** Dilution axis whose filing list was provided but empty. */
-const NO_FILINGS_TEXT = `${NOT_SCORED_MARKERS.noFilings} (no offering or registration filings on record) — the axis is not scored. Say no filings were found; do not call dilution neutral or quiet.`;
+/**
+ * Note on a dilution axis scored neutral because its provided filing list was
+ * empty: a measured "nothing filed", not missing data.
+ */
+const NO_FILINGS_ON_RECORD_NOTE =
+    ' (no offering or registration filings on record over the whole lookback: a measured neutral reading, not missing data — say no filings were found)';
+
+/**
+ * A Korean axis whose usable reports all fall outside the window. Distinct from
+ * NO DATA: the reports exist, there were just none recently.
+ */
+function noReportsInWindowText(latestReceiptDate: string): string {
+    return `${NOT_SCORED_MARKERS.noReportsInWindow} — no usable report from this source was filed in the last ${KR_WINDOW_DAYS} days (latest receipt date: ${latestReceiptDate}), so the axis is not scored. Say there were no reports in the last ${KR_WINDOW_DAYS} days with that date; do not call the data missing, and never call the axis neutral or quiet.`;
+}
+
+/**
+ * Rule for a Korean axis scored neutral from real reports (see
+ * {@link SIGNAL_NOTES}), shared by the investor-flows prompt and the overall
+ * prompt's Korean guidance. Prompt wording; no leading bullet.
+ */
+export const KR_NO_MATERIAL_CHANGE_RULE =
+    'An axis scored neutral (score 0) with a no-material-change note is a measured reading: reports were filed in the window and their figures are known, but nothing moved enough to count. It is not missing data and not an unscored axis.';
+
+/** Text of an insufficient Korean axis: NO REPORTS IN WINDOW when older usable reports exist, else NO DATA. */
+function krInsufficientTextOf(
+    scorecard: InvestorFlowsScorecard,
+    id: KrScoredAxisId
+): string {
+    const latest = scorecard[id].krMetrics?.latestReceiptDate ?? null;
+    const inWindow = scorecard[id].krMetrics?.reports ?? 0;
+    return latest !== null && inWindow === 0
+        ? noReportsInWindowText(latest)
+        : NO_DATA_TEXT;
+}
 
 type FormattableAxis = InvestorFlowsAxisBase & {
     metrics: object | null;
     krMetrics?: object;
+    noFilingsOnRecord?: boolean;
 };
 
 /** Options of {@link formatInvestorFlowsScorecard}. */
@@ -551,10 +726,33 @@ function insufficientTextOf(
                 : FINRA_MISSING_OR_THIN_TEXT;
         }
     }
-    if (id === 'dilution' && scorecard.dilution.noFilingsOnRecord) {
-        return NO_FILINGS_TEXT;
-    }
     return NO_DATA_TEXT;
+}
+
+/**
+ * Positions next to filings for the 13D/13G axis. The answer quoted seven
+ * filings as if they were seven holders; one holder's seven amendments are
+ * one position, so both counts are rendered in the words to copy.
+ */
+function positionsLine(
+    metrics: LargeHolderMetrics | null,
+    words: ScorecardWords
+): string {
+    if (metrics === null) return '';
+    return `\n  positions vs filings: ${words.positionsAndFilings('13D', metrics.events13d, metrics.filings13d)}; ${words.positionsAndFilings('13G', metrics.events13g, metrics.filings13g)}`;
+}
+
+/** Why a sufficient axis has no signals, when "none" alone would mislead. */
+function emptySignalsNote(axis: FormattableAxis): string {
+    if (axis.noFilingsOnRecord === true) return NO_FILINGS_ON_RECORD_NOTE;
+    const quietDilution =
+        axis.id === 'dilution' &&
+        axis.metrics !== null &&
+        'filingsInWindow' in axis.metrics &&
+        axis.metrics.filingsInWindow === 0;
+    return quietDilution
+        ? ' (no filings in the window; older filings exist)'
+        : '';
 }
 
 function formatAxis(
@@ -562,26 +760,23 @@ function formatAxis(
     source: string,
     words: ScorecardWords,
     axisIds: boolean,
-    insufficientText: string = NO_DATA_TEXT
+    insufficientText: string = NO_DATA_TEXT,
+    extraLine = '',
+    asOfDay: number | null = null
 ): string {
     const id = axisIds ? ` (axis "${axis.id}")` : '';
     const heading = `- ${words.axis[axis.id]}${id} — ${source}`;
     const signalLine = (signal: InvestorFlowsSignal): string =>
-        formatSignal(signal, words);
+        formatSignal(signal, words, asOfDay);
     if (axis.sufficiency === 'insufficient') {
         const signals = axis.signals.map(signalLine).join('\n');
         return `${heading}\n  ${insufficientText}${signals === '' ? '' : `\n${signals}`}`;
     }
-    const quietDilution =
-        axis.id === 'dilution' &&
-        axis.metrics !== null &&
-        'filingsInWindow' in axis.metrics &&
-        axis.metrics.filingsInWindow === 0;
     const signals =
         axis.signals.length === 0
-            ? `\n  signals: none${quietDilution ? ' (no filings in the window; older filings exist)' : ''}`
+            ? `\n  signals: none${emptySignalsNote(axis)}`
             : `\n  signals:\n${axis.signals.map(signalLine).join('\n')}`;
-    return `${heading}\n  label: ${words.label[axis.label]}, score: ${axis.score}${formatMetrics(axis.krMetrics ?? axis.metrics)}${signals}`;
+    return `${heading}\n  label: ${words.label[axis.label]}, score: ${axis.score}${formatMetrics(axis.krMetrics ?? axis.metrics)}${extraLine}${signals}`;
 }
 
 /** The computed squeeze score: level, coverage and its largest inputs. */
@@ -616,6 +811,19 @@ export function formatSqueezeRisk(
     return `${heading} (${coverage}${cap})\n  top inputs: ${top}\n  last completed daily bar used: ${squeeze.lastBarDate ?? 'none'}`;
 }
 
+/**
+ * A scoring window as an inclusive start date: "receipts on or after
+ * 2026-07-19 (90 days to 2026-10-17)". A bare `from to to` range was turned
+ * into a wrong boundary ("2026-07-10 이전 접수분은 채점 창 밖" for a window
+ * that also excluded 07-10), so the start is stated as the first included day
+ * and the model quotes it (see {@link INVESTOR_FLOWS_WINDOW_RULE}).
+ */
+function windowRange(window: InvestorFlowsWindow, rows: string): string {
+    return window.from === null || window.to === null
+        ? 'n/a'
+        : `${rows} on or after ${window.from} (${window.days} days to ${window.to})`;
+}
+
 /** Dates of every underlying source, so an answer can say how old each number is. */
 export function formatInvestorFlowsFreshness(
     freshness: InvestorFlowsFreshness,
@@ -638,11 +846,11 @@ export function formatInvestorFlowsFreshness(
         `- ${quarter}`,
         `- FINRA short interest settlement date: ${freshness.shortInterestSettlementDate ?? 'n/a'}`,
         `- FINRA off-exchange short volume latest trade date: ${freshness.shortVolumeLatestDate ?? 'n/a'}`,
-        `- Insider window: ${freshness.insiderWindow.from ?? 'n/a'} to ${freshness.insiderWindow.to ?? 'n/a'} (${groupDigits(freshness.insiderTransactionsInWindow)} Form 4 transactions)`,
-        `- 13D/13G window: ${freshness.largeHolderWindow.from ?? 'n/a'} to ${freshness.largeHolderWindow.to ?? 'n/a'}`,
+        `- Insider scoring window: ${windowRange(freshness.insiderWindow, 'transactions')} (${groupDigits(freshness.insiderTransactionsInWindow)} Form 4 transactions)`,
+        `- 13D/13G scoring window: ${windowRange(freshness.largeHolderWindow, 'filings')}`,
         `- SEC fails-to-deliver latest settlement date: ${ftdLatest}`,
         `- Reg SHO threshold list as-of: ${thresholdAsOf}`,
-        `- Offering filings window: ${freshness.dilutionWindow.from ?? 'n/a'} to ${freshness.dilutionWindow.to ?? 'n/a'}`,
+        `- Offering filings scoring window: ${windowRange(freshness.dilutionWindow, 'filings')}`,
     ].join('\n');
 }
 
@@ -653,7 +861,7 @@ export function formatKrInvestorFlowsFreshness(
     return [
         `- Snapshot as-of: ${freshness.asOf ?? 'unknown'}`,
         `- Latest DART receipt date: ${freshness.krDisclosureLatestDate ?? 'n/a'}`,
-        `- DART window: ${freshness.insiderWindow.from ?? 'n/a'} to ${freshness.insiderWindow.to ?? 'n/a'} (${groupDigits(freshness.insiderTransactionsInWindow)} executive / major-shareholder and trading-plan reports)`,
+        `- DART scoring window: ${windowRange(freshness.insiderWindow, 'receipts')} (${groupDigits(freshness.insiderTransactionsInWindow)} executive / major-shareholder and trading-plan reports)`,
     ].join('\n');
 }
 
@@ -679,7 +887,8 @@ function formatKrScorecard(
             scorecard[id],
             KR_INVESTOR_FLOWS_AXIS_HEADINGS[id],
             words,
-            axisIds
+            axisIds,
+            krInsufficientTextOf(scorecard, id)
         )
     ).join('\n');
     return `${compositeLineOf(scorecard, words)}\n${axes}\n${krNotProvidedLine(locale)}\n\nData freshness:\n${formatKrInvestorFlowsFreshness(scorecard.freshness)}`;
@@ -708,13 +917,19 @@ export function formatInvestorFlowsScorecard(
         return formatKrScorecard(scorecard, locale, axisIds);
     }
     const words = scorecardWords(locale);
+    const { asOf } = scorecard.freshness;
+    const asOfDay = asOf === null ? null : parseDay(asOf);
     const axes = INVESTOR_FLOWS_AXES.map(id =>
         formatAxis(
             scorecard[id],
             INVESTOR_FLOWS_AXIS_HEADINGS[id],
             words,
             axisIds,
-            insufficientTextOf(scorecard, id, options)
+            insufficientTextOf(scorecard, id, options),
+            id === 'largeHolders'
+                ? positionsLine(scorecard.largeHolders.metrics, words)
+                : '',
+            asOfDay
         )
     ).join('\n');
     const squeeze =

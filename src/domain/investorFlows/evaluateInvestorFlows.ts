@@ -224,7 +224,10 @@ function evaluateKrScorecard(
  * DART major-holder reports fill `largeHolders`, executive / major-shareholder
  * and trading-plan reports fill `insider` (share- and ratio-based thresholds,
  * `kr_*` signals), and institutional, short and dilution are insufficient. No
- * squeeze score is computed for them.
+ * squeeze score is computed for them. Unlike the rule above, a DART axis with
+ * usable reports in the window and no directional signal is `sufficient` at
+ * score 0 (a measured "no material change", like a quiet 13D/G window), so
+ * the composite computes when both DART axes have reports.
  *
  * **Squeeze score:** with `options.squeezeContext` the scorecard carries
  * `evaluateSqueezeRisk`'s result and the `short_squeeze_risk` signal follows

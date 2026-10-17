@@ -67,6 +67,8 @@ describe('evaluateKrMajorHolderAxis', () => {
             reports: 1,
             reporters: 1,
             detailedReports: 0,
+            maxAbsRatioChangePct: 6.2,
+            latestReceiptDate: daysBeforeAsOf(10),
         });
     });
 
@@ -154,30 +156,102 @@ describe('evaluateKrMajorHolderAxis', () => {
         expect(axis.signals[0].evidence.reports).toBe(2);
     });
 
-    it('is insufficient, not a fake neutral, when no report moved the ratio', () => {
-        // A purpose-change re-filing: ratio unchanged.
+    it('reads a sub-1%p re-filing as a measured neutral, not a fake one', () => {
+        // A purpose-change re-filing: ratio essentially unchanged.
         const axis = evaluateKrMajorHolderAxis(
             [krMajorHolderReport({ ratioPct: 6.2, ratioChangePct: 0.1 })],
             AS_OF_DAY
         );
         expect(isFakeNeutral(axis)).toBe(false);
-        expect(axis.sufficiency).toBe('insufficient');
-        expect(axis.score).toBeNull();
-        expect(axis.krMetrics?.reports).toBe(1);
+        expect(axis.sufficiency).toBe('sufficient');
+        expect(axis.score).toBe(0);
+        expect(axis.label).toBe('neutral');
+        expect(axis.signals).toEqual([
+            {
+                id: 'kr_major_holder_no_material_change',
+                axis: 'largeHolders',
+                direction: 'neutral',
+                strength: 'weak',
+                evidence: {
+                    reports: 1,
+                    reporters: 1,
+                    maxAbsRatioChangePct: 0.1,
+                },
+            },
+        ]);
     });
 
-    it('is insufficient with only out-of-window, future or invalid reports', () => {
+    it("scores Samsung's 43 unchanged 5%+ holder reports as neutral 0 with evidence", () => {
+        // 005930.KS: 43 대량보유 reports, every ratio change 0.00%p.
+        const holders = ['삼성물산', '삼성생명', '국민연금공단', 'BlackRock'];
+        const reports = Array.from({ length: 43 }, (_, i) =>
+            krMajorHolderReport({
+                receiptDate: daysBeforeAsOf(1 + (i % 80)),
+                reporter: holders[i % holders.length],
+                ratioPct: i % holders.length === 0 ? 19.69 : 7.5,
+                ratioChangePct: 0,
+                sharesChange: 0,
+            })
+        );
+        const axis = evaluateKrMajorHolderAxis(reports, AS_OF_DAY);
+        expect(axis.sufficiency).toBe('sufficient');
+        expect(axis.score).toBe(0);
+        expect(axis.label).toBe('neutral');
+        expect(axis.signals.map(s => s.id)).toEqual([
+            'kr_major_holder_no_material_change',
+        ]);
+        expect(axis.signals[0].evidence).toEqual({
+            reports: 43,
+            reporters: 4,
+            maxAbsRatioChangePct: 0,
+        });
+        expect(axis.krMetrics).toEqual({
+            reports: 43,
+            reporters: 4,
+            detailedReports: 0,
+            maxAbsRatioChangePct: 0,
+            latestReceiptDate: daysBeforeAsOf(1),
+        });
+    });
+
+    it('is insufficient with a reason when every usable report is outside the window', () => {
         const axis = evaluateKrMajorHolderAxis(
             [
+                krMajorHolderReport({
+                    receiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 40),
+                    ratioChangePct: 0,
+                }),
                 krMajorHolderReport({
                     receiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 1),
                 }),
                 krMajorHolderReport({ receiptDate: '2026-10-20' }),
-                krMajorHolderReport({ ratioChangePct: Number.NaN }),
             ],
             AS_OF_DAY
         );
         expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.score).toBeNull();
+        expect(axis.signals).toEqual([]);
+        expect(axis.krMetrics).toEqual({
+            reports: 0,
+            reporters: 0,
+            detailedReports: 0,
+            maxAbsRatioChangePct: null,
+            latestReceiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 1),
+        });
+    });
+
+    it('is insufficient without metrics when no report has usable ratios', () => {
+        const axis = evaluateKrMajorHolderAxis(
+            [
+                krMajorHolderReport({ ratioChangePct: Number.NaN }),
+                krMajorHolderReport({ ratioPct: Number.NaN }),
+                krMajorHolderReport({ receiptDate: 'not a date' }),
+                krMajorHolderReport({ receiptDate: '2026-10-20' }),
+            ],
+            AS_OF_DAY
+        );
+        expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.score).toBeNull();
         expect(axis.krMetrics).toBeUndefined();
     });
 
@@ -204,7 +278,11 @@ describe('evaluateKrInsiderAxis', () => {
     it('reads a 20,000-share executive increase on 50M shares as weak bullish', () => {
         // 20,000 / 50,000,000 = 0.04% — just under weak; two of them clear it.
         const one = axisOf([krInsiderReport()]);
-        expect(one.sufficiency).toBe('insufficient');
+        expect(one.sufficiency).toBe('sufficient');
+        expect(one.score).toBe(0);
+        expect(one.signals.map(s => s.id)).toEqual([
+            'kr_insider_no_material_change',
+        ]);
         const two = axisOf([
             krInsiderReport(),
             krInsiderReport({ reporter: '김철수', sharesChange: 10_000 }),
@@ -231,6 +309,7 @@ describe('evaluateKrInsiderAxis', () => {
             netSharesChange: 30_000,
             netChangePct: 0.06,
             tradingPlans: 0,
+            latestReceiptDate: daysBeforeAsOf(10),
         });
     });
 
@@ -256,7 +335,34 @@ describe('evaluateKrInsiderAxis', () => {
         expect(
             axis.signals.find(s => s.id === 'kr_insider_net_change')
         ).toBeUndefined();
+        // Measured: two reports, net zero — a real "no material change".
+        expect(axis.sufficiency).toBe('sufficient');
+        expect(axis.score).toBe(0);
+        expect(axis.label).toBe('neutral');
+        expect(axis.signals).toEqual([
+            {
+                id: 'kr_insider_no_material_change',
+                axis: 'insider',
+                direction: 'neutral',
+                strength: 'weak',
+                evidence: { reports: 2, reporters: 2, netChangePct: 0 },
+            },
+        ]);
+    });
+
+    it('is insufficient when the net change cannot be measured', () => {
+        // No shares outstanding and a missing ratio change: "no change" is not proven.
+        const axis = axisOf(
+            [krInsiderReport({ ratioChangePct: Number.NaN })],
+            [],
+            null
+        );
+        expect(axis.krMetrics?.netChangePct).toBeNull();
         expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.score).toBeNull();
+        expect(
+            axis.signals.some(s => s.id === 'kr_insider_no_material_change')
+        ).toBe(false);
     });
 
     it('falls back to the summed ratio change without shares outstanding', () => {
@@ -407,7 +513,9 @@ describe('evaluateKrInsiderAxis', () => {
             }
         );
 
-        it('does not let a routine mass filing alone make the axis sufficient', () => {
+        it('scores a routine-only window as a measured neutral, with only the routine note', () => {
+            // Hundreds of tiny grant filings with valid numbers are the
+            // absence of a material insider move, not missing data.
             const axis = axisOf(
                 samsungLikeReports().filter(r => r.reporter !== '이재용'),
                 [],
@@ -416,8 +524,9 @@ describe('evaluateKrInsiderAxis', () => {
             expect(axis.signals.map(s => s.id)).toEqual([
                 'kr_insider_routine_mass_filing',
             ]);
-            expect(axis.sufficiency).toBe('insufficient');
-            expect(axis.score).toBeNull();
+            expect(axis.sufficiency).toBe('sufficient');
+            expect(axis.score).toBe(0);
+            expect(axis.label).toBe('neutral');
         });
 
         it('still fires a genuine material cluster hidden in routine noise, without the routine note', () => {
@@ -685,14 +794,33 @@ describe('evaluateKrInsiderAxis', () => {
         ]);
         expect(axis.sufficiency).toBe('insufficient');
         expect(axis.krMetrics?.tradingPlans).toBe(2);
+        expect(axis.krMetrics?.latestReceiptDate).toBeNull();
     });
 
-    it('ignores out-of-window, future-dated and invalid reports', () => {
+    it('is insufficient with a reason when every usable report is outside the window', () => {
         const axis = axisOf([
             krInsiderReport({
-                sharesChange: 1_000_000,
                 receiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 1),
             }),
+            krInsiderReport({
+                receiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 30),
+            }),
+        ]);
+        expect(axis.sufficiency).toBe('insufficient');
+        expect(axis.score).toBeNull();
+        expect(axis.signals).toEqual([]);
+        expect(axis.krMetrics).toEqual({
+            reports: 0,
+            reporters: 0,
+            netSharesChange: 0,
+            netChangePct: 0,
+            tradingPlans: 0,
+            latestReceiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 1),
+        });
+    });
+
+    it('ignores future-dated and invalid reports', () => {
+        const axis = axisOf([
             krInsiderReport({
                 sharesChange: 1_000_000,
                 receiptDate: '2026-10-30',

@@ -1805,9 +1805,31 @@ export function buildCongressTrendCacheKey(
  * gets one Korean sentence that holds both parts; other locales keep the
  * English wording as one sentence.
  *
+ * **`p6`** — Korean "no material change" is neutral, not missing (2026-10-17).
+ * A DART axis with usable reports in the window and no directional signal is
+ * now scored neutral 0 with a `kr_*_no_material_change` note, and an axis
+ * whose reports all fall outside the window renders `NO REPORTS IN WINDOW`
+ * instead of `NO DATA`; the Korean prompt gains a rule for both. A `p5` entry
+ * can call Samsung's 43 unchanged 5%+ holder reports "데이터 부족". US
+ * scorecards change in the same release: an empty offering list scores the
+ * dilution axis neutral 0 (the `NO FILINGS` marker is gone), and 13D/13G
+ * events count a joint filing once, net a filer's stacked amendments into one
+ * event (evidence gains `filings`) and cap 13D points — a `p5` entry can read
+ * HSCS or GME as +100. Both markets: every scoring window renders as an
+ * inclusive start date ("receipts on or after …") with a rule to quote it, and
+ * Korean output gets 유의미한 변동 for a material change. 13D/13G direction is
+ * read from shares held (GME: more shares at a lower percent is an increase;
+ * a dilution-only drop is the neutral `large_holder_ratio_diluted`), the axis
+ * renders positions next to filings, and percent of class renders as
+ * `% of shares outstanding (class)`. Each 13D/13G event renders as dated
+ * positions — latest filing, first filing in the window, last filing before
+ * the window (the baseline the direction is measured from) — instead of a bare
+ * `prevPercentOfClass`, which a model read as the filing just before the
+ * latest; a split (shares rescaled, percent unchanged) is a neutral amendment.
+ *
  * @internal
  */
-export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * @internal TTL for investor-flows analysis cache results. Default: 12 hours —
@@ -2099,9 +2121,17 @@ export function buildNewsCacheKey(
  * {@link INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION} `p5`). Only prompts with a
  * US scorecard change, but the guidance is not folded into `inputHash`.
  *
+ * **`p8`** — Korean "no material change" reading (2026-10-17; see
+ * {@link INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION} `p6`). The Korean guidance
+ * gains a rule and its not-scored marker list a `NO REPORTS IN WINDOW` marker,
+ * and the US marker list drops `NO FILINGS` (an empty offering list now scores
+ * neutral), and the section gains the window-quoting and Korean change-term
+ * rules, so every prompt with an investor-flows section changes; the
+ * guidance is not folded into `inputHash`.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p7' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p8' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

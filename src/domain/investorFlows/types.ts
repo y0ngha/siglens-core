@@ -443,16 +443,19 @@ export type InvestorFlowsSignalId =
     | 'passive_13g_reduction'
     | 'passive_13g_exit'
     | 'large_holder_amendment'
+    | 'large_holder_ratio_diluted'
     // large holders, Korea (DART)
     | 'kr_major_holder_new'
     | 'kr_major_holder_increase'
     | 'kr_major_holder_reduction'
     | 'kr_major_holder_exit'
+    | 'kr_major_holder_no_material_change'
     // insider, Korea (DART)
     | 'kr_insider_net_change'
     | 'kr_insider_cluster'
     | 'kr_insider_routine_mass_filing'
     | 'kr_trading_plan'
+    | 'kr_insider_no_material_change'
     // short
     | 'short_interest_level'
     | 'short_interest_trend'
@@ -619,6 +622,13 @@ export interface KrInsiderMetrics {
     readonly netChangePct: number | null;
     /** Trading-plan reports in the window. */
     readonly tradingPlans: number;
+    /**
+     * Newest receipt date of a usable ownership report (parseable date, finite
+     * share change) on or before the reference day, inside the window or not;
+     * `null` when there is none. With `reports === 0` it marks "reports exist,
+     * none in the window" — an insufficient axis that is not missing data.
+     */
+    readonly latestReceiptDate: string | null;
 }
 
 /** Insider axis: Form 4 and Form 144 for US listings, DART ownership reports for Korean ones. */
@@ -626,15 +636,27 @@ export interface InsiderAxis extends InvestorFlowsAxisBase {
     readonly id: 'insider';
     /** US figures; `null` when the axis is insufficient or the snapshot is Korean. */
     readonly metrics: InsiderMetrics | null;
-    /** Korean figures; present only for a Korean snapshot with data in the window. */
+    /**
+     * Korean figures; present for a Korean snapshot with a usable report on or
+     * before the reference day (in the window or not) or a trading plan in the
+     * window.
+     */
     readonly krMetrics?: KrInsiderMetrics;
 }
 
 /** Computed 13D/13G figures over the large-holder window. */
 export interface LargeHolderMetrics {
-    /** 13D filings (original and amendments) in the window. */
+    /**
+     * 13D positions (events) in the window: one per holder after a filer's
+     * amendments are netted and a joint filing's co-filers merged. Quote this
+     * as the number of positions, not {@link LargeHolderMetrics.filings13d}.
+     */
+    readonly events13d: number;
+    /** 13D filings (original and amendments) in the window; a joint filing and a same-day repeat count once. */
     readonly filings13d: number;
-    /** 13G filings (original and amendments) in the window. */
+    /** 13G positions (events) in the window; see {@link LargeHolderMetrics.events13d}. */
+    readonly events13g: number;
+    /** 13G filings (original and amendments) in the window; see {@link LargeHolderMetrics.filings13d}. */
     readonly filings13g: number;
 }
 
@@ -646,6 +668,18 @@ export interface KrMajorHolderMetrics {
     readonly reporters: number;
     /** Reports in the window filed on the detailed (일반) form; informational. */
     readonly detailedReports: number;
+    /**
+     * Largest per-reporter net holding-ratio change in the window, percentage
+     * points, absolute; `null` when no report is in the window.
+     */
+    readonly maxAbsRatioChangePct: number | null;
+    /**
+     * Newest receipt date of a usable report (parseable date, finite ratio and
+     * ratio change) on or before the reference day, inside the window or not.
+     * With `reports === 0` it marks "reports exist, none in the window" — an
+     * insufficient axis that is not missing data.
+     */
+    readonly latestReceiptDate: string;
 }
 
 /** 5% beneficial-owner axis: 13D/13G for US listings, DART major-holder reports for Korean ones. */
@@ -653,7 +687,10 @@ export interface LargeHolderAxis extends InvestorFlowsAxisBase {
     readonly id: 'largeHolders';
     /** US figures; `null` when the axis is insufficient or the snapshot is Korean. */
     readonly metrics: LargeHolderMetrics | null;
-    /** Korean figures; present only for a Korean snapshot with data in the window. */
+    /**
+     * Korean figures; present for a Korean snapshot with a usable report on or
+     * before the reference day, in the window or not.
+     */
     readonly krMetrics?: KrMajorHolderMetrics;
 }
 
@@ -680,11 +717,12 @@ export interface DilutionAxis extends InvestorFlowsAxisBase {
     readonly id: 'dilution';
     /**
      * `true` only when the snapshot provided an offering list, the reference
-     * day is usable, and the list is empty — no filing exists for the issuer,
-     * so an insufficient axis renders "no filings". A missing list, an unusable
-     * reference day, or a list whose entries are all unparseable or future-dated
-     * is `false` and renders "no data": those are unusable inputs, not proof
-     * that nothing was filed. Rendering only — sufficiency is unchanged.
+     * day is usable, and the list is empty — no filing exists for the issuer
+     * over the provider's lookback. The axis is then `sufficient` at score 0
+     * (neutral) with zero metrics and renders "no filings on record". A missing
+     * list, an unusable reference day, or a list whose entries are all
+     * unparseable or future-dated is `false` and `insufficient` ("no data"):
+     * those are unusable inputs, not proof that nothing was filed.
      */
     readonly noFilingsOnRecord: boolean;
     /** Computed figures; `null` when the axis is insufficient. */

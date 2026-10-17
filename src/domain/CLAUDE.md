@@ -287,6 +287,8 @@ to reformat.
 ```typescript
 // ❌ `flow: 1234567890, label: net_buy, z=1.8`   // the answer repeats all three
 // ✅ `flow: 1,234,567,890 (net buying, well above its usual range)`
+// ❌ a generic rule "print the unit as rendered here" while the rendered unit is English ("shares", "% of class")
+// ✅ render Korean units/terms for Korean output (주, 지분율), and state unit rules per language
 ```
 
 <a id="DOM-12"></a>
@@ -302,6 +304,35 @@ Name the flag after the fact proven, not the conclusion you hope for.
 // ❌ offeringsProvided: boolean                     // implies more than "no filings found"
 // ✅ renderShortInterest(metrics, { finraUnavailable })   // explicit caller flag
 // ✅ noFilingsOnRecord: boolean
+// ❌ direction = sharesNow > sharesPrev ? 'increase' : 'decrease'   // a split changes shares without any trade
+// ✅ direction only when the change survives the split guard; otherwise 'unknown'
+```
+
+<a id="DOM-13"></a>
+#### DOM-13 — A rendered comparison names its basis
+
+A delta, "previous" value or baseline is rendered together with what it is measured against
+(the filing date, the period start, "before the window"). A bare `prev` reads as "the
+immediately preceding observation" to a model, even when the value is a pre-window baseline
+or an earlier unrelated filing. A derived score likewise carries the inputs it was computed from.
+
+```typescript
+// ❌ `stake: 5.2% (prev 4.1%)`                          // which "previous"?
+// ✅ `stake: 5.2% (4.1% as of the last filing before this window, 2026-03-02)`
+```
+
+<a id="DOM-14"></a>
+#### DOM-14 — Merge records only on a strong identity key
+
+Rows are merged (joint filers, duplicate filings) only when a key that proves they describe
+the same event matches (accession number, position match). An empty or absent field is
+"unknown", never a match: grouping on a blank URL merges unrelated filers, and merging
+joint filers without an accession or position match double-counts or misattributes. Rows
+without a usable key stay separate.
+
+```typescript
+// ❌ groupBy(rows, r => r.url)                          // '' groups every blank-URL row together
+// ✅ r.accession ? groupBy key `${r.accession}` : keep the row as its own group
 ```
 
 ## Overall axis weighting (`analysis/overallScore.ts`)

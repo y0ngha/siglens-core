@@ -157,7 +157,9 @@ describe('buildInvestorFlowsAnalysisPrompt', () => {
         expect(dynamic).toContain(
             `FINRA short interest settlement date: ${daysBeforeAsOf(10)}`
         );
-        expect(dynamic).toContain('Insider window:');
+        expect(dynamic).toContain(
+            'Insider scoring window: transactions on or after '
+        );
     });
 
     it('caps each compact-fact list', () => {

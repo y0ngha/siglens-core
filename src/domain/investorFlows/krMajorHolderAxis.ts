@@ -7,6 +7,7 @@ import {
 } from '@/domain/investorFlows/constants';
 import {
     daysBetween,
+    formatDay,
     groupByKey,
     isFiniteNumber,
     labelForScore,
@@ -76,14 +77,19 @@ function classify(
     return null;
 }
 
+/** Net holding-ratio change (percentage points) across one reporter's reports. */
+function netRatioChange(reports: readonly DatedReport[]): number {
+    return roundValue(
+        reports.reduce((sum, r) => sum + r.report.ratioChangePct, 0)
+    );
+}
+
 /** One signal for one reporter's reports in the window (oldest first). */
 function reporterSignal(
     reports: readonly DatedReport[]
 ): InvestorFlowsSignal[] {
     const latest = reports[reports.length - 1].report;
-    const netChange = roundValue(
-        reports.reduce((sum, r) => sum + r.report.ratioChangePct, 0)
-    );
+    const netChange = netRatioChange(reports);
     const priorRatio = roundValue(latest.ratioPct - netChange);
     const event = classify(priorRatio, latest.ratioPct, netChange);
     if (event === null) return [];
@@ -136,17 +142,27 @@ function reporterSignal(
  * form**: 약식 is used both for simple investment and for a professional
  * investor's general investment, and the reports carry no holding purpose.
  *
- * Unlike the US axes, **sufficient means at least one directional signal**.
- * Reports that moved nothing (a re-filing, a sub-1%p change inside the band)
- * leave the axis insufficient instead of reading as a zero; `krMetrics` still
- * counts them. Reports dated after the reference day, outside the window or
- * with non-finite ratios are dropped.
+ * A report is usable when its date parses, it is dated on or before the
+ * reference day and its ratio and ratio change are finite. Three states:
+ *
+ * - **Usable reports in the window, none moving a reporter's net ratio by
+ *   {@link KR_MAJOR_HOLDER_CHANGE_WEAK_PCT}%p or across 5%** (re-filings,
+ *   0.00%p changes, sub-1%p steps inside the band): `sufficient`, score 0,
+ *   `neutral`, with the neutral `kr_major_holder_no_material_change` note. The
+ *   holders filed and their ratios are known, so "no material change" is a
+ *   measured fact — the same reading the US 13D/G axis gives a quiet window.
+ * - **Usable reports only outside the window**: `insufficient`, with
+ *   `krMetrics.reports === 0` and `krMetrics.latestReceiptDate` so a renderer
+ *   can say "no reports in the window" instead of "no data".
+ * - **No usable report at all** (none, only future-dated, or ratios missing):
+ *   `insufficient` without `krMetrics` — the inputs cannot say anything, so
+ *   the axis never reads as a fake zero.
  */
 export function evaluateKrMajorHolderAxis(
     reports: readonly KrMajorHolderReport[],
     asOfDay: number | null
 ): LargeHolderAxis {
-    const inWindow: DatedReport[] =
+    const visible: Array<DatedReport & { readonly age: number }> =
         asOfDay === null
             ? []
             : reports
@@ -160,25 +176,10 @@ export function evaluateKrMajorHolderAxis(
                           return [];
                       }
                       const age = daysBetween(day, asOfDay);
-                      return age >= 0 && age <= KR_WINDOW_DAYS
-                          ? [{ report, day }]
-                          : [];
+                      return age >= 0 ? [{ report, day, age }] : [];
                   })
                   .sort((a, b) => a.day - b.day);
-    const byReporter = groupByKey(inWindow, r => reporterKey(r.report));
-    const signals = [...byReporter.values()].flatMap(reporterSignal);
-    const krMetrics: KrMajorHolderMetrics | undefined =
-        inWindow.length === 0
-            ? undefined
-            : {
-                  reports: inWindow.length,
-                  reporters: byReporter.size,
-                  detailedReports: inWindow.filter(
-                      r => r.report.reportForm === 'detailed'
-                  ).length,
-              };
-    const base = krMetrics === undefined ? {} : { krMetrics };
-    if (signals.length === 0) {
+    if (visible.length === 0) {
         return {
             id: 'largeHolders',
             score: null,
@@ -186,7 +187,58 @@ export function evaluateKrMajorHolderAxis(
             sufficiency: 'insufficient',
             signals: [],
             metrics: null,
-            ...base,
+        };
+    }
+    const inWindow: DatedReport[] = visible.filter(
+        r => r.age <= KR_WINDOW_DAYS
+    );
+    const byReporter = groupByKey(inWindow, r => reporterKey(r.report));
+    const groups = [...byReporter.values()];
+    const signals = groups.flatMap(reporterSignal);
+    const krMetrics: KrMajorHolderMetrics = {
+        reports: inWindow.length,
+        reporters: byReporter.size,
+        detailedReports: inWindow.filter(
+            r => r.report.reportForm === 'detailed'
+        ).length,
+        maxAbsRatioChangePct:
+            groups.length === 0
+                ? null
+                : Math.max(...groups.map(g => Math.abs(netRatioChange(g)))),
+        latestReceiptDate: formatDay(visible[visible.length - 1].day),
+    };
+    if (inWindow.length === 0) {
+        return {
+            id: 'largeHolders',
+            score: null,
+            label: 'insufficient',
+            sufficiency: 'insufficient',
+            signals: [],
+            metrics: null,
+            krMetrics,
+        };
+    }
+    if (signals.length === 0) {
+        return {
+            id: 'largeHolders',
+            score: 0,
+            label: 'neutral',
+            sufficiency: 'sufficient',
+            signals: [
+                makeSignal(
+                    'largeHolders',
+                    'kr_major_holder_no_material_change',
+                    'neutral',
+                    'weak',
+                    {
+                        reports: krMetrics.reports,
+                        reporters: krMetrics.reporters,
+                        maxAbsRatioChangePct: krMetrics.maxAbsRatioChangePct,
+                    }
+                ),
+            ],
+            metrics: null,
+            krMetrics,
         };
     }
     const score = scoreFromSignals(signals);
@@ -197,6 +249,6 @@ export function evaluateKrMajorHolderAxis(
         sufficiency: 'sufficient',
         signals: sortSignals(signals),
         metrics: null,
-        ...base,
+        krMetrics,
     };
 }

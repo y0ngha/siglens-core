@@ -269,6 +269,14 @@ export const LARGE_HOLDER_WINDOW_DAYS = 90;
  */
 export const LARGE_HOLDER_13G_POINTS_CAP = 30;
 
+/**
+ * Cap on the summed absolute score from 13D events: one strong event. A 13D
+ * already reads strong on its own, and several activist filings in one window
+ * (a group's members, stacked amendments) are one campaign, not independent
+ * votes — uncapped, they pinned the axis at ±100.
+ */
+export const LARGE_HOLDER_13D_POINTS_CAP = 60;
+
 // ─── Dilution (registration / offering filings) ──────
 
 /** Window offering filings are measured over: long enough to cover a shelf followed by its first takedown. */

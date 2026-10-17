@@ -21,7 +21,10 @@ import {
 } from '@/domain/investorFlows/constants';
 import {
     formatInvestorFlowsScorecard,
+    KR_NO_MATERIAL_CHANGE_RULE,
+    PCT_OF_CLASS,
     groupDigits,
+    INVESTOR_FLOWS_KO_CHANGE_TERM_RULE,
     INVESTOR_FLOWS_KO_TERMINOLOGY_RULE,
     INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE,
     investorFlowsInterpretationRules,
@@ -72,7 +75,9 @@ function name(text: string): string {
 }
 
 function formatNumber(value: number | null): string {
-    return value === null ? 'n/a' : groupDigits(value);
+    return value === null || !Number.isFinite(value)
+        ? 'n/a'
+        : groupDigits(value);
 }
 
 /** A price with adaptive decimals (2 from $1, 4 below), grouped; `n/a` when missing. */
@@ -139,7 +144,7 @@ function formatLargeHolders(
         .slice(0, PROMPT_MAX_LARGE_HOLDER_FILINGS)
         .map(
             f =>
-                `- ${f.filingDate}${windowTag(f.filingDate, window)} | ${name(f.filer)} | ${name(f.form)} | ${formatNumber(f.percentOfClass)}% of class | shares ${formatNumber(f.shares)}`
+                `- ${f.filingDate}${windowTag(f.filingDate, window)} | ${name(f.filer)} | ${name(f.form)} | ${f.percentOfClass === null || !Number.isFinite(f.percentOfClass) ? 'n/a' : `${groupDigits(f.percentOfClass)}${PCT_OF_CLASS}`} | shares ${formatNumber(f.shares)}`
         )
         .join('\n');
 }
@@ -342,6 +347,16 @@ function formatKrTradingPlans(
         .join('\n');
 }
 
+/**
+ * How the model should word a Korean axis scored neutral from real reports.
+ * Without it the neutral read as "데이터 부족" in the output. Prompt wording.
+ */
+function noMaterialChangeWording(locale: AnalysisLocale): string {
+    return locale === 'ko'
+        ? '"변동 없음(중립)"'
+        : '"no material change (neutral)"';
+}
+
 const EMPTY_KR: KrDisclosureSnapshot = {
     majorHolders: [],
     insiders: [],
@@ -380,6 +395,7 @@ ${formatKrTradingPlans(kr.tradingPlans, scorecard.freshness.insiderWindow)}
 - Executive / major-shareholder reports give the holding change but no cause: an open-market trade, a gift, an inheritance and an option exercise look alike. Read the computed net change and clusters, not single rows, and never name a cause the report does not state.
 - A cluster counts only reporters whose own change is material. A routine mass filing (more than ${KR_INSIDER_ROUTINE_MASS_FILING_MAX_REPORTERS} reporters inside ${INSIDER_CLUSTER_WINDOW_DAYS} days whose median change is too small to count) is neutral context: never call it a cluster, coordinated buying or selling, or a sign of insider conviction.
 - A trading-plan report pre-announces an insider trade; it is context, not a completed trade.
+- ${KR_NO_MATERIAL_CHANGE_RULE}
 - Not provided for Korean listings: institutional / foreign net buying, short selling and offering filings. Say they are not provided; never fill them in from general knowledge.
 
 ${outputSchema('"insider" | "largeHolders"', schemaLang)}
@@ -387,12 +403,12 @@ ${outputSchema('"insider" | "largeHolders"', schemaLang)}
 Rules:
 - Respond with valid JSON only. No markdown fences.
 ${localizedFieldDirective(locale)}
-- axisInterpretations: exactly one entry each for insider and largeHolders, in that order. For ${notScoredAxisPhrase('kr')}, interpretationKo must say why it is not scored, as its heading says, and never call it neutral. Do not add entries for the axes that are not provided.
+- axisInterpretations: exactly one entry each for insider and largeHolders, in that order. For ${notScoredAxisPhrase('kr')}, interpretationKo must say why it is not scored, as its heading says, and never call it neutral. For an axis scored neutral with a no-material-change note, interpretationKo states the report count and that nothing changed materially, written as ${noMaterialChangeWording(locale)}; never call it missing data${locale === 'ko' ? ' or 데이터 부족' : ''}. Do not add entries for the axes that are not provided.
 - keySignalsKo: 1–5 items, strongest first, each tied to a signal from the scorecard with its evidence numbers quoted as given. If no axis has a non-neutral signal, return exactly one item saying so.
 - risksKo: 2–4 items covering the reporting lag, the missing causes and purposes, and what would change the reading.
 - dataNotesKo: state the DART receipt dates and the window you used, and that institutional / foreign net buying is not provided. The last item must state that this is an interpretation of public filings, not investment advice.
 ${investorFlowsInterpretationRules('every output field', 'kr')}
-${INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE}
+${INVESTOR_FLOWS_KR_PLAIN_TEXT_RULE}${locale === 'ko' ? `\n${INVESTOR_FLOWS_KO_CHANGE_TERM_RULE}` : ''}
 ${CLOSING_RULES}`;
     return { stable: '', dynamic };
 }
