@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.22.2](https://github.com/y0ngha/siglens-core/compare/v2.22.1...v2.22.2) (2026-10-17)
+
+### Bug Fixes
+
+* 수급 축 정확도 — KR 무변동 중립, 13D 방향 주식 수 기준, 포지션·신고 분리, 한국어 단위 규칙 ([#282](https://github.com/y0ngha/siglens-core/issues/282)) ([5bb2a87](https://github.com/y0ngha/siglens-core/commit/5bb2a87ad7b4a532df6953035348a900745527cf))
+
 ## [2.22.1](https://github.com/y0ngha/siglens-core/compare/v2.22.0...v2.22.1) (2026-10-16)
 
 ### Bug Fixes
