@@ -2,39 +2,136 @@ import { MS_PER_DAY } from '@/domain/constants/time';
 import type { ExpirationSlot, SlotMapping } from './types';
 
 /**
- * @internal Inclusive upper-bound on days-to-expiration for the `0D` slot;
- * expirations beyond this boundary fall through to the `1W` slot. Set to
- * 6 (= 1 week minus 1 day) so a single weekly Friday expiration lands in
- * `0D` regardless of which ET weekday the lookup is performed on.
+ * @internal Inclusive upper-bound on days-to-expiration for the `0D` slot.
+ * The `0D` slot is chosen by ET calendar week (see `mapExpirationsToSlots`),
+ * so this value only documents the widest span a same-week lookup can cover
+ * (Mon–Sun = 6 days ahead of Monday) and is exposed as the slot's `maxDays`.
  */
 export const ZERO_DTE_MAX_DAYS = 6;
+
+/**
+ * @internal Per-slot selection windows in calendar days from the ET date of
+ * `now`. `target` is the ideal distance; `min`/`max` are inclusive bounds. An
+ * expiration outside `[min, max]` is never borrowed for the slot — the slot is
+ * left unmapped instead, so a "2주" chip can never show a 3-week expiration.
+ */
+export const EXPIRATION_SLOT_WINDOWS = {
+    '1W': { target: 7, min: 5, max: 10 },
+    '2W': { target: 14, min: 11, max: 17 },
+    '1M': { target: 30, min: 24, max: 45 },
+    '2M': { target: 60, min: 50, max: 75 },
+    '3M': { target: 90, min: 76, max: 120 },
+    '6M': { target: 180, min: 150, max: 240 },
+} as const;
 
 /**
  * @internal
  * Canonical chip slots in render order. Frontends pick the closest matching
  * provider expiration per slot.
  *
- * The `0D` slot represents same-week expirations (≤ 6 days out). The label
- * is "이번 주" ("this week") rather than "today" because a Monday call may
- * match a Friday weekly that is 4 days away — labelling it "today" would
- * be misleading.
+ * The `0D` slot represents the current ET week's last expiration. The label
+ * is "이번 주" ("this week") rather than "today" because it usually resolves
+ * to the week's Friday weekly, several days away.
  */
 export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
     { key: '0D', label: '이번 주', targetDays: 0, maxDays: ZERO_DTE_MAX_DAYS },
-    { key: '1W', label: '1주', targetDays: 7 },
-    { key: '2W', label: '2주', targetDays: 14 },
-    { key: '1M', label: '1개월', targetDays: 30 },
-    { key: '2M', label: '2개월', targetDays: 60 },
-    { key: '3M', label: '3개월', targetDays: 90 },
-    { key: '6M', label: '6개월', targetDays: 180 },
+    { key: '1W', label: '1주', ...slotWindow('1W') },
+    { key: '2W', label: '2주', ...slotWindow('2W') },
+    { key: '1M', label: '1개월', ...slotWindow('1M') },
+    { key: '2M', label: '2개월', ...slotWindow('2M') },
+    { key: '3M', label: '3개월', ...slotWindow('3M') },
+    { key: '6M', label: '6개월', ...slotWindow('6M') },
 ];
 
+function slotWindow(
+    key: keyof typeof EXPIRATION_SLOT_WINDOWS
+): Pick<ExpirationSlot, 'targetDays' | 'minDays' | 'maxDays'> {
+    const w = EXPIRATION_SLOT_WINDOWS[key];
+    return { targetDays: w.target, minDays: w.min, maxDays: w.max };
+}
+
+const FRIDAY = 5;
+const SATURDAY = 6;
+const DAYS_PER_WEEK = 7;
+
+interface DatedExpiration {
+    date: string;
+    days: number;
+}
+
+function isFriday(isoDate: string): boolean {
+    return new Date(`${isoDate}T12:00:00Z`).getUTCDay() === FRIDAY;
+}
+
 /**
- * Map provider expirations to slots. For each slot, pick the closest
- * expiration whose `daysToExpiration` falls within `[targetDays, maxDays]`
- * (or simply `>= targetDays` when `maxDays` is absent — standard slots
- * from `1W` onward omit the upper bound). An expiration mapped to one
- * slot is not reused for later slots.
+ * Inclusive `[start, end]` day offsets of the "current" trading week. Mon–Fri
+ * use the rest of the Mon–Sun week containing `now`. Saturday and Sunday roll
+ * to the upcoming Mon–Sun week: nothing can still expire in the finished week,
+ * and the user looking at the chain on a weekend means the coming week.
+ */
+function currentWeekRange(from: Date): { start: number; end: number } {
+    const p = etCalendarParts(from);
+    const weekday = new Date(
+        Date.UTC(p.year, p.month - 1, p.day, 12)
+    ).getUTCDay();
+    if (weekday === 0) return { start: 1, end: DAYS_PER_WEEK };
+    if (weekday === SATURDAY) return { start: 2, end: DAYS_PER_WEEK + 1 };
+    return { start: 0, end: DAYS_PER_WEEK - weekday };
+}
+
+/**
+ * `0D` ("이번 주"): the LAST expiration inside the current week, which is the
+ * regular Friday weekly rather than a Monday/Wednesday one. When nothing
+ * remains this week, falls back to the nearest upcoming expiration.
+ */
+function pickThisWeek(
+    candidates: ReadonlyArray<DatedExpiration>,
+    now: Date
+): DatedExpiration | undefined {
+    const { start, end } = currentWeekRange(now);
+    const inWeek = candidates.filter(e => e.days >= start && e.days <= end);
+    if (inWeek.length > 0) return inWeek[inWeek.length - 1];
+    return candidates[0];
+}
+
+/**
+ * Nearest expiration to `window.target` within `[min, max]`. Ties prefer a
+ * Friday (standard weekly/monthly), then the earlier date.
+ */
+function pickNearestInWindow(
+    candidates: ReadonlyArray<DatedExpiration>,
+    window: { target: number; min: number; max: number }
+): DatedExpiration | undefined {
+    let best: DatedExpiration | undefined;
+    for (const e of candidates) {
+        if (e.days < window.min || e.days > window.max) continue;
+        if (!best) {
+            best = e;
+            continue;
+        }
+        const dist = Math.abs(e.days - window.target);
+        const bestDist = Math.abs(best.days - window.target);
+        if (
+            dist < bestDist ||
+            (dist === bestDist && isFriday(e.date) && !isFriday(best.date))
+        ) {
+            best = e;
+        }
+    }
+    return best;
+}
+
+/**
+ * Map provider expirations to slots.
+ *
+ * - `0D`: the last expiration in the current ET week (weekend rolls to the
+ *   coming week); nearest expiration when none remain.
+ * - Other slots: the expiration nearest to the slot target inside its
+ *   {@link EXPIRATION_SLOT_WINDOWS} window; ties prefer a Friday, then the
+ *   earlier date. No expiration in the window leaves the slot `null` — a far
+ *   expiration is never borrowed.
+ *
+ * An expiration mapped to one slot is not reused for later slots.
  *
  * @param expirations - Expiration dates (ISO 'YYYY-MM-DD'), unsorted OK.
  * @param now - Reference date (typically ET-midnight today).
@@ -49,22 +146,20 @@ export function mapExpirationsToSlots(
         .filter(e => e.days >= 0)
         .sort((a, b) => a.days - b.days);
 
-    // `used` is a function-local Set — no external observer sees it mid-
-    // build. Using a for-of with pre-allocated result keeps the mutation
-    // and the array build co-located instead of mixing a `.map` callback
-    // with `used.add` side effects. The alternative (rebuilding an
-    // immutable Set per slot) would be O(N²) for no readability gain. Set
-    // lookup is O(1) per `find` predicate evaluation (vs O(N) for
-    // Array.includes).
+    // `used` is function-local; no external observer sees it mid-build.
     const used = new Set<string>();
     const result: (SlotMapping | null)[] = [];
     for (const slot of EXPIRATION_SLOTS) {
-        const match = dated.find(
-            e =>
-                slot.targetDays <= e.days &&
-                (slot.maxDays === undefined || e.days <= slot.maxDays) &&
-                !used.has(e.date)
-        );
+        const available = dated.filter(e => !used.has(e.date));
+        const match =
+            slot.key === '0D'
+                ? pickThisWeek(available, now)
+                : pickNearestInWindow(
+                      available,
+                      EXPIRATION_SLOT_WINDOWS[
+                          slot.key as keyof typeof EXPIRATION_SLOT_WINDOWS
+                      ]
+                  );
         if (!match) {
             result.push(null);
             continue;

@@ -89,6 +89,9 @@ export function detectWarning(
     return null;
 }
 
+/** @internal Snapshot before the display-only `ma200DistancePct` is attached by `computeFearGreedIndex`. */
+export type ScoredSnapshot = Omit<FearGreedSnapshot, 'ma200DistancePct'>;
+
 const FLOW_KEYS = ['volume_z', 'buysell_imbalance', 'poc_distance'] as const;
 const TREND_KEYS = ['ma200_distance', 'range_position'] as const;
 
@@ -163,7 +166,7 @@ function classifyConfidence(sampleSize: number): FearGreedConfidence {
 export function composeSnapshot(
     current: FactorValues | null,
     sample: FactorValues[]
-): FearGreedSnapshot | null {
+): ScoredSnapshot | null {
     if (!current) return null;
     const sampleSize = sample.length;
     const confidence = classifyConfidence(sampleSize);

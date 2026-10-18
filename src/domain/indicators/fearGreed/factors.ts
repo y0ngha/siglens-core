@@ -1,4 +1,5 @@
 import type { Bar, BuySellVolumeResult } from '@/domain/types';
+import { calculateMA } from '@/domain/indicators/ma';
 import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
 import type { FactorValues } from '@/domain/indicators/fearGreed/types';
 
@@ -25,6 +26,30 @@ const MIN_ROLLING_GUARD = 5;
  * @internal Imported by walkForward.ts; not part of the public API.
  */
 export const FEAR_GREED_MIN_FACTOR_WINDOW = 30;
+
+/**
+ * Display distance (percent) of the last close from the 200-day SMA computed
+ * INCLUSIVE of the last bar — the same value as `calculateMA(bars, 200)` on the
+ * last bar and `evaluatePullback().closeVsMa200Pct`.
+ *
+ * The scored `ma200Dist` factor in {@link computeFactorsAtT} deliberately
+ * excludes the current bar (look-ahead-free percentile ranking), so it differs
+ * slightly from what the analysis screens show. This helper exists only for
+ * display and never feeds a score.
+ *
+ * @returns percent, or `null` when there are fewer than 200 bars, the last close
+ *   is not finite, or the SMA is not positive.
+ *
+ * @internal Used by computeFearGreedIndex; not part of the public API.
+ */
+export function computeMa200DisplayDistancePct(bars: Bar[]): number | null {
+    const last = bars[bars.length - 1];
+    if (!last || !Number.isFinite(last.close)) return null;
+    const smas = calculateMA(bars, MA200_WINDOW);
+    const ma200 = smas[smas.length - 1];
+    if (ma200 === null || ma200 === undefined || ma200 <= 0) return null;
+    return ((last.close - ma200) / ma200) * 100;
+}
 
 /**
  * Compute the 5-factor raw values at index `t`. Returns `null` when:

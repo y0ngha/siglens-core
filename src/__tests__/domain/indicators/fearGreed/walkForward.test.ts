@@ -4,8 +4,16 @@ import {
     computeFearGreedIndex,
     computeFearGreedHistory,
 } from '@/domain/indicators/fearGreed/walkForward';
-import { FEAR_GREED_CONFIDENCE_THRESHOLDS } from '@/domain/indicators/fearGreed/composition';
-import type { FearGreedHistoryPoint } from '@/domain/indicators/fearGreed/types';
+import {
+    FEAR_GREED_CONFIDENCE_THRESHOLDS,
+    composeSnapshot,
+} from '@/domain/indicators/fearGreed/composition';
+import { computeFactorsAtT } from '@/domain/indicators/fearGreed/factors';
+import { evaluatePullback } from '@/domain/signals/pullback';
+import type {
+    FactorValues,
+    FearGreedHistoryPoint,
+} from '@/domain/indicators/fearGreed/types';
 
 function genBars(count: number, basePrice = 100): Bar[] {
     return Array.from({ length: count }, (_, i) => {
@@ -164,5 +172,61 @@ describe('computeFearGreedHistory', () => {
         // Final entry should carry a score because the latest bar's snapshot
         // (sample=14, confidence='limited') is non-null in this fixture.
         expect(history[history.length - 1].score).not.toBeNull();
+    });
+});
+
+describe('computeFearGreedIndex — ma200DistancePct (display)', () => {
+    it('equals the pullback closeVsMa200Pct for the same bars', () => {
+        const bars = genBars(400);
+        const snap = computeFearGreedIndex(bars, genBsv(400));
+        const pullback = evaluatePullback(bars);
+        expect(snap?.ma200DistancePct).toEqual(expect.any(Number));
+        expect(pullback).not.toBeNull();
+        expect(snap!.ma200DistancePct).toBeCloseTo(
+            pullback!.closeVsMa200Pct,
+            10
+        );
+    });
+
+    it('uses the inclusive SMA, unlike the look-ahead-free scored factor', () => {
+        const bars = genBars(400);
+        const snap = computeFearGreedIndex(bars, genBsv(400))!;
+        const factor = snap.groups
+            .flatMap(g => g.factors)
+            .find(f => f.key === 'ma200_distance')!;
+        expect(snap.ma200DistancePct).not.toBeCloseTo(factor.rawValue * 100, 6);
+    });
+
+    it('leaves score and groups equal to a snapshot composed without the display field', () => {
+        const bars = genBars(400);
+        const bsv = genBsv(400);
+        const t = bars.length - 1;
+        const factorTS = bars.map((_, i) => computeFactorsAtT(bars, bsv, i));
+        const sample = factorTS
+            .slice(0, t)
+            .filter((f): f is FactorValues => f !== null);
+        const expected = composeSnapshot(factorTS[t], sample)!;
+        const actual = computeFearGreedIndex(bars, bsv)!;
+        expect(actual.score).toBe(expected.score);
+        expect(actual.label).toBe(expected.label);
+        expect(actual.groups).toEqual(expected.groups);
+        expect(actual.warning).toBe(expected.warning);
+        expect(actual.sampleSize).toBe(expected.sampleSize);
+    });
+
+    it('is null on the consumer path for the smallest bar count that still yields a snapshot below 200 bars', () => {
+        let smallest = 0;
+        for (let n = 1; n < 200; n++) {
+            if (computeFearGreedIndex(genBars(n), genBsv(n))) {
+                smallest = n;
+                break;
+            }
+        }
+        expect(smallest).toBeGreaterThan(0);
+        const snap = computeFearGreedIndex(
+            genBars(smallest),
+            genBsv(smallest)
+        )!;
+        expect(snap.ma200DistancePct).toBeNull();
     });
 });
