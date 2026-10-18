@@ -43,27 +43,27 @@ describe('buildAbcCandidates', () => {
         ]);
     });
 
-    it('a done C neither states nor draws its targets, but the spent check still reads them', () => {
-        // C ended at 88 and a later pivot (95) followed it: the 100% / 161.8%
-        // projections are where C could have ended, not prices ahead.
+    it('a done C draws nothing; its prompt line states only the C-end invalidation, and the spent check reads it all', () => {
+        // C ended at 88 and a later pivot (95) followed it: the count is
+        // finished history. The 100% / 161.8% projections are where C could
+        // have ended, and only a move past C's end (88, down with A) says C
+        // was not done.
         const { pivots, bars } = pivotsAt([110, 100, 105, 88, 95]);
         const [abc] = buildAbcCandidates(pivots, bars, FMT);
         expect(abc.candidate.promptLine).not.toContain('C target');
         expect(abc.candidate.promptLine).toContain(
-            ', C 1970-01-01 88.00; invalidation 110.00; score '
+            ', C 1970-01-01 88.00; invalidation 88.00; score '
         );
-        expect(abc.candidate.levels.map(l => l.label)).toEqual([
-            'invalidation',
-        ]);
-        expect(abc.levels.map(l => l.label)).toEqual([
-            'target 100%',
-            'target 161.8%',
-            'invalidation',
+        expect(abc.candidate.levels).toEqual([]);
+        expect(abc.levels.map(l => [l.label, l.price, l.breach])).toEqual([
+            ['target 100%', 95, 'down'],
+            ['target 161.8%', expect.closeTo(88.82, 10), 'down'],
+            ['invalidation', 88, 'down'],
         ]);
     });
 
-    it("sets the breach directions: targets with A, a zigzag's invalidation against it", () => {
-        const { pivots, bars } = pivotsAt([110, 100, 105, 88, 95]);
+    it("sets the breach directions while C forms: targets with A, a zigzag's invalidation against it", () => {
+        const { pivots, bars } = pivotsAt([110, 100, 105, 97]);
         expect(
             buildAbcCandidates(pivots, bars, FMT)[0].levels.map(l => [
                 l.label,
@@ -74,6 +74,29 @@ describe('buildAbcCandidates', () => {
             ['target 161.8%', 'down'],
             ['invalidation', 'up'],
         ]);
+    });
+
+    it('a done C with a rising A is invalidated above C, with A', () => {
+        // A 90 → 100 (up), B 95, C 112, then 105 follows: C is done.
+        const { pivots, bars } = pivotsAt([90, 100, 95, 112, 105]);
+        expect(buildAbcCandidates(pivots, bars, FMT)[0].levels.at(-1)).toEqual({
+            label: 'invalidation',
+            price: 112,
+            breach: 'up',
+        });
+    });
+
+    it('a done flat gets the same C-end invalidation (a forming flat has none)', () => {
+        const done = pivotsAt([110, 100, 112, 97, 101]);
+        expect(
+            buildAbcCandidates(done.pivots, done.bars, FMT)[0].levels.at(-1)
+        ).toEqual({ label: 'invalidation', price: 97, breach: 'down' });
+        const forming = pivotsAt([110, 100, 112, 97]);
+        expect(
+            buildAbcCandidates(forming.pivots, forming.bars, FMT)[0].levels.map(
+                l => l.label
+            )
+        ).toEqual(['target 100%', 'target 161.8%']);
     });
 
     it("draws levels at the prompt's precision; the spent check keeps the exact price", () => {

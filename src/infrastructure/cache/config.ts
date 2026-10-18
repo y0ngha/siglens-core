@@ -1035,9 +1035,15 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * boundary pairs and flags already did. Bytes change for any prompt with
  * such a pattern.
  *
+ * **`p29`** — a finished A–B–C's invalidation (2026-10-18). An A–B–C whose
+ * C is done (impulse-attached or standalone) states C's end as its
+ * `invalidation` instead of wave 5's end / A's start — past wave 5 is the
+ * trend resuming once the correction is over. Bytes change for any prompt
+ * with such a count.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p28' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p29' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

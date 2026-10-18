@@ -1211,6 +1211,9 @@ state the same behavior, so changing one without the other leaves contradicting
 instructions (the intro says unlisted patterns get `geometry: null`, the rules still say
 to fill the geometry). After editing either, re-read the other.
 
+Tracked design specs (`docs/superpowers/specs/`) restate contracts too: grep them for the
+old behavior when an invalidation, qualification or threshold rule changes.
+
 <a id="DS-6"></a>
 #### DS-6 — No process residue in code
 

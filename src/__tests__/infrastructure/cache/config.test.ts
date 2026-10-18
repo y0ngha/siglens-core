@@ -1104,7 +1104,8 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 일반 규칙·상태 코드 규칙, 무효화를 넘은 종가(슬랙 없음)가 있는 패턴 제외, 라운딩 극값 위치·곡선 재고정.
         // p27 (2026-10-18): 끝난 C·꺾인 thrust의 목표와 깨진 피보 후보를 빼고, KRW 가격을 호가 단위로 찍는다.
         // p28 (2026-10-18): 넥라인 계열 패턴의 돌파 후 복귀를 `failed breakout`으로 찍는다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p28');
+        // p29 (2026-10-18): 끝난 A–B–C의 무효화를 C 끝으로 옮긴다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p29');
     });
 });
 
