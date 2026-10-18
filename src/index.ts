@@ -191,6 +191,8 @@ export type {
 } from './domain/signals/pullback';
 // Exported so consumers stop re-implementing a moving average the library already has.
 export { calculateMA } from './domain/indicators/ma';
+export { rsiZone } from './domain/indicators/rsiZone';
+export type { RsiZone } from './domain/indicators/rsiZone';
 
 // Prompt builders
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';

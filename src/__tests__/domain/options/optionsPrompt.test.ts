@@ -180,3 +180,42 @@ describe('buildOptionsAnalysisPrompt numeric rounding', () => {
         expect(prompt).toContain('"putCallRatio": 1,');
     });
 });
+
+describe('buildOptionsAnalysisPrompt Interpretation Guide wording', () => {
+    const { stable: stableOnly, dynamic } = buildOptionsAnalysisPromptRaw({
+        expirationDate: 'all',
+        companyName: 'Apple Inc.',
+        snapshot: {
+            symbol: 'AAPL',
+            underlyingPrice: 198,
+            capturedAt: '2026-05-14T16:00:00Z',
+            chains: [],
+        },
+    });
+    const stable = `${stableOnly}\n${dynamic}`;
+
+    it('defines max pain as the minimum-payout strike, not a forecast', () => {
+        expect(stable).toContain(
+            'the strike at which the total payout to option holders'
+        );
+        expect(stable).toContain('not a price forecast');
+    });
+
+    it('states the put/call ratio direction', () => {
+        expect(stable).toContain(
+            'total put open interest ÷ total call open interest'
+        );
+        expect(stable).toContain('never "0.58 calls per put"');
+    });
+
+    it('separates contract counts from prices', () => {
+        expect(stable).toContain('are numbers of contracts, never prices');
+        expect(stable).toContain(
+            'Never state a price or value for an option whose strike has no mid price.'
+        );
+    });
+
+    it('requires USD prices to the cent', () => {
+        expect(stable).toContain('never write a fraction of a cent');
+    });
+});

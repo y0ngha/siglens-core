@@ -2489,9 +2489,12 @@ export function buildOverallPeekCacheKey(
  * the source (previously unrounded floating-point ratios) — the rendered
  * Key Metrics JSON changes for every request.
  *
+ * **`p4`** — Interpretation Guide wording fixes (max pain definition,
+ * put/call ratio direction, counts-vs-prices, USD cent rule).
+ *
  * @internal
  */
-export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p3' as const;
+export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
 /**
  * @internal Build the Redis key for a cached options analysis result.
