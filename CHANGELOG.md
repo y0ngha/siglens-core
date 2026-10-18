@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.22.4](https://github.com/y0ngha/siglens-core/compare/v2.22.3...v2.22.4) (2026-10-18)
+
+### Bug Fixes
+
+* 끝난 A–B–C 카운트는 수평선을 그리지 않고, 무효화는 C 끝으로 ([#286](https://github.com/y0ngha/siglens-core/issues/286)) ([bdfc258](https://github.com/y0ngha/siglens-core/commit/bdfc258b62c3270d740f5323e1b50648f7449f0c))
+
 ## [2.22.3](https://github.com/y0ngha/siglens-core/compare/v2.22.2...v2.22.3) (2026-10-18)
 
 ### Bug Fixes
