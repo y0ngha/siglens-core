@@ -273,10 +273,11 @@ describe('buildElliottCandidates', () => {
             ['target 100%', 118, STEP],
             ['target 161.8%', 112.44, STEP],
         ]);
-        // C done (121 followed it): only the invalidation is still ahead.
+        // C done (121 followed it): the count is finished history and draws
+        // nothing.
         expect(
             levels([...TEXTBOOK.slice(0, -1), 122, 127, 118, 121], ':abc')
-        ).toEqual([['invalidation', 131, STEP]]);
+        ).toEqual([]);
     });
 
     it('a forming wave is left out of the ratios; the invalidation follows the state', () => {
@@ -308,11 +309,13 @@ describe('buildElliottCandidates', () => {
         expect(forming).toContain(
             '; invalidation 131.00; W2 60.0% of W1, W3 220.0% of W1, W4 27.3% of W3, W5 110.0% of W1; C target 100% 118.00, 161.8% 112.44; score '
         );
-        // C done: its targets are history and leave the prompt line.
+        // C done: its targets are history and leave the prompt line, and the
+        // invalidation moves to C's end (118) — past wave 5 is the trend
+        // resuming once the correction is over, not a broken count.
         const done = line([...TEXTBOOK.slice(0, -1), 122, 127, 118, 121]);
         expect(done).toContain('impulse complete, A–B–C done (zigzag);');
         expect(done).toContain(
-            '; invalidation 131.00; W2 60.0% of W1, W3 220.0% of W1, W4 27.3% of W3, W5 110.0% of W1; score '
+            '; invalidation 118.00; W2 60.0% of W1, W3 220.0% of W1, W4 27.3% of W3, W5 110.0% of W1; score '
         );
     });
 
@@ -342,9 +345,11 @@ describe('buildElliottCandidates', () => {
         ]);
         expect(abc?.promptLine).toContain('A–B–C done');
         expect(abc?.promptLine).not.toContain('C target');
-        expect(abc?.levels.map(l => [l.label, l.price])).toEqual([
-            ['invalidation', 217],
-        ]);
+        // A finished count draws no line — not wave 5's end (217, under the
+        // price: breaking it is the downtrend resuming) nor C's end. The
+        // prompt keeps C's end (275) as the invalidation.
+        expect(abc?.levels).toEqual([]);
+        expect(abc?.promptLine).toContain('; invalidation 275.00; ');
         // No candidate of any structure draws a target above the price.
         const lastClose = 225;
         expect(
@@ -637,12 +642,34 @@ describe('buildElliottCandidates — spent counts (breach directions)', () => {
         expect(ids([...prefix, 122, 121])).toContain(`ew:up:${STEP}:6`);
     });
 
-    it("an attached A–B–C is spent once C runs on to its 161.8% target in A's direction", () => {
-        // C = 118 sits on its 100% projection (the count reached it itself);
-        // 161.8% = 112.44, reached within the slack at 112.6.
+    it("a done attached A–B–C is spent once price passes C's end in A's direction, not on a touch", () => {
+        // C = 118 done (121 followed it); its invalidation is C's end, passed
+        // downward (with A) beyond the 0.25 slack.
         const abc = [...TEXTBOOK.slice(0, -1), 122, 127, 118, 121];
-        expect(ids([...abc, 113])).toContain(`ew:up:${STEP}:6:abc`);
-        expect(ids([...abc, 112.6])).not.toContain(`ew:up:${STEP}:6:abc`);
+        expect(ids([...abc, 119.5])).toContain(`ew:up:${STEP}:6:abc`);
+        expect(ids([...abc, 117.6])).not.toContain(`ew:up:${STEP}:6:abc`);
+    });
+
+    it('an untyped done attached A–B–C (B at 85% of A) also takes C’s end as its invalidation, and is spent past it', () => {
+        // A 131 → 121 (10), B to 129.5 (85%: neither zigzag nor flat), C 118,
+        // then 121 follows: C done, no type, so no targets.
+        const untyped = [...TEXTBOOK.slice(0, -1), 121, 129.5, 118, 121];
+        const line = buildElliottCandidates(ladder(untyped), 1, FMT).find(c =>
+            c.id.endsWith(':6:abc')
+        )?.promptLine;
+        expect(line).toContain('impulse complete, A–B–C done;');
+        expect(line).toContain('; invalidation 118.00; ');
+        expect(line).not.toContain('C target');
+        expect(ids([...untyped, 119.5])).toContain(`ew:up:${STEP}:6:abc`);
+        expect(ids([...untyped, 117.5])).not.toContain(`ew:up:${STEP}:6:abc`);
+    });
+
+    it('a done attached A–B–C is no longer spent by a new extreme past wave 5 (the trend resuming)', () => {
+        // Up impulse to 131, A–B–C down to C 118, then a rally — passing
+        // wave 5's end (131) is the uptrend resuming, which the count
+        // predicts; it used to be read as the count's invalidation.
+        const abc = [...TEXTBOOK.slice(0, -1), 122, 127, 118, 133, 130];
+        expect(ids(abc)).toContain(`ew:up:${STEP}:6:abc`);
     });
 });
 

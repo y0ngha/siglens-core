@@ -388,22 +388,39 @@ export function abcTargetLevels(seq: readonly PivotPoint[]): ElliottLevel[] {
 
 /**
  * @internal
- * The levels an A–B–C still projects ahead of the price. C's targets are
- * where a FORMING C may run to; once a later pivot has followed C, C is over
- * and its 100% / 161.8% projections only say where it could have ended — a
- * finished C that stopped short left them hanging above or below the price
- * as live targets (2026-10-18: an impulse-down + A–B–C-up count kept drawing
+ * The invalidation of a DONE C (a later pivot followed it): price passing
+ * C's end in A's direction — C was still running, so "C done" was wrong.
+ * Wave 5's end no longer serves: once the correction is over, a new extreme
+ * beyond wave 5 is the trend resuming, which confirms the count rather than
+ * negating it (2026-10-18: a finished impulse-down + A–B–C-up count drew
+ * "impulse invalidation" at wave 5's low, under the price). `seq` is the
+ * 4-pivot A–B–C (start, A, B, C).
+ */
+export const doneCInvalidation = (
+    seq: readonly PivotPoint[]
+): ElliottLevel => ({
+    label: OVERLAY_LEVEL_LABELS.invalidation,
+    price: seq[3].price,
+    // C runs with A.
+    breach: breachOf(legSign(seq)),
+});
+
+/**
+ * @internal
+ * The levels an A–B–C count draws. While C forms, all of them: C's targets
+ * (where C may run to) and its invalidation. Once a later pivot has followed
+ * C the count is finished history, so it draws none — its targets only say
+ * where C could have ended (2026-10-18: a finished count kept drawing
  * "A–B–C target 100% / 161.8%" well above the price after C topped and the
- * price fell back under B). The full list still feeds `isSpentCount`: a done
- * C the price later carries to a target was not done after all.
+ * price fell back under B), and a horizontal line from a finished structure
+ * reads as a level ahead. The full list still feeds `isSpentCount` and the
+ * prompt line keeps the invalidation: a done C the price later carries past
+ * its end or to a target was not done after all, and the count drops out.
  */
 export const projectedAbcLevels = (
     levels: readonly ElliottLevel[],
     cInProgress: boolean
-): ElliottLevel[] =>
-    cInProgress
-        ? [...levels]
-        : levels.filter(l => !l.label.startsWith(OVERLAY_LEVEL_LABELS.target));
+): ElliottLevel[] => (cInProgress ? [...levels] : []);
 
 /**
  * @internal

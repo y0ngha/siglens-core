@@ -19,6 +19,7 @@ import {
     abcTargets,
     breachOf,
     classifyAbc,
+    doneCInvalidation,
     elliottPromptLine,
     firstLegDir,
     isLastPivotInList,
@@ -36,42 +37,49 @@ import { formatOverlayPrice } from '@/domain/overlays/format';
 
 /**
  * The levels of an A–B–C: C's 100% / 161.8% targets (reached as C runs on
- * with A) and — for a zigzag, whose B may not pass A's start — that start as
- * the invalidation level (passed by B moving against A). Flats have none:
- * their B may run past it.
+ * with A), then its invalidation. While C forms, a zigzag's B may not pass
+ * A's start, so that start is the invalidation (passed by B moving against
+ * A); flats have none — their B may run past it. Once C is done, the
+ * invalidation is C's own end (`doneCInvalidation`) for every type.
  */
 const abcLevels = (
     seq: readonly PivotPoint[],
-    type: AbcType
+    type: AbcType,
+    cInProgress: boolean
 ): ElliottLevel[] => [
     ...abcTargetLevels(seq),
-    ...(type === 'zigzag'
-        ? [
-              {
-                  label: OVERLAY_LEVEL_LABELS.invalidation,
-                  price: seq[0].price,
-                  // B passing A's start, against A.
-                  breach: breachOf(-legSign(seq)),
-              },
-          ]
-        : []),
+    ...(!cInProgress
+        ? [doneCInvalidation(seq)]
+        : type === 'zigzag'
+          ? [
+                {
+                    label: OVERLAY_LEVEL_LABELS.invalidation,
+                    price: seq[0].price,
+                    // B passing A's start, against A.
+                    breach: breachOf(-legSign(seq)),
+                },
+            ]
+          : []),
 ];
 
 /**
- * The same values as prompt facts: the C targets while C forms, and a
- * zigzag's `invalidation <price>`.
+ * The same values as prompt facts: the C targets while C forms, then the
+ * `invalidation <price>` of `abcLevels`.
  */
 function abcFacts(
+    levels: readonly ElliottLevel[],
     seq: readonly PivotPoint[],
-    type: AbcType,
     cInProgress: boolean,
     fmt: OverlayFormat
 ): string[] {
+    const invalidation = levels.find(
+        l => l.label === OVERLAY_LEVEL_LABELS.invalidation
+    );
     return [
         // A done C's targets are history, not projections (`projectedAbcLevels`).
         ...(cInProgress ? [abcTargets(seq, fmt)] : []),
-        ...(type === 'zigzag'
-            ? [`invalidation ${formatOverlayPrice(seq[0].price, fmt)}`]
+        ...(invalidation !== undefined
+            ? [`invalidation ${formatOverlayPrice(invalidation.price, fmt)}`]
             : []),
     ];
 }
@@ -118,7 +126,7 @@ export function buildAbcCandidates(
                 recency(seq[3].index, lastBarIndex)) /
                 3);
         const dir = firstLegDir(seq);
-        const levels = abcLevels(seq, type);
+        const levels = abcLevels(seq, type, inProgress);
         const drawn = projectedAbcLevels(levels, inProgress);
         return [
             {
@@ -133,7 +141,7 @@ export function buildAbcCandidates(
                         `A–B–C ${type}, A ${dir}`,
                         inProgress ? 'C in progress' : 'complete',
                         namedPoints(bars, seq, ['0', 'A', 'B', 'C'], fmt),
-                        abcFacts(seq, type, inProgress, fmt),
+                        abcFacts(levels, seq, inProgress, fmt),
                         score
                     ),
                     segments: legSegments(bars, seq, [

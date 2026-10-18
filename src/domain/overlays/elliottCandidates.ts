@@ -45,6 +45,7 @@ import {
     alternates,
     breachOf,
     classifyAbc,
+    doneCInvalidation,
     elliottPromptLine,
     isLastPivotInList,
     structureLevels,
@@ -207,14 +208,17 @@ function impulseState(count: Count, abcTag: AbcTag | null): string {
 /**
  * The count's levels: its invalidation for its state, then an attached
  * A–B–C's C targets. Wave 4 forming: wave 1's end (rule 3).
- * Wave 5 forming: wave 4's end. Complete — with or without an A–B–C — a new
- * extreme beyond wave 5's end, which negates "impulse complete" (wave 5 is
- * still extending); breaking wave 4's end then only confirms the
+ * Wave 5 forming: wave 4's end. Complete — alone or with C still forming —
+ * a new extreme beyond wave 5's end, which negates "impulse complete" (wave
+ * 5 is still extending); breaking wave 4's end then only confirms the
  * correction. An attached A–B–C's B never passes wave 5's end (`abcAfter`),
- * so this is also every attached A–B–C's invalidation (a zigzag's A start).
+ * so while C forms this is also its invalidation (a zigzag's A start). Once
+ * C is done, the invalidation is C's own end (`doneCInvalidation`).
  */
 function impulseLevels(count: Count, abcTag: AbcTag | null): ElliottLevel[] {
     const { seq, abc } = count;
+    const abcSeq = [seq[seq.length - 1], ...abc];
+    const cDone = abc.length > 0 && abcTag !== null && !abcTag.cInProgress;
     const level =
         seq.length < EW_IMPULSE_PIVOTS
             ? seq[1]
@@ -223,15 +227,17 @@ function impulseLevels(count: Count, abcTag: AbcTag | null): ElliottLevel[] {
               : seq[5];
     const trend = count.up ? 1 : -1;
     return [
-        {
-            label: OVERLAY_LEVEL_LABELS.invalidation,
-            price: level.price,
-            // Complete: a new extreme past wave 5, with the trend. Running:
-            // wave 1's / wave 4's end, against it.
-            breach: breachOf(level === seq[5] ? trend : -trend),
-        },
+        cDone
+            ? doneCInvalidation(abcSeq)
+            : {
+                  label: OVERLAY_LEVEL_LABELS.invalidation,
+                  price: level.price,
+                  // Complete: a new extreme past wave 5, with the trend.
+                  // Running: wave 1's / wave 4's end, against it.
+                  breach: breachOf(level === seq[5] ? trend : -trend),
+              },
         ...(abc.length > 0 && abcTag !== null && abcTag.type !== null
-            ? abcTargetLevels([seq[seq.length - 1], ...abc])
+            ? abcTargetLevels(abcSeq)
             : []),
     ];
 }
@@ -303,7 +309,11 @@ function toCandidate(
         levels: structureLevels(
             bars,
             all,
-            projectedAbcLevels(levels, abcTag?.cInProgress ?? false),
+            // Only an attached A–B–C finishes the count; an impulse alone
+            // keeps its invalidation.
+            abcTag === null
+                ? levels
+                : projectedAbcLevels(levels, abcTag.cInProgress),
             fmt
         ),
         labels: pivotLabels(bars, all.slice(1), [...waves, ...abcNames]),
