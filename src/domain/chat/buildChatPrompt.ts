@@ -3,7 +3,7 @@
 
 import {
     formatBarDateTime,
-    formatNullableNumber,
+    formatPriceAtDp,
     formatSignedPercent,
     sharedPriceDecimalPlaces,
 } from '@/domain/analysis/promptFormat';
@@ -97,7 +97,7 @@ function formatKeyLevels(
     return levels
         .map(
             l =>
-                `${formatNullableNumber(l.price, dp)}${formatDistanceFromBase(l.price, analysisTimePrice, 'analysis-time price')} (${l.reason})`
+                `${formatPriceAtDp(l.price, dp)}${formatDistanceFromBase(l.price, analysisTimePrice, 'analysis-time price')} (${l.reason})`
         )
         .join(', ');
 }
@@ -108,7 +108,7 @@ function formatPoc(
     analysisTimePrice?: number
 ): string {
     return poc
-        ? `${formatNullableNumber(poc.price, dp)}${formatDistanceFromBase(poc.price, analysisTimePrice, 'analysis-time price')} (${poc.reason})`
+        ? `${formatPriceAtDp(poc.price, dp)}${formatDistanceFromBase(poc.price, analysisTimePrice, 'analysis-time price')} (${poc.reason})`
         : 'None detected';
 }
 
@@ -121,7 +121,7 @@ function formatPriceTargets(
     return scenario.targets
         .map(
             t =>
-                `${formatNullableNumber(t.price, dp)}${formatDistanceFromBase(t.price, analysisTimePrice, 'analysis-time price')} — ${t.basis}`
+                `${formatPriceAtDp(t.price, dp)}${formatDistanceFromBase(t.price, analysisTimePrice, 'analysis-time price')} — ${t.basis}`
         )
         .join('; ');
 }
@@ -172,8 +172,8 @@ function formatStructuredPlan(
         entryPrices.length === 0
             ? 'N/A'
             : entryPrices.length === 1
-              ? formatNullableNumber(entryPrices[0], dp)
-              : `${formatNullableNumber(entryPrices[0], dp)} ~ ${formatNullableNumber(entryPrices[entryPrices.length - 1], dp)} (mid ${formatNullableNumber(entryRef ?? null, dp)})`;
+              ? formatPriceAtDp(entryPrices[0], dp)
+              : `${formatPriceAtDp(entryPrices[0], dp)} ~ ${formatPriceAtDp(entryPrices[entryPrices.length - 1], dp)} (mid ${formatPriceAtDp(entryRef ?? null, dp)})`;
     // Reconciled levels win where they exist — the SAME preference
     // `buildPlanCheck` applies internally (spec 2026-09-18), so
     // this block and its own `planCheck` ratios below never disagree about
@@ -184,13 +184,13 @@ function formatStructuredPlan(
     const stopText =
         effectiveStopLoss === undefined
             ? 'N/A'
-            : `${formatNullableNumber(effectiveStopLoss, dp)}${formatDistanceFromBase(effectiveStopLoss, entryRef, 'entry')}`;
+            : `${formatPriceAtDp(effectiveStopLoss, dp)}${formatDistanceFromBase(effectiveStopLoss, entryRef, 'entry')}`;
     const targetsText =
         (effectiveTakeProfitPrices ?? []).length > 0
             ? effectiveTakeProfitPrices!
                   .map(
                       t =>
-                          `${formatNullableNumber(t, dp)}${formatDistanceFromBase(t, entryRef, 'entry')}`
+                          `${formatPriceAtDp(t, dp)}${formatDistanceFromBase(t, entryRef, 'entry')}`
                   )
                   .join(', ')
             : 'N/A';
@@ -567,7 +567,7 @@ Symbol: ${symbol}
 Company: ${companyName}
 Timeframe: ${timeframe}
 Overall Trend: ${analysis.trend} | Risk Level: ${analysis.riskLevel}
-${analysis.analyzedAt ? `Analysis generated: ${formatAnalyzedAtUtc(analysis.analyzedAt)}\n` : ''}${analysisTimePrice !== undefined ? `Analysis-time price: ${formatNullableNumber(analysisTimePrice, levelDp)}\n` : ''}
+${analysis.analyzedAt ? `Analysis generated: ${formatAnalyzedAtUtc(analysis.analyzedAt)}\n` : ''}${analysisTimePrice !== undefined ? `Analysis-time price: ${formatPriceAtDp(analysisTimePrice, levelDp)}\n` : ''}
 Summary:
 ${analysis.summary}
 ${

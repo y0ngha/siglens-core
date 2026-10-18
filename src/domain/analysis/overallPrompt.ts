@@ -16,7 +16,7 @@ import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
     equityListingContext,
-    formatNullableNumber,
+    formatPriceAtDp,
     formatSignedPercent,
     priceDecimalPlaces,
     sharedPriceDecimalPlaces,
@@ -134,7 +134,7 @@ function formatTechnical(
         currency,
         assetClass
     );
-    const px = (n: number): string => formatNullableNumber(n, dp);
+    const px = (n: number): string => formatPriceAtDp(n, dp);
     // Null rule (spec §0): a 0/negative/non-finite close is "unknown", never
     // a real snapshot price — `isUsablePrice` mirrors the same gate `prompt.ts`
     // uses for the analogous Analysis Snapshot section.

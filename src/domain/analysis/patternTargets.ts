@@ -3,6 +3,7 @@ import type {
     PatternGeometry,
     PatternTargetGeometry,
 } from '@/domain/types';
+import { roundPriceAtDp } from '@/domain/analysis/promptFormat';
 
 /** Upper bound on decimals kept for an app-computed pattern target. */
 const MAX_TARGET_DECIMALS = 8;
@@ -109,7 +110,8 @@ export function printedPatternGeometry(
     geometry: PatternGeometry,
     priceDp: number
 ): PatternTargetGeometry {
-    const round = (n: number): number => Number(n.toFixed(priceDp));
+    const round = (n: number): number =>
+        Number(roundPriceAtDp(n, priceDp).toFixed(priceDp));
     const invalidation = geometry.invalidationLevel;
     return {
         breakoutLevel: round(geometry.breakoutLevel),

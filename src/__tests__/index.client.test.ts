@@ -97,6 +97,9 @@ describe('browser public API exports', () => {
             'fibonacci',
             'elliott',
         ]);
+        // Consumers round displayed KRX prices with the same rule core uses.
+        expect(clientApi.roundToKrxTick(205_325)).toBe(205_500);
+        expect(clientApi.krxTickSize(215_000)).toBe(500);
         expect(skillType).toBe('indicator_guide');
     });
 

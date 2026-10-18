@@ -1113,7 +1113,7 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets (spec 20
 describe('exit text currency', () => {
     // 실측 회귀: 원화 종목 20건 중 19건이 `목표가 $143025.73 ... 손절 $121980.70`
     // 형태로 나왔다. 단위가 틀렸고(달러 아님), 원화에 없는 소수 정밀도를 주장한다.
-    it('formats KRW levels as rounded won, not dollars', () => {
+    it('formats KRW levels as won at the KRX tick, not dollars', () => {
         const text = buildBullishExitText(
             131000,
             121980.69948682484,
@@ -1121,8 +1121,9 @@ describe('exit text currency', () => {
             'KRW'
         );
 
-        expect(text).toContain('목표가 143,026원');
-        expect(text).toContain('손절 121,981원');
+        // 50,000–200,000원 구간의 호가 단위는 100원이다.
+        expect(text).toContain('목표가 143,000원');
+        expect(text).toContain('손절 122,000원');
         expect(text).not.toContain('$');
         expect(text).not.toContain('.7');
     });

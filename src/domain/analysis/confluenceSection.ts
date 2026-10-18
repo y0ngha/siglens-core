@@ -3,7 +3,10 @@ import {
     AT_PRICE_BAR_RANGE_FRACTION,
     meanBarRangePercent,
 } from '@/domain/analysis/referenceLevels';
-import { formatNullableNumber } from '@/domain/analysis/promptFormat';
+import {
+    formatNullableNumber,
+    formatPriceAtDp,
+} from '@/domain/analysis/promptFormat';
 import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import {
     confluenceFamilyWeight,
@@ -200,7 +203,7 @@ function formatConfluence(
     const maText =
         snapshot.ma50 === null
             ? 'SMA50 unavailable (short history)'
-            : `close ${formatNullableNumber(snapshot.close, priceDp)} vs SMA50 ${formatNullableNumber(snapshot.ma50, priceDp)} (${
+            : `close ${formatPriceAtDp(snapshot.close, priceDp)} vs SMA50 ${formatPriceAtDp(snapshot.ma50, priceDp)} (${
                   snapshot.close > snapshot.ma50 ? 'above' : 'at or below'
               })`;
 
@@ -340,9 +343,9 @@ function formatPullback(
     const side = snapshot.close > snapshot.ma200 ? 'above' : 'at or below';
     const lines = [
         PULLBACK_HEADER,
-        `Close ${formatNullableNumber(snapshot.close, priceDp)} vs MA200 ${formatNullableNumber(snapshot.ma200, priceDp)} (${formatNullableNumber(snapshot.closeVsMa200Pct)}%, ${side})`,
+        `Close ${formatPriceAtDp(snapshot.close, priceDp)} vs MA200 ${formatPriceAtDp(snapshot.ma200, priceDp)} (${formatNullableNumber(snapshot.closeVsMa200Pct)}%, ${side})`,
         `Williams %R(14): ${formatNullableNumber(snapshot.williamsR)} / RSI(2): ${formatNullableNumber(snapshot.rsi2)}`,
-        `Exit reference MA5: ${formatNullableNumber(snapshot.ma5, priceDp)} — the measured sell-off is treated as resolved on the first daily close above it, or after about 10 trading days`,
+        `Exit reference MA5: ${formatPriceAtDp(snapshot.ma5, priceDp)} — the measured sell-off is treated as resolved on the first daily close above it, or after about 10 trading days`,
         `Reading: ${PULLBACK_READING_TEXT[snapshot.reading]}`,
     ];
     if (snapshot.reading === 'none') return lines;
@@ -465,8 +468,8 @@ function formatRiskReward(
     return [
         RISK_REWARD_HEADER,
         ...noiseNote,
-        `Nearest resistance ${up.label} at ${formatNullableNumber(up.price, priceDp)} (${formatNullableNumber(up.distancePercent)}%)`,
-        `Nearest support ${down.label} at ${formatNullableNumber(down.price, priceDp)} (${formatNullableNumber(down.distancePercent)}%)`,
+        `Nearest resistance ${up.label} at ${formatPriceAtDp(up.price, priceDp)} (${formatNullableNumber(up.distancePercent)}%)`,
+        `Nearest support ${down.label} at ${formatPriceAtDp(down.price, priceDp)} (${formatNullableNumber(down.distancePercent)}%)`,
         `Structural risk:reward from current price = ${fmtRatio(ratio)}`,
         verdict,
         // The correlation is the part the model cannot infer from the ratio alone.

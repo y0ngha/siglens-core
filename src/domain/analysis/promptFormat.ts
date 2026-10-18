@@ -8,6 +8,7 @@
 
 import type { AssetClass, CurrencyCode, Timeframe } from '@/domain/types';
 import { MS_PER_DAY, MS_PER_SECOND } from '@/domain/constants/time';
+import { roundToKrxTick } from '@/domain/analysis/krxTick';
 
 /**
  * Human-readable timeframe labels used in prompt headers.
@@ -245,6 +246,15 @@ export function equityListingContext(currency: CurrencyCode = 'USD'): string {
 
 /** Decimal places for equity prices of one unit or more (USD cent precision). */
 const DEFAULT_PRICE_DECIMAL_PLACES = 2;
+/**
+ * @internal
+ * Decimal places of a KRW price: whole won. No other listing resolves to it —
+ * USD prices of a unit or more take 2, sub-unit prices keep 4 significant
+ * digits (≥ 4 decimals), crypto never fewer than 2 — so a price precision of
+ * 0 identifies a KRX price, and {@link roundPriceAtDp} rounds it to the KRX
+ * tick (a guard test pins this invariant).
+ */
+export const KRW_PRICE_DECIMAL_PLACES = 0;
 /** Significant digits kept for sub-unit equity prices (e.g. `0.08359`). */
 const SUB_UNIT_PRICE_SIGNIFICANT_DIGITS = 4;
 /**
@@ -301,7 +311,7 @@ export function priceDecimalPlaces(
     currency: CurrencyCode = 'USD',
     assetClass: AssetClass = 'equity'
 ): number {
-    if (currency === 'KRW') return 0;
+    if (currency === 'KRW') return KRW_PRICE_DECIMAL_PLACES;
     if (!isPositiveFinite(referencePrice)) return DEFAULT_PRICE_DECIMAL_PLACES;
     if (assetClass === 'crypto') {
         return clampDecimals(
@@ -363,14 +373,44 @@ export function sharedPriceDecimalPlaces(
 
 /**
  * @internal
+ * A price-axis value as the market quotes it at `priceDp` (a
+ * {@link priceDecimalPlaces} result): a KRX price ({@link KRW_PRICE_DECIMAL_PLACES})
+ * rounded to its KRX tick, any other price unchanged — `formatNullableNumber`
+ * then rounds the decimals. Only for prices: a difference-scale value (ATR,
+ * MACD, a pattern height) at whole-won precision is not a quote and keeps
+ * `formatNullableNumber`.
+ */
+export function roundPriceAtDp(price: number, priceDp: number): number {
+    return priceDp === KRW_PRICE_DECIMAL_PLACES ? roundToKrxTick(price) : price;
+}
+
+/**
+ * @internal
+ * {@link formatNullableNumber} for a price-axis value: a KRX price is printed
+ * at its KRX tick (`205,325` → `205500`), so the model cites and the chart
+ * draws prices the market can quote. `'N/A'` for a missing or non-finite value.
+ */
+export function formatPriceAtDp(
+    price: number | null | undefined,
+    priceDp: number
+): string {
+    return formatNullableNumber(
+        price == null ? price : roundPriceAtDp(price, priceDp),
+        priceDp
+    );
+}
+
+/**
+ * @internal
  * One price at the precision its own magnitude calls for — for a lone figure (an options
- * underlying, a fallback level) rather than a list or a bar series.
+ * underlying, a fallback level) rather than a list or a bar series. A KRW price is
+ * printed at its KRX tick.
  */
 export function formatPrice(
     price: number | null | undefined,
     currency: CurrencyCode = 'USD'
 ): string {
-    return formatNullableNumber(price, priceDecimalPlaces(price, currency));
+    return formatPriceAtDp(price, priceDecimalPlaces(price, currency));
 }
 
 /** Largest first; the unit row renders sub-million amounts unscaled. */

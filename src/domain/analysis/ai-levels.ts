@@ -21,6 +21,7 @@ import type {
     ReconcileResult,
     ResolvedLevel,
 } from '@/domain/types';
+import { roundToKrxTick } from '@/domain/analysis/krxTick';
 
 /** AI SL/TP 검증 + ATR 기반 fallback resolver. AI 원본 필드를 수정하지 않고 reconciledLevels에 보정값을 병기한다. */
 
@@ -153,7 +154,7 @@ function ordinalLabel(index: number): string {
 /**
  * 가격 한 개를 통화에 맞게 표기한다.
  *
- * 원화는 소수 단위로 호가되지 않으므로 반올림해 정수로 쓰고 `원`을 붙인다.
+ * 원화는 KRX 호가 단위로 반올림해(`roundToKrxTick`) 쓰고 `원`을 붙인다.
  * `$121980.70` 같은 표기는 값이 틀린 것과 같다 — 단위가 틀렸고, 존재하지 않는
  * 정밀도를 주장한다. 달러는 $1 이상이면 기존 `$1234.56` 표기와 바이트 동일,
  * $1 미만은 유효숫자 4자리(`$0.08250`)로 표기해 서브달러 자산이 `$0.08`로
@@ -161,7 +162,7 @@ function ordinalLabel(index: number): string {
  */
 function formatLevelPrice(price: number, currency: CurrencyCode): string {
     return currency === 'KRW'
-        ? `${Math.round(price).toLocaleString('en-US')}원`
+        ? `${roundToKrxTick(price).toLocaleString('en-US')}원`
         : `$${formatPrice(price)}`;
 }
 
@@ -348,11 +349,18 @@ export function reconcileBullishActionRecommendation(
         return { recommendation: rec, wasReconciled: false, changes: [] };
     }
 
-    const slResolved = resolveBullishStopLoss(rec.stopLoss, entryPrice, atr);
-    const tpResolved = resolveBullishTakeProfit(
-        rec.takeProfitPrices?.[0],
-        entryPrice,
-        atr
+    // A fallback is a computed price, so a KRX listing gets it at its tick —
+    // here, not after post-processing, so the plan check and the risk:reward
+    // line below read the same level the card shows (`roundAnalysisPrices`).
+    const quoted = <T extends { value?: number }>(r: T): T =>
+        currency === 'KRW' && r.value !== undefined
+            ? { ...r, value: roundToKrxTick(r.value) }
+            : r;
+    const slResolved = quoted(
+        resolveBullishStopLoss(rec.stopLoss, entryPrice, atr)
+    );
+    const tpResolved = quoted(
+        resolveBullishTakeProfit(rec.takeProfitPrices?.[0], entryPrice, atr)
     );
 
     const slWasReconciled =

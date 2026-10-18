@@ -265,13 +265,18 @@ describe('buildElliottCandidates', () => {
                 ]);
         // From wave 0 (bar STEP), across the whole count.
         expect(levels(TEXTBOOK, ':6')).toEqual([['invalidation', 131, STEP]]);
+        // C forming at the right edge (118): its targets are still ahead.
         expect(
-            levels([...TEXTBOOK.slice(0, -1), 122, 127, 118, 121], ':abc')
+            levels([...TEXTBOOK.slice(0, -1), 122, 127, 118], ':abc')
         ).toEqual([
             ['invalidation', 131, STEP],
             ['target 100%', 118, STEP],
             ['target 161.8%', 112.44, STEP],
         ]);
+        // C done (121 followed it): only the invalidation is still ahead.
+        expect(
+            levels([...TEXTBOOK.slice(0, -1), 122, 127, 118, 121], ':abc')
+        ).toEqual([['invalidation', 131, STEP]]);
     });
 
     it('a forming wave is left out of the ratios; the invalidation follows the state', () => {
@@ -289,18 +294,66 @@ describe('buildElliottCandidates', () => {
         );
     });
 
-    it('types the attached A–B–C and gives its C targets; wave 5’s end stays the invalidation', () => {
-        const line = buildElliottCandidates(
-            ladder([...TEXTBOOK.slice(0, -1), 122, 127, 118, 121]),
-            1,
-            FMT
-        ).find(c => c.id.endsWith(':abc'))?.promptLine;
-        expect(line).toContain('impulse complete, A–B–C done (zigzag);');
+    it('types the attached A–B–C and gives its C targets while C forms; wave 5’s end stays the invalidation', () => {
+        const line = (prices: number[]) =>
+            buildElliottCandidates(ladder(prices), 1, FMT).find(c =>
+                c.id.endsWith(':abc')
+            )?.promptLine;
+        const forming = line([...TEXTBOOK.slice(0, -1), 122, 127, 118]);
+        expect(forming).toContain(
+            'impulse complete, A–B–C with C in progress (zigzag);'
+        );
         // A = 9 from 131; C at 100% / 161.8% of A from B (127). B may not
         // pass wave 5's end (131) — A's start, a zigzag's invalidation.
-        expect(line).toContain(
+        expect(forming).toContain(
             '; invalidation 131.00; W2 60.0% of W1, W3 220.0% of W1, W4 27.3% of W3, W5 110.0% of W1; C target 100% 118.00, 161.8% 112.44; score '
         );
+        // C done: its targets are history and leave the prompt line.
+        const done = line([...TEXTBOOK.slice(0, -1), 122, 127, 118, 121]);
+        expect(done).toContain('impulse complete, A–B–C done (zigzag);');
+        expect(done).toContain(
+            '; invalidation 131.00; W2 60.0% of W1, W3 220.0% of W1, W4 27.3% of W3, W5 110.0% of W1; score '
+        );
+    });
+
+    it('a finished A–B–C stops projecting C targets once the price turns back through B (2026-10-18 regression)', () => {
+        // Down impulse 372 → 217, A–B–C up to C 275 — short of its 100%
+        // projection (285) — then a lower high (272) and a slide to 225,
+        // under B (240) yet above wave 5 (217), so nothing is spent. C topped
+        // two pivots ago: "C target 100% / 161.8%" above the price would be
+        // stale targets of a move that already reversed.
+        const out = buildElliottCandidates(
+            ladder([
+                360, 372, 322, 352, 242, 272, 217, 262, 240, 275, 255, 272, 225,
+            ]),
+            1,
+            FMT
+        );
+        const abc = out.find(c => /:6:abc$/.test(c.id));
+        expect(abc?.labels.map(l => l.text)).toEqual([
+            '1',
+            '2',
+            '3',
+            '4',
+            '5',
+            'A',
+            'B',
+            'C',
+        ]);
+        expect(abc?.promptLine).toContain('A–B–C done');
+        expect(abc?.promptLine).not.toContain('C target');
+        expect(abc?.levels.map(l => [l.label, l.price])).toEqual([
+            ['invalidation', 217],
+        ]);
+        // No candidate of any structure draws a target above the price.
+        const lastClose = 225;
+        expect(
+            out.flatMap(c =>
+                c.levels.filter(
+                    l => l.label.startsWith('target') && l.price > lastClose
+                )
+            )
+        ).toEqual([]);
     });
 
     it('a typed A–B–C whose C is the right-edge pivot says C is in progress', () => {

@@ -273,6 +273,11 @@ export const EW_TRI_LEG_TOLERANCE = 0.05;
 /** @internal E may end this many ATR beyond the A–C boundary line. */
 export const EW_TRI_E_OVERSHOOT = 1;
 /**
+ * @internal Pivots after a complete triangle's E that mark its thrust as
+ * over (the thrust's end, then a turn): its target is no longer projected.
+ */
+export const EW_TRI_THRUST_DONE_PIVOTS = 2;
+/**
  * @internal A contracting triangle moves sideways: each leg retraces at least
  * this share of the leg before it.
  */

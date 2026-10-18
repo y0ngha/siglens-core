@@ -12,7 +12,7 @@
 import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
     formatBarDateTime,
-    formatNullableNumber,
+    formatPriceAtDp,
     formatSignedPercent,
     priceDecimalPlaces,
     TIMEFRAME_LABEL,
@@ -31,7 +31,7 @@ import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
  * reference price.
  */
 const finitePrice = (n: number | undefined, priceDp: number): string | null =>
-    n != null && Number.isFinite(n) ? formatNullableNumber(n, priceDp) : null;
+    n != null && Number.isFinite(n) ? formatPriceAtDp(n, priceDp) : null;
 
 /**
  * Percentage move of `value` from `reference`, formatted signed via
@@ -88,7 +88,7 @@ const formatEntryPlanPart = (
     // `entry NaN-180.00`.
     const finite = entryPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
-    const px = (n: number): string => formatNullableNumber(n, priceDp);
+    const px = (n: number): string => formatPriceAtDp(n, priceDp);
     if (finite.length === 1) return `entry ${px(finite[0])}`;
     return `entry ${px(finite[0])}-${px(finite[finite.length - 1])}`;
 };
@@ -101,7 +101,7 @@ const formatTakeProfitPlanPart = (
     if (!takeProfitPrices || takeProfitPrices.length === 0) return '';
     const finite = takeProfitPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
-    return `TP ${finite.map(n => formatNullableNumber(n, priceDp)).join('/')}`;
+    return `TP ${finite.map(n => formatPriceAtDp(n, priceDp)).join('/')}`;
 };
 
 /** One rendered past call, newest-first order trusted from the caller (`selected` is not re-sorted here). */

@@ -135,6 +135,40 @@ describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
         expect(p).not.toMatch(/C:\d+\.\d{2} V:/);
     });
 
+    it('prints every KRX price-axis value at its KRX tick — bars, bands, averages, levels, tables', () => {
+        // Synthetic bars around 269,500 sit in the 200,000–500,000 band (tick
+        // 500): computed levels (MA, Keltner, pivots, fib) land between ticks
+        // unless the prompt rounds them (2026-10-18: `205,325` was quoted).
+        const p = renderDynamic(
+            '005930.KS',
+            syntheticBars(260, 269500, 86_400),
+            '1Day',
+            'equity',
+            'KRW'
+        );
+        const priceLines = p
+            .split('\n')
+            .filter(l =>
+                /^- (Snapshot Price|MA\(|EMA\(|Bollinger|Keltner|Donchian|VWAP)|^Fib (table|anchor)|^Pivot table|^- \d{6} \(/.test(
+                    l
+                )
+            );
+        expect(priceLines.length).toBeGreaterThan(5);
+        const sixDigit = priceLines.flatMap(l =>
+            [...l.matchAll(/(?<![\d.])(\d{6})(?![\d.])/g)].map(m =>
+                Number(m[1])
+            )
+        );
+        expect(sixDigit.length).toBeGreaterThan(10);
+        expect(sixDigit.filter(n => n >= 200_000 && n % 500 !== 0)).toEqual([]);
+        expect(p).toMatch(/C:\d{6} V:/);
+        expect(
+            [...p.matchAll(/C:(\d{6}) V:/g)]
+                .map(m => Number(m[1]))
+                .filter(n => n % 500 !== 0)
+        ).toEqual([]);
+    });
+
     it('renders differences below the price precision so a whole-won chart keeps its MACD', () => {
         // A 1,000-won listing moves ~10 won a bar; whole-won MACD and ATR erased crossovers.
         const p = renderDynamic(

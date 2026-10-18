@@ -9,7 +9,9 @@ import {
 import {
     formatBarDate,
     formatNullableNumber,
+    formatPriceAtDp,
     formatSignedPercent,
+    roundPriceAtDp,
 } from '@/domain/analysis/promptFormat';
 import { patternOverlayId } from '@/domain/overlays/patternOverlays';
 import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
@@ -70,7 +72,7 @@ function formatLevelLine(
         Number.isFinite(lastClose) && lastClose > 0
             ? ` (${formatSignedPercent(((level - lastClose) / lastClose) * 100)} from last close)`
             : '';
-    return `- ${label}: ${formatNullableNumber(level, priceDp)}${distance}`;
+    return `- ${label}: ${formatPriceAtDp(level, priceDp)}${distance}`;
 }
 
 /** Whether the last close has already moved past the (printed, rounded) breakout level, in the pattern's own breakout direction. */
@@ -164,7 +166,7 @@ function keyPointsLine(
         ? `- Key points: ${keyPoints
               .map(
                   p =>
-                      `${p.label} ${formatNullableNumber(p.price, priceDp)} (${formatBarDate(p.time, timeframe)})`
+                      `${p.label} ${formatPriceAtDp(p.price, priceDp)} (${formatBarDate(p.time, timeframe)})`
               )
               .join(', ')}`
         : '- Key points: N/A';
@@ -184,8 +186,12 @@ function formatUndirectedCandidate(
     timeframe: Timeframe,
     failed: boolean
 ): string {
-    const upper = Number(geometry.upperLevel.toFixed(priceDp));
-    const lower = Number(geometry.lowerLevel.toFixed(priceDp));
+    const upper = Number(
+        roundPriceAtDp(geometry.upperLevel, priceDp).toFixed(priceDp)
+    );
+    const lower = Number(
+        roundPriceAtDp(geometry.lowerLevel, priceDp).toFixed(priceDp)
+    );
     const status =
         lastClose > upper || lastClose < lower
             ? 'broken'
