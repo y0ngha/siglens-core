@@ -339,6 +339,16 @@ describe('evaluateKrInsiderAxis', () => {
         });
     });
 
+    it('has a null largestSingleDayFiling when the window holds no usable report', () => {
+        const axis = axisOf([
+            krInsiderReport({
+                receiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 3),
+            }),
+        ]);
+        expect(axis.krMetrics?.reports).toBe(0);
+        expect(axis.krMetrics?.largestSingleDayFiling).toBeNull();
+    });
+
     it('breaks a largestSingleDayFiling tie toward the earlier day', () => {
         const earlier = daysBeforeAsOf(30);
         const later = daysBeforeAsOf(3);

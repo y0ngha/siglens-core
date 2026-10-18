@@ -239,15 +239,20 @@ function routineMassFiling(
 function largestSingleDayFiling(
     reports: readonly DatedInsiderReport[]
 ): { date: string; count: number } | null {
-    const counts = new Map<number, number>();
-    for (const r of reports) counts.set(r.day, (counts.get(r.day) ?? 0) + 1);
-    let best: { day: number; count: number } | null = null;
-    for (const [day, count] of counts) {
-        if (best === null || count > best.count) best = { day, count };
-    }
-    return best === null
-        ? null
-        : { date: formatDay(best.day), count: best.count };
+    const countByDay = reports.reduce<ReadonlyMap<number, number>>(
+        (acc, r) => new Map([...acc, [r.day, (acc.get(r.day) ?? 0) + 1]]),
+        new Map()
+    );
+    const best = [...countByDay].reduce<readonly [number, number] | null>(
+        (top, entry) =>
+            top === null ||
+            entry[1] > top[1] ||
+            (entry[1] === top[1] && entry[0] < top[0])
+                ? entry
+                : top,
+        null
+    );
+    return best === null ? null : { date: formatDay(best[0]), count: best[1] };
 }
 
 /**

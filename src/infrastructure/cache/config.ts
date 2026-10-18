@@ -1894,8 +1894,10 @@ export function buildCongressTrendCacheKey(
  *
  * **`p7`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
  * Non-Korean system prompts and the output language reminder gain the
- * currency-writing rule (`$214.13`, never "214.13 dollars"); Korean bytes are
- * unchanged, but the version bumps every key so non-Korean entries regenerate.
+ * currency-writing rule (`$214.13`, never "214.13 dollars"). Korean bytes
+ * change too: a Korean listing's `krMetrics` is serialized into the prompt
+ * (`formatScorecard` → `formatMetrics`), and the insider axis now carries
+ * `largestSingleDayFiling`.
  *
  * @internal
  */
