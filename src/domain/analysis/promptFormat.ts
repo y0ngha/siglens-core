@@ -252,7 +252,8 @@ const DEFAULT_PRICE_DECIMAL_PLACES = 2;
  * USD prices of a unit or more take 2, sub-unit prices keep 4 significant
  * digits (≥ 4 decimals), crypto never fewer than 2 — so a price precision of
  * 0 identifies a KRX price, and {@link roundPriceAtDp} rounds it to the KRX
- * tick (a guard test pins this invariant).
+ * tick. `krxTick.test.ts` ("only a KRW listing resolves to the KRW
+ * precision") pins this invariant across magnitudes and asset classes.
  */
 export const KRW_PRICE_DECIMAL_PLACES = 0;
 /** Significant digits kept for sub-unit equity prices (e.g. `0.08359`). */

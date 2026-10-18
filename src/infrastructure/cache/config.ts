@@ -1018,9 +1018,19 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * rounding arc runs through the printed rims and bottom. Bytes change on
  * every request.
  *
+ * **`p27`** — stale structure targets and KRX ticks (2026-10-18). An A–B–C
+ * whose C is done no longer states `C target …` (impulse-attached and
+ * standalone), a complete triangle whose thrust has turned no longer states
+ * its thrust target, and a fib leg or ABC projection the price has closed
+ * through is no longer an overlay candidate. A KRW listing prints every
+ * price-axis value (bars, bands, averages, levels, fib/pivot tables, pattern
+ * and overlay levels, prior-analysis levels) at its KRX tick through the
+ * shared `formatPriceAtDp`. Bytes change for any prompt with such a
+ * structure and for every KRW prompt.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p26' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p27' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest
@@ -1507,9 +1517,13 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * loss-making peer's negative P/E no longer renders `-0.0` when it rounds
  * to exactly zero.
  *
+ * **`f6`** — KRX ticks (2026-10-18; see {@link PROMPT_TEMPLATE_VERSION}
+ * `p27`). The shared `formatPrice` prints a KRW price at its KRX tick, so the
+ * price lines of every KRW prompt change.
+ *
  * @internal
  */
-export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f5' as const;
+export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f6' as const;
 
 /**
  * Build the Redis key for a cached fundamental analysis result.
@@ -2129,9 +2143,13 @@ export function buildNewsCacheKey(
  * rules, so every prompt with an investor-flows section changes; the
  * guidance is not folded into `inputHash`.
  *
+ * **`p9`** — KRX ticks (2026-10-18; see {@link PROMPT_TEMPLATE_VERSION}
+ * `p27`). The overall key-level list prints a KRW listing's prices at their
+ * KRX tick through the shared `formatPriceAtDp`, so every KRW prompt changes.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p8' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p9' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

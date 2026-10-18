@@ -1102,7 +1102,8 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 패턴은 "Unconfirmed shape resemblances" 한 줄로 묶는다.
         // p26 (2026-10-08 최종 A/B 후속): 형태 유사 줄 제거, 계산 섹션 서술의
         // 일반 규칙·상태 코드 규칙, 무효화를 넘은 종가(슬랙 없음)가 있는 패턴 제외, 라운딩 극값 위치·곡선 재고정.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p26');
+        // p27 (2026-10-18): 끝난 C·꺾인 thrust의 목표와 깨진 피보 후보를 빼고, KRW 가격을 호가 단위로 찍는다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p27');
     });
 });
 

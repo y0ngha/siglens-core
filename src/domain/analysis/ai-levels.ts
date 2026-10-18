@@ -3,6 +3,7 @@ import {
     nearestTargetAbove,
 } from '@/domain/analysis/planCheck';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
+import { roundToKrxTick } from '@/domain/analysis/krxTick';
 import {
     formatNullableNumber,
     formatPrice,
@@ -21,7 +22,6 @@ import type {
     ReconcileResult,
     ResolvedLevel,
 } from '@/domain/types';
-import { roundToKrxTick } from '@/domain/analysis/krxTick';
 
 /** AI SL/TP 검증 + ATR 기반 fallback resolver. AI 원본 필드를 수정하지 않고 reconciledLevels에 보정값을 병기한다. */
 
