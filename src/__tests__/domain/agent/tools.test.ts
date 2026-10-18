@@ -68,6 +68,12 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_cached_analysis')?.description).toContain(
             'chart patterns'
         );
+        const barsDescription = findToolSpec(
+            'get_bars_indicators'
+        )?.description;
+        expect(barsDescription).toContain('`groups[]` entry carries a `label`');
+        expect(barsDescription).toContain('`history`');
+        expect(barsDescription).toContain('`yearMin` / `yearMax`');
     });
 
     it('get_guide는 DB 조회라 free이고 query 하나만 받는다', () => {

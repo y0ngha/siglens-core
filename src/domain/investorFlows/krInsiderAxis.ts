@@ -232,6 +232,25 @@ function routineMassFiling(
 }
 
 /**
+ * The receipt day with the most reports in the window and its count; the
+ * earliest day wins a tie. `null` for an empty window. `reports` is sorted by
+ * day, so the first day to reach the top count is the earliest.
+ */
+function largestSingleDayFiling(
+    reports: readonly DatedInsiderReport[]
+): { date: string; count: number } | null {
+    const counts = new Map<number, number>();
+    for (const r of reports) counts.set(r.day, (counts.get(r.day) ?? 0) + 1);
+    let best: { day: number; count: number } | null = null;
+    for (const [day, count] of counts) {
+        if (best === null || count > best.count) best = { day, count };
+    }
+    return best === null
+        ? null
+        : { date: formatDay(best.day), count: best.count };
+}
+
+/**
  * Korean insider axis from DART executive / major-shareholder ownership reports
  * (임원·주요주주 소유보고) and trading-plan reports (거래계획보고서) in the
  * trailing {@link KR_WINDOW_DAYS} days. Fills the `insider` slot.
@@ -397,6 +416,7 @@ export function evaluateKrInsiderAxis(
                       latestUsable === undefined
                           ? null
                           : formatDay(latestUsable.day),
+                  largestSingleDayFiling: largestSingleDayFiling(reports),
               };
     const base = krMetrics === undefined ? {} : { krMetrics };
     if (measuredNoChange) {

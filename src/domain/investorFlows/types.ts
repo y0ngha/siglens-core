@@ -629,6 +629,17 @@ export interface KrInsiderMetrics {
      * none in the window" — an insufficient axis that is not missing data.
      */
     readonly latestReceiptDate: string | null;
+    /**
+     * The receipt date with the most usable reports inside the window, and that
+     * count (`YYYY-MM-DD`; earliest date wins a tie); `null` when the window has
+     * no usable report. Lets a renderer explain a large `reports` count
+     * that one mass filing produced ("7/21 일괄 보고 742건 포함"). Optional: absent
+     * on metrics built before it existed.
+     */
+    readonly largestSingleDayFiling?: {
+        readonly date: string;
+        readonly count: number;
+    } | null;
 }
 
 /** Insider axis: Form 4 and Form 144 for US listings, DART ownership reports for Korean ones. */

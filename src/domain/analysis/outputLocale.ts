@@ -94,6 +94,17 @@ export function outputLanguageName(locale: AnalysisLocale): string {
 }
 
 /**
+ * @internal 비-ko 출력에서 통화를 쓰는 규칙.
+ *
+ * 프롬프트의 가격은 단위 없는 숫자이고 유일한 가격 서술 예시가 한국어 원화
+ * (`122,000원`)라, 영어 분석이 "214.13 dollars"를 쓰는 일이 있었다. 기본
+ * 로케일은 자연스러운 한국어(달러/원)를 그대로 두므로 이 문장은 비-ko에만 붙는다 —
+ * ko 프롬프트 바이트는 바뀌지 않는다.
+ */
+const CURRENCY_WRITING_RULE =
+    '- Write USD prices with a leading $ and cents ($214.13), never "214.13 dollars" or "USD 214.13"; write large amounts as $1.2B. Write KRW prices as ₩122,000 (or "122,000 won"). The Korean-language examples elsewhere in this prompt (e.g. "122,000원") show structure only — do not copy their wording or their currency; use the listing currency in the format above. This applies to EVERY string field in the JSON, not only the prose — key-level and target reasons, rationale, signal descriptions and scenario triggers: write "pivot S1 at $213.90", never "pivot S1 at 213.90". Price ranges carry the symbol on both ends: "the $208.93 to $243.37 leg", never "the 208.93 to 243.37 leg".';
+
+/**
  * @internal
  *
  * 시스템 프롬프트의 출력 언어 계약 한 줄.
@@ -119,6 +130,7 @@ export function outputLanguageContract(locale: AnalysisLocale): string {
         `- All text content inside the JSON MUST be written in ${name} in ${register}.`,
         `- This language rule overrides every other language hint in the user prompt. If a field description names a different language, ignore that name and still write ${name}.`,
         '- Ticker symbols, company names as officially registered, and standard finance abbreviations (RSI, MACD, EPS, P/E) stay in their original form.',
+        CURRENCY_WRITING_RULE,
     ].join('\n');
 }
 
@@ -146,6 +158,7 @@ export function outputLanguageReminder(locale: AnalysisLocale): string {
         `- Write every human-readable text value in ${name}, in ${register}.`,
         `- Field descriptions above may say "Korean" or use field names ending in "Ko". Those name the field, not the language. Write ${name} regardless.`,
         '- Keep JSON keys, ticker symbols, and standard finance abbreviations exactly as specified.',
+        '- Currency: USD prices as $214.13 (leading $, cents), never "214.13 dollars" or "USD 214.13"; large amounts as $1.2B; KRW as ₩122,000 or "122,000 won". Applies to every string field (reasons, rationale, signals, scenarios), never a bare number: "pivot S1 at $213.90", not "pivot S1 at 213.90"; ranges as "$208.93 to $243.37".',
     ].join('\n');
 }
 

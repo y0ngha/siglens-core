@@ -66,6 +66,39 @@ describe('출력 로케일', () => {
         }
     );
 
+    it('ko 계약·리마인더는 통화 규칙을 싣지 않는다 — 바이트 불변', () => {
+        expect(outputLanguageContract('ko')).not.toContain('$');
+        expect(aiSystemPrompt('ko')).not.toContain('214.13');
+        expect(outputLanguageReminder('ko')).toBe('');
+    });
+
+    it.each(ANALYSIS_LOCALES.filter(l => l !== 'ko'))(
+        '%s: 시스템 계약과 리마인더가 $·₩ 통화 표기를 요구하고 dollars 표기를 금지한다',
+        locale => {
+            for (const text of [
+                outputLanguageContract(locale),
+                outputLanguageReminder(locale),
+                aiSystemPrompt(locale),
+            ]) {
+                expect(text).toContain('$214.13');
+                expect(text).toContain('never "214.13 dollars"');
+                expect(text).toContain('₩122,000');
+            }
+            expect(outputLanguageContract(locale)).toContain(
+                'do not copy their wording or their currency'
+            );
+            // Every string field, not just the prose (reasons carried bare numbers).
+            for (const text of [
+                outputLanguageContract(locale),
+                outputLanguageReminder(locale),
+            ]) {
+                expect(text).toMatch(/every string field/i);
+                expect(text).toContain('pivot S1 at $213.90');
+                expect(text).toContain('$208.93 to $243.37');
+            }
+        }
+    );
+
     /** 언어마다 기본 문체가 달라 지정하지 않으면 호출마다 문체가 흔들린다. */
     it.each(ANALYSIS_LOCALES)('%s: 공손 층위를 지정한다', locale => {
         expect(outputLanguageContract(locale).length).toBeGreaterThan(40);
