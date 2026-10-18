@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.23.1](https://github.com/y0ngha/siglens-core/compare/v2.23.0...v2.23.1) (2026-10-18)
+
+### Bug Fixes
+
+* 옵션·에이전트 프롬프트 문장 오류 정정 ([#288](https://github.com/y0ngha/siglens-core/issues/288)) ([adba9b0](https://github.com/y0ngha/siglens-core/commit/adba9b0962c529d19649ba9f4bdeaa92bb85ecf2))
+
 # [2.23.0](https://github.com/y0ngha/siglens-core/compare/v2.22.4...v2.23.0) (2026-10-18)
 
 ### Features
