@@ -374,3 +374,19 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(bars?.description).toContain('On timeframe 1Day');
     });
 });
+
+describe('tool description wording', () => {
+    const description = (name: string): string =>
+        AGENT_TOOL_SPECS.find(s => s.name === name)?.description ?? '';
+
+    it('get_options_summary defines max pain, P/C direction and counts vs prices', () => {
+        const d = description('get_options_summary');
+        expect(d).toContain('smallest total payout to option holders');
+        expect(d).toContain('put OI ÷ call OI (0.58 = 0.58 puts per call)');
+        expect(d).toContain('contract counts, never prices');
+    });
+
+    it('get_bars_indicators mentions latest.rsiZone', () => {
+        expect(description('get_bars_indicators')).toContain('latest.rsiZone');
+    });
+});

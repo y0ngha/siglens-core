@@ -6,6 +6,7 @@ import {
     STOCHASTIC_OVERBOUGHT_LEVEL,
     STOCHASTIC_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
+import { rsiZone } from '@/domain/indicators/rsiZone';
 import { GAP_MIN_ATR_MULT } from '@/domain/signals/constants';
 import { ADX_TRENDING_THRESHOLD } from '@/domain/analysis/marketReferenceConstants';
 import {
@@ -435,12 +436,6 @@ function maCycleLine(series: Record<number, (number | null)[]>): string {
     if (!isMaCycleOrder(order)) return `${MA_CYCLE_LABEL}: N/A`;
     const stage = MA_CYCLE_STAGE[order];
     return `${MA_CYCLE_LABEL}: ${sorted.map(x => `MA${x.p}`).join('>')}; stage ${stage}`;
-}
-
-function rsiZone(rsi: number): 'overbought' | 'oversold' | 'neutral' {
-    if (rsi >= RSI_OVERBOUGHT_LEVEL) return 'overbought';
-    if (rsi <= RSI_OVERSOLD_LEVEL) return 'oversold';
-    return 'neutral';
 }
 
 /** @internal `- RSI(14): 64.83 neutral (overbought ≥ 70, oversold ≤ 30)` — so "과열" is never said of a sub-70 RSI. */

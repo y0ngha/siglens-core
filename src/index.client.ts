@@ -461,6 +461,8 @@ export {
     STOCH_RSI_RSI_PERIOD,
     STOCH_RSI_STOCH_PERIOD,
 } from './domain/indicators/constants';
+export { rsiZone } from './domain/indicators/rsiZone';
+export type { RsiZone } from './domain/indicators/rsiZone';
 
 // Domain ports + infrastructure type-only interfaces are safe for browser consumers.
 export type { CacheProvider } from './domain/ports/cache';

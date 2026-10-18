@@ -17,6 +17,7 @@ import {
     aggregateBarsToWeekly,
     buildPlanCheck,
     calculateMA,
+    rsiZone,
     planEntryPrice,
     CONFLUENCE_HTF_MODE,
     CONFLUENCE_MIN,
@@ -130,6 +131,13 @@ describe('public API exports', () => {
         const snap: ConfluenceSnapshot | null = evaluateConfluence([], opts);
         expect(params.min).toBe(3);
         expect(snap).toBeNull();
+    });
+
+    it('exports rsiZone so consumers share one RSI zone boundary', () => {
+        expect(typeof rsiZone).toBe('function');
+        expect(rsiZone(70)).toBe('overbought');
+        expect(rsiZone(37.5)).toBe('neutral');
+        expect(rsiZone(30)).toBe('oversold');
     });
 
     it('exports calculateMA so consumers stop re-implementing it', () => {

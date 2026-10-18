@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 import {
     AGENT_FOLLOW_UP_MARKER,
@@ -112,6 +111,28 @@ describe('buildAgentSystemPrompt', () => {
         });
         expect(p).toContain('Answer in English');
         expect(p).not.toContain('- web_search');
+    });
+
+    it('옵션 답변 규칙(맥스 페인 끌림 해석 금지·IV 이력 없는 평가 금지·센트 표기)은 get_options_summary가 있을 때만 넣는다', () => {
+        expect(prompt).toContain(
+            'never mention the pinning or gravitation idea that price drifts toward it'
+        );
+        expect(prompt).toContain(
+            'Never call implied volatility high, low or normal for this stock'
+        );
+        expect(prompt).toContain("not '9.5 cents', not 'half a cent'");
+        expect(prompt).toContain(
+            'beyond daysToExpiration and the expiration date'
+        );
+        const noOptions = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_options_summary'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(noOptions).not.toContain('pinning or gravitation');
     });
 
     it('도구 선택은 질문 유형 표로, 가용한 도구를 가리키는 행만 넣는다', () => {
@@ -429,7 +450,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-16.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-18.1');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
@@ -650,55 +671,6 @@ describe('buildAgentSystemPrompt', () => {
             expect(noAnalysis).toContain('→ get_investor_flows.');
             expect(noAnalysis).not.toContain('alongside the outlook tools');
         });
-
-        /**
-         * With the tool absent the prompt must match what the previous version
-         * produced, byte for byte, apart from the version line. The hashes were
-         * taken from the pre-change file at the same inputs (NOW, 'open').
-         */
-        it.each([
-            [
-                'ko',
-                false,
-                '7de1c5a9170f2391f4426da94ffbe6486bbaeb5e6de0b59c94222cc369f00516',
-            ],
-            [
-                'ko',
-                true,
-                '04b4ab8a135d070b0a8c74b1d13e54e5443b9145195d653144c053c791226770',
-            ],
-            [
-                'en',
-                false,
-                'cbe4ef208b4d48c902076cade878b59d356332244854832ec1cea3d2d0f843ae',
-            ],
-            [
-                'en',
-                true,
-                '65aa48d5a0212b9b7981cafe91848d039c517a125721ce6df7f022f405ef1870',
-            ],
-        ] as const)(
-            'is byte-identical to the previous output when get_investor_flows is absent (%s, guest=%s)',
-            (locale, guest, previousHash) => {
-                const absent = buildAgentSystemPrompt({
-                    locale,
-                    tools: AGENT_TOOL_SPECS.filter(
-                        t => t.name !== 'get_investor_flows'
-                    ),
-                    now: NOW,
-                    etSessionStatus: 'open',
-                    guest,
-                });
-                const asPrevious = absent.replace(
-                    `Prompt version: ${AGENT_PROMPT_VERSION}`,
-                    'Prompt version: 2026-10-10.2'
-                );
-                expect(asPrevious).not.toBe(absent);
-                expect(
-                    createHash('sha256').update(asPrevious).digest('hex')
-                ).toBe(previousHash);
-            }
-        );
 
         it('names investor flows in the guest line only when the tool is available', () => {
             const guestOf = (tools: typeof AGENT_TOOL_SPECS) =>
@@ -1184,5 +1156,32 @@ describe('buildAgentSystemPrompt', () => {
         );
         // 기존 경계(수량·손절·분할)는 그대로 남는다.
         expect(prompt).toContain('Still not yours to decide');
+    });
+});
+
+describe('buildAgentSystemPrompt wording rules', () => {
+    const prompt = buildAgentSystemPrompt({
+        locale: 'ko',
+        tools: AGENT_TOOL_SPECS,
+        now: NOW,
+        etSessionStatus: 'open',
+    });
+
+    it('writes USD prices of $1 or more to the cent, never a fraction of a cent', () => {
+        expect(prompt).toContain('always written to the cent');
+        expect(prompt).toContain('214.305 → 214.31');
+        expect(prompt).toContain('no "half a cent"');
+        expect(prompt).toContain('KRW as integers');
+    });
+
+    it('forbids unsourced historical claims', () => {
+        expect(prompt).toContain('claims about what has historically happened');
+        expect(prompt).toContain("SIGLENS's backtest across many stocks");
+    });
+
+    it('anchors the RSI zone to latest.rsiZone', () => {
+        expect(prompt).toContain('use latest.rsiZone');
+        expect(prompt).toContain('when present; otherwise treat an RSI');
+        expect(prompt).toContain('oversold, overbought, or "near" either');
     });
 });

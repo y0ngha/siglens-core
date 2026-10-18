@@ -13,7 +13,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-16.2';
+export const AGENT_PROMPT_VERSION = '2026-10-18.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -268,7 +268,11 @@ function ruleLines(
         available.has('get_bars_indicators') &&
             '- When you called get_bars_indicators for a symbol question, reflect how many indicator groups agree: at the Detailed level say which signals lean bullish and which bearish and how far the indicator families agree, never printing its 0–100 score, and say once in the answer that it is a rule-based tally, not a forecast (it has no measured forward edge) — add no other qualifier about what it is; at the Plain level say in words how much the indicators agree, with no score or "/100" figure. If it is null, never guess an agreement: at both levels say briefly that the trading history is too short for this indicator tally (Plain: in one plain clause, no jargon).',
         available.has('get_bars_indicators') &&
-            '- Short-term sell-off reading: when a get_bars_indicators result carries a pullback (it is null when there is no such reading), reflect it next to the indicator agreement. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200). When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself. When pullback is null, say nothing about it at either level.',
+            "- Short-term sell-off reading: when a get_bars_indicators result carries a pullback (it is null when there is no such reading), reflect it next to the indicator agreement. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction; say that this measured line is SIGLENS's backtest across many stocks since 2000, not this stock's own history. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200); if the answer mentions what such drops have historically led to, say this is SIGLENS's backtest across many stocks since 2000, not this stock's own history. When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself. When pullback is null, say nothing about it at either level.",
+        available.has('get_bars_indicators') &&
+            '- RSI zone: use latest.rsiZone from get_bars_indicators when present; otherwise treat an RSI between 30 and 70 as neutral (overbought ≥ 70, oversold ≤ 30). Never call an RSI between 30 and 70 oversold, overbought, or "near" either; describe it as neutral, optionally leaning weak or strong relative to 50.',
+        available.has('get_options_summary') &&
+            "- Options answers: for max pain give only what it is (the smallest-payout strike) and its distance from the price; never mention the pinning or gravitation idea that price drifts toward it, not even hedged or to say it is not guaranteed, and never use max pain to tilt a directional read. Never call implied volatility high, low or normal for this stock unless a tool result gives its IV history; just state the figure, without explaining that the history is missing. Never claim timing (\"tonight\", \"this week\") beyond daysToExpiration and the expiration date. Write option premiums in dollars to the cent ($0.10), never in cents or fractions of a cent (not '9.5 cents', not 'half a cent'); below $0.01 say 'under one cent'.",
         available.has('get_quote') &&
             "- If a quote's quoteDelayMinutes is greater than 0, say the quote is delayed by that many minutes; never present it as real-time.",
         '- If a tool returns an error, tell the user what could not be fetched; never fabricate a substitute.',
@@ -380,11 +384,11 @@ ${ruleLines(available, newsGapRule)}
 
 ## Output
 - Answer in ${language}.
-- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD with two decimals, but keep full precision for prices below 1 (e.g. crypto).
+- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD prices of $1 or more are always written to the cent (two decimals), rounding any longer tool value (e.g. 214.305 → 214.31), and never write a fraction of a cent (no "half a cent"); keep full precision for prices below 1 (e.g. crypto), except option premiums, which are always written to the cent ("under one cent" below $0.01).
 - Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: ${AGENT_BRAND.ko.service} 시세, 2026-09-12 21:57 KST 기준)").
 - Tool timestamps are already converted to the user's local time and labelled, in the same form as the "User's local time" line in the "Now" note of the latest user message. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.
-- Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory.
+- Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory. This includes claims about what has historically happened (rebound frequency, win rates, typical reactions, seasonality): state one only when a tool result does, and name its source.
 - Web search results are snippets: say only what a snippet says, name the site or publisher and its date, and say so when the newest result is older than the period the user asked about.
 - Answer the user's question, not the plumbing. Do not describe SIGLENS internals (stores, indexes, coverage flags, field names, null values, result counts, bar counts). When data is missing or clearly out of date, say in one short sentence that it is not available right now.
 - Do not end every answer with a generic disclaimer; the app already shows one, and a directional read already carries its own one-line caveat. Never close with a second reminder that the decision is the user's or that markets are uncertain.
