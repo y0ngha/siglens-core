@@ -3385,6 +3385,27 @@ export interface MarketEvent {
     readonly impact: NewsImpact;
 }
 
+/** Input of `pullbackEventCaveat`. */
+export interface PullbackEventCaveatInput {
+    /** Market events for this symbol, any order. */
+    events: readonly MarketEvent[];
+    /** `YYYY-MM-DD` report dates of this company, past and upcoming. */
+    earningsDates?: readonly string[];
+    /** Daily bars, oldest first. */
+    bars: readonly Bar[];
+}
+
+/** Input of `computeRiskLevel`: market data only, never model output. */
+export interface RiskLevelInputs {
+    /** OHLCV history, oldest first. The last bar is the one being assessed. */
+    bars: readonly Bar[];
+    timeframe: Timeframe;
+    /** Market events for this symbol, any order. */
+    events?: readonly MarketEvent[];
+    /** `YYYY-MM-DD` report dates of this company, past and upcoming. */
+    earningsDates?: readonly string[];
+}
+
 /** Per-card translation and sentiment result produced by the news-card model. */
 export interface NewsCardAnalysis {
     titleKo: string;

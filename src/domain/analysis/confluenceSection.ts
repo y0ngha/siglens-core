@@ -34,6 +34,7 @@ import type {
     MarketReference,
     NewsCategory,
     NewsImpact,
+    PullbackEventCaveatInput,
     ReferenceLevel,
     ReferenceLevels,
     Timeframe,
@@ -322,16 +323,6 @@ export function newsDrivenWashoutEvent(
             );
         }) ?? null
     );
-}
-
-/** Input of {@link pullbackEventCaveat}. */
-export interface PullbackEventCaveatInput {
-    /** Market events for this symbol, any order. */
-    events: readonly MarketEvent[];
-    /** `YYYY-MM-DD` report dates of this company, past and upcoming. */
-    earningsDates?: readonly string[];
-    /** Daily bars, oldest first. */
-    bars: readonly Bar[];
 }
 
 /**

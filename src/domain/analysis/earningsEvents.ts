@@ -21,15 +21,13 @@ const DAY_MS = 86_400_000;
 
 /** UTC midnight of a `Date` or a `YYYY-MM-DD` string; `NaN` when unparsable. */
 function utcDayMs(value: Date | string): number {
-    const ms =
-        typeof value === 'string'
-            ? Date.parse(`${value.slice(0, 10)}T00:00:00Z`)
-            : Date.UTC(
-                  value.getUTCFullYear(),
-                  value.getUTCMonth(),
-                  value.getUTCDate()
-              );
-    return ms;
+    return typeof value === 'string'
+        ? Date.parse(`${value.slice(0, 10)}T00:00:00Z`)
+        : Date.UTC(
+              value.getUTCFullYear(),
+              value.getUTCMonth(),
+              value.getUTCDate()
+          );
 }
 
 /**

@@ -55,6 +55,8 @@ export const PULLBACK_NEAR_WILLIAMS_R = -80;
  * What each reading has historically meant, in words a model can quote. `none` carries no
  * base rate.
  *
+ * Keep in sync: the "66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), not a holding win rate" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and the agent pullback rule (domain/agent/buildAgentSystemPrompt.ts). Change all three together.
+ *
  * Measured on daily bars, entry at the signal day's close, 0.1% cost per side:
  * point-in-time S&P 500 members 2000-01 → 2020-11 (615 symbols) plus nine large caps and
  * SPY/QQQ 2024-07 → 2026-09, split into five periods (2000–07, 2007–09, 2009–14,
