@@ -4,9 +4,9 @@ import type {
     FearGreedFactorKey,
     FearGreedGroup,
     FearGreedLabel,
-    ScoredSnapshot,
     FearGreedWarning,
     FactorValues,
+    ScoredSnapshot,
 } from '@/domain/indicators/fearGreed/types';
 import { percentile } from '@/domain/indicators/fearGreed/percentile';
 

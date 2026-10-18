@@ -215,17 +215,19 @@ describe('computeFearGreedIndex — ma200DistancePct (display)', () => {
     });
 
     it('is null on the consumer path for the smallest bar count that still yields a snapshot below 200 bars', () => {
-        let smallest = 0;
-        for (let n = 1; n < 200; n++) {
-            if (computeFearGreedIndex(genBars(n), genBsv(n))) {
-                smallest = n;
-                break;
-            }
-        }
-        expect(smallest).toBeGreaterThan(0);
+        // 41 is the smallest count yielding a snapshot: the factors need 30 bars
+        // of window and the percentile sample needs the LIMITED minimum (10)
+        // valid prior factor rows. Re-derive if those thresholds change.
+        const SMALLEST_SNAPSHOT_BAR_COUNT = 41;
+        expect(
+            computeFearGreedIndex(
+                genBars(SMALLEST_SNAPSHOT_BAR_COUNT - 1),
+                genBsv(SMALLEST_SNAPSHOT_BAR_COUNT - 1)
+            )
+        ).toBeNull();
         const snap = computeFearGreedIndex(
-            genBars(smallest),
-            genBsv(smallest)
+            genBars(SMALLEST_SNAPSHOT_BAR_COUNT),
+            genBsv(SMALLEST_SNAPSHOT_BAR_COUNT)
         )!;
         expect(snap.ma200DistancePct).toBeNull();
     });

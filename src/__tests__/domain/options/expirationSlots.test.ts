@@ -165,33 +165,53 @@ describe('mapExpirationsToSlots — 0D (this week)', () => {
     });
 });
 
-describe('mapExpirationsToSlots — 0D weekend fallback', () => {
-    it.each([
-        ['Sunday', '2026-10-18'],
-        ['Saturday', '2026-10-17'],
-    ])(
-        'on a %s with nothing in the upcoming week falls back to the nearest expiration',
-        (_label, nowIso) => {
-            // Upcoming Mon–Sun week (10-19..10-25) has no expiration.
-            const result = byKey(
-                mapExpirationsToSlots(
-                    ['2026-11-06', '2026-10-30'],
-                    etMidnight(nowIso)
-                )
-            );
-            expect(result['0D']).toBe('2026-10-30');
-        }
-    );
-
-    it('consumes the fallback expiration so the next slot moves on to another one', () => {
-        // Sun 2026-10-18: 0D falls back to 10-30 (+12); 2W (11–17) then takes 11-02 (+15).
+describe('mapExpirationsToSlots — 0D fallback', () => {
+    it('on a Sunday with nothing in the upcoming week uses the nearest expiration within the cap', () => {
+        // Upcoming Mon–Sun week (10-19..10-25) is empty; 10-26 is +8 days.
         const result = byKey(
             mapExpirationsToSlots(
-                ['2026-10-30', '2026-11-02'],
+                ['2026-11-06', '2026-10-26'],
                 etMidnight('2026-10-18')
             )
         );
-        expect(result['0D']).toBe('2026-10-30');
+        expect(result['0D']).toBe('2026-10-26');
+    });
+
+    it('leaves 0D unmapped when the nearest expiration is 12 days away', () => {
+        const result = byKey(
+            mapExpirationsToSlots(['2026-10-30'], etMidnight('2026-10-18'))
+        );
+        expect(result['0D']).toBeUndefined();
+    });
+
+    it('allows exactly ZERO_DTE_MAX_DAYS and rejects one day more', () => {
+        // Thu 2026-05-14: week ends 05-17; 05-22 is +8, 05-23 is +9.
+        const now = etMidnight('2026-05-14');
+        expect(byKey(mapExpirationsToSlots(['2026-05-22'], now))['0D']).toBe(
+            '2026-05-22'
+        );
+        expect(
+            byKey(mapExpirationsToSlots(['2026-05-23'], now))['0D']
+        ).toBeUndefined();
+        expect(ZERO_DTE_MAX_DAYS).toBe(8);
+    });
+
+    it('on a Saturday leaves 0D unmapped when only a +9 day expiration exists', () => {
+        const result = byKey(
+            mapExpirationsToSlots(['2026-10-26'], etMidnight('2026-10-17'))
+        );
+        expect(result['0D']).toBeUndefined();
+    });
+
+    it('consumes the fallback expiration so the next slot moves on to another one', () => {
+        // Sun 2026-10-18: 0D falls back to 10-26 (+8); 2W (11–17) then takes 11-02 (+15).
+        const result = byKey(
+            mapExpirationsToSlots(
+                ['2026-10-26', '2026-11-02'],
+                etMidnight('2026-10-18')
+            )
+        );
+        expect(result['0D']).toBe('2026-10-26');
         expect(result['2W']).toBe('2026-11-02');
     });
 });
@@ -263,8 +283,8 @@ describe('mapExpirationsToSlots — windows', () => {
         const result = byKey(mapExpirationsToSlots([plus(19)], now));
         expect(result['2W']).toBeUndefined();
         expect(result['1M']).toBeUndefined();
-        // Only 0D (nearest fallback) is filled.
-        expect(Object.keys(result)).toEqual(['0D']);
+        // 19 days is also beyond the 0D fallback cap, so nothing is filled.
+        expect(Object.keys(result)).toEqual([]);
     });
 
     it.each([
