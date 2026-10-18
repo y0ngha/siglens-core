@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.22.3](https://github.com/y0ngha/siglens-core/compare/v2.22.2...v2.22.3) (2026-10-18)
+
+### Bug Fixes
+
+* 넥라인 계열 차트 패턴의 돌파 후 복귀를 failed breakout으로 표기 ([#284](https://github.com/y0ngha/siglens-core/issues/284)) ([22292e3](https://github.com/y0ngha/siglens-core/commit/22292e3745be9b97e91e412bdd44d38f75fb2b0f))
+* 지난 구조의 목표가를 작도·프롬프트에서 제외, KRX 가격을 호가 단위로 반올림 ([#283](https://github.com/y0ngha/siglens-core/issues/283)) ([b5a7030](https://github.com/y0ngha/siglens-core/commit/b5a7030ee96afcb7a81fcf811c6194bc0bcf32c5))
+
 ## [2.22.2](https://github.com/y0ngha/siglens-core/compare/v2.22.1...v2.22.2) (2026-10-17)
 
 ### Bug Fixes
