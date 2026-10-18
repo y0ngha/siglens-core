@@ -1,5 +1,5 @@
 import { MS_PER_DAY } from '@/domain/constants/time';
-import type { ExpirationSlot, SlotMapping } from './types';
+import type { ExpirationSlot, ExpirationSlotKey, SlotMapping } from './types';
 
 /**
  * @internal Inclusive upper-bound on days-to-expiration for the `0D` slot.
@@ -44,10 +44,16 @@ export const EXPIRATION_SLOTS: ReadonlyArray<ExpirationSlot> = [
 ];
 
 function slotWindow(
-    key: keyof typeof EXPIRATION_SLOT_WINDOWS
+    key: WindowedSlotKey
 ): Pick<ExpirationSlot, 'targetDays' | 'minDays' | 'maxDays'> {
     const w = EXPIRATION_SLOT_WINDOWS[key];
     return { targetDays: w.target, minDays: w.min, maxDays: w.max };
+}
+
+type WindowedSlotKey = keyof typeof EXPIRATION_SLOT_WINDOWS;
+
+function isWindowedKey(key: ExpirationSlotKey): key is WindowedSlotKey {
+    return key in EXPIRATION_SLOT_WINDOWS;
 }
 
 const FRIDAY = 5;
@@ -102,23 +108,17 @@ function pickNearestInWindow(
     candidates: ReadonlyArray<DatedExpiration>,
     window: { target: number; min: number; max: number }
 ): DatedExpiration | undefined {
-    let best: DatedExpiration | undefined;
-    for (const e of candidates) {
-        if (e.days < window.min || e.days > window.max) continue;
-        if (!best) {
-            best = e;
-            continue;
-        }
-        const dist = Math.abs(e.days - window.target);
-        const bestDist = Math.abs(best.days - window.target);
-        if (
-            dist < bestDist ||
-            (dist === bestDist && isFriday(e.date) && !isFriday(best.date))
-        ) {
-            best = e;
-        }
-    }
-    return best;
+    const rank = (e: DatedExpiration): [number, number] => [
+        Math.abs(e.days - window.target),
+        isFriday(e.date) ? 0 : 1,
+    ];
+    return candidates
+        .filter(e => e.days >= window.min && e.days <= window.max)
+        .sort((a, b) => {
+            const [distA, nonFriA] = rank(a);
+            const [distB, nonFriB] = rank(b);
+            return distA - distB || nonFriA - nonFriB || a.days - b.days;
+        })[0];
 }
 
 /**
@@ -151,15 +151,9 @@ export function mapExpirationsToSlots(
     const result: (SlotMapping | null)[] = [];
     for (const slot of EXPIRATION_SLOTS) {
         const available = dated.filter(e => !used.has(e.date));
-        const match =
-            slot.key === '0D'
-                ? pickThisWeek(available, now)
-                : pickNearestInWindow(
-                      available,
-                      EXPIRATION_SLOT_WINDOWS[
-                          slot.key as keyof typeof EXPIRATION_SLOT_WINDOWS
-                      ]
-                  );
+        const match = !isWindowedKey(slot.key)
+            ? pickThisWeek(available, now)
+            : pickNearestInWindow(available, EXPIRATION_SLOT_WINDOWS[slot.key]);
         if (!match) {
             result.push(null);
             continue;

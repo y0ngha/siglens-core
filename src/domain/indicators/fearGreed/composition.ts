@@ -4,7 +4,7 @@ import type {
     FearGreedFactorKey,
     FearGreedGroup,
     FearGreedLabel,
-    FearGreedSnapshot,
+    ScoredSnapshot,
     FearGreedWarning,
     FactorValues,
 } from '@/domain/indicators/fearGreed/types';
@@ -88,9 +88,6 @@ export function detectWarning(
     }
     return null;
 }
-
-/** @internal Snapshot before the display-only `ma200DistancePct` is attached by `computeFearGreedIndex`. */
-export type ScoredSnapshot = Omit<FearGreedSnapshot, 'ma200DistancePct'>;
 
 const FLOW_KEYS = ['volume_z', 'buysell_imbalance', 'poc_distance'] as const;
 const TREND_KEYS = ['ma200_distance', 'range_position'] as const;

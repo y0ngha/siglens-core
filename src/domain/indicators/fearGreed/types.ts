@@ -102,6 +102,9 @@ export interface FearGreedSnapshot {
     ma200DistancePct?: number | null;
 }
 
+/** @internal Snapshot before the display-only `ma200DistancePct` is attached by `computeFearGreedIndex`. */
+export type ScoredSnapshot = Omit<FearGreedSnapshot, 'ma200DistancePct'>;
+
 /**
  * A single point in a walk-forward Fear & Greed history series. `date` is the
  * ISO `YYYY-MM-DD` calendar date of `bars[t].time`. Same shape as
