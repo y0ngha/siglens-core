@@ -7,7 +7,7 @@ import type {
 } from '@/domain/types';
 import { buildFibonacciCandidates } from '@/domain/overlays/fibonacciCandidates';
 
-const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+const FMT = { timeframe: '1Day' as const, quoting: { dp: 2, krxTick: null } };
 // Closes at 110: inside every leg (100–120) and exactly at each ABC's C, so
 // no fixture leg or ABC is broken (`isBrokenFibLeg`, `isBrokenAbcExtension`).
 const bars: Bar[] = Array.from({ length: 30 }, (_, i) => ({

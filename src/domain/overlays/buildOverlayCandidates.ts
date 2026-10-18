@@ -38,7 +38,7 @@ export function buildOverlayCandidates(
                     patternCandidates,
                     bars,
                     atr,
-                    fmt.priceDp
+                    fmt.quoting
                 ),
         ],
         ['trendline', () => buildTrendlineCandidates(bars, atr, fmt)],

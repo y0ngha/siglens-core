@@ -2,7 +2,10 @@ import type { PivotPoint } from '@/domain/types';
 import { makeBars } from '@/__tests__/domain/patterns/helpers';
 
 /** Prompt-line format shared by the Elliott structure tests. */
-export const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+export const FMT = {
+    timeframe: '1Day' as const,
+    quoting: { dp: 2, krxTick: null },
+};
 /** Default bars between consecutive pivots in `pivotsAt`. */
 export const STEP = 4;
 

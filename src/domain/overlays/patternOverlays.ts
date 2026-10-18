@@ -23,6 +23,7 @@ import {
     computePatternTargets,
     printedPatternGeometry,
 } from '@/domain/analysis/patternTargets';
+import type { PriceQuoting } from '@/domain/analysis/promptFormat';
 
 const HS_LABELS = ['LS', 'H', 'RS'] as const;
 const HS_LABEL_PIVOT_INDICES = [0, 2, 4] as const;
@@ -180,10 +181,10 @@ function patternLevels(
     pattern: QualifiedPattern,
     g: PatternGeometry,
     bars: readonly Bar[],
-    priceDp: number,
+    quoting: PriceQuoting,
     withBreakout: boolean
 ): OverlayLevel[] {
-    const p = printedPatternGeometry(g, priceDp);
+    const p = printedPatternGeometry(g, quoting);
     const { measuredTarget } = computePatternTargets(
         p.breakoutLevel,
         p.extremeLevel,
@@ -360,7 +361,7 @@ export function buildPatternOverlayCandidates(
     patterns: readonly QualifiedPattern[],
     bars: readonly Bar[],
     atr: number,
-    priceDp: number
+    quoting: PriceQuoting
 ): OverlayCandidate[] {
     return patterns.flatMap(pattern => {
         const g = computeCandidateGeometry(pattern, bars, atr);
@@ -381,7 +382,7 @@ export function buildPatternOverlayCandidates(
                               pattern,
                               g,
                               bars,
-                              priceDp,
+                              quoting,
                               drawing.breakoutLevel
                           ),
                 labels: drawing.labels,

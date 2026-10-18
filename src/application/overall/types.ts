@@ -1,4 +1,5 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
+import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -458,6 +459,17 @@ export interface OverallDependencyInputs {
      * Defaults to `'USD'`.
      */
     currency?: CurrencyCode;
+    /**
+     * KRX tick table the listing's prices round to — `'etp'` for an ETF/ETN,
+     * `'share'` (default) otherwise. The consumer decides from the listing;
+     * ignored unless `currency` is `KRW`.
+     *
+     * Forwarded to the technical axis too. Pass the same table as
+     * `runAnalysis` for a symbol. Like `currency`, deliberately NOT part of
+     * the cache key (a symbol fixes it); an entry written with the wrong
+     * table cannot be corrected until its TTL expires.
+     */
+    krxTickTable?: KrxTickTable;
 }
 
 // ─────────────────────────────────────────

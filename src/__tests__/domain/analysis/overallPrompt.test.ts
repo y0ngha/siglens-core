@@ -2012,3 +2012,45 @@ describe('buildOverallAnalysisPrompt — investor flows by market', () => {
         expect(prompt).not.toContain(INVESTOR_FLOWS_KO_TERMINOLOGY_RULE);
     });
 });
+
+describe('buildOverallAnalysisPrompt — KRX tick table', () => {
+    const technical: AnalysisResponse = {
+        ...MOCK_TECHNICAL,
+        keyLevels: {
+            support: [{ price: 40_123, reason: 'support-reason' }],
+            resistance: [{ price: 42_122.5, reason: 'resistance-reason' }],
+        },
+    };
+    const build = (krxTick?: 'share' | 'etp'): string =>
+        buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            technical,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Day',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'equity',
+            'ko',
+            undefined,
+            undefined,
+            'KRW',
+            undefined,
+            krxTick
+        );
+
+    it('quotes key levels on the 5-won ETP grid when asked', () => {
+        const prompt = build('etp');
+        expect(prompt).toContain('40125 (support-reason');
+        expect(prompt).toContain('42125 (resistance-reason');
+    });
+
+    it('keeps the 50-won share grid by default', () => {
+        const prompt = build();
+        expect(prompt).toContain('40100 (support-reason');
+        expect(prompt).toContain('42100 (resistance-reason');
+    });
+});

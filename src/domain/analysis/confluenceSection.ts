@@ -5,7 +5,8 @@ import {
 } from '@/domain/analysis/referenceLevels';
 import {
     formatNullableNumber,
-    formatPriceAtDp,
+    formatQuotedPrice,
+    type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import {
@@ -197,13 +198,13 @@ function signalLine(label: string, types: readonly string[]): string {
 function formatConfluence(
     snapshot: ConfluenceSnapshot,
     timeframe: Timeframe,
-    priceDp: number
+    quoting: PriceQuoting
 ): string[] {
     const params = snapshot.params;
     const maText =
         snapshot.ma50 === null
             ? 'SMA50 unavailable (short history)'
-            : `close ${formatPriceAtDp(snapshot.close, priceDp)} vs SMA50 ${formatPriceAtDp(snapshot.ma50, priceDp)} (${
+            : `close ${formatQuotedPrice(snapshot.close, quoting)} vs SMA50 ${formatQuotedPrice(snapshot.ma50, quoting)} (${
                   snapshot.close > snapshot.ma50 ? 'above' : 'at or below'
               })`;
 
@@ -337,15 +338,15 @@ const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
  */
 function formatPullback(
     snapshot: PullbackSnapshot,
-    priceDp: number,
+    quoting: PriceQuoting,
     newsEvent: MarketEvent | null
 ): string[] {
     const side = snapshot.close > snapshot.ma200 ? 'above' : 'at or below';
     const lines = [
         PULLBACK_HEADER,
-        `Close ${formatPriceAtDp(snapshot.close, priceDp)} vs MA200 ${formatPriceAtDp(snapshot.ma200, priceDp)} (${formatNullableNumber(snapshot.closeVsMa200Pct)}%, ${side})`,
+        `Close ${formatQuotedPrice(snapshot.close, quoting)} vs MA200 ${formatQuotedPrice(snapshot.ma200, quoting)} (${formatNullableNumber(snapshot.closeVsMa200Pct)}%, ${side})`,
         `Williams %R(14): ${formatNullableNumber(snapshot.williamsR)} / RSI(2): ${formatNullableNumber(snapshot.rsi2)}`,
-        `Exit reference MA5: ${formatPriceAtDp(snapshot.ma5, priceDp)} — the measured sell-off is treated as resolved on the first daily close above it, or after about 10 trading days`,
+        `Exit reference MA5: ${formatQuotedPrice(snapshot.ma5, quoting)} — the measured sell-off is treated as resolved on the first daily close above it, or after about 10 trading days`,
         `Reading: ${PULLBACK_READING_TEXT[snapshot.reading]}`,
     ];
     if (snapshot.reading === 'none') return lines;
@@ -366,7 +367,7 @@ function formatPullback(
 function formatPullbackSection(
     bars: readonly Bar[],
     timeframe: Timeframe,
-    priceDp: number,
+    quoting: PriceQuoting,
     events: readonly MarketEvent[]
 ): string[] {
     if (timeframe !== '1Day') return [];
@@ -374,7 +375,7 @@ function formatPullbackSection(
     return snapshot !== null
         ? formatPullback(
               snapshot,
-              priceDp,
+              quoting,
               newsDrivenWashoutEvent(events, bars)
           )
         : [
@@ -426,7 +427,7 @@ const RISK_REWARD_HEADER = '### Risk:Reward From Current Price';
 function formatRiskReward(
     reference: MarketReference,
     bars: readonly Bar[],
-    priceDp: number
+    quoting: PriceQuoting
 ): string[] {
     const meanRangePercent = meanBarRangePercent(bars);
     const floorPercent = meanRangePercent * AT_PRICE_BAR_RANGE_FRACTION;
@@ -468,8 +469,8 @@ function formatRiskReward(
     return [
         RISK_REWARD_HEADER,
         ...noiseNote,
-        `Nearest resistance ${up.label} at ${formatPriceAtDp(up.price, priceDp)} (${formatNullableNumber(up.distancePercent)}%)`,
-        `Nearest support ${down.label} at ${formatPriceAtDp(down.price, priceDp)} (${formatNullableNumber(down.distancePercent)}%)`,
+        `Nearest resistance ${up.label} at ${formatQuotedPrice(up.price, quoting)} (${formatNullableNumber(up.distancePercent)}%)`,
+        `Nearest support ${down.label} at ${formatQuotedPrice(down.price, quoting)} (${formatNullableNumber(down.distancePercent)}%)`,
         `Structural risk:reward from current price = ${fmtRatio(ratio)}`,
         verdict,
         // The correlation is the part the model cannot infer from the ratio alone.
@@ -491,7 +492,7 @@ export function formatDeterministicMetricsSection(
     bars: readonly Bar[],
     timeframe: Timeframe,
     reference: MarketReference,
-    priceDp = 2,
+    quoting: PriceQuoting = { dp: 2, krxTick: null },
     events: readonly MarketEvent[] = []
 ): string {
     const { min, expectedWeight } = CONFLUENCE_PARAMS_BY_TIMEFRAME[timeframe];
@@ -511,14 +512,14 @@ export function formatDeterministicMetricsSection(
 
     const confluence =
         snapshot !== null
-            ? formatConfluence(snapshot, timeframe, priceDp)
+            ? formatConfluence(snapshot, timeframe, quoting)
             : [
                   `### Indicator Agreement (computed, ${timeframe} bars)`,
                   `Not measurable: the check needs more than ${CONFLUENCE_MIN_BARS} bars and received ${bars.length}. This is an absence of measurement, not an absence of agreement — judge the indicators yourself for this chart.`,
               ];
 
-    const pullback = formatPullbackSection(bars, timeframe, priceDp, events);
-    const riskReward = formatRiskReward(reference, bars, priceDp);
+    const pullback = formatPullbackSection(bars, timeframe, quoting, events);
+    const riskReward = formatRiskReward(reference, bars, quoting);
 
     return [
         DETERMINISTIC_METRICS_HEADER,

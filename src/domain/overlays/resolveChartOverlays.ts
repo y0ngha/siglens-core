@@ -2,6 +2,7 @@ import type {
     AnalysisResponse,
     ChartOverlay,
     OverlayCandidate,
+    MisplacedOverlayId,
     OverlayKind,
     PatternResult,
     PatternSummary,
@@ -280,8 +281,10 @@ function toTrendline(o: ChartOverlay): Trendline[] {
  * @internal
  * Joins the model's candidate ids to the candidates the prompt offered
  * (spec 2026-09-28 §2.5). Pure; an id the prompt never offered is returned in
- * `unknownIds` for logging and otherwise ignored. `skills` enables the
- * missing-`candidateId` fallback for detected patterns (see
+ * `unknownIds` for logging and otherwise ignored, and an offered id cited from
+ * a slot that does not accept it (wrong kind for the card, another pattern's
+ * candidate) in `misplacedIds` — rejected the same way, but not "unknown".
+ * `skills` enables the missing-`candidateId` fallback for detected patterns (see
  * {@link fallbackPatternCandidateId}), the pattern-card identity check (see
  * {@link patternCandidateSkill}) and the per-strategy kind check (see
  * {@link strategySlotKinds}); omit it to disable all three.
@@ -301,6 +304,7 @@ export function resolveChartOverlays(
     // Resolved overlays per `sourceRef` + kind, for {@link MAX_PER_SOURCE}.
     const drawnPerSource = new Map<string, number>();
     const unknownIds: string[] = [];
+    const misplacedIds: MisplacedOverlayId[] = [];
     const chartOverlays: ChartOverlay[] = [];
     for (const ref of collectRefs(
         analysis,
@@ -311,16 +315,21 @@ export function resolveChartOverlays(
         strategyByName
     )) {
         const candidate = byId.get(ref.id);
+        if (!candidate) {
+            unknownIds.push(ref.id);
+            continue;
+        }
         // A known id resolved from the wrong slot (e.g. an elliott candidate
-        // id used as a patternSummary.candidateId) is treated like an
-        // unknown id — the model referenced something that does not belong there.
+        // id used as a patternSummary.candidateId) is rejected like an unknown
+        // one, but reported apart: it was offered, so calling it "unknown"
+        // misled the log (a multi-timeframe card citing trendline ids that
+        // were also drawn from `trendlineIds`).
         if (
-            !candidate ||
             !ref.allowedKinds.includes(candidate.kind) ||
             (ref.requiredSkill !== undefined &&
                 candidate.skill !== ref.requiredSkill)
         ) {
-            unknownIds.push(ref.id);
+            misplacedIds.push({ id: ref.id, sourceRef: ref.sourceRef });
             continue;
         }
         if (seen.has(ref.id)) continue;
@@ -350,6 +359,7 @@ export function resolveChartOverlays(
             .filter(o => o.kind === 'trendline')
             .flatMap(toTrendline),
         unknownIds,
+        misplacedIds,
     };
 }
 

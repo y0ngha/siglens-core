@@ -56,7 +56,7 @@ describe('buildPatternOverlayCandidates — outcome levels', () => {
             ],
             bars,
             1,
-            2
+            { dp: 2, krxTick: null }
         );
         expect(c.levels.map(l => [l.label, l.price])).toEqual([
             ['breakout', 10],
@@ -83,7 +83,7 @@ describe('buildPatternOverlayCandidates — outcome levels', () => {
             ],
             bars,
             1,
-            2
+            { dp: 2, krxTick: null }
         );
         expect(c.segments).toHaveLength(1);
         expect(c.segments[0].to.time).toBeGreaterThan(c.segments[0].from.time);

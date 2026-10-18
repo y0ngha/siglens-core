@@ -531,7 +531,7 @@ describe('formatPriorAnalysisSection price precision', () => {
             krwBars,
             '005930.KS',
             '1Day',
-            0
+            { dp: 0, krxTick: 'share' }
         );
         expect(out).toContain('entry 266000-268000, SL 262000');
         expect(out).toContain('now 269500');

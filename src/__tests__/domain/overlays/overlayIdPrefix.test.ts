@@ -51,7 +51,7 @@ describe('OVERLAY_ID_PREFIX', () => {
             volume: 1,
         })),
         lows.map((_, i) => (i === 4 ? 25 : i === 15 ? 32 : 50)),
-        { timeframe: '1Day', priceDp: 2 }
+        { timeframe: '1Day', quoting: { dp: 2, krxTick: null } }
     );
     const all = [...offered, ...divergences];
 

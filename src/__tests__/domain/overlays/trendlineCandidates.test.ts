@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { buildTrendlineCandidates } from '@/domain/overlays/trendlineCandidates';
 import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
 
-const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+const FMT = { timeframe: '1Day' as const, quoting: { dp: 2, krxTick: null } };
 // Rising lows 100 → 104 → 108 with highs in between; ATR 1, reversal 1.5.
 const risingBars = () =>
     makeHLBars([

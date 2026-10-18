@@ -6,6 +6,7 @@ import {
     outputLanguageName,
     type AnalysisLocale,
 } from './outputLocale';
+import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import {
     computeOverallScore,
@@ -16,10 +17,10 @@ import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import {
     equityListingContext,
-    formatPriceAtDp,
+    formatQuotedPrice,
     formatSignedPercent,
-    priceDecimalPlaces,
-    sharedPriceDecimalPlaces,
+    priceQuoting,
+    sharedPriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import {
     formatInvestorFlowsScorecard,
@@ -119,12 +120,13 @@ function formatTechnical(
     currency: CurrencyCode,
     assetClass: AssetClass,
     /** Last bar close, when the caller has bars for this symbol/timeframe (spec §2.5). */
-    bars?: readonly Bar[]
+    bars?: readonly Bar[],
+    krxTick: KrxTickTable = 'share'
 ): string {
     // One precision for every level, from the finest one and the listing currency, so a
     // sub-dollar target is not flattened to `0.08`, a won level is not `269500.00`, and a
     // list near $1 does not mix `0.9950` with `1.01`.
-    const dp = sharedPriceDecimalPlaces(
+    const quoting = sharedPriceQuoting(
         [
             ...tech.keyLevels.support.map(l => l.price),
             ...tech.keyLevels.resistance.map(l => l.price),
@@ -132,9 +134,10 @@ function formatTechnical(
             ...(tech.priceTargets.bearish?.targets ?? []).map(t => t.price),
         ],
         currency,
-        assetClass
+        assetClass,
+        krxTick
     );
-    const px = (n: number): string => formatPriceAtDp(n, dp);
+    const px = (n: number): string => formatQuotedPrice(n, quoting);
     // Null rule (spec §0): a 0/negative/non-finite close is "unknown", never
     // a real snapshot price — `isUsablePrice` mirrors the same gate `prompt.ts`
     // uses for the analogous Analysis Snapshot section.
@@ -593,6 +596,8 @@ function koTerminologyRule(
  *   this builder — `stable` here is already empty, see this function's own
  *   doc comment). Omitting either parameter produces a byte-identical
  *   prompt to the one this builder emitted before these parameters existed.
+ * @param krxTick - KRX tick table the listing's prices round to (`'etp'` for an
+ *   ETF/ETN, `'share'` otherwise). Ignored unless `currency` is `KRW`.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 // 4-axis canonical signature. The legacy 3-axis overload (without
@@ -622,7 +627,9 @@ export function buildOverallAnalysisPrompt(
     // symbol. `KRW` frames a Korean listing and renders levels in whole won.
     currency: CurrencyCode = 'USD',
     // `undefined` = investor flows (수급) not integrated (prompt unchanged); `null` = integrated but no data.
-    investorFlows?: InvestorFlowsScorecard | null
+    investorFlows?: InvestorFlowsScorecard | null,
+    // KRX tick table the listing's prices round to (ETF/ETN → 'etp'); ignored unless `currency` is KRW.
+    krxTick: KrxTickTable = 'share'
 ): AssembledPrompt {
     const resolvedOptions: OptionsAnalysisResponse | null = options ?? null;
     const resolvedOptionsOiStale: boolean = optionsOiStale ?? false;
@@ -662,7 +669,12 @@ export function buildOverallAnalysisPrompt(
                   bars,
                   symbol,
                   timeframe,
-                  priceDecimalPlaces(bars.at(-1)?.close, currency, assetClass)
+                  priceQuoting(
+                      bars.at(-1)?.close,
+                      currency,
+                      assetClass,
+                      krxTick
+                  )
               )
             : '';
     const priorAnalysisBlock =
@@ -793,7 +805,7 @@ ${assetContext}
 ${context}
 
 ## Axis 1 — Technical Analysis
-${formatTechnical(technical, currency, assetClass, bars)}${fearGreedBlock}
+${formatTechnical(technical, currency, assetClass, bars, krxTick)}${fearGreedBlock}
 
 ${fundamentalSection}
 

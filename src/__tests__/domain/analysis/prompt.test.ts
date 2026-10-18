@@ -79,6 +79,9 @@ import type {
     SMCResult,
     SqueezeMomentumResult,
 } from '@/domain/types';
+import type { PriceQuoting } from '@/domain/analysis/promptFormat';
+
+const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
 
 // `buildAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4 assembly
 // split) — this file's ~240 call sites predate the split and assert against
@@ -6325,7 +6328,7 @@ describe('formatPivotTableLine', () => {
         s3: 85,
     };
     it('returns an empty string without pivots', () => {
-        expect(formatPivotTableLine(undefined, 2)).toBe('');
+        expect(formatPivotTableLine(undefined, USD_QUOTING)).toBe('');
         expect(
             formatPivotTableLine(
                 {
@@ -6335,7 +6338,7 @@ describe('formatPivotTableLine', () => {
                     woodie: null,
                     demark: null,
                 },
-                2
+                USD_QUOTING
             )
         ).toBe('');
     });
@@ -6348,7 +6351,7 @@ describe('formatPivotTableLine', () => {
                 woodie: null,
                 demark: null,
             },
-            2
+            USD_QUOTING
         );
         expect(line).toBe(
             'Pivot table: Standard PP 100.00 R1 105.00 R2 110.00 R3 115.00 S1 95.00 S2 90.00 S3 85.00'
@@ -6371,7 +6374,7 @@ describe('formatPivotTableLine', () => {
                 woodie: null,
                 demark: null,
             },
-            2
+            USD_QUOTING
         );
         expect(line).toContain('S2 N/A S3 N/A');
         expect(line).not.toContain('-5.00');
@@ -6386,7 +6389,7 @@ describe('formatPivotTableLine', () => {
                 woodie: null,
                 demark: { pp: Number.NaN, r1: 1, s1: 0.5 },
             },
-            2
+            USD_QUOTING
         );
         expect(line).toBe('Pivot table: DeMark PP N/A R1 1.00 S1 0.50');
         expect(line).not.toContain('NaN');
@@ -6395,12 +6398,12 @@ describe('formatPivotTableLine', () => {
 
 describe('formatTablePrice', () => {
     it('prints a positive price at the given precision', () => {
-        expect(formatTablePrice(303.4917, 2)).toBe('303.49');
+        expect(formatTablePrice(303.4917, USD_QUOTING)).toBe('303.49');
     });
     it('prints N/A for a zero, negative or non-finite level (deep down-leg extensions)', () => {
-        expect(formatTablePrice(0, 2)).toBe('N/A');
-        expect(formatTablePrice(-10.9, 2)).toBe('N/A');
-        expect(formatTablePrice(Number.NaN, 2)).toBe('N/A');
+        expect(formatTablePrice(0, USD_QUOTING)).toBe('N/A');
+        expect(formatTablePrice(-10.9, USD_QUOTING)).toBe('N/A');
+        expect(formatTablePrice(Number.NaN, USD_QUOTING)).toBe('N/A');
     });
 });
 
@@ -6421,7 +6424,7 @@ describe('Fib table lines never print a non-positive level', () => {
                     { ratio: 2, price: -40 },
                 ],
             },
-            2
+            USD_QUOTING
         );
         expect(line).toBe(
             'Fib table: 61.8% 73.26 | ext 100% 30.00 / 161.8% N/A / 200% N/A'
@@ -6443,7 +6446,7 @@ describe('Fib table lines never print a non-positive level', () => {
                     { ratio: 1.618, price: -10.9 },
                 ],
             },
-            2
+            USD_QUOTING
         );
         expect(line).toBe('Fib ABC table: 100% 20.00 / 161.8% N/A');
     });

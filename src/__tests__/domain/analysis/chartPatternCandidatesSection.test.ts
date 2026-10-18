@@ -20,6 +20,7 @@ import {
 } from '@/domain/overlays/patternOverlays';
 import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 import { makeBars } from '@/__tests__/domain/patterns/helpers';
+import type { PriceQuoting } from '@/domain/analysis/promptFormat';
 import type {
     Bar,
     PatternGeometry,
@@ -36,6 +37,15 @@ interface Fixture {
     atr: number;
     bars: Bar[];
 }
+const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
+const KRW_SHARE_QUOTING: PriceQuoting = { dp: 0, krxTick: 'share' };
+const KRW_ETP_QUOTING: PriceQuoting = { dp: 0, krxTick: 'etp' };
+const QUOTINGS: ReadonlyArray<readonly [string, PriceQuoting]> = [
+    ['USD 2dp', USD_QUOTING],
+    ['KRW share tick', KRW_SHARE_QUOTING],
+    ['KRW etp tick', KRW_ETP_QUOTING],
+];
+
 const FIXTURES = [
     hsTextbook,
     doubleTop,
@@ -54,9 +64,12 @@ const offeredIdsFor = (
     atr: number | null
 ): ReadonlySet<string> =>
     new Set(
-        buildPatternOverlayCandidates(candidates, bars, atr ?? 0, 2).map(
-            c => c.id
-        )
+        buildPatternOverlayCandidates(
+            candidates,
+            bars,
+            atr ?? 0,
+            USD_QUOTING
+        ).map(c => c.id)
     );
 
 const render = (
@@ -64,7 +77,7 @@ const render = (
     bars: readonly Bar[],
     atr: number | null,
     opts: {
-        priceDp?: number;
+        quoting?: PriceQuoting;
         offered?: ReadonlySet<string>;
     } = {}
 ): string =>
@@ -72,7 +85,7 @@ const render = (
         candidates,
         bars,
         atr,
-        opts.priceDp ?? 2,
+        opts.quoting ?? USD_QUOTING,
         '1Day',
         opts.offered ?? offeredIdsFor(candidates, bars, atr)
     );
@@ -194,7 +207,7 @@ describe('formatChartPatternCandidatesSection', () => {
         const tri = block(section, 'ascending_triangle');
         const g = computeCandidateGeometry(q[0], f.bars, f.atr);
         if (g === null || g.direction === null) throw new Error('undirected');
-        const p = printedPatternGeometry(g, 2);
+        const p = printedPatternGeometry(g, USD_QUOTING);
         expect(tri.startsWith('ascending_triangle (forming)')).toBe(true);
         expect(tri).toContain(
             `- Candidate id: ${patternOverlayId(q[0], f.bars)}`
@@ -269,13 +282,13 @@ describe('formatChartPatternCandidatesSection', () => {
     // A model copies the PRINTED breakout/extreme, so the app's recomputation
     // must reproduce the PRINTED targets exactly — with raw, non-terminating
     // geometry (sloped boundaries) and at every price precision.
-    it.each([2, 0])(
-        'printed targets equal computePatternTargets of the printed breakout/extreme, every fixture family (priceDp %i)',
-        priceDp => {
+    it.each(QUOTINGS)(
+        'printed targets equal computePatternTargets of the printed breakout/extreme, every fixture family (%s)',
+        (_name, quoting) => {
             let checked = 0;
             for (const f of FIXTURES) {
                 const section = render(qualifiedOf(f), f.bars, f.atr, {
-                    priceDp,
+                    quoting,
                 });
                 for (const b of section
                     .split('\n### ')
@@ -300,7 +313,7 @@ describe('formatChartPatternCandidatesSection', () => {
                     const decimals = text.includes('.')
                         ? text.split('.')[1]!.length
                         : 0;
-                    expect(decimals).toBeLessThanOrEqual(priceDp + 1);
+                    expect(decimals).toBeLessThanOrEqual(quoting.dp + 1);
                     checked++;
                 }
             }
@@ -398,22 +411,22 @@ describe('formatChartPatternCandidatesSection', () => {
 });
 
 describe('printedPatternGeometriesByOverlayId', () => {
-    it.each([2, 0])(
-        'maps each printed Candidate id to exactly the breakout/extreme/direction/invalidation its block prints (priceDp %i)',
-        priceDp => {
+    it.each(QUOTINGS)(
+        'maps each printed Candidate id to exactly the breakout/extreme/direction/invalidation its block prints (%s)',
+        (_name, quoting) => {
             let checked = 0;
             for (const f of FIXTURES) {
                 const candidates = qualifiedOf(f);
                 const offered = offeredIdsFor(candidates, f.bars, f.atr);
                 const section = render(candidates, f.bars, f.atr, {
-                    priceDp,
+                    quoting,
                     offered,
                 });
                 const geometries = printedPatternGeometriesByOverlayId(
                     candidates,
                     f.bars,
                     f.atr,
-                    priceDp,
+                    quoting,
                     offered
                 );
                 const blocks = section
@@ -443,7 +456,7 @@ describe('printedPatternGeometriesByOverlayId', () => {
                 qualifiedOf(f),
                 f.bars,
                 f.atr,
-                2,
+                USD_QUOTING,
                 new Set()
             ).size
         ).toBe(0);
@@ -457,7 +470,7 @@ describe('printedPatternGeometriesByOverlayId', () => {
                 [undirectedRectangle],
                 bars,
                 1,
-                2,
+                USD_QUOTING,
                 new Set([id])
             )
         ).toEqual(new Map([[id, null]]));
@@ -477,7 +490,7 @@ describe('printedPatternGeometry', () => {
     };
 
     it('rounds breakout and breakout ± height to the printed precision', () => {
-        expect(printedPatternGeometry(geometry, 2)).toEqual({
+        expect(printedPatternGeometry(geometry, USD_QUOTING)).toEqual({
             breakoutLevel: 50,
             extremeLevel: 60.13,
             direction: 'down',
@@ -485,13 +498,13 @@ describe('printedPatternGeometry', () => {
     });
 
     it('omits an invalidation level the block prints as N/A', () => {
-        expect(printedPatternGeometry(geometry, 2)).not.toHaveProperty(
-            'invalidationLevel'
-        );
+        expect(
+            printedPatternGeometry(geometry, USD_QUOTING)
+        ).not.toHaveProperty('invalidationLevel');
         expect(
             printedPatternGeometry(
                 { ...geometry, invalidationLevel: 61.456 },
-                2
+                USD_QUOTING
             ).invalidationLevel
         ).toBe(61.46);
     });
@@ -658,4 +671,48 @@ describe('isFailedBreakout', () => {
             ).toBe(false);
         }
     });
+});
+
+describe('KRX conservative target', () => {
+    // Scaled into won so the halved height has a fraction the tick rounding
+    // then removes. Each case sits where its table is fine enough for that to
+    // show: the share table ticks 1 won only below 2,000 (a 200,000-won
+    // price ticks 100–500, which makes the halved height whole anyway), and
+    // the ETP table ticks 5 won from 2,000.
+    const scaled = (f: Fixture, scale: number): Fixture => ({
+        atr: f.atr * scale,
+        bars: f.bars.map(b => ({
+            ...b,
+            open: b.open * scale,
+            high: b.high * scale,
+            low: b.low * scale,
+            close: b.close * scale,
+        })),
+    });
+
+    it.each([
+        ['share, prices ~1,500 (1-won tick)', KRW_SHARE_QUOTING, 15],
+        ['etp, prices ~200,000 (5-won tick)', KRW_ETP_QUOTING, 2_000],
+    ] as const)(
+        'prints the conservative target in whole won, with no decimal point (%s)',
+        (_name, quoting, scale) => {
+            let checked = 0;
+            for (const base of FIXTURES) {
+                const f = scaled(base, scale);
+                const lines = render(qualifiedOf(f), f.bars, f.atr, {
+                    quoting,
+                })
+                    .split('\n')
+                    .filter(l => l.startsWith('- Conservative target (50%)'));
+                for (const line of lines) {
+                    checked++;
+                    // The price token ends at the space before the distance suffix.
+                    expect(line).toMatch(
+                        /^- Conservative target \(50%\): \d+ /
+                    );
+                }
+            }
+            expect(checked).toBeGreaterThan(0);
+        }
+    );
 });

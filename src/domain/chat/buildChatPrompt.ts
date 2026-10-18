@@ -3,10 +3,12 @@
 
 import {
     formatBarDateTime,
-    formatPriceAtDp,
+    formatQuotedPrice,
     formatSignedPercent,
-    sharedPriceDecimalPlaces,
+    sharedPriceQuoting,
+    type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
+import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import { planEntryPrice } from '@/domain/analysis/ai-levels';
 import type {
     ActionRecommendation,
@@ -44,17 +46,18 @@ function isTimeframe(value: unknown): value is Timeframe {
 }
 
 /**
- * One precision for every level in the analysis, from the finest one and the listing
- * currency: a sub-dollar level is not flattened to `0.08`, a won level is not `269500.00`,
+ * One quoting (decimals and KRX tick table) for every level in the analysis, from the
+ * finest one and the listing currency: a sub-dollar level is not flattened to `0.08`, a won level is not `269500.00`,
  * and a list near $1 does not mix `0.9950` with `1.01`.
  */
-function levelDecimalPlaces(
+function quoteLevels(
     analysis: AnalysisResponse,
     currency: CurrencyCode,
-    assetClass: AssetClass
-): number {
+    assetClass: AssetClass,
+    krxTick: KrxTickTable
+): PriceQuoting {
     const { keyLevels, priceTargets } = analysis;
-    return sharedPriceDecimalPlaces(
+    return sharedPriceQuoting(
         [
             ...keyLevels.resistance.map(l => l.price),
             ...keyLevels.support.map(l => l.price),
@@ -63,7 +66,8 @@ function levelDecimalPlaces(
             ...(priceTargets.bearish?.targets ?? []).map(t => t.price),
         ],
         currency,
-        assetClass
+        assetClass,
+        krxTick
     );
 }
 
@@ -90,38 +94,38 @@ function formatDistanceFromBase(
 
 function formatKeyLevels(
     levels: KeyLevel[],
-    dp: number,
+    quoting: PriceQuoting,
     analysisTimePrice?: number
 ): string {
     if (levels.length === 0) return 'None detected';
     return levels
         .map(
             l =>
-                `${formatPriceAtDp(l.price, dp)}${formatDistanceFromBase(l.price, analysisTimePrice, 'analysis-time price')} (${l.reason})`
+                `${formatQuotedPrice(l.price, quoting)}${formatDistanceFromBase(l.price, analysisTimePrice, 'analysis-time price')} (${l.reason})`
         )
         .join(', ');
 }
 
 function formatPoc(
     poc: KeyLevel | undefined,
-    dp: number,
+    quoting: PriceQuoting,
     analysisTimePrice?: number
 ): string {
     return poc
-        ? `${formatPriceAtDp(poc.price, dp)}${formatDistanceFromBase(poc.price, analysisTimePrice, 'analysis-time price')} (${poc.reason})`
+        ? `${formatQuotedPrice(poc.price, quoting)}${formatDistanceFromBase(poc.price, analysisTimePrice, 'analysis-time price')} (${poc.reason})`
         : 'None detected';
 }
 
 function formatPriceTargets(
     scenario: PriceScenario | null | undefined,
-    dp: number,
+    quoting: PriceQuoting,
     analysisTimePrice?: number
 ): string {
     if (!scenario || scenario.targets.length === 0) return 'None';
     return scenario.targets
         .map(
             t =>
-                `${formatPriceAtDp(t.price, dp)}${formatDistanceFromBase(t.price, analysisTimePrice, 'analysis-time price')} — ${t.basis}`
+                `${formatQuotedPrice(t.price, quoting)}${formatDistanceFromBase(t.price, analysisTimePrice, 'analysis-time price')} — ${t.basis}`
         )
         .join('; ');
 }
@@ -156,7 +160,7 @@ function formatRatio(n: number | null): string {
  */
 function formatStructuredPlan(
     rec: ActionRecommendation | undefined,
-    dp: number,
+    quoting: PriceQuoting,
     analysisTimePrice: number | undefined
 ): string {
     if (!rec) return '';
@@ -172,8 +176,8 @@ function formatStructuredPlan(
         entryPrices.length === 0
             ? 'N/A'
             : entryPrices.length === 1
-              ? formatPriceAtDp(entryPrices[0], dp)
-              : `${formatPriceAtDp(entryPrices[0], dp)} ~ ${formatPriceAtDp(entryPrices[entryPrices.length - 1], dp)} (mid ${formatPriceAtDp(entryRef ?? null, dp)})`;
+              ? formatQuotedPrice(entryPrices[0], quoting)
+              : `${formatQuotedPrice(entryPrices[0], quoting)} ~ ${formatQuotedPrice(entryPrices[entryPrices.length - 1], quoting)} (mid ${formatQuotedPrice(entryRef ?? null, quoting)})`;
     // Reconciled levels win where they exist — the SAME preference
     // `buildPlanCheck` applies internally (spec 2026-09-18), so
     // this block and its own `planCheck` ratios below never disagree about
@@ -184,13 +188,13 @@ function formatStructuredPlan(
     const stopText =
         effectiveStopLoss === undefined
             ? 'N/A'
-            : `${formatPriceAtDp(effectiveStopLoss, dp)}${formatDistanceFromBase(effectiveStopLoss, entryRef, 'entry')}`;
+            : `${formatQuotedPrice(effectiveStopLoss, quoting)}${formatDistanceFromBase(effectiveStopLoss, entryRef, 'entry')}`;
     const targetsText =
         (effectiveTakeProfitPrices ?? []).length > 0
             ? effectiveTakeProfitPrices!
                   .map(
                       t =>
-                          `${formatPriceAtDp(t, dp)}${formatDistanceFromBase(t, entryRef, 'entry')}`
+                          `${formatQuotedPrice(t, quoting)}${formatDistanceFromBase(t, entryRef, 'entry')}`
                   )
                   .join(', ')
             : 'N/A';
@@ -443,6 +447,9 @@ function formatCurrentAnalysisContext(
  *   and renders levels in whole won. Defaults to `'USD'`. The legacy
  *   `(symbol, timeframe, …)` overload cannot carry it and always uses `'USD'`
  *   — a `.KS` symbol is not read as Korean; use this overload for KRX listings.
+ * @param krxTick - Optional KRX tick table the listing's prices round to
+ *   (`'etp'` for an ETF/ETN). Defaults to `'share'`; ignored unless
+ *   `currency` is `KRW`. The legacy overload always uses `'share'`.
  * @returns The prompt payload — see {@link ChatPromptPayload}.
  */
 export function buildChatPrompt(
@@ -462,7 +469,8 @@ export function buildChatPrompt(
     userMessage: string,
     currentAnalysisContext?: CurrentAnalysisContext,
     assetClass?: AssetClass,
-    currency?: CurrencyCode
+    currency?: CurrencyCode,
+    krxTick?: KrxTickTable
 ): ChatPromptPayload;
 export function buildChatPrompt(
     symbol: string,
@@ -473,7 +481,8 @@ export function buildChatPrompt(
     userMessageOrContext?: string | CurrentAnalysisContext,
     maybeCurrentAnalysisContext?: CurrentAnalysisContext | AssetClass,
     maybeAssetClass?: AssetClass,
-    maybeCurrency?: CurrencyCode
+    maybeCurrency?: CurrencyCode,
+    maybeKrxTick?: KrxTickTable
 ): ChatPromptPayload {
     const oldSignature = isTimeframe(companyNameOrTimeframe);
     const companyName = oldSignature ? symbol : companyNameOrTimeframe;
@@ -512,12 +521,15 @@ export function buildChatPrompt(
     const currency: CurrencyCode = oldSignature
         ? 'USD'
         : (maybeCurrency ?? 'USD');
+    const krxTick: KrxTickTable = oldSignature
+        ? 'share'
+        : (maybeKrxTick ?? 'share');
     const assetKind = isCrypto
         ? 'cryptocurrency'
         : currency === 'KRW'
           ? 'Korean equity listed on the KRX, priced in KRW'
           : 'U.S. equity';
-    const levelDp = levelDecimalPlaces(analysis, currency, assetClass);
+    const levelQuoting = quoteLevels(analysis, currency, assetClass, krxTick);
     const refuseExample = isCrypto
         ? `- REFUSE (unrelated asset): "다른 코인은 지금 어때요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`
         : `- REFUSE (unrelated stock): "그럼 이 종목 말고 다른 종목은 지금 사도 돼요?" → decline: "이 분석 결과와 관련된 질문만 답변할 수 있어요."`;
@@ -567,7 +579,7 @@ Symbol: ${symbol}
 Company: ${companyName}
 Timeframe: ${timeframe}
 Overall Trend: ${analysis.trend} | Risk Level: ${analysis.riskLevel}
-${analysis.analyzedAt ? `Analysis generated: ${formatAnalyzedAtUtc(analysis.analyzedAt)}\n` : ''}${analysisTimePrice !== undefined ? `Analysis-time price: ${formatPriceAtDp(analysisTimePrice, levelDp)}\n` : ''}
+${analysis.analyzedAt ? `Analysis generated: ${formatAnalyzedAtUtc(analysis.analyzedAt)}\n` : ''}${analysisTimePrice !== undefined ? `Analysis-time price: ${formatQuotedPrice(analysisTimePrice, levelQuoting)}\n` : ''}
 Summary:
 ${analysis.summary}
 ${
@@ -578,14 +590,14 @@ Trading Strategy:
 - Entry: ${rec.entry ?? 'N/A'}
 - Exit: ${rec.exit ?? 'N/A'}
 - Risk/Reward: ${rec.riskReward ?? 'N/A'}
-${formatStructuredPlan(rec, levelDp, analysisTimePrice)}
+${formatStructuredPlan(rec, levelQuoting, analysisTimePrice)}
 `
         : ''
 }
 Key Levels:
-- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance, levelDp, analysisTimePrice)}
-- Support: ${formatKeyLevels(analysis.keyLevels.support, levelDp, analysisTimePrice)}
-- POC: ${formatPoc(analysis.keyLevels.poc, levelDp, analysisTimePrice)}
+- Resistance: ${formatKeyLevels(analysis.keyLevels.resistance, levelQuoting, analysisTimePrice)}
+- Support: ${formatKeyLevels(analysis.keyLevels.support, levelQuoting, analysisTimePrice)}
+- POC: ${formatPoc(analysis.keyLevels.poc, levelQuoting, analysisTimePrice)}
 
 Detected Patterns: ${formatDetectedPatterns(analysis.patternSummaries)}
 
@@ -596,8 +608,8 @@ Indicator Signals:
 ${formatIndicatorSignals(analysis.indicatorResults) || 'None'}
 
 Price Targets:
-- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish, levelDp, analysisTimePrice)}
-- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish, levelDp, analysisTimePrice)}
+- Bullish scenario: ${formatPriceTargets(analysis.priceTargets.bullish, levelQuoting, analysisTimePrice)}
+- Bearish scenario: ${formatPriceTargets(analysis.priceTargets.bearish, levelQuoting, analysisTimePrice)}
 === END ANALYSIS DATA ===${formatCurrentAnalysisContext(currentAnalysisContext)}`;
 
     const messages = [

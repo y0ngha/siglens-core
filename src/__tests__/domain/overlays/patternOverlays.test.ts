@@ -11,6 +11,7 @@ import {
     buildPatternOverlayCandidates,
     patternOverlayId,
 } from '@/domain/overlays/patternOverlays';
+import type { PriceQuoting } from '@/domain/analysis/promptFormat';
 import { makeBars } from '@/__tests__/domain/patterns/helpers';
 import hsTextbook from '@/__tests__/domain/patterns/fixtures/hs-textbook.json';
 import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
@@ -23,7 +24,7 @@ interface Fixture {
     bars: Bar[];
 }
 /** Prompt price precision the fixtures are printed at. */
-const DP = 2;
+const DP: PriceQuoting = { dp: 2, krxTick: null };
 const FIXTURES = [
     hsTextbook,
     doubleTop,

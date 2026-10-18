@@ -12,10 +12,11 @@
 import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
     formatBarDateTime,
-    formatPriceAtDp,
+    formatQuotedPrice,
     formatSignedPercent,
-    priceDecimalPlaces,
+    priceQuoting,
     TIMEFRAME_LABEL,
+    type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
 
@@ -30,8 +31,11 @@ import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
  * a non-finite input — the same posture {@link percentFrom} takes for a zero
  * reference price.
  */
-const finitePrice = (n: number | undefined, priceDp: number): string | null =>
-    n != null && Number.isFinite(n) ? formatPriceAtDp(n, priceDp) : null;
+const finitePrice = (
+    n: number | undefined,
+    quoting: PriceQuoting
+): string | null =>
+    n != null && Number.isFinite(n) ? formatQuotedPrice(n, quoting) : null;
 
 /**
  * Percentage move of `value` from `reference`, formatted signed via
@@ -80,7 +84,7 @@ const formatTargetWord = (firstTarget: number, high: number): string | null => {
 /** `entry a-b` for a range, `entry a` for a single price; `''` when absent. */
 const formatEntryPlanPart = (
     entryPrices: readonly number[] | undefined,
-    priceDp: number
+    quoting: PriceQuoting
 ): string => {
     if (!entryPrices || entryPrices.length === 0) return '';
     // Non-finite entries are dropped before the range is formed, so a partly
@@ -88,7 +92,7 @@ const formatEntryPlanPart = (
     // `entry NaN-180.00`.
     const finite = entryPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
-    const px = (n: number): string => formatPriceAtDp(n, priceDp);
+    const px = (n: number): string => formatQuotedPrice(n, quoting);
     if (finite.length === 1) return `entry ${px(finite[0])}`;
     return `entry ${px(finite[0])}-${px(finite[finite.length - 1])}`;
 };
@@ -96,19 +100,19 @@ const formatEntryPlanPart = (
 /** `TP a/b/...` in the given (ascending) order; `''` when absent. */
 const formatTakeProfitPlanPart = (
     takeProfitPrices: readonly number[] | undefined,
-    priceDp: number
+    quoting: PriceQuoting
 ): string => {
     if (!takeProfitPrices || takeProfitPrices.length === 0) return '';
     const finite = takeProfitPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
-    return `TP ${finite.map(n => formatPriceAtDp(n, priceDp)).join('/')}`;
+    return `TP ${finite.map(n => formatQuotedPrice(n, quoting)).join('/')}`;
 };
 
 /** One rendered past call, newest-first order trusted from the caller (`selected` is not re-sorted here). */
 function formatEntry(
     entry: PriorAnalysis,
     bars: readonly Bar[],
-    priceDp: number
+    quoting: PriceQuoting
 ): string | null {
     const anchorIndex = findAnchorBarIndex(bars, entry.generatedAt.getTime());
     if (anchorIndex === null) return null;
@@ -125,10 +129,10 @@ function formatEntry(
     // weekend gaps.
     const anchorDateTime = formatBarDateTime(barTimeMs(anchorBar));
 
-    const stopText = finitePrice(entry.stopLoss, priceDp);
+    const stopText = finitePrice(entry.stopLoss, quoting);
     const planParts = [
-        formatEntryPlanPart(entry.entryPrices, priceDp),
-        formatTakeProfitPlanPart(entry.takeProfitPrices, priceDp),
+        formatEntryPlanPart(entry.entryPrices, quoting),
+        formatTakeProfitPlanPart(entry.takeProfitPrices, quoting),
         stopText !== null ? `SL ${stopText}` : '',
     ].filter(part => part !== '');
     const plan =
@@ -156,9 +160,9 @@ function formatEntry(
     // would render `high NaN` into a prompt billed to a paid model — the exact
     // defect the `PriorAnalysis` field guards above exist to prevent, just
     // arriving by a different path.
-    const highText = finitePrice(high, priceDp);
-    const lowText = finitePrice(low, priceDp);
-    const nowText = finitePrice(now, priceDp);
+    const highText = finitePrice(high, quoting);
+    const lowText = finitePrice(low, quoting);
+    const nowText = finitePrice(now, quoting);
     if (highText === null || lowText === null || nowText === null) {
         // Without a trustworthy reference frame there is no honest outcome to
         // state, so the entry stops at its header line rather than reporting a
@@ -225,8 +229,8 @@ export const PRIOR_ANALYSIS_GUARDRAIL =
  * @param bars - OHLCV history for the same symbol + timeframe, oldest-first.
  * @param symbol - Ticker symbol, for the section header.
  * @param timeframe - Chart timeframe, for the section header label.
- * @param priceDp - Decimal places for prices. Pass the precision the rest of the
- *   prompt renders bar prices at, so a past call's prices can be matched against
+ * @param quoting - How prices are quoted (decimals and KRX tick table). Pass the
+ *   quoting the rest of the prompt renders bar prices with, so a past call's prices can be matched against
  *   them verbatim (sub-dollar assets, whole-won KRX). Defaults to the USD equity
  *   rule applied to the latest close.
  */
@@ -235,12 +239,12 @@ export function formatPriorAnalysisSection(
     bars: readonly Bar[],
     symbol: string,
     timeframe: Timeframe,
-    priceDp = priceDecimalPlaces(bars.at(-1)?.close)
+    quoting: PriceQuoting = priceQuoting(bars.at(-1)?.close)
 ): string {
     if (selected.length === 0 || bars.length === 0) return '';
 
     const entryLines = selected
-        .map(entry => formatEntry(entry, bars, priceDp))
+        .map(entry => formatEntry(entry, bars, quoting))
         .filter((line): line is string => line !== null);
     if (entryLines.length === 0) return '';
 

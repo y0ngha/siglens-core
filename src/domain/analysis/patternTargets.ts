@@ -3,7 +3,10 @@ import type {
     PatternGeometry,
     PatternTargetGeometry,
 } from '@/domain/types';
-import { roundPriceAtDp } from '@/domain/analysis/promptFormat';
+import {
+    roundQuotedPrice,
+    type PriceQuoting,
+} from '@/domain/analysis/promptFormat';
 
 /** Upper bound on decimals kept for an app-computed pattern target. */
 const MAX_TARGET_DECIMALS = 8;
@@ -103,15 +106,15 @@ export function computePatternTargets(
  * prints a number for it (finite and > 0 — `N/A` otherwise).
  *
  * @param geometry - The candidate's computed geometry (`computeCandidateGeometry`).
- * @param priceDp - Decimal places the section prints prices with.
+ * @param quoting - How the section quotes prices (decimals and KRX tick table).
  * @returns The printed breakout/extreme/direction(/invalidation).
  */
 export function printedPatternGeometry(
     geometry: PatternGeometry,
-    priceDp: number
+    quoting: PriceQuoting
 ): PatternTargetGeometry {
     const round = (n: number): number =>
-        Number(roundPriceAtDp(n, priceDp).toFixed(priceDp));
+        Number(roundQuotedPrice(n, quoting).toFixed(quoting.dp));
     const invalidation = geometry.invalidationLevel;
     return {
         breakoutLevel: round(geometry.breakoutLevel),

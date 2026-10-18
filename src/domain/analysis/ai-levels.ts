@@ -3,7 +3,7 @@ import {
     nearestTargetAbove,
 } from '@/domain/analysis/planCheck';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
-import { roundToKrxTick } from '@/domain/analysis/krxTick';
+import { roundToKrxTick, type KrxTickTable } from '@/domain/analysis/krxTick';
 import {
     formatNullableNumber,
     formatPrice,
@@ -154,15 +154,19 @@ function ordinalLabel(index: number): string {
 /**
  * 가격 한 개를 통화에 맞게 표기한다.
  *
- * 원화는 KRX 호가 단위로 반올림해(`roundToKrxTick`) 쓰고 `원`을 붙인다.
+ * 원화는 KRX 호가 단위(`krxTick` 표 기준)로 반올림해(`roundToKrxTick`) 쓰고 `원`을 붙인다.
  * `$121980.70` 같은 표기는 값이 틀린 것과 같다 — 단위가 틀렸고, 존재하지 않는
  * 정밀도를 주장한다. 달러는 $1 이상이면 기존 `$1234.56` 표기와 바이트 동일,
  * $1 미만은 유효숫자 4자리(`$0.08250`)로 표기해 서브달러 자산이 `$0.08`로
  * 뭉개지지 않게 한다.
  */
-function formatLevelPrice(price: number, currency: CurrencyCode): string {
+function formatLevelPrice(
+    price: number,
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
+): string {
     return currency === 'KRW'
-        ? `${roundToKrxTick(price).toLocaleString('en-US')}원`
+        ? `${roundToKrxTick(price, krxTick).toLocaleString('en-US')}원`
         : `$${formatPrice(price)}`;
 }
 
@@ -176,16 +180,17 @@ function formatSignedPct(entryPrice: number, price: number): string {
 function buildExitTpPart(
     entryPrice: number,
     validTps: readonly number[],
-    currency: CurrencyCode
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
 ): string | undefined {
     if (validTps.length === 0) return undefined;
     if (validTps.length === 1) {
         const tp = validTps[0];
-        return `목표가 ${formatLevelPrice(tp, currency)} (${formatSignedPct(entryPrice, tp)})에서 익절`;
+        return `목표가 ${formatLevelPrice(tp, currency, krxTick)} (${formatSignedPct(entryPrice, tp)})에서 익절`;
     }
     const tpParts = validTps.map(
         (tp, idx) =>
-            `${ordinalLabel(idx)} 목표 ${formatLevelPrice(tp, currency)} (${formatSignedPct(entryPrice, tp)})`
+            `${ordinalLabel(idx)} 목표 ${formatLevelPrice(tp, currency, krxTick)} (${formatSignedPct(entryPrice, tp)})`
     );
     return `${tpParts.join(', ')}에서 익절`;
 }
@@ -194,7 +199,8 @@ function buildExitTpPart(
 function buildExitSlPart(
     entryPrice: number,
     stopLoss: number | undefined,
-    currency: CurrencyCode
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
 ): string | undefined {
     if (
         stopLoss === undefined ||
@@ -204,7 +210,7 @@ function buildExitSlPart(
     ) {
         return undefined;
     }
-    return `손절 ${formatLevelPrice(stopLoss, currency)} (${formatSignedPct(entryPrice, stopLoss)})`;
+    return `손절 ${formatLevelPrice(stopLoss, currency, krxTick)} (${formatSignedPct(entryPrice, stopLoss)})`;
 }
 
 /**
@@ -220,7 +226,8 @@ export function buildBullishExitText(
     entryPrice: number,
     stopLoss: number | undefined,
     takeProfitPrices: readonly number[] | undefined,
-    currency: CurrencyCode
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
 ): string {
     const validTps = (takeProfitPrices ?? []).filter(
         (tp): tp is number =>
@@ -228,8 +235,8 @@ export function buildBullishExitText(
     );
 
     const parts = [
-        buildExitTpPart(entryPrice, validTps, currency),
-        buildExitSlPart(entryPrice, stopLoss, currency),
+        buildExitTpPart(entryPrice, validTps, currency, krxTick),
+        buildExitSlPart(entryPrice, stopLoss, currency, krxTick),
     ].filter((p): p is string => p !== undefined);
 
     return parts.length > 0 ? parts.join(', ') + '.' : '';
@@ -342,7 +349,8 @@ export function reconcileBullishActionRecommendation(
     entryPrice: number,
     atr: number | undefined,
     currency: CurrencyCode,
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    krxTick: KrxTickTable = 'share'
 ): ReconcileResult {
     // avoid: AI가 의도적으로 레벨을 비운 것이므로 보정하지 않는다.
     if (rec.entryRecommendation === 'avoid') {
@@ -354,7 +362,7 @@ export function reconcileBullishActionRecommendation(
     // line below read the same level the card shows (`roundAnalysisPrices`).
     const quoted = <T extends { value?: number }>(r: T): T =>
         currency === 'KRW' && r.value !== undefined
-            ? { ...r, value: roundToKrxTick(r.value) }
+            ? { ...r, value: roundToKrxTick(r.value, krxTick) }
             : r;
     const slResolved = quoted(
         resolveBullishStopLoss(rec.stopLoss, entryPrice, atr)
@@ -402,7 +410,8 @@ export function reconcileBullishActionRecommendation(
             entryPrice,
             reconciledSl,
             reconciledTpArr,
-            currency
+            currency,
+            krxTick
         ),
         riskReward: buildBullishRiskRewardText(
             entryPrice,
@@ -421,12 +430,12 @@ export function reconcileBullishActionRecommendation(
     const changes: readonly string[] = [
         ...(slWasReconciled
             ? [
-                  `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency)} (fallback)`,
+                  `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency, krxTick)} (fallback)`,
               ]
             : []),
         ...(tpWasReconciled
             ? [
-                  `takeProfitPrices[0]: ${rec.takeProfitPrices?.[0] ?? 'null'} → ${formatPrice(tpResolved.value, currency)} (fallback)`,
+                  `takeProfitPrices[0]: ${rec.takeProfitPrices?.[0] ?? 'null'} → ${formatPrice(tpResolved.value, currency, krxTick)} (fallback)`,
               ]
             : []),
     ];
@@ -602,7 +611,12 @@ export function postProcessAnalysisWithReconcile(
      * §2.3). Defaults to `'ko'` so callers that omit it keep the pre-existing
      * Korean line.
      */
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    /**
+     * KRX tick table the listing's prices round to (ETF/ETN → `'etp'`); only
+     * read for a KRW `currency`.
+     */
+    krxTick: KrxTickTable = 'share'
 ): AnalysisResponse {
     // Independent of the action-recommendation reconciliation below — applies
     // (or no-ops, preserving identity) regardless of whether `actionRecommendation`
@@ -624,7 +638,8 @@ export function postProcessAnalysisWithReconcile(
             entryPrice,
             atr,
             currency,
-            locale
+            locale,
+            krxTick
         );
 
     // Deterministic risk:reward line — only when CORE did not reconcile.

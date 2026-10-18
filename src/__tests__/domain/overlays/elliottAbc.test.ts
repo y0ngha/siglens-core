@@ -101,7 +101,10 @@ describe('buildAbcCandidates', () => {
 
     it("draws levels at the prompt's precision; the spent check keeps the exact price", () => {
         const { pivots, bars } = pivotsAt([110, 100, 105, 97]);
-        const [abc] = buildAbcCandidates(pivots, bars, { ...FMT, priceDp: 1 });
+        const [abc] = buildAbcCandidates(pivots, bars, {
+            ...FMT,
+            quoting: { dp: 1, krxTick: null },
+        });
         // 161.8% of A (10) from B (105) = 88.82 → printed and drawn as 88.8.
         expect(abc.candidate.promptLine).toContain('161.8% 88.8;');
         expect(abc.candidate.levels[1].price).toBe(88.8);

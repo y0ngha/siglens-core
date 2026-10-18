@@ -5,43 +5,55 @@ import type {
     KeyLevel,
     PriceScenario,
 } from '@/domain/types';
-import { roundToKrxTick } from '@/domain/analysis/krxTick';
+import { roundToKrxTick, type KrxTickTable } from '@/domain/analysis/krxTick';
 
-const roundLevel = <T extends { price: number }>(level: T): T => ({
-    ...level,
-    price: roundToKrxTick(level.price),
-});
+/** Rounds one price to the tick of `table`. */
+type TickRounder = (price: number) => number;
 
-const roundScenario = (s: PriceScenario | null): PriceScenario | null =>
-    s === null ? null : { ...s, targets: s.targets.map(roundLevel) };
+const roundLevel =
+    (round: TickRounder) =>
+    <T extends { price: number }>(level: T): T => ({
+        ...level,
+        price: round(level.price),
+    });
 
-const roundAll = (prices: readonly number[] | undefined) =>
-    prices?.map(roundToKrxTick);
+const roundScenario = (
+    s: PriceScenario | null,
+    round: TickRounder
+): PriceScenario | null =>
+    s === null ? null : { ...s, targets: s.targets.map(roundLevel(round)) };
 
-function roundRecommendation(rec: ActionRecommendation): ActionRecommendation {
+const roundAll = (prices: readonly number[] | undefined, round: TickRounder) =>
+    prices?.map(p => round(p));
+
+function roundRecommendation(
+    rec: ActionRecommendation,
+    round: TickRounder
+): ActionRecommendation {
     const { reconciledLevels: levels } = rec;
     return {
         ...rec,
         ...(rec.entryPrices !== undefined
-            ? { entryPrices: rec.entryPrices.map(roundToKrxTick) }
+            ? { entryPrices: rec.entryPrices.map(p => round(p)) }
             : {}),
         ...(rec.stopLoss !== undefined
-            ? { stopLoss: roundToKrxTick(rec.stopLoss) }
+            ? { stopLoss: round(rec.stopLoss) }
             : {}),
         ...(rec.takeProfitPrices !== undefined
-            ? { takeProfitPrices: rec.takeProfitPrices.map(roundToKrxTick) }
+            ? { takeProfitPrices: rec.takeProfitPrices.map(p => round(p)) }
             : {}),
         ...(levels !== undefined
             ? {
                   reconciledLevels: {
                       ...levels,
                       ...(levels.stopLoss !== undefined
-                          ? { stopLoss: roundToKrxTick(levels.stopLoss) }
+                          ? { stopLoss: round(levels.stopLoss) }
                           : {}),
                       ...(levels.takeProfitPrices !== undefined
                           ? {
                                 takeProfitPrices: roundAll(
-                                    levels.takeProfitPrices
+                                    levels.takeProfitPrices,
+                                    round
                                 ),
                             }
                           : {}),
@@ -55,9 +67,9 @@ function roundRecommendation(rec: ActionRecommendation): ActionRecommendation {
  * @internal
  * The quoted prices of an analysis — key levels and POC, scenario targets,
  * pattern key prices, entry / stop / take-profit (AI and reconciled) —
- * rounded to the KRX tick for a KRW listing, so what is cached and shown is
+ * rounded to the KRX tick (`krxTick` table) for a KRW listing, so what is cached and shown is
  * a price the market can quote (`240,300` stays, `205,325` → `205,500`). The
- * prompt already prints KRX prices at their tick (`formatPriceAtDp`); this
+ * prompt already prints KRX prices at their tick (`formatQuotedPrice`); this
  * catches what the model computed itself and the measured pattern targets
  * post-processing appends. Rounding the model's entry / stop / take-profit
  * is normalization, like the rest of the response parsing — not the
@@ -74,33 +86,38 @@ function roundRecommendation(rec: ActionRecommendation): ActionRecommendation {
  */
 export function roundAnalysisPrices<T extends AnalysisResponse>(
     response: T,
-    currency: CurrencyCode = 'USD'
+    currency: CurrencyCode = 'USD',
+    krxTick: KrxTickTable = 'share'
 ): T {
     if (currency !== 'KRW') return response;
+    const round: TickRounder = price => roundToKrxTick(price, krxTick);
+    const roundKeyLevel = roundLevel(round);
     const { keyLevels, priceTargets, actionRecommendation } = response;
     return {
         ...response,
         keyLevels: {
             ...keyLevels,
-            support: keyLevels.support.map(roundLevel),
-            resistance: keyLevels.resistance.map(roundLevel),
+            support: keyLevels.support.map(roundKeyLevel),
+            resistance: keyLevels.resistance.map(roundKeyLevel),
             ...(keyLevels.poc !== undefined
-                ? { poc: roundLevel<KeyLevel>(keyLevels.poc) }
+                ? { poc: roundKeyLevel<KeyLevel>(keyLevels.poc) }
                 : {}),
         },
         priceTargets: {
-            bullish: roundScenario(priceTargets.bullish),
-            bearish: roundScenario(priceTargets.bearish),
+            bullish: roundScenario(priceTargets.bullish, round),
+            bearish: roundScenario(priceTargets.bearish, round),
         },
         patternSummaries: response.patternSummaries.map(p =>
             p.keyPrices === undefined
                 ? p
-                : { ...p, keyPrices: p.keyPrices.map(roundLevel) }
+                : { ...p, keyPrices: p.keyPrices.map(roundKeyLevel) }
         ),
         ...(actionRecommendation !== undefined
             ? {
-                  actionRecommendation:
-                      roundRecommendation(actionRecommendation),
+                  actionRecommendation: roundRecommendation(
+                      actionRecommendation,
+                      round
+                  ),
               }
             : {}),
     };

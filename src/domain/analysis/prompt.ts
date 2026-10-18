@@ -5,6 +5,7 @@ import {
     outputLanguageName,
     type AnalysisLocale,
 } from './outputLocale';
+import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import { TIMEFRAME_MINUTES } from '@/domain/constants/market';
 import { MS_PER_SECOND } from '@/domain/constants/time';
 import {
@@ -129,11 +130,12 @@ import {
     equityListingContext,
     formatBarDateTime,
     formatNullableNumber,
-    formatPriceAtDp,
+    formatQuotedPrice,
     formatSignedNumber,
     formatSignedPercent,
-    priceDecimalPlaces,
+    priceQuoting,
     TIMEFRAME_LABEL,
+    type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 
 type SkillGroupKey = SkillType | 'regular';
@@ -286,7 +288,7 @@ const shareOf = (part: number, total: number): number | null =>
         ? (part / total) * PERCENTAGE_FACTOR
         : null;
 
-const formatMarketSection = (bars: Bar[], priceDp: number): string => {
+const formatMarketSection = (bars: Bar[], quoting: PriceQuoting): string => {
     if (bars.length === 0) {
         return [
             '## Analysis Snapshot',
@@ -303,7 +305,7 @@ const formatMarketSection = (bars: Bar[], priceDp: number): string => {
 
     return [
         '## Analysis Snapshot',
-        `- Snapshot Price (price captured at analysis time; not a live quote): ${formatPriceAtDp(last.close, priceDp)}`,
+        `- Snapshot Price (price captured at analysis time; not a live quote): ${formatQuotedPrice(last.close, quoting)}`,
         `- Price Change %: ${changeRate}`,
         `- Volume: ${formatVolume(last.volume)}`,
     ].join('\n');
@@ -326,12 +328,12 @@ export const distanceFromExtreme = (
     return `${pct} ${side} the period ${name}`;
 };
 
-const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
+const formatLongTermContext = (bars: Bar[], quoting: PriceQuoting): string => {
     if (bars.length === 0) {
         return ['## Long-term Context', '- No data available'].join('\n');
     }
 
-    const px = (n: number): string => formatPriceAtDp(n, priceDp);
+    const px = (n: number): string => formatQuotedPrice(n, quoting);
     // One non-finite high or low would turn the whole period extreme into NaN.
     const highs = bars.map(b => b.high).filter(Number.isFinite);
     const lows = bars.map(b => b.low).filter(Number.isFinite);
@@ -360,8 +362,8 @@ const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
     ].join('\n');
 };
 
-const formatBarRow = (bar: Bar, priceDp: number): string => {
-    const px = (n: number): string => formatPriceAtDp(n, priceDp);
+const formatBarRow = (bar: Bar, quoting: PriceQuoting): string => {
+    const px = (n: number): string => formatQuotedPrice(n, quoting);
     const datetime = formatBarDateTime(bar.time * MS_PER_SECOND);
     const pattern = detectCandlePattern(bar);
     return `[ts:${bar.time}] ${datetime} | O:${px(bar.open)} H:${px(bar.high)} L:${px(bar.low)} C:${px(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
@@ -414,7 +416,7 @@ const formatRecentBarsSection = (
     bars: Bar[],
     recentBarsCount: number,
     candleEntries: CandlePatternEntry[],
-    priceDp: number
+    quoting: PriceQuoting
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -427,7 +429,7 @@ const formatRecentBarsSection = (
     return [
         `## Recent Bar Data (Last ${recentBars.length} bars)`,
         'Format: Date/Time(UTC) | O:Open H:High L:Low C:Close V:Volume [CandlePattern]',
-        ...recentBars.map(bar => formatBarRow(bar, priceDp)),
+        ...recentBars.map(bar => formatBarRow(bar, quoting)),
         ...(patternEntries.length > 0
             ? [
                   `## Detected Candle Patterns (Short-term Trend Signal)`,
@@ -628,11 +630,11 @@ const formatLiquidityLine = (
     liquidityKind: string,
     eq: SMCEqualLevel,
     totalBars: number,
-    priceDp: number,
+    quoting: PriceQuoting,
     price: number | null,
     atr: number | null
 ): string =>
-    `- ${label} at ${formatPriceAtDp(eq.price, priceDp)} (${liquidityKind})${formatSmcDistanceSuffix(eq.price, price, atr)} (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
+    `- ${label} at ${formatQuotedPrice(eq.price, quoting)} (${liquidityKind})${formatSmcDistanceSuffix(eq.price, price, atr)} (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
 
 // When adding a new field to SMCResult, update this check accordingly.
 const isSMCEmpty = (smc: SMCResult): boolean =>
@@ -650,10 +652,10 @@ const isSMCEmpty = (smc: SMCResult): boolean =>
 const formatZoneLine = (
     zone: SMCZone | null,
     label: string,
-    priceDp: number
+    quoting: PriceQuoting
 ): string | null =>
     zone !== null
-        ? `- ${label}: ${formatPriceAtDp(zone.low, priceDp)} ~ ${formatPriceAtDp(zone.high, priceDp)}`
+        ? `- ${label}: ${formatQuotedPrice(zone.low, quoting)} ~ ${formatQuotedPrice(zone.high, quoting)}`
         : null;
 
 // Priority: premium > discount > equilibrium (most actionable first).
@@ -681,7 +683,7 @@ const classifyPriceZone = (
 const formatSMCSection = (
     indicators: IndicatorResult,
     bars: Bar[],
-    priceDp: number,
+    quoting: PriceQuoting,
     atr: number | null
 ): string => {
     const smc = indicators.smc;
@@ -693,7 +695,7 @@ const formatSMCSection = (
         ].join('\n');
     }
 
-    const px = (n: number): string => formatPriceAtDp(n, priceDp);
+    const px = (n: number): string => formatQuotedPrice(n, quoting);
     const totalBars = bars.length;
     const currentPrice = totalBars > 0 ? bars[totalBars - 1].close : null;
 
@@ -765,7 +767,7 @@ const formatSMCSection = (
                           'sell-side liquidity',
                           eq,
                           totalBars,
-                          priceDp,
+                          quoting,
                           currentPrice,
                           atr
                       )
@@ -776,7 +778,7 @@ const formatSMCSection = (
                           'buy-side liquidity',
                           eq,
                           totalBars,
-                          priceDp,
+                          quoting,
                           currentPrice,
                           atr
                       )
@@ -788,17 +790,17 @@ const formatSMCSection = (
     const premiumLine = formatZoneLine(
         smc.premiumZone,
         'Premium Zone',
-        priceDp
+        quoting
     );
     const equilibriumLine = formatZoneLine(
         smc.equilibriumZone,
         'Equilibrium Zone',
-        priceDp
+        quoting
     );
     const discountLine = formatZoneLine(
         smc.discountZone,
         'Discount Zone',
-        priceDp
+        quoting
     );
     const zoneLines = [premiumLine, equilibriumLine, discountLine].filter(
         (l): l is string => l !== null
@@ -944,9 +946,9 @@ const EFFICIENCY_DECIMAL_PLACES = 2;
  */
 const formatReferenceLevelLine = (
     level: ReferenceLevel,
-    priceDp: number
+    quoting: PriceQuoting
 ): string =>
-    `- ${formatPriceAtDp(level.price, priceDp)} (${level.label}; ${fmt(Math.abs(level.distancePercent))}% away${level.atPrice ? '; at price — inside bar noise, not a stop or target' : ''})`;
+    `- ${formatQuotedPrice(level.price, quoting)} (${level.label}; ${fmt(Math.abs(level.distancePercent))}% away${level.atPrice ? '; at price — inside bar noise, not a stop or target' : ''})`;
 
 const HORIZON_LABEL: Record<HorizonKey, string> = {
     short: 'Short-term',
@@ -1006,24 +1008,27 @@ const cryptoHorizonSpan = (barCount: number, timeframe: Timeframe): string => {
  * price — it renders `N/A` instead of a quotable "target", matching the capped
  * nearest-level lists, which drop such levels via referenceLevels' own guard.
  */
-export const formatTablePrice = (price: number, priceDp: number): string =>
+export const formatTablePrice = (
+    price: number,
+    quoting: PriceQuoting
+): string =>
     Number.isFinite(price) && price > 0
-        ? formatPriceAtDp(price, priceDp)
+        ? formatQuotedPrice(price, quoting)
         : 'N/A';
 
 /** @internal `Fib table:` line — every retracement and extension of the horizon's anchor leg. */
 export const formatFibTableLine = (
     fib: FibonacciProjection,
-    priceDp: number
+    quoting: PriceQuoting
 ): string =>
-    `Fib table: ${fib.retracements.map(r => `${formatFibRatio(r.ratio)} ${formatTablePrice(r.price, priceDp)}`).join(' / ')} | ext ${fib.extensions.map(e => `${formatFibRatio(e.ratio)} ${formatTablePrice(e.price, priceDp)}`).join(' / ')}`;
+    `Fib table: ${fib.retracements.map(r => `${formatFibRatio(r.ratio)} ${formatTablePrice(r.price, quoting)}`).join(' / ')} | ext ${fib.extensions.map(e => `${formatFibRatio(e.ratio)} ${formatTablePrice(e.price, quoting)}`).join(' / ')}`;
 
 /** @internal `Fib ABC table:` line — every extension projected from C. */
 export const formatAbcTableLine = (
     abc: AbcExtensionProjection,
-    priceDp: number
+    quoting: PriceQuoting
 ): string =>
-    `Fib ABC table: ${abc.extensions.map(e => `${formatFibRatio(e.ratio)} ${formatTablePrice(e.price, priceDp)}`).join(' / ')}`;
+    `Fib ABC table: ${abc.extensions.map(e => `${formatFibRatio(e.ratio)} ${formatTablePrice(e.price, quoting)}`).join(' / ')}`;
 
 /** Decimals of the retracement depth printed after a Fib anchor line (Fib ratios themselves are 1 dp). */
 const RETRACEMENT_DEPTH_DP = 1;
@@ -1055,7 +1060,7 @@ const formatHorizonBlock = (
     key: HorizonKey,
     horizon: HorizonReference,
     timeframe: Timeframe,
-    priceDp: number,
+    quoting: PriceQuoting,
     assetClass: AssetClass,
     currentPrice: number | null
 ): string => {
@@ -1065,7 +1070,7 @@ const formatHorizonBlock = (
             ? cryptoHorizonSpan(horizon.window.bars, timeframe)
             : HORIZON_SPAN_BY_TIMEFRAME[timeframe][key];
     const levelLine = (level: ReferenceLevel): string =>
-        formatReferenceLevelLine(level, priceDp);
+        formatReferenceLevelLine(level, quoting);
     const structureLine =
         `Structure: price ${s.priceVsMA60} MA60 / ${s.priceVsMA200} MA200; price/EMA9/EMA20 ${s.emaStack}; swings ${s.swingStructure}; ` +
         `ADX ${s.adx != null ? s.adx.toFixed(INDICATOR_DECIMAL_PLACES) : 'n/a'}; efficiency ${s.efficiencyRatio != null ? s.efficiencyRatio.toFixed(EFFICIENCY_DECIMAL_PLACES) : 'n/a'}; regime ${s.regime}.`;
@@ -1080,8 +1085,8 @@ const formatHorizonBlock = (
             ? []
             : [
                   (fib.direction === 'up'
-                      ? `Fib anchor: swing low ${formatPriceAtDp(fib.low, priceDp)} → swing high ${formatPriceAtDp(fib.high, priceDp)} (up leg)`
-                      : `Fib anchor: swing high ${formatPriceAtDp(fib.high, priceDp)} → swing low ${formatPriceAtDp(fib.low, priceDp)} (down leg)`) +
+                      ? `Fib anchor: swing low ${formatQuotedPrice(fib.low, quoting)} → swing high ${formatQuotedPrice(fib.high, quoting)} (up leg)`
+                      : `Fib anchor: swing high ${formatQuotedPrice(fib.high, quoting)} → swing low ${formatQuotedPrice(fib.low, quoting)} (down leg)`) +
                       retracementDepthSuffix(fib, currentPrice),
               ];
     // Same reasoning as `fibLine`, for the separate A→B→C swing triplet the
@@ -1092,14 +1097,14 @@ const formatHorizonBlock = (
         abc == null
             ? []
             : [
-                  `Fib ABC anchor: A ${formatPriceAtDp(abc.a, priceDp)} → B ${formatPriceAtDp(abc.b, priceDp)} → C ${formatPriceAtDp(abc.c, priceDp)} (${abc.direction})`,
+                  `Fib ABC anchor: A ${formatQuotedPrice(abc.a, quoting)} → B ${formatQuotedPrice(abc.b, quoting)} → C ${formatQuotedPrice(abc.c, quoting)} (${abc.direction})`,
               ];
     // Complete Fib sets (spec 2026-09-18 analysis-prompt decision): the
     // nearest-level lists below are capped per side, so a far ratio the model
     // may need for a second target can be missing there. One compact line per
     // set replaces "compute it yourself" with a number to quote.
-    const fibTable = fib == null ? [] : [formatFibTableLine(fib, priceDp)];
-    const abcTable = abc == null ? [] : [formatAbcTableLine(abc, priceDp)];
+    const fibTable = fib == null ? [] : [formatFibTableLine(fib, quoting)];
+    const abcTable = abc == null ? [] : [formatAbcTableLine(abc, quoting)];
     const resistance =
         horizon.levels.resistance.length > 0
             ? [
@@ -1132,10 +1137,10 @@ const formatHorizonBlock = (
  */
 export const formatPivotTableLine = (
     pivots: PivotTables | undefined,
-    priceDp: number
+    quoting: PriceQuoting
 ): string => {
     if (!pivots) return '';
-    const px = (n: number): string => formatTablePrice(n, priceDp);
+    const px = (n: number): string => formatTablePrice(n, quoting);
     const parts = [
         pivots.standard &&
             `Standard PP ${px(pivots.standard.pp)} R1 ${px(pivots.standard.r1)} R2 ${px(pivots.standard.r2)} R3 ${px(pivots.standard.r3)} S1 ${px(pivots.standard.s1)} S2 ${px(pivots.standard.s2)} S3 ${px(pivots.standard.s3)}`,
@@ -1162,7 +1167,7 @@ export const formatPivotTableLine = (
 const formatMarketReferenceSection = (
     reference: MarketReference,
     timeframe: Timeframe,
-    priceDp: number,
+    quoting: PriceQuoting,
     assetClass: AssetClass,
     currentPrice: number | null
 ): string =>
@@ -1175,12 +1180,12 @@ const formatMarketReferenceSection = (
                 key,
                 reference[key],
                 timeframe,
-                priceDp,
+                quoting,
                 assetClass,
                 currentPrice
             )
         ),
-        formatPivotTableLine(reference.pivots, priceDp),
+        formatPivotTableLine(reference.pivots, quoting),
     ]
         .filter(line => line !== '')
         .join('\n');
@@ -1480,7 +1485,7 @@ const formatElderImpulseLine = (indicators: IndicatorResult): string => {
 
 const formatChandelierLine = (
     indicators: IndicatorResult,
-    priceDp: number
+    quoting: PriceQuoting
 ): string => {
     const last = lastOf(indicators.chandelierExit);
     if (!last || last.trend === null) {
@@ -1488,16 +1493,16 @@ const formatChandelierLine = (
     }
     const activeStop =
         last.trend === 'long'
-            ? `long stop ${formatPriceAtDp(last.longStop, priceDp)}`
-            : `short stop ${formatPriceAtDp(last.shortStop, priceDp)}`;
+            ? `long stop ${formatQuotedPrice(last.longStop, quoting)}`
+            : `short stop ${formatQuotedPrice(last.shortStop, quoting)}`;
     return `- Chandelier Exit: ${activeStop} (trend: ${last.trend}) ${PRO_RELIABILITY_NOTE.chandelier}`;
 };
 
-/** Decimal places for the two kinds of price-denominated value a prompt renders. */
+/** How the two kinds of price-denominated value a prompt renders are quoted. */
 interface PricePrecision {
     /** Levels on the price axis: bars, bands, averages, stops. */
-    price: number;
-    /** Differences of prices: MACD, ATR, momentum, Elder-Ray. See `differenceDecimalPlaces`. */
+    price: PriceQuoting;
+    /** Decimal places of differences of prices: MACD, ATR, momentum, Elder-Ray. See `differenceDecimalPlaces`. */
     difference: number;
 }
 
@@ -1526,7 +1531,7 @@ const formatIndicatorSection = (
     // differences (MACD, ATR) at the difference precision; bounded oscillators (RSI, DMI,
     // %K, CCI, MFI, CMF) keep `fmt`.
     const px = (n: number | null): string =>
-        formatPriceAtDp(n, precision.price);
+        formatQuotedPrice(n, precision.price);
     const dx = (n: number | null): string =>
         formatNullableNumber(n, precision.difference);
     const lastRSI = lastNonNull(indicators.rsi);
@@ -2375,6 +2380,8 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   market profile (see {@link CurrencyCode} — core never derives it from the
  *   symbol). Drives the listing framing sentence and price precision (`KRW` →
  *   whole won). Defaults to `'USD'`.
+ * @param krxTick - KRX tick table the listing's prices round to (`'etp'` for an
+ *   ETF/ETN, `'share'` otherwise). Ignored unless `currency` is `KRW`.
  * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
@@ -2393,7 +2400,8 @@ export function buildAnalysisPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     priorAnalyses?: readonly PriorAnalysis[],
     marketEvents?: readonly MarketEvent[],
-    currency: CurrencyCode = 'USD'
+    currency: CurrencyCode = 'USD',
+    krxTick: KrxTickTable = 'share'
 ): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -2457,16 +2465,17 @@ export function buildAnalysisPrompt(
     // One precision for every price-axis value in this prompt, taken from the
     // snapshot close — see `priceDecimalPlaces` for why a fixed 2 was wrong — and
     // a second for differences of prices, scaled by the latest ATR.
-    const priceDp = priceDecimalPlaces(
+    const quoting = priceQuoting(
         bars.at(-1)?.close,
         currency,
-        assetClass
+        assetClass,
+        krxTick
     );
     const precision: PricePrecision = {
-        price: priceDp,
+        price: quoting,
         difference: differenceDecimalPlaces(
             lastNonNull(indicators.atr),
-            priceDp
+            quoting.dp
         ),
     };
 
@@ -2489,7 +2498,7 @@ export function buildAnalysisPrompt(
         rsi: indicators.rsi,
         patternCandidates,
         marketReference,
-        fmt: { timeframe, priceDp },
+        fmt: { timeframe, quoting },
     });
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
     const overlayCandidatesSection =
@@ -2567,7 +2576,7 @@ export function buildAnalysisPrompt(
         bars,
         symbol,
         timeframe,
-        priceDp
+        quoting
     );
 
     // The v0.31 production section order (see
@@ -2584,13 +2593,13 @@ export function buildAnalysisPrompt(
     const dynamicSections = [
         `Symbol: ${symbol}\nCompany: ${companyName}\n${assetContext}`,
         `Timeframe: ${TIMEFRAME_LABEL[timeframe]}\nTimeframe interpretation: ${TIMEFRAME_CONTEXT[timeframe]}`,
-        formatMarketSection(bars, priceDp),
-        formatLongTermContext(bars, priceDp),
+        formatMarketSection(bars, quoting),
+        formatLongTermContext(bars, quoting),
         formatRecentBarsSection(
             bars,
             config.recentBarsCount,
             candleEntries,
-            priceDp
+            quoting
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),
@@ -2613,6 +2622,7 @@ export function buildAnalysisPrompt(
             supertrend: lastOf(indicators.supertrend) ?? undefined,
             parabolicSar: lastOf(indicators.parabolicSar) ?? undefined,
             atr: lastNonNull(indicators.atr),
+            quoting: precision.price,
             diffDp: precision.difference,
             lastVolume: bars.length > 0 ? bars[bars.length - 1].volume : null,
             // Raw history, oldest-first, minus the last bar — `volumeLine`
@@ -2624,13 +2634,13 @@ export function buildAnalysisPrompt(
             prevBar: bars.at(-2),
         }),
         formatProIndicatorSection(indicators, config, precision),
-        formatSMCSection(indicators, bars, priceDp, atrForPatternGeometry),
+        formatSMCSection(indicators, bars, quoting, atrForPatternGeometry),
         ...(smcConceptNote !== null ? [smcConceptNote] : []),
         formatChartPatternCandidatesSection(
             patternCandidates,
             bars,
             atrForPatternGeometry,
-            priceDp,
+            quoting,
             timeframe,
             offeredPatternOverlayIds,
             patternCandidateGeometries
@@ -2639,7 +2649,7 @@ export function buildAnalysisPrompt(
         formatMarketReferenceSection(
             marketReference,
             timeframe,
-            priceDp,
+            quoting,
             assetClass,
             bars.length > 0 ? bars[bars.length - 1].close : null
         ),
@@ -2650,7 +2660,7 @@ export function buildAnalysisPrompt(
             bars,
             timeframe,
             marketReference,
-            priceDp,
+            quoting,
             marketEvents
         ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
@@ -2694,7 +2704,7 @@ export function buildAnalysisPrompt(
             patternCandidates,
             bars,
             atrForPatternGeometry,
-            priceDp,
+            quoting,
             offeredPatternOverlayIds,
             patternCandidateGeometries
         ),

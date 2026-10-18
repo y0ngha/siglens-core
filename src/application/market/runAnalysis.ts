@@ -467,7 +467,8 @@ async function runAnalysisImpl(
         locale,
         priorAnalysisCandidates,
         marketEventCandidates,
-        options.currency
+        options.currency,
+        options.krxTickTable
     );
     // Logged here, before the model call, so a failure is reported even when
     // the generation itself fails: without it a throwing qualifier reads as
@@ -581,14 +582,17 @@ async function runAnalysisImpl(
                     resolvedOverlays.chartOverlays,
                     patternGeometries
                 ),
-                options.currency
+                options.currency,
+                options.krxTickTable
             ),
             lastClose,
             atr,
             options.currency,
-            locale
+            locale,
+            options.krxTickTable
         ),
-        options.currency
+        options.currency,
+        options.krxTickTable
     );
     if (overlayBuildFailures.length > 0) {
         console.warn('[ChartOverlays] candidate builder failed', {
@@ -603,6 +607,19 @@ async function runAnalysisImpl(
             timeframe,
             unknownIds: resolvedOverlays.unknownIds,
         });
+    }
+    if (resolvedOverlays.misplacedIds.length > 0) {
+        // Not a model invention: the ids were offered. A rejected citation is
+        // routine (the same id is often drawn from the slot that accepts it),
+        // so this is informational.
+        console.info(
+            '[ChartOverlays] candidate id cited from a slot that does not accept it',
+            {
+                symbol,
+                timeframe,
+                misplacedIds: resolvedOverlays.misplacedIds,
+            }
+        );
     }
     // Referral-rate signal (spec 2026-09-28 §7): candidates were offered but
     // the model cited none. Logged only on that anomaly — this layer has no
