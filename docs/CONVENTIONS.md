@@ -145,6 +145,10 @@ implementation. Logic shared by a pair of AI providers belongs in
 
 Why: duplicated helpers drift apart, and the copy nobody remembers keeps the old bug.
 
+Two checks that feed one decision (a status, a verdict) read the same value from one
+source. If the prompt prints a level, the status logic uses that printed level, not a
+second derivation of it (a sloped line for one check, the flat figure for another).
+
 <a id="CP-2"></a>
 #### CP-2 — Compute a value once
 
@@ -718,6 +722,10 @@ not a hand-picked subset that silently omits one.
 
 A filter that must be inclusive (`>=`) or exclusive (`>`) needs one item exactly on the
 boundary and one just outside it. Mutate the comparator to confirm the test fails.
+
+Include the near-miss from the opposite side: a state named for one side of a line (for
+example "failed") must not trigger from the other side, so a slack tolerance needs a test
+for each side.
 
 <a id="TE-7"></a>
 #### TE-7 — One behavior per `it()`
