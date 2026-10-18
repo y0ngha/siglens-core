@@ -475,6 +475,9 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                 additionalProperties: false,
             },
         },
+        // Kept for backward compatibility with cached/parsed shapes; core
+        // overwrites it with `computeRiskLevel` after normalization, so the
+        // model's pick is never shown.
         riskLevel: { type: 'string', enum: ['low', 'medium', 'high'] },
         keyLevels: {
             type: 'object',

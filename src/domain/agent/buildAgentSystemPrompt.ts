@@ -13,7 +13,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-18.1';
+export const AGENT_PROMPT_VERSION = '2026-10-18.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -115,12 +115,12 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
                 : '';
             return tools === ''
                 ? ''
-                : `Outlook, "how is it doing", "should I buy / is it a good time", rebound, top/bottom, trading-setup or "analyze it" questions about a symbol → ${tools}.${flows}`;
+                : `Outlook, "how is it doing", "should I buy / is it a good time", rebound, top/bottom, trading-setup or "analyze it" questions about a symbol (Korean: 전망, 앞으로 어때, 어떻게 될까, 오를까, 떨어질까, 반등할까, 분석해줘, 사도 될까) → ${tools}.${flows}`;
         },
     },
     {
         requires: ['get_bars_indicators'],
-        text: 'Chart, trend, price-flow, momentum or indicator-value questions (RSI, MACD, Bollinger, moving averages, overbought) about a symbol → get_bars_indicators; a question only about earnings, financials, news or congressional trades does not need it.',
+        text: 'Chart, trend, price-flow, momentum or indicator-value questions (차트, 추세, 지표; RSI, MACD, Bollinger, moving averages, overbought) about a symbol → get_bars_indicators; a question only about earnings, financials, news or congressional trades does not need it. A Korean outlook question (전망, 오를까, 떨어질까, 반등할까) matches the outlook row above, not only this chart row.',
     },
     {
         requires: ['get_cached_analysis'],
@@ -268,7 +268,8 @@ function ruleLines(
         available.has('get_bars_indicators') &&
             '- When you called get_bars_indicators for a symbol question, reflect how many indicator groups agree: at the Detailed level say which signals lean bullish and which bearish and how far the indicator families agree, never printing its 0–100 score, and say once in the answer that it is a rule-based tally, not a forecast (it has no measured forward edge) — add no other qualifier about what it is; at the Plain level say in words how much the indicators agree, with no score or "/100" figure. If it is null, never guess an agreement: at both levels say briefly that the trading history is too short for this indicator tally (Plain: in one plain clause, no jargon).',
         available.has('get_bars_indicators') &&
-            "- Short-term sell-off reading: when a get_bars_indicators result carries a pullback (it is null when there is no such reading), reflect it next to the indicator agreement. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction; say that this measured line is SIGLENS's backtest across many stocks since 2000, not this stock's own history. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200); if the answer mentions what such drops have historically led to, say this is SIGLENS's backtest across many stocks since 2000, not this stock's own history. When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself. When pullback is null, say nothing about it at either level.",
+            // Keep in sync: the "66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), not a holding win rate" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and this agent pullback rule. Change all three together.
+            "- Short-term sell-off reading: when a get_bars_indicators result carries a pullback (it is null when there is no such reading), reflect it next to the indicator agreement. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction; the measured 66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), never a holding-period win rate, and never present it as the chance the stock is higher later; say that this measured line is SIGLENS's backtest across many stocks since 2000, not this stock's own history. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200); if the answer mentions what such drops have historically led to, say this is SIGLENS's backtest across many stocks since 2000, not this stock's own history. When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself. When pullback.caveat is a string, say the base rate may not apply to this drop and give that reason in one clause. When pullback is null, say nothing about it at either level.",
         available.has('get_bars_indicators') &&
             '- RSI zone: use latest.rsiZone from get_bars_indicators when present; otherwise treat an RSI between 30 and 70 as neutral (overbought ≥ 70, oversold ≤ 30). Never call an RSI between 30 and 70 oversold, overbought, or "near" either; describe it as neutral, optionally leaning weak or strong relative to 50.',
         available.has('get_options_summary') &&

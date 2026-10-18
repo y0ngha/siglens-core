@@ -221,4 +221,11 @@ describe('PULLBACK_BASE_RATES', () => {
             [...readings].sort()
         );
     });
+
+    it('66-75% is stated as a short trade hit rate, not a holding win rate', () => {
+        const text = PULLBACK_BASE_RATES.washoutInUptrend;
+        expect(text).toContain('66-75%');
+        expect(text).toContain('exited on the first close above MA5');
+        expect(text).toContain('not a win rate for holding');
+    });
 });

@@ -110,4 +110,35 @@ describe('formatMarketEventsSection', () => {
             section.split('\n').filter(l => l.startsWith('- '))
         ).toHaveLength(1);
     });
+
+    describe('earningsDates', () => {
+        const bars = makeBars(10);
+        const render = (dates?: readonly string[]): string =>
+            formatMarketEventsSection([event(8)], bars, 'NVDA', '15Min', dates);
+        const reportDay = new Date(event(8).publishedAt)
+            .toISOString()
+            .slice(0, 10);
+
+        it('renders earnings on a real report date as earnings', () => {
+            expect(render([reportDay])).toContain(': earnings, bullish');
+        });
+
+        it('renders off-date earnings as earnings-themed news', () => {
+            expect(render(['2030-01-01'])).toContain(
+                "earnings-related news (not this company's report), bullish"
+            );
+        });
+
+        it('treats an empty earningsDates like absent (calendar unknown)', () => {
+            const out = render([]);
+            expect(out).toContain(': earnings-related news, bullish');
+            expect(out).not.toContain('not this company');
+        });
+
+        it('never claims a report when earningsDates is absent', () => {
+            const out = render(undefined);
+            expect(out).toContain(': earnings-related news, bullish');
+            expect(out).not.toContain(': earnings,');
+        });
+    });
 });

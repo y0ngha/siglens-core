@@ -217,6 +217,22 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
     marketEvents?: readonly MarketEvent[];
 
     /**
+     * `YYYY-MM-DD` report dates of THIS company, past and upcoming (e.g. from
+     * the earnings calendar). The news-card category `earnings` is a theme
+     * label — peer results, previews and earnings-season pieces carry it — so
+     * an `earnings` {@link marketEvents} row counts as the company's own
+     * report only from 1 day before to 3 days after one of these dates (UTC
+     * calendar days). Omitted OR an empty array means "calendar unknown" (a
+     * failed calendar fetch may yield `[]`): no row is ever presented as the
+     * company's report (rendered as "earnings-related news") and the washout
+     * verdict is suspended on the safe side.
+     *
+     * Not part of the cache key: the dates change at most a few times a
+     * year, and the prompt-version bump covers the wording change.
+     */
+    earningsDates?: readonly string[];
+
+    /**
      * Market session of the analysed instrument. It decides how long a
      * freshly generated analysis stays cached (see `computeEffectiveTtl`): the
      * entry expires at that session's next regular close plus a settle buffer

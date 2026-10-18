@@ -22,6 +22,7 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
+import { computeRiskLevel } from '@/domain/analysis/riskLevel';
 import {
     enrichAnalysisWithConfidence,
     isFallbackAnalysis,
@@ -468,7 +469,8 @@ async function runAnalysisImpl(
         priorAnalysisCandidates,
         marketEventCandidates,
         options.currency,
-        options.krxTickTable
+        options.krxTickTable,
+        options.earningsDates
     );
     // Logged here, before the model call, so a failure is reported even when
     // the generation itself fails: without it a throwing qualifier reads as
@@ -641,8 +643,18 @@ async function runAnalysisImpl(
     // and close tell a consumer which data the analysis describes — `analyzedAt`
     // alone cannot, since an analysis written before a close is reused after it.
     const lastBar = bars[bars.length - 1];
+    // `riskLevel` is computed, not the model's pick: each locale is its own LLM
+    // run and the schema gave no rubric, so the same inputs came back "high" in
+    // one language and "medium" in another. The model's value is overwritten.
+    const riskLevel = computeRiskLevel({
+        bars,
+        timeframe,
+        events: marketEventCandidates,
+        earningsDates: options.earningsDates,
+    });
     const result = {
         ...reconciled,
+        riskLevel,
         trendlines: resolvedOverlays.trendlines,
         chartOverlays: resolvedOverlays.chartOverlays,
         analyzedAt,

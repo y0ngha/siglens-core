@@ -114,6 +114,14 @@ describe('buildNewsCardAnalysisPrompt', () => {
             'based only on the headline and avoid guessing missing details'
         );
     });
+
+    it("limits category earnings to the named symbol company's own report", () => {
+        const prompt = buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM);
+        expect(prompt).toContain('own reported results / earnings report');
+        expect(prompt).toContain(
+            'OTHER companies\' earnings are not "earnings"'
+        );
+    });
 });
 
 describe('sourceLanguage', () => {
@@ -606,8 +614,11 @@ describe('buildNewsCardAnalysisPrompt — stable / dynamic layout', () => {
             nonBlankLinesOf(`${prompt.stable}\n${prompt.dynamic}`).toSorted();
         // The only line the reorder adds: a heading for the per-article rules,
         // whose old `Rules:` heading moved into `stable`.
+        // Added by the 2026-10-18 rubric fix (company's own report only).
+        const EARNINGS_RUBRIC_LINE =
+            '  - earnings: ONLY the named symbol company\'s own reported results / earnings report, or its earnings-call guidance. Previews, "into earnings" trade setups, earnings-season roundups, comparisons ("which stock to buy after earnings") and OTHER companies\' earnings are not "earnings" \u2014 use "other" (or "macro" for market-wide season pieces).';
         const withFieldRulesHeading = (legacy: readonly string[]) =>
-            [...legacy, 'Field rules:'].toSorted();
+            [...legacy, 'Field rules:', EARNINGS_RUBRIC_LINE].toSorted();
 
         it('ko + translate + truncated: only moves text, never rewords it', () => {
             const prompt = buildNewsCardAnalysisPromptRaw(

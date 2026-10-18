@@ -147,6 +147,7 @@ ${summaryFewShot}
 - priceImpact must be exactly one of: "high", "medium", "low", "negligible".
 - sentiment: the directional market implication for the named symbol — bullish if positive catalyst, bearish if negative, neutral if ambiguous or unrelated.
 - category: the dominant news theme from the provided options.
+  - earnings: ONLY the named symbol company's own reported results / earnings report, or its earnings-call guidance. Previews, "into earnings" trade setups, earnings-season roundups, comparisons ("which stock to buy after earnings") and OTHER companies' earnings are not "earnings" — use "other" (or "macro" for market-wide season pieces).
 - priceImpact: estimated magnitude of price movement for the named symbol.
   - high: likely material mover — earnings miss/beat, regulatory action, major M&A, product recall.
   - medium: noticeable but contained — analyst rating change, guidance update, sector news.

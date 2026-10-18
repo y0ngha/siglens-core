@@ -55,6 +55,8 @@ export const PULLBACK_NEAR_WILLIAMS_R = -80;
  * What each reading has historically meant, in words a model can quote. `none` carries no
  * base rate.
  *
+ * Keep in sync: the "66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), not a holding win rate" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and the agent pullback rule (domain/agent/buildAgentSystemPrompt.ts). Change all three together.
+ *
  * Measured on daily bars, entry at the signal day's close, 0.1% cost per side:
  * point-in-time S&P 500 members 2000-01 → 2020-11 (615 symbols) plus nine large caps and
  * SPY/QQQ 2024-07 → 2026-09, split into five periods (2000–07, 2007–09, 2009–14,
@@ -64,7 +66,7 @@ export const PULLBACK_BASE_RATES: Readonly<
     Record<Exclude<PullbackReading, 'none'>, string>
 > = {
     washoutInUptrend:
-        'Historical base rate, not an instruction. Daily closes above MA200 with Williams %R(14) at or below -90 were followed by above-baseline 5-day returns in every period backtested (2000-07, 2007-09, 2009-14, 2015-20, 2024-26); trades exited on the first close above MA5 (or after 10 days) won 66-75% of the time. In broad sell-offs the edge was relative, not absolute (2007-09: -0.71% over 10 days vs -1.03% baseline). About 2/3 of these days show a bearish indicator tally; that is the normal state of this reading, not evidence against it.',
+        'Historical base rate, not an instruction. Daily closes above MA200 with Williams %R(14) at or below -90 were followed by above-baseline 5-day returns in every period backtested (2000-07, 2007-09, 2009-14, 2015-20, 2024-26); a short-term trade exited on the first close above MA5 (or after 10 days) won 66-75% of the time — that is the hit rate of that quick exit, not a win rate for holding the stock. In broad sell-offs the edge was relative, not absolute (2007-09: -0.71% over 10 days vs -1.03% baseline). About 2/3 of these days show a bearish indicator tally; that is the normal state of this reading, not evidence against it.',
     nearWashoutInUptrend:
         'Historical base rate, not an instruction. Above MA200 with Williams %R(14) between -90 and -80: the same direction as the sell-off reading — 5-day returns were above the baseline in every backtested period, but by a small margin that since 2020 has been statistically indistinguishable from the baseline.',
     washoutBelowMa200:

@@ -42,6 +42,12 @@ vi.mock('@/domain/analysis/confidence', async () => {
     return { ...actual, enrichAnalysisWithConfidence: vi.fn() };
 });
 vi.mock('@/domain/analysis/ai-levels');
+// Spy wrapping the real function: the wiring test asserts what runAnalysis feeds it.
+vi.mock('@/domain/analysis/riskLevel', async importOriginal => {
+    const actual =
+        await importOriginal<typeof import('@/domain/analysis/riskLevel')>();
+    return { ...actual, computeRiskLevel: vi.fn(actual.computeRiskLevel) };
+});
 vi.mock('@/infrastructure/cache/config', async () => {
     const actual = await vi.importActual<
         typeof import('@/infrastructure/cache/config')
@@ -63,6 +69,7 @@ import {
     runAnalysis,
     runAnalysisForOverall,
 } from '@/application/market/runAnalysis';
+import { computeRiskLevel } from '@/domain/analysis/riskLevel';
 import { USER_API_KEY_REQUIRED_MESSAGE } from '@/application/byok/messages';
 import type { UsageRepository } from '@/domain/ports/usageRepository';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
@@ -307,6 +314,72 @@ describe('runAnalysis', () => {
             expect(result.result.riskLevel).toBeNull();
             expect(result.unfilteredResult.riskLevel).toBe('low');
             expect(result.unfilteredResult.trend).toBe(mockRawResult.trend);
+        });
+
+        it('feeds computeRiskLevel only data (bars, events, earningsDates) and ignores the LLM stop', async () => {
+            const event = {
+                publishedAt: new Date(),
+                category: 'earnings' as const,
+                sentiment: 'bearish' as const,
+                impact: 'high' as const,
+            };
+            const rawStop = 50;
+            const reconciledStop = 90;
+            mockPostProcessAnalysisWithReconcile.mockReturnValueOnce({
+                ...mockRawResult,
+                actionRecommendation: {
+                    ...mockRawResult.actionRecommendation,
+                    stopLoss: rawStop,
+                    reconciledLevels: { stopLoss: reconciledStop },
+                },
+            });
+            const earningsDates = ['2026-10-15'];
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    marketEvents: [event],
+                    earningsDates,
+                }
+            );
+
+            expect(result.status).toBe('done');
+            const input = vi.mocked(computeRiskLevel).mock.lastCall![0];
+            expect('stopLoss' in input).toBe(false);
+            expect(input.events).toEqual([event]);
+            expect(input.earningsDates).toBe(earningsDates);
+            expect(input.timeframe).toBe(mockTimeframe);
+            expect(input.bars).toBe(mockBarsData.bars);
+        });
+
+        it('overwrites the model riskLevel with the computed one (same for every locale)', async () => {
+            const levels: string[] = [];
+            for (const [locale, modelPick] of [
+                ['ko', 'high'],
+                ['en', 'medium'],
+            ] as const) {
+                mockCallAnalysisAi.mockResolvedValueOnce(
+                    JSON.stringify({ ...mockRawResult, riskLevel: modelPick })
+                );
+                const result = await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider, locale }
+                );
+                expect(result.status).toBe('done');
+                if (result.status !== 'done') return;
+                levels.push(result.unfilteredResult.riskLevel);
+            }
+            // Two bars: no volatility, trend or event points -> 'low'.
+            expect(levels).toEqual(['low', 'low']);
         });
 
         it('result carries dataAsOf = start time and close of the last bar the prompt used', async () => {
@@ -1864,9 +1937,10 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 }
             );
 
-            expect(mockBuildAnalysisPrompt.mock.lastCall?.slice(-2)).toEqual([
+            expect(mockBuildAnalysisPrompt.mock.lastCall?.slice(-3)).toEqual([
                 'KRW',
                 'etp',
+                undefined,
             ]);
             const postArgs =
                 mockPostProcessAnalysisWithReconcile.mock.lastCall!;

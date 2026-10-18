@@ -1418,15 +1418,15 @@ const impulseFlipNote = (colors: (ImpulseColor | null)[]): string => {
 const formatBollingerPercentBLine = (indicators: IndicatorResult): string => {
     const last = lastOf(indicators.bollingerDerived);
     if (!last || last.pctB === null) {
-        return `- Bollinger %B: N/A ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
+        return `- Bollinger %B (price position within the bands: 0 = lower band, 1 = upper band): N/A ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
     }
     // BandWidth is (upper − lower) / middle, a fraction — shown as a percent so a
     // squeeze (e.g. 3.84% vs 4.12%) is not flattened to `0.04`.
     const bandwidthStr =
         last.bandwidth !== null
-            ? ` / BandWidth ${fmt(last.bandwidth * PERCENTAGE_FACTOR)}%`
+            ? ` / BandWidth ${fmt(last.bandwidth * PERCENTAGE_FACTOR)}% (band width relative to the middle band — a separate measure from %B)`
             : '';
-    return `- Bollinger %B: ${fmt(last.pctB)}${bandwidthStr}${pctBLabel(last.pctB)} ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
+    return `- Bollinger %B (price position within the bands: 0 = lower band, 1 = upper band): ${fmt(last.pctB)}${bandwidthStr}${pctBLabel(last.pctB)} ${PRO_RELIABILITY_NOTE.bollingerPctB}`;
 };
 
 const formatMacdVLine = (
@@ -1752,7 +1752,8 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- The engine covers indicator crosses and flips only. Pattern detection, SMC structure, and support/resistance are yours to judge. When they agree with the engine, say the signal is corroborated beyond the indicators; when they disagree, treat it as a conflict and follow ### Conflicting Signals.',
         '- When ## Deterministic Metrics reports the tally as not measurable, judge the indicators yourself and say in the summary that the automatic indicator tally could not be measured and the read rests on your own judgment of the indicators.',
         '- The tally is descriptive (read its Reliability line): cite it as how many indicator families agree, never as the reason for a verdict on its own.',
-        "- When ## Deterministic Metrics shows a Short-term sell-off check reading other than none, state it next to the tally with its Measured line, describing it as a short-term sell-off that has run its course rather than naming the label, and say plainly that a bearish tally is that reading's normal state rather than evidence against it.",
+        // Keep in sync: the "66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), not a holding win rate" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt rule on the next line and the agent pullback rule (domain/agent/buildAgentSystemPrompt.ts). Change all three together.
+        "- When ## Deterministic Metrics shows a Short-term sell-off check reading other than none, state it next to the tally with its Measured line, describing it as a short-term sell-off that has run its course rather than naming the label, and say plainly that a bearish tally is that reading's normal state rather than evidence against it. When you cite its Measured line, say it is SIGLENS's backtest across many stocks since 2000, not this stock's own history, and that the 66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), never a holding win rate.",
         '',
         '### Indicator State',
         '- ## Indicator State is computed; do not re-derive these comparisons. Every line below already holds the answer — cite it, never recompute it, and never contradict it:',
@@ -1812,9 +1813,9 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Step 1 — Determine entryRecommendation (in this order):',
         '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", entryRecommendation is "enter". Copy it; do not re-judge it and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A sub-1.0 structural ratio, a bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading\'s normal state: name them as risks in the prose, never as reasons to change the verdict.',
         '  - When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.',
-        '  - "enter" (other charts): price near support + risk level not high.',
+        '  - "enter" (other charts): price near support and no high-risk warning sign (very high ATR, a company event in the last sessions, a close under MA200).',
         '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a reading that is close to a sharp short-term sell-off inside a longer-term uptrend.',
-        '  - "avoid": price extended from support, strong resistance overhead, or risk high. A bearish indicator tally alone is not a reason for "avoid" — it has no measured forward edge, and it is the normal state of a sharp short-term sell-off inside a longer-term uptrend.',
+        '  - "avoid": price extended from support, strong resistance overhead, or a high-risk warning sign (very high ATR, a recent company event, a close under MA200). A bearish indicator tally alone is not a reason for "avoid" — it has no measured forward edge, and it is the normal state of a sharp short-term sell-off inside a longer-term uptrend.',
         '  - Outside the short-term sell-off path, before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met indicator-agreement entry condition does not override this — the two were measured to be inversely related.',
         '  - The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.',
         '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a description of what bounds the risk and the reward (no ratio — see Step 3 riskReward rule) — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
@@ -2367,6 +2368,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   and cannot change which skills get injected into a prompt. Omitting it
  *   (or passing an empty array) produces a byte-identical prompt to the one
  *   this builder emitted before the parameter existed.
+ * @param earningsDates - Optional `YYYY-MM-DD` report dates of this company (past and
+ *   upcoming). An `earnings` market event off every date is rendered as earnings-themed
+ *   news and no longer suspends the washout verdict; omitted, no event is ever presented
+ *   as the company's own report.
  * @param marketEvents - Optional market-moving news events for this symbol,
  *   supplied by the consumer from its own storage. When provided, narrowed via
  *   `selectMarketEvents` (bar-window cut, impact filter, capped at
@@ -2401,7 +2406,8 @@ export function buildAnalysisPrompt(
     priorAnalyses?: readonly PriorAnalysis[],
     marketEvents?: readonly MarketEvent[],
     currency: CurrencyCode = 'USD',
-    krxTick: KrxTickTable = 'share'
+    krxTick: KrxTickTable = 'share',
+    earningsDates?: readonly string[]
 ): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -2569,7 +2575,8 @@ export function buildAnalysisPrompt(
         marketEvents ?? [],
         bars,
         symbol,
-        timeframe
+        timeframe,
+        earningsDates
     );
     const priorAnalysisSection = formatPriorAnalysisSection(
         selectPriorAnalyses(priorAnalyses ?? [], bars),
@@ -2661,7 +2668,8 @@ export function buildAnalysisPrompt(
             timeframe,
             marketReference,
             quoting,
-            marketEvents
+            marketEvents,
+            earningsDates
         ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),

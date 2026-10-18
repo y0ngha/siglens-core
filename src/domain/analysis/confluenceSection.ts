@@ -1,3 +1,7 @@
+import {
+    eventCategoryLabel,
+    isCompanyEarningsEvent,
+} from '@/domain/analysis/earningsEvents';
 import { structuralRiskReward } from '@/domain/analysis/planCheck';
 import {
     AT_PRICE_BAR_RANGE_FRACTION,
@@ -30,6 +34,7 @@ import type {
     MarketReference,
     NewsCategory,
     NewsImpact,
+    PullbackEventCaveatInput,
     ReferenceLevel,
     ReferenceLevels,
     Timeframe,
@@ -280,14 +285,22 @@ const WASHOUT_NEWS_IMPACTS: readonly NewsImpact[] = ['high', 'medium'];
  *
  * Bullish-labelled events are ignored: they do not explain a washout.
  *
+ * `earnings` is a theme label on news cards, not proof the company reported. With
+ * `earningsDates` supplied, an `earnings` row counts only within the report-date window
+ * ({@link isCompanyEarningsEvent}); guidance and regulation are unchanged. With it omitted
+ * or empty (calendar unknown) the row still counts — suspending the verdict is the safe side when a real report cannot
+ * be ruled out — but the verdict text calls it "earnings-related news", never a report.
+ *
  * @internal
  * @param events - Market events for this symbol, any order.
  * @param bars - Daily bars, oldest first.
+ * @param earningsDates - `YYYY-MM-DD` report dates of this company, past and upcoming.
  * @returns The first qualifying event, or `null` when the drop is not news-driven.
  */
 export function newsDrivenWashoutEvent(
     events: readonly MarketEvent[],
-    bars: readonly Bar[]
+    bars: readonly Bar[],
+    earningsDates?: readonly string[]
 ): MarketEvent | null {
     const from = bars.at(-WASHOUT_NEWS_LOOKBACK_SESSIONS) ?? bars.at(0);
     const last = bars.at(-1);
@@ -302,10 +315,32 @@ export function newsDrivenWashoutEvent(
                 at < toMs &&
                 event.sentiment !== 'bullish' &&
                 WASHOUT_NEWS_CATEGORIES.includes(event.category) &&
-                WASHOUT_NEWS_IMPACTS.includes(event.impact)
+                WASHOUT_NEWS_IMPACTS.includes(event.impact) &&
+                (event.category !== 'earnings' ||
+                    earningsDates === undefined ||
+                    earningsDates.length === 0 ||
+                    isCompanyEarningsEvent(event.publishedAt, earningsDates))
             );
         }) ?? null
     );
+}
+
+/**
+ * A short English caveat for a consumer to attach as `pullback.caveat` when a
+ * company event landed within the last sessions, or `null` when none did. Uses the
+ * same gate as the analysis prompt's suspended washout verdict, so the agent tool
+ * and the analysis agree on when the sell-off base rate does not apply.
+ */
+export function pullbackEventCaveat(
+    input: PullbackEventCaveatInput
+): string | null {
+    const event = newsDrivenWashoutEvent(
+        input.events,
+        input.bars,
+        input.earningsDates
+    );
+    if (event === null) return null;
+    return `A ${event.impact}-impact ${eventCategoryLabel(event, input.earningsDates)} event (${event.sentiment}, published ${event.publishedAt.toISOString().slice(0, 10)}) landed within the last ${WASHOUT_NEWS_LOOKBACK_SESSIONS} sessions. The sell-off base rate was measured without news-driven drops, so it may not apply to this drop.`;
 }
 
 const WASHOUT_ENTRY_VERDICT =
@@ -316,8 +351,11 @@ const WASHOUT_ENTRY_VERDICT =
  * that section stops at the last bar's stamp and keeps at most a handful of events, so the
  * same-session article this gate exists to catch can be absent from it.
  */
-const washoutNewsVerdict = (event: MarketEvent): string =>
-    `Entry verdict (computed): none — a ${event.impact}-impact ${event.category} event (${event.sentiment}, published ${event.publishedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC) landed within the last ${WASHOUT_NEWS_LOOKBACK_SESSIONS} sessions. The measured sell-off history does not cover news-driven drops, which were its largest failures. Judge entryRecommendation yourself from the event and the chart, and say that the sell-off base rate does not apply to this drop.`;
+const washoutNewsVerdict = (
+    event: MarketEvent,
+    earningsDates: readonly string[] | undefined
+): string =>
+    `Entry verdict (computed): none — a ${event.impact}-impact ${eventCategoryLabel(event, earningsDates)} event (${event.sentiment}, published ${event.publishedAt.toISOString().slice(0, 16).replace('T', ' ')} UTC) landed within the last ${WASHOUT_NEWS_LOOKBACK_SESSIONS} sessions. The measured sell-off history does not cover news-driven drops, which were its largest failures. Judge entryRecommendation yourself from the event and the chart, and say that the sell-off base rate does not apply to this drop.`;
 
 const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
     washoutInUptrend:
@@ -339,7 +377,8 @@ const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
 function formatPullback(
     snapshot: PullbackSnapshot,
     quoting: PriceQuoting,
-    newsEvent: MarketEvent | null
+    newsEvent: MarketEvent | null,
+    earningsDates: readonly string[] | undefined
 ): string[] {
     const side = snapshot.close > snapshot.ma200 ? 'above' : 'at or below';
     const lines = [
@@ -355,7 +394,7 @@ function formatPullback(
     const verdict =
         newsEvent === null
             ? WASHOUT_ENTRY_VERDICT
-            : washoutNewsVerdict(newsEvent);
+            : washoutNewsVerdict(newsEvent, earningsDates);
     return [...lines, verdict, measured];
 }
 
@@ -368,7 +407,8 @@ function formatPullbackSection(
     bars: readonly Bar[],
     timeframe: Timeframe,
     quoting: PriceQuoting,
-    events: readonly MarketEvent[]
+    events: readonly MarketEvent[],
+    earningsDates: readonly string[] | undefined
 ): string[] {
     if (timeframe !== '1Day') return [];
     const snapshot = evaluatePullback(bars);
@@ -376,7 +416,8 @@ function formatPullbackSection(
         ? formatPullback(
               snapshot,
               quoting,
-              newsDrivenWashoutEvent(events, bars)
+              newsDrivenWashoutEvent(events, bars, earningsDates),
+              earningsDates
           )
         : [
               PULLBACK_HEADER,
@@ -493,7 +534,8 @@ export function formatDeterministicMetricsSection(
     timeframe: Timeframe,
     reference: MarketReference,
     quoting: PriceQuoting = { dp: 2, krxTick: null },
-    events: readonly MarketEvent[] = []
+    events: readonly MarketEvent[] = [],
+    earningsDates?: readonly string[]
 ): string {
     const { min, expectedWeight } = CONFLUENCE_PARAMS_BY_TIMEFRAME[timeframe];
     // `exitMin` is deliberately not raised alongside `min` on the daily chart. Raising the
@@ -518,7 +560,13 @@ export function formatDeterministicMetricsSection(
                   `Not measurable: the check needs more than ${CONFLUENCE_MIN_BARS} bars and received ${bars.length}. This is an absence of measurement, not an absence of agreement — judge the indicators yourself for this chart.`,
               ];
 
-    const pullback = formatPullbackSection(bars, timeframe, quoting, events);
+    const pullback = formatPullbackSection(
+        bars,
+        timeframe,
+        quoting,
+        events,
+        earningsDates
+    );
     const riskReward = formatRiskReward(reference, bars, quoting);
 
     return [

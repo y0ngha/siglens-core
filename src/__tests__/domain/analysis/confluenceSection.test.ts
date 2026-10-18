@@ -4,6 +4,7 @@ import {
     DETERMINISTIC_METRICS_HEADER,
     formatDeterministicMetricsSection,
     newsDrivenWashoutEvent,
+    pullbackEventCaveat,
 } from '@/domain/analysis/confluenceSection';
 import { CONFLUENCE_MIN_BARS } from '@/domain/signals/confluence';
 import type {
@@ -560,7 +561,8 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             '1Day',
             reference(),
             USD_QUOTING,
-            [earnings]
+            [earnings],
+            [new Date(lastMs).toISOString().slice(0, 10)]
         );
         const publishedUtc = new Date(lastMs + 13 * 3_600_000)
             .toISOString()
@@ -775,5 +777,101 @@ describe('newsDrivenWashoutEvent', () => {
         expect(
             newsDrivenWashoutEvent([event(two[0]!.time * 1000)], two)
         ).not.toBeNull();
+    });
+});
+
+describe('newsDrivenWashoutEvent with earningsDates', () => {
+    const bs: Bar[] = Array.from({ length: 10 }, (_, i) => ({
+        time: 1_700_006_400 + i * 86_400,
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 1000,
+    }));
+    const lastMs = bs.at(-1)!.time * 1000;
+    const lastDay = new Date(lastMs).toISOString().slice(0, 10);
+    const ev = (over: Partial<MarketEvent> = {}): MarketEvent => ({
+        publishedAt: new Date(lastMs + 3_600_000),
+        category: 'earnings',
+        sentiment: 'bearish',
+        impact: 'high',
+        ...over,
+    });
+
+    it('ignores themed earnings news off every report date', () => {
+        expect(
+            newsDrivenWashoutEvent([ev()], bs, ['2026-08-26', '2099-01-01'])
+        ).toBeNull();
+    });
+
+    it('treats [] like undefined: calendar unknown suspends on the safe side', () => {
+        const e = ev();
+        expect(newsDrivenWashoutEvent([e], bs, [])).toBe(e);
+        expect(
+            pullbackEventCaveat({ events: [e], earningsDates: [], bars: bs })
+        ).toContain('earnings-related news');
+    });
+
+    it('still fires on a real report date', () => {
+        const e = ev();
+        expect(newsDrivenWashoutEvent([e], bs, [lastDay])).toBe(e);
+    });
+
+    it('keeps guidance and regulation regardless of dates', () => {
+        const g = ev({ category: 'guidance' });
+        expect(newsDrivenWashoutEvent([g], bs, ['2026-08-26'])).toBe(g);
+    });
+
+    it('without dates still suspends (safe side) but never calls it a report', () => {
+        const e = ev();
+        expect(newsDrivenWashoutEvent([e], bs)).toBe(e);
+        const caveat = pullbackEventCaveat({ events: [e], bars: bs });
+        expect(caveat).toContain('earnings-related news');
+        expect(caveat).not.toContain('-impact earnings event');
+    });
+});
+
+describe('pullbackEventCaveat', () => {
+    const bs: Bar[] = Array.from({ length: 10 }, (_, i) => ({
+        time: 1_700_006_400 + i * 86_400,
+        open: 100,
+        high: 101,
+        low: 99,
+        close: 100,
+        volume: 1000,
+    }));
+    const lastMs = bs.at(-1)!.time * 1000;
+    const e: MarketEvent = {
+        publishedAt: new Date(lastMs + 3_600_000),
+        category: 'earnings',
+        sentiment: 'bearish',
+        impact: 'high',
+    };
+
+    it('is null for themed earnings news off every report date', () => {
+        expect(
+            pullbackEventCaveat({
+                events: [e],
+                earningsDates: ['2026-08-26'],
+                bars: bs,
+            })
+        ).toBeNull();
+    });
+
+    it('names a real report within the last sessions', () => {
+        const day = e.publishedAt.toISOString().slice(0, 10);
+        const out = pullbackEventCaveat({
+            events: [e],
+            earningsDates: [day],
+            bars: bs,
+        });
+        expect(out).toContain('high-impact earnings event');
+        expect(out).toContain('may not apply');
+    });
+
+    it('is null with no events or no bars', () => {
+        expect(pullbackEventCaveat({ events: [], bars: bs })).toBeNull();
+        expect(pullbackEventCaveat({ events: [e], bars: [] })).toBeNull();
     });
 });
