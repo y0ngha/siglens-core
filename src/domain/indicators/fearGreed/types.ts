@@ -85,7 +85,25 @@ export interface FearGreedSnapshot {
     sampleSize: number;
     /** Spec §4.5 chronic regime flag, or `null` when neither regime applies. */
     warning: FearGreedWarning;
+    /**
+     * Display-only distance of the latest close from the 200-day SMA, in
+     * percent: `(close - SMA200) / SMA200 * 100`, where SMA200 INCLUDES the
+     * latest bar — identical to `calculateMA(bars, 200)` on the last bar and to
+     * `PullbackSnapshot.closeVsMa200Pct`, so every screen shows one number.
+     *
+     * Not the scored factor: the `ma200_distance` factor (`rawValue`, a
+     * fraction) averages the 200 closes BEFORE the latest bar to stay
+     * look-ahead-free in the walk-forward percentile. The two differ slightly
+     * (e.g. 5.57% vs 5.50%). Scores never read this field. `null` when fewer
+     * than 200 bars exist or the SMA is not positive. Optional so snapshots built
+     * by consumers (fixtures, older payloads) stay valid; `computeFearGreedIndex`
+     * always sets it.
+     */
+    ma200DistancePct?: number | null;
 }
+
+/** @internal Snapshot before the display-only `ma200DistancePct` is attached by `computeFearGreedIndex`. */
+export type ScoredSnapshot = Omit<FearGreedSnapshot, 'ma200DistancePct'>;
 
 /**
  * A single point in a walk-forward Fear & Greed history series. `date` is the

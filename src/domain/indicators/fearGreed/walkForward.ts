@@ -3,6 +3,7 @@ import { MS_PER_SECOND } from '@/domain/constants/time';
 import type { Bar, BuySellVolumeResult } from '@/domain/types';
 import {
     computeFactorsAtT,
+    computeMa200DisplayDistancePct,
     POC_WINDOW_DEFAULT,
 } from '@/domain/indicators/fearGreed/factors';
 import { composeSnapshot } from '@/domain/indicators/fearGreed/composition';
@@ -67,7 +68,14 @@ export function computeFearGreedIndex(
         .slice(0, t)
         .filter((f): f is FactorValues => f !== null);
 
-    return composeSnapshot(current, sample);
+    const snapshot = composeSnapshot(current, sample);
+    if (!snapshot) return null;
+    // Display-only; see FearGreedSnapshot.ma200DistancePct. Added after
+    // composition so it can never influence the score.
+    return {
+        ...snapshot,
+        ma200DistancePct: computeMa200DisplayDistancePct(bars),
+    };
 }
 
 /**

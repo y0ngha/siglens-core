@@ -4,9 +4,9 @@ import type {
     FearGreedFactorKey,
     FearGreedGroup,
     FearGreedLabel,
-    FearGreedSnapshot,
     FearGreedWarning,
     FactorValues,
+    ScoredSnapshot,
 } from '@/domain/indicators/fearGreed/types';
 import { percentile } from '@/domain/indicators/fearGreed/percentile';
 
@@ -163,7 +163,7 @@ function classifyConfidence(sampleSize: number): FearGreedConfidence {
 export function composeSnapshot(
     current: FactorValues | null,
     sample: FactorValues[]
-): FearGreedSnapshot | null {
+): ScoredSnapshot | null {
     if (!current) return null;
     const sampleSize = sample.length;
     const confidence = classifyConfidence(sampleSize);
