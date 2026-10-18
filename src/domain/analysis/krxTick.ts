@@ -15,6 +15,12 @@
  *
  * Every band edge is a multiple of the next band's tick, so a price rounded
  * up across an edge still lands on a valid tick.
+ *
+ * Shares only: KRX ETFs and ETNs quote in 5-won steps from 2,000 won up (1
+ * won below), and ELWs in 5-won steps throughout. Core sees only the quote
+ * currency, not the instrument type, so a KRW ETF priced 20,000 won or more
+ * is rounded on this coarser share grid (at most half a share tick, about
+ * 0.13% of the price) until the consumer can pass the type.
  */
 const KRX_TICK_BANDS: ReadonlyArray<readonly [below: number, tick: number]> = [
     [2_000, 1],
