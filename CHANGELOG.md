@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.23.2](https://github.com/y0ngha/siglens-core/compare/v2.23.1...v2.23.2) (2026-10-18)
+
+### Bug Fixes
+
+* 실적 테마 뉴스를 회사 실적으로 오인하던 문제, 리스크 등급을 코드로 계산, 한국어 전망 질문 라우팅 ([#290](https://github.com/y0ngha/siglens-core/issues/290)) ([2d39c0b](https://github.com/y0ngha/siglens-core/commit/2d39c0b4badb0c68aaee1d5ab52e8d20a29b112c))
+* 옵션 만기 칩을 목표 기간에 가장 가까운 만기로, 공포·탐욕 200일선 거리 표시 기준 통일 ([#289](https://github.com/y0ngha/siglens-core/issues/289)) ([0223940](https://github.com/y0ngha/siglens-core/commit/02239400e196f469fd8a71aead303da43b136519))
+
 ## [2.23.1](https://github.com/y0ngha/siglens-core/compare/v2.23.0...v2.23.1) (2026-10-18)
 
 ### Bug Fixes
