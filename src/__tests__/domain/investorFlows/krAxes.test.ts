@@ -310,6 +310,57 @@ describe('evaluateKrInsiderAxis', () => {
             netChangePct: 0.06,
             tradingPlans: 0,
             latestReceiptDate: daysBeforeAsOf(10),
+            largestSingleDayFiling: { date: daysBeforeAsOf(10), count: 2 },
+        });
+    });
+
+    it('reports the day with the most reports in the window as largestSingleDayFiling', () => {
+        const massDay = daysBeforeAsOf(40);
+        const axis = axisOf([
+            krInsiderReport({ receiptDate: daysBeforeAsOf(5) }),
+            ...Array.from({ length: 5 }, (_, i) =>
+                krInsiderReport({
+                    reporter: `임원${i}`,
+                    receiptDate: massDay,
+                })
+            ),
+            // Outside the window: must not count toward the largest day.
+            ...Array.from({ length: 9 }, (_, i) =>
+                krInsiderReport({
+                    reporter: `과거${i}`,
+                    receiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 5),
+                })
+            ),
+        ]);
+        expect(axis.krMetrics?.reports).toBe(6);
+        expect(axis.krMetrics?.largestSingleDayFiling).toEqual({
+            date: massDay,
+            count: 5,
+        });
+    });
+
+    it('has a null largestSingleDayFiling when the window holds no usable report', () => {
+        const axis = axisOf([
+            krInsiderReport({
+                receiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 3),
+            }),
+        ]);
+        expect(axis.krMetrics?.reports).toBe(0);
+        expect(axis.krMetrics?.largestSingleDayFiling).toBeNull();
+    });
+
+    it('breaks a largestSingleDayFiling tie toward the earlier day', () => {
+        const earlier = daysBeforeAsOf(30);
+        const later = daysBeforeAsOf(3);
+        const axis = axisOf([
+            krInsiderReport({ reporter: 'a', receiptDate: later }),
+            krInsiderReport({ reporter: 'b', receiptDate: later }),
+            krInsiderReport({ reporter: 'c', receiptDate: earlier }),
+            krInsiderReport({ reporter: 'd', receiptDate: earlier }),
+        ]);
+        expect(axis.krMetrics?.largestSingleDayFiling).toEqual({
+            date: earlier,
+            count: 2,
         });
     });
 
@@ -816,6 +867,7 @@ describe('evaluateKrInsiderAxis', () => {
             netChangePct: 0,
             tradingPlans: 0,
             latestReceiptDate: daysBeforeAsOf(KR_WINDOW_DAYS + 1),
+            largestSingleDayFiling: null,
         });
     });
 

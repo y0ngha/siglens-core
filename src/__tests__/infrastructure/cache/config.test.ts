@@ -35,6 +35,7 @@ import {
     CONGRESS_PROMPT_TEMPLATE_VERSION,
     DEFAULT_ANALYSIS_MODEL_ID,
     FINANCIALS_CACHE_TTL_SECONDS,
+    FINANCIALS_PROMPT_TEMPLATE_VERSION,
     FUNDAMENTAL_CACHE_TTL_SECONDS,
     FUNDAMENTAL_PROMPT_TEMPLATE_VERSION,
     INVESTOR_FLOWS_CACHE_TTL_SECONDS,
@@ -46,6 +47,7 @@ import {
     narrowPriorAnalysesForCacheKey,
     NEWS_CACHE_TTL_SECONDS,
     NEWS_PROMPT_TEMPLATE_VERSION,
+    OPTIONS_PROMPT_TEMPLATE_VERSION,
     OVERALL_CACHE_TTL_SECONDS,
     OVERALL_PROMPT_TEMPLATE_VERSION,
     priorAnalysisWindowStartMs,
@@ -544,6 +546,28 @@ describe('buildFinancialsCacheKey', () => {
     });
 });
 
+describe('currency wording template versions (p32 bump set)', () => {
+    it('pins every version whose non-Korean prompt bytes gained the currency rule', () => {
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p32');
+        expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).toBe('f7');
+        expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p10');
+        expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p9');
+        expect(FINANCIALS_PROMPT_TEMPLATE_VERSION).toBe('p9');
+        expect(CONGRESS_PROMPT_TEMPLATE_VERSION).toBe('p5');
+        expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p7');
+        expect(OPTIONS_PROMPT_TEMPLATE_VERSION).toBe('p5');
+    });
+
+    it('financials and options keys carry the bumped version', () => {
+        expect(
+            buildFinancialsCacheKey('AAPL', 'gemini-3.6-flash', 'annual')
+        ).toBe('v1:analysis:financials:AAPL:annual:gemini-3.6-flash:p9');
+        expect(
+            buildOptionsCacheKey('AAPL', '2026-11-20', 'gemini-3.6-flash', 'h1')
+        ).toBe('v1:analysis:options:AAPL:2026-11-20:gemini-3.6-flash:p5:h1');
+    });
+});
+
 describe('buildCongressTrendCacheKey', () => {
     it('skillFingerprint 미제공 시 base key', () => {
         expect(buildCongressTrendCacheKey('AAPL', 'gemini-3.6-flash')).toBe(
@@ -562,8 +586,8 @@ describe('buildCongressTrendCacheKey', () => {
 describe('buildInvestorFlowsCacheKey', () => {
     const base = `v1:analysis:investorFlows:AAPL:gemini-3.6-flash:${INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION}`;
 
-    it('is on template version p6 (Korean no-material-change reads neutral)', () => {
-        expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p6');
+    it('is on template version p7 (currency wording in non-Korean prompts)', () => {
+        expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p7');
     });
 
     it('a squeeze context appends :squeeze=on last; false and omitted match the base key', () => {
@@ -1106,7 +1130,7 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // p28 (2026-10-18): 넥라인 계열 패턴의 돌파 후 복귀를 `failed breakout`으로 찍는다.
         // p29 (2026-10-18): 끝난 A–B–C의 무효화를 C 끝으로 옮긴다.
         // p30 (2026-10-18): KRX ETF/ETN 호가 표, KRW 보수 목표가를 호가 단위 정수로 찍는다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p31');
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p32');
     });
 });
 

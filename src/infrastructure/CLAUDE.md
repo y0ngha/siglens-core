@@ -179,6 +179,12 @@ validates before comparing).
   formatters; without a bump, stale entries are served until the TTL expires.
 - After any bump, audit every `build*Key` in `cache/config.ts`, not just the one you
   touched. Deterministic non-LLM keys (identifier-only concatenation) are exempt.
+- A shared prompt fragment (a common system base, language contract, formatter) changes the
+  bytes of every prompt that embeds it. List the bump set by rendering each consuming
+  template before and after (non-default locales included), not by recalling which ones
+  you edited, and give each bumped constant a key-format test.
+  ❌ Bump `OVERALL_*` only because its file was edited while financials/options prompts also
+  changed through the shared base. ✅ Bump every template whose rendered output differs.
 - A read path that rebuilds a key tests each key argument with a case where a mismatch on
   that argument alone misses (`CONVENTIONS.md#TE-5`).
 - A second reader of an existing cache entry applies the same validity guards as the first

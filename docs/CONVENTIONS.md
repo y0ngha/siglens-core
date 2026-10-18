@@ -238,6 +238,10 @@ instead of reassigning a `let`, including flags set from inside a `.catch()` han
 //        .catch(() => ({ skills: [], degraded: true }));
 ```
 
+The same holds for a `for…of` loop that only builds a `Map`/object through `let` and
+mutation when no [CP-5](#CP-5) case applies: fold it with `reduce` (or `Object.fromEntries`
+over a `map`) so the result is one `const` expression.
+
 <a id="CP-8"></a>
 #### CP-8 — Destructure with rest instead of field-by-field copies
 
@@ -716,6 +720,8 @@ A guard added to block a specific false positive gets a near-miss fixture of tha
 and mirrored branches (left/right edge, bullish/bearish) each get their own.
 A per-locale (or per-key) behaviour iterates the constant's keys so every member is pinned,
 not a hand-picked subset that silently omits one.
+An empty or degenerate input (empty window, zero items) gets its own `it()`; asserting it
+only as one field inside a larger `toEqual` leaves the branch untested by name.
 
 <a id="TE-6"></a>
 #### TE-6 — Test inclusive and exclusive boundaries on the boundary
@@ -1107,6 +1113,10 @@ in two keeps describing both halves).
 When a contract changes (cache-hit semantics, error behavior, a default), grep for every JSDoc,
 doc table and sibling entry point that restates it and update them in the same change — a
 restatement left behind is the most common stale claim.
+
+The same applies to version `@remarks` and change-log notes: do not claim rendered output is
+"unchanged" for a locale or prompt when a shared change (such as a new serialized metric)
+reaches it — check which outputs the change actually touches before writing the claim.
 
 For an optional field (`x?: T`), do not write "Required"; write "Must be provided when …".
 Tag requirements per tier are in [Required Tags by Tier](#required-tags-by-tier).

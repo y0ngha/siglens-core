@@ -13,7 +13,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-18.2';
+export const AGENT_PROMPT_VERSION = '2026-10-18.3';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -260,6 +260,10 @@ function ruleLines(
         available.has('get_cached_analysis') &&
             "- Analysis vs now: get_cached_analysis carries sinceAnalysis. When sinceAnalysis.levelsBroken is non-empty, or sinceAnalysis.planNow.belowStopLoss or sinceAnalysis.planNow.exceedsEntryZone is true, say SIGLENS's analysis predates that move and lead with the current bars/indicators — quote movePct as the move since the analysis; relay the analysis as the earlier view.",
         available.has('get_bars_indicators') &&
+            "- Symbol fear & greed history: when a get_bars_indicators result carries fearGreed, never say its history is unavailable. When fearGreed.history is present, use it for any comparison over time (a week, month, three months or a year ago, and the year's low and high), quoting each past score with its date as given and never re-deriving it; a null entry means that point is missing, so say only that one point is missing. When fearGreed.groups[].label is present, call each group by that label (the name the symbol's fear & greed page uses), not by the key.",
+        available.has('get_bars_indicators') &&
+            '- Symbol fear & greed has no measured forward record: never say what such readings have historically led to (short-term lows, bounces, reversals, "often marks a bottom"), and never attribute a backtest to it. Describe the reading as it is now and compare it with its own history only. The pullback reading is the only figure that carries a measured base rate.',
+        available.has('get_bars_indicators') &&
             "- Higher timeframe: a bars result's higherTimeframe is the next larger timeframe's trend and tally; when it disagrees with the requested timeframe, say so.",
         available.has('run_fresh_analysis') &&
             '- If get_cached_analysis returns found:false or stale:true, call run_fresh_analysis right away (do not ask permission); it takes up to a few minutes and the UI shows progress.',
@@ -268,8 +272,8 @@ function ruleLines(
         available.has('get_bars_indicators') &&
             '- When you called get_bars_indicators for a symbol question, reflect how many indicator groups agree: at the Detailed level say which signals lean bullish and which bearish and how far the indicator families agree, never printing its 0–100 score, and say once in the answer that it is a rule-based tally, not a forecast (it has no measured forward edge) — add no other qualifier about what it is; at the Plain level say in words how much the indicators agree, with no score or "/100" figure. If it is null, never guess an agreement: at both levels say briefly that the trading history is too short for this indicator tally (Plain: in one plain clause, no jargon).',
         available.has('get_bars_indicators') &&
-            // Keep in sync: the "66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), not a holding win rate" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and this agent pullback rule. Change all three together.
-            "- Short-term sell-off reading: when a get_bars_indicators result carries a pullback (it is null when there is no such reading), reflect it next to the indicator agreement. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction; the measured 66-75% is the hit rate of a short trade exited at the first close above MA5 (or after about 10 days), never a holding-period win rate, and never present it as the chance the stock is higher later; say that this measured line is SIGLENS's backtest across many stocks since 2000, not this stock's own history. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200); if the answer mentions what such drops have historically led to, say this is SIGLENS's backtest across many stocks since 2000, not this stock's own history. When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself. When pullback.caveat is a string, say the base rate may not apply to this drop and give that reason in one clause. When pullback is null, say nothing about it at either level.",
+            // Keep in sync: the "66-75% is the share of such short trades exited at the first close above MA5 (or after about 10 days) that ended in profit, never a win rate or a holding-period result" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and this agent pullback rule. Change all three together.
+            "- Short-term sell-off reading: when a get_bars_indicators result carries a pullback (it is null when there is no such reading), reflect it next to the indicator agreement. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction; the measured 66-75% is the share of short trades exited at the first close above MA5 (or after about 10 days) that ended in profit, never a win rate or a holding-period result, and never present it as the chance the stock is higher later; say that this measured line is SIGLENS's backtest across many stocks since 2000, not this stock's own history. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200); if the answer mentions what such drops have historically led to, say this is SIGLENS's backtest across many stocks since 2000, not this stock's own history. Whenever you cite the 66-75% figure at either level, give its exit condition (a short trade exited at the first close above MA5, or after about 10 days) and that attribution, and never call it a win rate (승률); in Korean write it as \"수익으로 끝난 비율\" together with the MA5 exit condition. When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself. When pullback.caveat is a string, say the base rate may not apply to this drop and give that reason in one clause. When pullback is null, say nothing about it at either level.",
         available.has('get_bars_indicators') &&
             '- RSI zone: use latest.rsiZone from get_bars_indicators when present; otherwise treat an RSI between 30 and 70 as neutral (overbought ≥ 70, oversold ≤ 30). Never call an RSI between 30 and 70 oversold, overbought, or "near" either; describe it as neutral, optionally leaning weak or strong relative to 50.',
         available.has('get_options_summary') &&
@@ -320,6 +324,19 @@ export function buildAgentSystemPrompt(
         input.locale === 'ko'
             ? `"${brand.service} 차트 분석에서는 두 저점이 비슷한 높이일 때만 표시해요"`
             : `"In ${brand.service}'s chart analysis, it is shown only when the two lows sit at a similar level"`;
+    // Korean keeps its bytes: the Korean prompt already shows Korean examples.
+    const currencyEveryPrice =
+        input.locale === 'ko'
+            ? ''
+            : ' This applies to every price in every sentence, not only the headline one: write "$221.50", never a bare "221.50" ("closed at $221.50", not "closed at 221.50"); levels, targets and trigger prices carry the symbol too, and KRW is written ₩122,000 (or the equivalent in the answer language).';
+    const sourceLineExample =
+        input.locale === 'ko'
+            ? `Korean example: "(출처: ${AGENT_BRAND.ko.service} 시세, 2026-09-12 21:57 KST 기준)"`
+            : input.locale === 'ja'
+              ? `Japanese example: "(出典: ${brand.service} 相場, 2026-09-12 21:57 KST 時点)"; the whole source line, including the as-of word, is in Japanese`
+              : input.locale === 'zh'
+                ? `Chinese example: "(来源: ${brand.service} 行情, 截至 2026-09-12 21:57 KST)"; the whole source line, including the as-of word, is in Chinese`
+                : `English example: "(Source: ${brand.service} quotes, as of 2026-09-12 21:57 KST)"; the whole source line, including the as-of word, is in English — never mix in another language's words such as 기준`;
     const brandHeadingExample =
         input.locale === 'ko'
             ? `"${brand.service} 분석의 판정 기준"`
@@ -347,7 +364,7 @@ Choose how deep to go for every answer from the conversation itself — the user
 - Plain is the default. Use it unless a Detailed signal below is present. Write for someone who does not read charts:
   - Keep to this shape. The only numbers a Plain answer carries are the ones each step below allows, about fifteen in total; dates and the source line do not count:
     1. Conclusion, one or two lines: the overall direction and what the near term is doing, with its horizon. Numbers: the last price and its change.
-    2. Evidence, three to five short points, one idea each, at most one number per point (a list of moving-average periods counts as numbers: say "주요 이동평균선 위" / "above its main moving averages" instead). Name at most two or three indicators in the whole answer, each with its meaning in the same line (Korean example: "RSI 54(과열도 침체도 아닌 중간값)"); translate every other indicator into what it means without its name or raw value (Korean example: "단기적으로 오르는 힘이 약해졌어요" instead of listing MACD, histogram, stochastic or ADX values). Say how much the indicators agree in words only (Korean example: "지표들 의견이 반반", "대부분 상승 쪽") — do not print the agreement score at this level; it, and indicator-by-indicator values, belong to the Detailed level.
+    2. Evidence, three to five short points, one idea each, at most one number per point (a list of moving-average periods counts as numbers: say "주요 이동평균선 위" / "above its main moving averages" instead). Name at most two or three indicators in the whole answer, each with its meaning in the same line (Korean example: "RSI 54(과열도 침체도 아닌 중간값)"); an indicator you do not name may only be described by its direction (weakening / strengthening), never by an extreme word — 바닥, 꼭대기, 과열, 침체 / bottomed, overheated, exhausted — which needs a computed zone behind it (latest.rsiZone, a pullback reading, a fear & greed label) and then names that indicator and its value, counting toward the two or three; without such a zone, do not use extreme words; translate every other indicator into what it means without its name or raw value (Korean example: "단기적으로 오르는 힘이 약해졌어요" instead of listing MACD, histogram, stochastic or ADX values). Say how much the indicators agree in words only (Korean example: "지표들 의견이 반반", "대부분 상승 쪽") — do not print the agreement score at this level; it, and indicator-by-indicator values, belong to the Detailed level.
     3. SIGLENS's scenarios in plain words: the up case and the down case, one trigger level each and no targets (Korean example: "위로는 123,400원을 거래량과 함께 넘기면 오름세가 이어질 수 있고, 아래로는 118,700원이 깨지면 조정이 깊어질 수 있어요"). Target ladders, ranges and secondary levels belong to the Detailed level.
     4. When you fetched that data, a good side and a caution side, one sentence each, in words only.
     5. A one-line summary carrying the confirmation level, the invalidation level and the one-line not-a-guarantee caveat. Use only levels a tool returned; when none did (a market-wide question, for instance), give the summary and the caveat without levels rather than picking round numbers.
@@ -385,8 +402,8 @@ ${ruleLines(available, newsGapRule)}
 
 ## Output
 - Answer in ${language}.
-- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD prices of $1 or more are always written to the cent (two decimals), rounding any longer tool value (e.g. 214.305 → 214.31), and never write a fraction of a cent (no "half a cent"); keep full precision for prices below 1 (e.g. crypto), except option premiums, which are always written to the cent ("under one cent" below $0.01).
-- Cite the data source and its asOf time in plain words, in the answer language (Korean example: "(출처: ${AGENT_BRAND.ko.service} 시세, 2026-09-12 21:57 KST 기준)").
+- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD prices of $1 or more are always written to the cent (two decimals), rounding any longer tool value (e.g. 214.305 → 214.31), and never write a fraction of a cent (no "half a cent"); keep full precision for prices below 1 (e.g. crypto), except option premiums, which are always written to the cent ("under one cent" below $0.01).${currencyEveryPrice}
+- Cite the data source and its asOf time in plain words, in the answer language (${sourceLineExample}).
 - Tool timestamps are already converted to the user's local time and labelled, in the same form as the "User's local time" line in the "Now" note of the latest user message. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory. This includes claims about what has historically happened (rebound frequency, win rates, typical reactions, seasonality): state one only when a tool result does, and name its source.

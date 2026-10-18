@@ -558,7 +558,7 @@ describe('runNewsAnalysis', () => {
             await runNewsAnalysis(baseArgs());
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p8:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p9:719732b6711a0154'
             );
         });
 

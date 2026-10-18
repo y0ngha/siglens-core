@@ -233,15 +233,16 @@ export function formatPlainNumber(n: number | null | undefined): string {
  * Framing sentence for an equity listing — U.S. by default, Korean for a KRW quote.
  *
  * Keyed on the supplied quote currency, never on the symbol (see {@link CurrencyCode}).
- * The U.S. sentence is kept byte-identical to the one every builder already emitted. The
- * Korean sentence exists because Korean listings travel with `assetClass: 'equity'`, and
+ * The U.S. sentence opens with the one every builder already emitted and adds
+ * the quote currency, so a non-Korean analysis does not write bare numbers as
+ * "dollars". The Korean sentence exists because Korean listings travel with `assetClass: 'equity'`, and
  * the U.S. framing made models cite U.S.-only benchmarks (sector ETFs, VIX) on Korean
  * charts.
  */
 export function equityListingContext(currency: CurrencyCode = 'USD'): string {
     return currency === 'KRW'
         ? 'This is a Korean equity listed on the KRX (KOSPI/KOSDAQ). Prices are quoted in KRW (whole won, no decimal ticks) and the regular session runs 09:00–15:30 KST. Do not describe it as a U.S. stock or cite U.S.-only benchmarks, indices, or sector ETFs.'
-        : 'This is a publicly traded U.S. equity.';
+        : 'This is a publicly traded U.S. equity. Prices are quoted in USD.';
 }
 
 /** Decimal places for equity prices of one unit or more (USD cent precision). */

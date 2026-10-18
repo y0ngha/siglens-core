@@ -174,8 +174,9 @@ describe('formatNullableNumber', () => {
 });
 
 describe('equityListingContext', () => {
-    it('keeps the U.S. framing byte-identical for USD and by default', () => {
-        const us = 'This is a publicly traded U.S. equity.';
+    it('keeps the U.S. framing identical for USD and by default and states the quote currency', () => {
+        const us =
+            'This is a publicly traded U.S. equity. Prices are quoted in USD.';
         expect(equityListingContext()).toBe(us);
         expect(equityListingContext('USD')).toBe(us);
     });

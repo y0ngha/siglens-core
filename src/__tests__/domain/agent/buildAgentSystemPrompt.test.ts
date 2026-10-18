@@ -60,8 +60,27 @@ describe('buildAgentSystemPrompt', () => {
     });
 
     it('눌림 기저율을 보유 승률로 말하지 않게 하고 caveat를 전한다', () => {
-        expect(prompt).toContain('never a holding-period win rate');
+        expect(prompt).toContain('never a win rate or a holding-period result');
+        expect(prompt).toContain('never call it a win rate (승률)');
+        expect(prompt).toContain('수익으로 끝난 비율');
         expect(prompt).toContain('pullback.caveat is a string');
+    });
+
+    it('종목 공포·탐욕 이력을 없다고 말하지 않고, 라벨·이력 필드는 있을 때만 쓴다', () => {
+        expect(prompt).toContain(
+            'never say its history is unavailable. When fearGreed.history is present'
+        );
+        expect(prompt).toContain('When fearGreed.groups[].label is present');
+    });
+
+    it('Plain 단계는 이름 없는 지표를 방향으로만 말하고 극단어는 계산된 구간이 있을 때만 쓴다', () => {
+        expect(prompt).toContain(
+            'may only be described by its direction (weakening / strengthening)'
+        );
+        expect(prompt).toContain('바닥, 꼭대기, 과열, 침체');
+        expect(prompt).toContain(
+            'without such a zone, do not use extreme words'
+        );
     });
 
     it('현재 시각(ET·KST)과 장 상태는 턴 컨텍스트에 주입한다', () => {
@@ -78,6 +97,48 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).not.toContain('UTC: 2026-09-12');
         expect(prompt).not.toContain('US regular session: open');
         expect(prompt).toContain('It is your only clock');
+    });
+
+    const promptFor = (locale: 'ko' | 'en' | 'ja' | 'zh') =>
+        buildAgentSystemPrompt({
+            locale,
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+
+    it('종목 공포·탐욕에는 측정된 선행 기록이 없다고 못 박고 백테스트 귀속을 금지한다', () => {
+        for (const locale of ['ko', 'en'] as const) {
+            const p = promptFor(locale);
+            expect(p).toContain(
+                'Symbol fear & greed has no measured forward record'
+            );
+            expect(p).toContain('never attribute a backtest to it');
+        }
+        expect(
+            AGENT_TOOL_SPECS.find(t => t.name === 'get_bars_indicators')
+                ?.description
+        ).toContain('no measured forward edge');
+    });
+
+    it('비-ko 답변은 모든 문장의 가격에 통화 기호를 붙이게 하고 ko 바이트는 그대로다', () => {
+        const en = promptFor('en');
+        expect(en).toContain('every price in every sentence');
+        expect(en).toContain('never a bare "221.50"');
+        expect(prompt).not.toContain('every price in every sentence');
+        expect(prompt).not.toContain('221.50');
+    });
+
+    it('출처 줄 예시는 답변 언어를 따른다', () => {
+        expect(prompt).toContain(
+            'Korean example: "(출처: 시그렌즈 시세, 2026-09-12 21:57 KST 기준)"'
+        );
+        expect(promptFor('en')).toContain(
+            '"(Source: SIGLENS quotes, as of 2026-09-12 21:57 KST)"'
+        );
+        expect(promptFor('en')).toContain('never mix in another language');
+        expect(promptFor('ja')).toContain('(出典: SIGLENS 相場');
+        expect(promptFor('zh')).toContain('(来源: SIGLENS 行情');
     });
 
     it('보유 심볼이 있으면 사용자 컨텍스트 줄을 넣는다', () => {
@@ -476,7 +537,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-18.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-18.3');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at

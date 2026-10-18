@@ -1057,9 +1057,18 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * holding win rate. Bytes change for prompts with an `earnings` event or a
  * pullback reading.
  *
+ * **`p32`** — currency wording (2026-10-18). The U.S. listing sentence gains
+ * "Prices are quoted in USD."; non-Korean system prompts and the output
+ * language reminder gain a currency-writing rule (`$214.13`, never "214.13
+ * dollars"); the sell-off base-rate text says "ended in profit in 66-75% of
+ * cases (the hit rate of that quick exit)" instead of "won ...% of the time",
+ * and the rule that cites it requires the exit condition and attribution and
+ * forbids "win rate". Bytes change for every U.S. listing prompt and every
+ * non-Korean prompt.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p31' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p32' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest
@@ -1550,9 +1559,12 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * `p27`). The shared `formatPrice` prints a KRW price at its KRX tick, so the
  * price lines of every KRW prompt change.
  *
+ * **`f7`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
+ * Non-Korean system prompts gain the currency-writing rule.
+ *
  * @internal
  */
-export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f6' as const;
+export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f7' as const;
 
 /**
  * Build the Redis key for a cached fundamental analysis result.
@@ -1654,9 +1666,14 @@ export function buildFundamentalCacheKey(
  * `Liabilities / Equity` line for the latest row. Bytes change for every
  * request that has at least one statement row.
  *
+ * **`p9`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
+ * Non-Korean system prompts and the output language reminder gain the
+ * currency-writing rule (`$214.13`, never "214.13 dollars"); Korean bytes are
+ * unchanged, but the version bumps every key so non-Korean entries regenerate.
+ *
  * @internal
  */
-export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p8' as const;
+export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p9' as const;
 
 /**
  * Build the Redis key for a cached financials (multi-year statement) analysis result.
@@ -1746,9 +1763,14 @@ export function buildFinancialsCacheKey(
  * so free and non-free requests never share a cache entry. Bumped to
  * invalidate warm caches carrying pre-tier-gating (unfiltered) content.
  *
+ * **`p5`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
+ * Non-Korean system prompts and the output language reminder gain the
+ * currency-writing rule (`$214.13`, never "214.13 dollars"); Korean bytes are
+ * unchanged, but the version bumps every key so non-Korean entries regenerate.
+ *
  * @internal
  */
-export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const CONGRESS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /** @internal TTL for congressional-trade trend analysis cache results. Default: 24 hours. */
 export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
@@ -1870,9 +1892,16 @@ export function buildCongressTrendCacheKey(
  * `prevPercentOfClass`, which a model read as the filing just before the
  * latest; a split (shares rescaled, percent unchanged) is a neutral amendment.
  *
+ * **`p7`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
+ * Non-Korean system prompts and the output language reminder gain the
+ * currency-writing rule (`$214.13`, never "214.13 dollars"). Korean bytes
+ * change too: a Korean listing's `krMetrics` is serialized into the prompt
+ * (`formatScorecard` → `formatMetrics`), and the insider axis now carries
+ * `largestSingleDayFiling`.
+ *
  * @internal
  */
-export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p6' as const;
+export const INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION = 'p7' as const;
 
 /**
  * @internal TTL for investor-flows analysis cache results. Default: 12 hours —
@@ -1999,9 +2028,13 @@ export function buildInvestorFlowsCacheKey(
  * article simply gets the new wording, and the normalizer only post-processes
  * model output.
  *
+ * **`p9`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
+ * The U.S. listing sentence gains "Prices are quoted in USD." and non-Korean
+ * system prompts gain the currency-writing rule.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p8' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p9' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
@@ -2176,9 +2209,13 @@ export function buildNewsCacheKey(
  * `p27`). The overall key-level list prints a KRW listing's prices at their
  * KRX tick through the shared `formatPriceAtDp`, so every KRW prompt changes.
  *
+ * **`p10`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
+ * The U.S. listing sentence gains "Prices are quoted in USD." and non-Korean
+ * system prompts gain the currency-writing rule.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p9' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p10' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.
@@ -2500,9 +2537,14 @@ export function buildOverallPeekCacheKey(
  * **`p4`** — Interpretation Guide wording fixes (max pain definition,
  * put/call ratio direction, counts-vs-prices, USD cent rule).
  *
+ * **`p5`** — currency wording (see {@link PROMPT_TEMPLATE_VERSION} `p32`).
+ * Non-Korean system prompts and the output language reminder gain the
+ * currency-writing rule (`$214.13`, never "214.13 dollars"); Korean bytes are
+ * unchanged, but the version bumps every key so non-Korean entries regenerate.
+ *
  * @internal
  */
-export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p4' as const;
+export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
 
 /**
  * @internal Build the Redis key for a cached options analysis result.
