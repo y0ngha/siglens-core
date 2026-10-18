@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.23.3](https://github.com/y0ngha/siglens-core/compare/v2.23.2...v2.23.3) (2026-10-18)
+
+### Bug Fixes
+
+* 영어 분석 가격을 $214.13로, 에이전트 공포·탐욕·기준율 문구, KR 하루 최다 공시 ([#291](https://github.com/y0ngha/siglens-core/issues/291)) ([012e12a](https://github.com/y0ngha/siglens-core/commit/012e12a28e71b47457985d095f114f45d49d6d10))
+
 ## [2.23.2](https://github.com/y0ngha/siglens-core/compare/v2.23.1...v2.23.2) (2026-10-18)
 
 ### Bug Fixes
