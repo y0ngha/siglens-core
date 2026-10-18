@@ -13,7 +13,10 @@ import { buildElliottCandidates } from '@/domain/overlays/elliottCandidates';
 import { ELLIOTT_ENABLED_STRUCTURES } from '@/domain/overlays/constants';
 import { measureGate } from './metrics';
 
-const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+const FMT = {
+    timeframe: '1Day' as const,
+    quoting: { dp: 2, krxTick: null },
+};
 const args = process.argv.slice(2);
 const opt = (name: string, fallback: number) => {
     const i = args.indexOf(name);

@@ -6,7 +6,7 @@ describe('formatOverlayPoint', () => {
         expect(
             formatOverlayPoint(
                 { time: 1767571200, price: 101.2 },
-                { timeframe: '1Day', priceDp: 2 }
+                { timeframe: '1Day', quoting: { dp: 2, krxTick: null } }
             )
         ).toBe('2026-01-05 101.20');
     });
@@ -14,7 +14,7 @@ describe('formatOverlayPoint', () => {
         expect(
             formatOverlayPoint(
                 { time: 1767571200 + 3600 * 14, price: 5 },
-                { timeframe: '1Hour', priceDp: 1 }
+                { timeframe: '1Hour', quoting: { dp: 1, krxTick: null } }
             )
         ).toMatch(/^2026-01-05 14:00 UTC 5\.0$/);
     });

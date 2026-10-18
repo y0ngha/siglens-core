@@ -33,6 +33,7 @@ const baseInput: IndicatorStateInput = {
     supertrend: { supertrend: 95, trend: 'up' },
     parabolicSar: { sar: 90, trend: 'up' },
     atr: 2,
+    quoting: { dp: 2, krxTick: null },
     diffDp: 2,
     lastVolume: 1500,
     priorVolumes: Array.from({ length: 20 }, () => 1000),

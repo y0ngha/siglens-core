@@ -42,7 +42,7 @@ describe('buildOverlayCandidates — non-forward segments', () => {
                 medium: EMPTY_HORIZON,
                 long: EMPTY_HORIZON,
             } as unknown as MarketReference,
-            fmt: { timeframe: '1Day', priceDp: 2 },
+            fmt: { timeframe: '1Day', quoting: { dp: 2, krxTick: null } },
         });
         expect(out.candidates.map(c => c.id)).toEqual(['ew:good']);
     });

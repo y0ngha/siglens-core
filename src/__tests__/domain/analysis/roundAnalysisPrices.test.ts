@@ -83,6 +83,34 @@ describe('roundAnalysisPrices', () => {
         });
     });
 
+    it('rounds on the ETF/ETN table when asked, and on the share table by default', () => {
+        const etp = roundAnalysisPrices(response(), 'KRW', 'etp');
+        // ≥ 2,000 won an ETP ticks 5: 205,325 → 205,325; 224,565 → 224,565;
+        // 56,663 → 56,665; the share grid would give 205,500 / 224,500 / 56,700.
+        expect(etp.keyLevels).toEqual({
+            support: [{ price: 205_325, reason: '카마릴라 S3' }],
+            resistance: [{ price: 224_565, reason: '켈트너 하단' }],
+            poc: { price: 56_665, reason: 'POC' },
+        });
+        expect(etp.priceTargets.bullish?.targets[0].price).toBe(240_300);
+        expect(etp.patternSummaries[0].keyPrices).toEqual([
+            { label: '측정 목표가', price: 202_440 },
+        ]);
+        expect(etp.actionRecommendation).toMatchObject({
+            entryPrices: [210_000, 215_120],
+            stopLoss: 204_480,
+            reconciledLevels: { stopLoss: 204_480 },
+        });
+        expect(roundAnalysisPrices(response(), 'KRW', 'share')).toEqual(
+            roundAnalysisPrices(response(), 'KRW')
+        );
+    });
+
+    it('ignores the table for a non-KRW listing (same reference)', () => {
+        const usd = response();
+        expect(roundAnalysisPrices(usd, 'USD', 'etp')).toBe(usd);
+    });
+
     it('leaves drawing coordinates exact', () => {
         const out = roundAnalysisPrices(response(), 'KRW');
         expect(out.trendlines).toEqual(response().trendlines);

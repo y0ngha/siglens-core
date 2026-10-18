@@ -4,7 +4,7 @@ import { buildDivergenceCandidates } from '@/domain/overlays/divergenceCandidate
 import { findRegularDivergencePair } from '@/domain/signals/anticipation';
 import { DIVERGENCE_LOOKBACK_BARS } from '@/domain/signals/constants';
 
-const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+const FMT = { timeframe: '1Day' as const, quoting: { dp: 2, krxTick: null } };
 
 /**
  * 20 bars: pivot low at index 4 (105) and a lower, fresher pivot low at

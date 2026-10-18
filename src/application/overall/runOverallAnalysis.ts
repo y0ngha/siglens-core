@@ -355,6 +355,7 @@ export async function runOverallAnalysis(
                      */
                     locale: options.locale,
                     currency: options.currency,
+                    krxTickTable: options.krxTickTable,
                     tierContext:
                         technicalRest.tierContext ??
                         (topLevelTier !== undefined
@@ -697,7 +698,8 @@ export async function runOverallAnalysis(
         priorAnalysisBars,
         priorAnalysisCandidates,
         options.currency,
-        options.investorFlowsScorecard
+        options.investorFlowsScorecard,
+        options.krxTickTable
     );
     // Design C: `stable` is always '' for the overall builder (no skills catalog),
     // so system stays the base persona unchanged.

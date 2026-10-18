@@ -321,7 +321,8 @@ export async function requestChatCompletion(
         params.userMessage,
         params.currentAnalysisContext,
         params.assetClass,
-        params.currency
+        params.currency,
+        params.krxTickTable
     );
 
     const {

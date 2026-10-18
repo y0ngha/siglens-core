@@ -24,6 +24,9 @@ import {
     patternOverlayId,
 } from '@/domain/overlays/patternOverlays';
 import { formatChartPatternCandidatesSection } from '@/domain/analysis/chartPatternCandidatesSection';
+import type { PriceQuoting } from '@/domain/analysis/promptFormat';
+
+const QUOTING: PriceQuoting = { dp: 2, krxTick: null };
 
 /** Everything the production pipeline derives from one bar series (prompt.ts order). */
 export interface PipelineRun {
@@ -56,12 +59,17 @@ export function runPipeline(
         timeframe,
         atrSeries
     );
-    const overlays = buildPatternOverlayCandidates(qualified, bars, atr, 2);
+    const overlays = buildPatternOverlayCandidates(
+        qualified,
+        bars,
+        atr,
+        QUOTING
+    );
     const section = formatChartPatternCandidatesSection(
         qualified,
         bars,
         atr,
-        2,
+        QUOTING,
         timeframe,
         new Set(overlays.map(o => o.id))
     );

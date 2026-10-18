@@ -287,6 +287,7 @@ export {
 } from './domain/analysis/keyLevels';
 export { computeMarketReference } from './domain/analysis/marketReference';
 export { krxTickSize, roundToKrxTick } from './domain/analysis/krxTick';
+export type { KrxTickTable } from './domain/analysis/krxTick';
 export { classifyMaStack } from './domain/analysis/trendStructure';
 export {
     OVERLAY_LEVEL_LABELS,

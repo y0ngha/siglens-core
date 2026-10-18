@@ -189,7 +189,10 @@ describe('resolveChartOverlays', () => {
             'tl:resistance:2:4',
             'tl:support:3:5',
         ]);
-        expect(r.unknownIds).toEqual(['tl:made:up', 'fib:short:5']);
+        expect(r.unknownIds).toEqual(['tl:made:up']);
+        expect(r.misplacedIds).toEqual([
+            { id: 'fib:short:5', sourceRef: 'trendlines' },
+        ]);
     });
 
     it('assigns the elliott primary/alternate split over resolved ids only: a count already claimed by an earlier card does not take the primary slot', () => {
@@ -220,7 +223,7 @@ describe('resolveChartOverlays', () => {
         ]);
     });
 
-    it('a known id in the wrong slot is treated like an unknown id: patternSummaries.candidateId must resolve to a pattern candidate', () => {
+    it('a known id in the wrong slot is rejected as misplaced, not unknown: patternSummaries.candidateId must resolve to a pattern candidate', () => {
         const r = resolveChartOverlays(
             CANDIDATES,
             analysis({
@@ -240,18 +243,22 @@ describe('resolveChartOverlays', () => {
             []
         );
         expect(r.chartOverlays).toEqual([]);
-        expect(r.unknownIds).toEqual(['ew:up:1:6']);
+        expect(r.unknownIds).toEqual([]);
+        expect(r.misplacedIds).toEqual([{ id: 'ew:up:1:6', sourceRef: 'p' }]);
     });
 
-    it('a known id in the wrong slot is treated like an unknown id: trendlineIds must resolve to a trendline candidate', () => {
+    it('a known id in the wrong slot is rejected as misplaced, not unknown: trendlineIds must resolve to a trendline candidate', () => {
         const r = resolveChartOverlays(CANDIDATES, analysis({}), [
             'fib:short:5',
         ]);
         expect(r.chartOverlays).toEqual([]);
-        expect(r.unknownIds).toEqual(['fib:short:5']);
+        expect(r.unknownIds).toEqual([]);
+        expect(r.misplacedIds).toEqual([
+            { id: 'fib:short:5', sourceRef: 'trendlines' },
+        ]);
     });
 
-    it('a known id in the wrong slot is treated like an unknown id: strategyResults.candidateIds must resolve to divergence/fibonacci/elliott', () => {
+    it('a known id in the wrong slot is rejected as misplaced, not unknown: strategyResults.candidateIds must resolve to divergence/fibonacci/elliott', () => {
         const r = resolveChartOverlays(
             CANDIDATES,
             analysis({
@@ -269,7 +276,50 @@ describe('resolveChartOverlays', () => {
             []
         );
         expect(r.chartOverlays).toEqual([]);
-        expect(r.unknownIds).toEqual(['pattern:double_bottom:1']);
+        expect(r.unknownIds).toEqual([]);
+        expect(r.misplacedIds).toEqual([
+            { id: 'pattern:double_bottom:1', sourceRef: 's' },
+        ]);
+    });
+
+    it('a never-offered id stays unknown, and a misplaced one never reaches unknownIds', () => {
+        const r = resolveChartOverlays(CANDIDATES, analysis({}), [
+            'tl:made:up',
+            'fib:short:5',
+        ]);
+        expect(r.unknownIds).toEqual(['tl:made:up']);
+        expect(r.misplacedIds.map(m => m.id)).toEqual(['fib:short:5']);
+    });
+
+    it('a strategy card citing trendline ids that are also drawn from trendlineIds: drawn once, misplaced not unknown, output unchanged', () => {
+        const withCitation = resolveChartOverlays(
+            CANDIDATES,
+            analysis({
+                strategyResults: [
+                    {
+                        id: 'mtf_0',
+                        strategyName: 'multi-timeframe',
+                        trend: 'neutral',
+                        summary: '',
+                        confidenceWeight: 1,
+                        candidateIds: ['tl:support:1:3', 'tl:resistance:2:4'],
+                    },
+                ],
+            }),
+            ['tl:support:1:3', 'tl:resistance:2:4']
+        );
+        const without = resolveChartOverlays(CANDIDATES, analysis({}), [
+            'tl:support:1:3',
+            'tl:resistance:2:4',
+        ]);
+        expect(withCitation.chartOverlays).toEqual(without.chartOverlays);
+        expect(withCitation.trendlines).toEqual(without.trendlines);
+        expect(withCitation.chartOverlays).toHaveLength(2);
+        expect(withCitation.unknownIds).toEqual([]);
+        expect(withCitation.misplacedIds).toEqual([
+            { id: 'tl:support:1:3', sourceRef: 'mtf_0' },
+            { id: 'tl:resistance:2:4', sourceRef: 'mtf_0' },
+        ]);
     });
 
     describe('per-strategy overlay kind', () => {
@@ -560,21 +610,25 @@ describe('resolveChartOverlays', () => {
                 ]);
             });
 
-            it('does not move pattern or trendline ids cited by a strategy', () => {
-                expect(
-                    drawn(
-                        cards(
-                            [
-                                '엘리어트 파동',
-                                ['pattern:double_bottom:1', 'tl:support:1:3'],
-                            ],
-                            ['피보나치 전략', []]
-                        )
-                    )
-                ).toEqual({
-                    overlays: [],
-                    unknownIds: ['pattern:double_bottom:1', 'tl:support:1:3'],
-                });
+            it('does not move pattern or trendline ids cited by a strategy — they are misplaced, not unknown', () => {
+                const r = resolveChartOverlays(
+                    MIXED,
+                    cards(
+                        [
+                            '엘리어트 파동',
+                            ['pattern:double_bottom:1', 'tl:support:1:3'],
+                        ],
+                        ['피보나치 전략', []]
+                    ),
+                    [],
+                    SKILLS
+                );
+                expect(r.chartOverlays).toEqual([]);
+                expect(r.unknownIds).toEqual([]);
+                expect(r.misplacedIds.map(m => m.id)).toEqual([
+                    'pattern:double_bottom:1',
+                    'tl:support:1:3',
+                ]);
             });
         });
 
@@ -726,7 +780,10 @@ describe('resolveChartOverlays', () => {
                 SKILLS
             );
             expect(r.chartOverlays).toEqual([]);
-            expect(r.unknownIds).toEqual(['pattern:double_bottom:1']);
+            expect(r.unknownIds).toEqual([]);
+            expect(r.misplacedIds.map(m => m.id)).toEqual([
+                'pattern:double_bottom:1',
+            ]);
         });
 
         it('keeps an explicit candidateId of the same pattern as the card', () => {

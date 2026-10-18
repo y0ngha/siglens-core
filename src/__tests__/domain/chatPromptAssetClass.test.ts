@@ -463,3 +463,35 @@ describe('legacy overloads never infer the listing from the symbol', () => {
         expect(prompt).not.toContain('Korean equity');
     });
 });
+
+describe('KRX tick table (chat)', () => {
+    const build = (krxTick?: 'share' | 'etp') =>
+        buildChatPrompt(
+            '069500.KS',
+            'KODEX 200',
+            '1Day',
+            {
+                ...analysis,
+                keyLevels: {
+                    support: [{ price: 40_123, reason: '지지선' }],
+                    resistance: [],
+                },
+            },
+            [],
+            '어때요?',
+            undefined,
+            'equity',
+            'KRW',
+            krxTick
+        );
+
+    it('quotes levels on the 5-won ETP grid when asked', () => {
+        expect(build('etp').systemPrompt).toContain(
+            '- Support: 40125 (지지선)'
+        );
+    });
+
+    it('keeps the 50-won share grid by default', () => {
+        expect(build().systemPrompt).toContain('- Support: 40100 (지지선)');
+    });
+});

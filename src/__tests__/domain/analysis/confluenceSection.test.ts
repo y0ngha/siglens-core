@@ -14,6 +14,9 @@ import type {
     ReferenceLevel,
     Timeframe,
 } from '@/domain/types';
+import type { PriceQuoting } from '@/domain/analysis/promptFormat';
+
+const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
 
 function bars(count: number, start = 100, step = 0.4): Bar[] {
     return Array.from({ length: count }, (_, i) => {
@@ -177,7 +180,7 @@ describe('formatDeterministicMetricsSection', () => {
             enough,
             '30Min',
             reference([level(0.08423, 1)], [level(0.0826, -2)]),
-            5
+            { dp: 5, krxTick: null }
         );
         expect(out).toContain('MA50 at 0.08423 (1.00%)');
         expect(out).toContain('MA50 at 0.08260 (-2.00%)');
@@ -470,7 +473,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
                 washoutBars(),
                 '1Day',
                 reference(),
-                2,
+                USD_QUOTING,
                 [event]
             ),
             formatDeterministicMetricsSection(shortDaily, '1Day', reference()),
@@ -556,7 +559,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             bs,
             '1Day',
             reference(),
-            2,
+            USD_QUOTING,
             [earnings]
         );
         const publishedUtc = new Date(lastMs + 13 * 3_600_000)
@@ -600,7 +603,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             bs,
             '1Day',
             reference(),
-            2,
+            USD_QUOTING,
             events
         );
         expect(out).toContain(

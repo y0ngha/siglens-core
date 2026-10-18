@@ -28,7 +28,7 @@ import {
     formatOverlayPoint,
     formatOverlayPrice,
 } from '@/domain/overlays/format';
-import { roundPriceAtDp } from '@/domain/analysis/promptFormat';
+import { roundQuotedPrice } from '@/domain/analysis/promptFormat';
 
 /**
  * Building blocks shared by the Elliott structure counters (spec
@@ -173,7 +173,7 @@ export const boundaryLine = (
  * `levels` drawn from the count's first pivot, across the whole structure
  * like a pattern's breakout line — a line starting at the last leg sits a
  * few bars from the right edge and hides behind its own axis label
- * (2026-10-02 live render). Prices are rounded to the prompt's `priceDp`, so
+ * (2026-10-02 live render). Prices are rounded to the prompt's `quoting`, so
  * a line's axis label matches the number the card cites.
  */
 export const structureLevels = (
@@ -189,7 +189,7 @@ export const structureLevels = (
         .map(({ label, price }) => ({
             label,
             price: Number(
-                roundPriceAtDp(price, fmt.priceDp).toFixed(fmt.priceDp)
+                roundQuotedPrice(price, fmt.quoting).toFixed(fmt.quoting.dp)
             ),
             fromTime: bars[pivots[0].index].time,
         }));

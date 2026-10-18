@@ -1,4 +1,5 @@
 import type { OptionsAnalysisResponse } from './options/types';
+import type { PriceQuoting } from './analysis/promptFormat';
 
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */
 export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
@@ -4642,7 +4643,7 @@ export interface ChartOverlay extends Omit<OverlayCandidate, 'promptLine'> {
 /** Formatting context for candidate prompt lines. */
 export interface OverlayFormat {
     timeframe: Timeframe;
-    priceDp: number;
+    quoting: PriceQuoting;
 }
 
 /** Both pivots of a regular RSI divergence, as bars indices (first < second). */
@@ -4660,12 +4661,27 @@ export interface OverlayCandidateBuild {
     failedBuilders: OverlayKind[];
 }
 
+/** @internal An offered candidate id cited from a slot that does not accept it. */
+export interface MisplacedOverlayId {
+    id: string;
+    /** The citing card (`patternSummaries[].id`, `strategyResults[].id`) or `'trendlines'`. */
+    sourceRef: string;
+}
+
 export interface ResolvedChartOverlays {
     chartOverlays: ChartOverlay[];
     /** Trendlines derived from resolved trendline overlays (legacy `trendlines` field). */
     trendlines: Trendline[];
-    /** Referenced ids with no matching candidate (model invented them). */
+    /** Referenced ids no offered candidate matches (the model invented them). */
     unknownIds: string[];
+    /**
+     * Referenced ids that ARE offered candidates but were cited from a slot
+     * that does not accept them — the wrong kind for that card, or a pattern
+     * card citing another pattern's candidate. Not unknown: the same id may
+     * well be drawn from the slot that does accept it (a strategy card citing
+     * trendline ids that also arrived in `trendlineIds`).
+     */
+    misplacedIds: MisplacedOverlayId[];
 }
 
 /** @internal Inputs {@link buildAnalysisPrompt} already has in scope, passed to {@link buildOverlayCandidates}. */

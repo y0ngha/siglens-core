@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { buildAnalysisPrompt as buildAnalysisPromptRaw } from '@/domain/analysis/prompt';
 import { calculateIndicators } from '@/domain/indicators';
 import { EMPTY_INDICATOR_RESULT } from '@/domain/indicators/constants';
+import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import type { AssetClass, Bar, CurrencyCode, Timeframe } from '@/domain/types';
 
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
@@ -72,7 +73,8 @@ const renderDynamic = (
     series: Bar[],
     timeframe: Timeframe,
     assetClass: AssetClass = 'equity',
-    currency: CurrencyCode = 'USD'
+    currency: CurrencyCode = 'USD',
+    krxTick: KrxTickTable = 'share'
 ): string =>
     buildAnalysisPromptRaw(
         symbol,
@@ -87,7 +89,8 @@ const renderDynamic = (
         undefined,
         undefined,
         undefined,
-        currency
+        currency,
+        krxTick
     ).dynamic;
 
 describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
@@ -167,6 +170,82 @@ describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
                 .map(m => Number(m[1]))
                 .filter(n => n % 500 !== 0)
         ).toEqual([]);
+    });
+
+    describe('KRX ETF/ETN tick table', () => {
+        // Synthetic bars around 40,000 sit in the 20,000–50,000 band: the share
+        // table ticks 50 there, the ETF/ETN table 5.
+        const fortyThousandBars = syntheticBars(260, 40_000, 86_400);
+        const fiveDigitPrices = (p: string): number[] =>
+            p
+                .split('\n')
+                .filter(l =>
+                    /^- (Snapshot Price|MA\(|EMA\(|Bollinger|Keltner|Donchian|VWAP)|^Fib (table|anchor)|^Pivot table/.test(
+                        l
+                    )
+                )
+                .flatMap(l =>
+                    [...l.matchAll(/(?<![\d.])(\d{5})(?![\d.])/g)].map(m =>
+                        Number(m[1])
+                    )
+                )
+                .filter(n => n >= 20_000);
+
+        it('prints every price at a 5-won tick for an ETP listing, finer than the share grid', () => {
+            const p = renderDynamic(
+                '069500.KS',
+                fortyThousandBars,
+                '1Day',
+                'equity',
+                'KRW',
+                'etp'
+            );
+            const prices = fiveDigitPrices(p);
+            expect(prices.length).toBeGreaterThan(10);
+            expect(prices.filter(n => n % 5 !== 0)).toEqual([]);
+            // At least one price sits between share ticks, proving the 50-won
+            // grid is no longer applied.
+            expect(prices.filter(n => n % 50 !== 0).length).toBeGreaterThan(0);
+            expect(
+                [...p.matchAll(/C:(\d{5}) V:/g)]
+                    .map(m => Number(m[1]))
+                    .filter(n => n % 5 !== 0)
+            ).toEqual([]);
+        });
+
+        it('keeps the 50-won share grid by default', () => {
+            const p = renderDynamic(
+                '005930.KS',
+                fortyThousandBars,
+                '1Day',
+                'equity',
+                'KRW'
+            );
+            const prices = fiveDigitPrices(p);
+            expect(prices.length).toBeGreaterThan(10);
+            expect(prices.filter(n => n % 50 !== 0)).toEqual([]);
+        });
+
+        it('ignores the ETP table for a non-KRW listing', () => {
+            expect(
+                renderDynamic(
+                    'SPY',
+                    syntheticBars(260, 400, 86_400),
+                    '1Day',
+                    'equity',
+                    'USD',
+                    'etp'
+                )
+            ).toBe(
+                renderDynamic(
+                    'SPY',
+                    syntheticBars(260, 400, 86_400),
+                    '1Day',
+                    'equity',
+                    'USD'
+                )
+            );
+        });
     });
 
     it('renders differences below the price precision so a whole-won chart keeps its MACD', () => {

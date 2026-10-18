@@ -158,36 +158,42 @@ describe('resolveBullishTakeProfit', () => {
 
 describe('buildBullishExitText', () => {
     it('유효한 TP와 SL로 exit 텍스트를 생성한다', () => {
-        const text = buildBullishExitText(100, 97, [105], 'USD');
+        const text = buildBullishExitText(100, 97, [105], 'USD', 'share');
         expect(text).toContain('105.00');
         expect(text).toContain('97.00');
     });
 
     it('TP가 없으면 SL만 포함한다', () => {
-        const text = buildBullishExitText(100, 97, [], 'USD');
+        const text = buildBullishExitText(100, 97, [], 'USD', 'share');
         expect(text).toContain('97.00');
         expect(text).not.toContain('익절');
     });
 
     it('SL이 없으면 TP만 포함한다', () => {
-        const text = buildBullishExitText(100, undefined, [105], 'USD');
+        const text = buildBullishExitText(
+            100,
+            undefined,
+            [105],
+            'USD',
+            'share'
+        );
         expect(text).toContain('105.00');
         expect(text).not.toContain('손절');
     });
 
     it('TP와 SL 모두 없으면 빈 문자열을 반환한다', () => {
-        const text = buildBullishExitText(100, undefined, [], 'USD');
+        const text = buildBullishExitText(100, undefined, [], 'USD', 'share');
         expect(text).toBe('');
     });
 
     it('TP가 여러 개이면 1차, 2차 라벨을 포함한다', () => {
-        const text = buildBullishExitText(100, 97, [105, 110], 'USD');
+        const text = buildBullishExitText(100, 97, [105, 110], 'USD', 'share');
         expect(text).toContain('1차');
         expect(text).toContain('2차');
     });
 
     it('TP가 entryPrice 이하이면 무효로 처리한다', () => {
-        const text = buildBullishExitText(100, 97, [99], 'USD');
+        const text = buildBullishExitText(100, 97, [99], 'USD', 'share');
         expect(text).not.toContain('익절');
     });
 });
@@ -793,7 +799,8 @@ describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels i
                 entryPrice,
                 baseRec.stopLoss,
                 baseRec.takeProfitPrices,
-                'USD'
+                'USD',
+                'share'
             ),
             riskReward: buildBullishRiskRewardText(
                 entryPrice,
@@ -840,7 +847,8 @@ describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels i
                 entryPrice,
                 baseRec.stopLoss,
                 baseRec.takeProfitPrices,
-                'USD'
+                'USD',
+                'share'
             ),
             riskReward: '',
             reason: '',
@@ -1118,7 +1126,8 @@ describe('exit text currency', () => {
             131000,
             121980.69948682484,
             [143025.73401756687],
-            'KRW'
+            'KRW',
+            'share'
         );
 
         // 50,000–200,000원 구간의 호가 단위는 100원이다.
@@ -1130,7 +1139,7 @@ describe('exit text currency', () => {
 
     it('keeps the pre-existing dollar format for USD', () => {
         // 이 인자가 생기기 전 출력과 바이트 단위로 같아야 한다.
-        expect(buildBullishExitText(100, 97, [105], 'USD')).toBe(
+        expect(buildBullishExitText(100, 97, [105], 'USD', 'share')).toBe(
             '목표가 $105.00 (+5.0%)에서 익절, 손절 $97.00 (-3.0%).'
         );
     });
@@ -1140,7 +1149,8 @@ describe('exit text currency', () => {
             100000,
             95000,
             [110000, 120000],
-            'KRW'
+            'KRW',
+            'share'
         );
 
         expect(text).toContain('1차 목표 110,000원');
@@ -1174,16 +1184,91 @@ describe('exit text currency', () => {
     });
 });
 
+describe('KRX ETF/ETN tick table', () => {
+    const fallbackResponse = {
+        patternSummaries: [],
+        actionRecommendation: {
+            entryRecommendation: 'enter',
+            entryPrices: [40_000],
+        },
+    } as unknown as Parameters<typeof postProcessAnalysisWithReconcile>[0];
+
+    it('formats exit levels at the 5-won ETP tick instead of the 50-won share tick', () => {
+        const etp = buildBullishExitText(
+            40_000,
+            38_123,
+            [42_123],
+            'KRW',
+            'etp'
+        );
+        const share = buildBullishExitText(
+            40_000,
+            38_123,
+            [42_123],
+            'KRW',
+            'share'
+        );
+        expect(etp).toContain('목표가 42,125원');
+        expect(etp).toContain('손절 38,125원');
+        expect(share).toContain('목표가 42,100원');
+        expect(share).toContain('손절 38,100원');
+    });
+
+    it('rounds the ATR fallback levels to the ETP tick, and to the share tick by default', () => {
+        const etp = postProcessAnalysisWithReconcile(
+            fallbackResponse,
+            40_000,
+            123,
+            'KRW',
+            undefined,
+            'etp'
+        ).actionRecommendation?.reconciledLevels;
+        const share = postProcessAnalysisWithReconcile(
+            fallbackResponse,
+            40_000,
+            123,
+            'KRW'
+        ).actionRecommendation?.reconciledLevels;
+
+        const etpLevels = [etp!.stopLoss!, ...etp!.takeProfitPrices!];
+        const shareLevels = [share!.stopLoss!, ...share!.takeProfitPrices!];
+        expect(etpLevels.filter(n => n % 5 !== 0)).toEqual([]);
+        expect(etpLevels.filter(n => n % 50 !== 0).length).toBeGreaterThan(0);
+        expect(shareLevels.filter(n => n % 50 !== 0)).toEqual([]);
+    });
+
+    it('ignores the table for a non-KRW listing', () => {
+        expect(
+            postProcessAnalysisWithReconcile(
+                fallbackResponse,
+                100,
+                2.37,
+                'USD',
+                undefined,
+                'etp'
+            )
+        ).toEqual(
+            postProcessAnalysisWithReconcile(fallbackResponse, 100, 2.37, 'USD')
+        );
+    });
+});
+
 describe('buildBullishExitText 서브달러 정밀도', () => {
     it('$1 미만 가격은 유효숫자 4자리로 표기한다', () => {
-        const text = buildBullishExitText(0.0835, 0.0825, [0.0852], 'USD');
+        const text = buildBullishExitText(
+            0.0835,
+            0.0825,
+            [0.0852],
+            'USD',
+            'share'
+        );
         expect(text).toContain('$0.08520');
         expect(text).toContain('$0.08250');
         expect(text).not.toContain('$0.08 ');
     });
 
     it('$1 이상 가격은 기존 2자리 표기를 유지한다', () => {
-        const text = buildBullishExitText(100, 95, [110], 'USD');
+        const text = buildBullishExitText(100, 95, [110], 'USD', 'share');
         expect(text).toContain('$110.00');
         expect(text).toContain('$95.00');
     });

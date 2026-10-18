@@ -189,7 +189,7 @@ type NormalizedPatternCard = Omit<PatternSummary, 'confidenceWeight' | 'id'>;
  *
  * - The card's skill (by `skillName`, then `patternName`) is a pattern (or
  *   untyped) skill: kept as is. A wrong-kind id on it is rejected later by
- *   `resolveChartOverlays` (logged in `unknownIds`), which leaves it undrawn
+ *   `resolveChartOverlays` (reported in `misplacedIds`, an info log), which leaves it undrawn
  *   and target-free.
  * - Its skill is a known NON-pattern skill (the always-on pattern index, an
  *   indicator guide, a strategy) — repaired when its `patternName` names a

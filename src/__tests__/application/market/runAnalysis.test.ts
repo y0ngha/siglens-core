@@ -1785,6 +1785,95 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             warnSpy.mockRestore();
         });
 
+        it('offered 후보를 받지 않는 슬롯이 인용한 id는 unknown 경고가 아니라 misplaced info 로그를 남긴다', async () => {
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [overlayCandidate],
+                overlayBuildFailures: [],
+                patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
+                patternGeometries: new Map(),
+            });
+            const citedByStrategy: AnalysisResponse = {
+                ...mockRawResult,
+                patternSummaries: [],
+                strategyResults: [
+                    {
+                        id: 'mtf_0',
+                        strategyName: 'multi-timeframe',
+                        trend: 'neutral',
+                        summary: '',
+                        confidenceWeight: 1,
+                        candidateIds: [overlayCandidate.id],
+                    },
+                ],
+            };
+            mockEnrichAnalysisWithConfidence.mockReturnValueOnce(
+                citedByStrategy
+            );
+            mockPostProcessAnalysisWithReconcile.mockReturnValueOnce(
+                citedByStrategy
+            );
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify(citedByStrategy)
+            );
+            const warnSpy = vi
+                .spyOn(console, 'warn')
+                .mockImplementation(() => undefined);
+            const infoSpy = vi
+                .spyOn(console, 'info')
+                .mockImplementation(() => undefined);
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+
+            expect(infoSpy).toHaveBeenCalledWith(
+                '[ChartOverlays] candidate id cited from a slot that does not accept it',
+                expect.objectContaining({
+                    misplacedIds: [
+                        { id: overlayCandidate.id, sourceRef: 'mtf_0' },
+                    ],
+                })
+            );
+            expect(warnSpy).not.toHaveBeenCalledWith(
+                '[ChartOverlays] unknown candidate id',
+                expect.anything()
+            );
+            warnSpy.mockRestore();
+            infoSpy.mockRestore();
+        });
+
+        it('krxTickTable 옵션을 프롬프트와 후처리에 그대로 넘긴다', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    currency: 'KRW',
+                    krxTickTable: 'etp',
+                }
+            );
+
+            expect(mockBuildAnalysisPrompt.mock.lastCall?.slice(-2)).toEqual([
+                'KRW',
+                'etp',
+            ]);
+            const postArgs =
+                mockPostProcessAnalysisWithReconcile.mock.lastCall!;
+            expect(postArgs[3]).toBe('KRW');
+            expect(postArgs[5]).toBe('etp');
+        });
+
         it('후보 빌더가 실패하면 candidate builder failed 경고에 kind를 남긴다', async () => {
             mockBuildAnalysisPrompt.mockReturnValueOnce({
                 stable: 'mock-stable',

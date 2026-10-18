@@ -1041,9 +1041,17 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * trend resuming once the correction is over. Bytes change for any prompt
  * with such a count.
  *
+ * **`p30`** — KRX ETF/ETN tick table and a whole-won conservative target
+ * (2026-10-18). A KRW listing the consumer marks `krxTickTable: 'etp'` is
+ * rounded on the ETF/ETN table (1 won below 2,000, 5 won from there) instead
+ * of the share table. Separately, a KRW pattern's `Conservative target (50%)`
+ * is now tick-rounded and printed in whole won; at `p29` an odd height printed
+ * the raw fraction (`205312.5`). Bytes change for KRW prompts with a pattern
+ * whose halved height has a fraction, and for every `etp` prompt.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p29' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p30' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

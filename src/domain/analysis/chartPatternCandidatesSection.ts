@@ -9,9 +9,10 @@ import {
 import {
     formatBarDate,
     formatNullableNumber,
-    formatPriceAtDp,
+    formatQuotedPrice,
     formatSignedPercent,
-    roundPriceAtDp,
+    roundQuotedPrice,
+    type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { patternOverlayId } from '@/domain/overlays/patternOverlays';
 import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
@@ -62,7 +63,7 @@ function formatLevelLine(
     label: string,
     level: number | null,
     lastClose: number,
-    priceDp: number
+    quoting: PriceQuoting
 ): string {
     // A target at or below zero (a down pattern taller than its breakout
     // level) is not a price — N/A, never a negative quotable "target".
@@ -72,7 +73,7 @@ function formatLevelLine(
         Number.isFinite(lastClose) && lastClose > 0
             ? ` (${formatSignedPercent(((level - lastClose) / lastClose) * 100)} from last close)`
             : '';
-    return `- ${label}: ${formatPriceAtDp(level, priceDp)}${distance}`;
+    return `- ${label}: ${formatQuotedPrice(level, quoting)}${distance}`;
 }
 
 /** Whether the last close has already moved past the (printed, rounded) breakout level, in the pattern's own breakout direction. */
@@ -202,14 +203,14 @@ export function spacingLine(
 /** `- Key points: label price (date), …`, or `N/A` when there are none. */
 function keyPointsLine(
     keyPoints: PatternGeometry['keyPoints'],
-    priceDp: number,
+    quoting: PriceQuoting,
     timeframe: Timeframe
 ): string {
     return keyPoints.length > 0
         ? `- Key points: ${keyPoints
               .map(
                   p =>
-                      `${p.label} ${formatPriceAtDp(p.price, priceDp)} (${formatBarDate(p.time, timeframe)})`
+                      `${p.label} ${formatQuotedPrice(p.price, quoting)} (${formatBarDate(p.time, timeframe)})`
               )
               .join(', ')}`
         : '- Key points: N/A';
@@ -225,15 +226,15 @@ function formatUndirectedCandidate(
     geometry: UndirectedPatternGeometry,
     candidateIdLine: string,
     lastClose: number,
-    priceDp: number,
+    quoting: PriceQuoting,
     timeframe: Timeframe,
     failed: boolean
 ): string {
     const upper = Number(
-        roundPriceAtDp(geometry.upperLevel, priceDp).toFixed(priceDp)
+        roundQuotedPrice(geometry.upperLevel, quoting).toFixed(quoting.dp)
     );
     const lower = Number(
-        roundPriceAtDp(geometry.lowerLevel, priceDp).toFixed(priceDp)
+        roundQuotedPrice(geometry.lowerLevel, quoting).toFixed(quoting.dp)
     );
     const status =
         lastClose > upper || lastClose < lower
@@ -243,11 +244,11 @@ function formatUndirectedCandidate(
               : 'forming';
     return [
         `### ${candidate.id} (${status})${candidateIdLine}`,
-        keyPointsLine(geometry.keyPoints, priceDp, timeframe),
-        formatLevelLine('Upper boundary', upper, lastClose, priceDp),
-        formatLevelLine('Lower boundary', lower, lastClose, priceDp),
+        keyPointsLine(geometry.keyPoints, quoting, timeframe),
+        formatLevelLine('Upper boundary', upper, lastClose, quoting),
+        formatLevelLine('Lower boundary', lower, lastClose, quoting),
         '- Direction: undetermined (no prior trend) — no measured target until a close outside a boundary',
-        `- Height: ${formatNullableNumber(geometry.height, priceDp)}`,
+        `- Height: ${formatNullableNumber(geometry.height, quoting.dp)}`,
     ].join('\n');
 }
 
@@ -257,7 +258,7 @@ function formatCandidate(
     overlayId: string | null,
     offeredOverlayIds: ReadonlySet<string>,
     lastClose: number,
-    priceDp: number,
+    quoting: PriceQuoting,
     timeframe: Timeframe,
     failed: boolean
 ): string {
@@ -280,7 +281,7 @@ function formatCandidate(
             geometry,
             candidateIdLine,
             lastClose,
-            priceDp,
+            quoting,
             timeframe,
             failed
         );
@@ -295,7 +296,7 @@ function formatCandidate(
     // what the app later appends from the exact same two numbers.
     const { breakoutLevel, extremeLevel } = printedPatternGeometry(
         geometry,
-        priceDp
+        quoting
     );
     const targets = computePatternTargets(
         breakoutLevel,
@@ -310,41 +311,43 @@ function formatCandidate(
           ? FAILED_BREAKOUT_STATUS
           : 'forming';
     // The conservative target (a halved height) can need one more decimal
-    // than `priceDp` carries — print it at whichever precision is wider so
+    // than `quoting` carries — print it at whichever precision is wider so
     // the listed number is the exact one `ai-levels.ts` would also produce.
-    const conservativeDp = Math.max(
-        priceDp,
-        decimalPlacesOf(targets.conservativeTarget)
-    );
+    // A KRX price is rounded to its tick, which has no fraction, so it prints
+    // at `quoting.dp` — a wider precision would print `205500.0`.
+    const conservativeDp =
+        quoting.krxTick !== null
+            ? quoting.dp
+            : Math.max(quoting.dp, decimalPlacesOf(targets.conservativeTarget));
 
     return [
         `### ${candidate.id} (${status})${candidateIdLine}`,
-        keyPointsLine(geometry.keyPoints, priceDp, timeframe),
+        keyPointsLine(geometry.keyPoints, quoting, timeframe),
         ...(spacing === null ? [] : [spacing]),
-        formatLevelLine('Breakout level', breakoutLevel, lastClose, priceDp),
+        formatLevelLine('Breakout level', breakoutLevel, lastClose, quoting),
         // The measured-move anchor, printed as breakout ∓ height so a model
         // that copies breakout/extreme/direction into `geometry` makes the app
         // recompute exactly the targets listed here (height = |extreme − breakout|).
-        formatLevelLine('Extreme level', extremeLevel, lastClose, priceDp),
+        formatLevelLine('Extreme level', extremeLevel, lastClose, quoting),
         `- Direction: ${geometry.direction}`,
-        `- Height: ${formatNullableNumber(targets.height, priceDp)}`,
+        `- Height: ${formatNullableNumber(targets.height, quoting.dp)}`,
         formatLevelLine(
             'Measured target',
             targets.measuredTarget,
             lastClose,
-            priceDp
+            quoting
         ),
         formatLevelLine(
             'Conservative target (50%)',
             targets.conservativeTarget,
             lastClose,
-            conservativeDp
+            { ...quoting, dp: conservativeDp }
         ),
         formatLevelLine(
             'Invalidation level',
             geometry.invalidationLevel,
             lastClose,
-            priceDp
+            quoting
         ),
     ].join('\n');
 }
@@ -384,7 +387,7 @@ export function printedPatternGeometriesByOverlayId(
     candidates: readonly QualifiedPattern[],
     bars: readonly Bar[],
     atr: number | null,
-    priceDp: number,
+    quoting: PriceQuoting,
     offeredOverlayIds: ReadonlySet<string>,
     geometries: readonly (QualifiedPatternGeometry | null)[] = candidateGeometries(
         candidates,
@@ -404,7 +407,7 @@ export function printedPatternGeometriesByOverlayId(
                         overlayId,
                         geometry.direction === null
                             ? null
-                            : printedPatternGeometry(geometry, priceDp),
+                            : printedPatternGeometry(geometry, quoting),
                     ],
                 ];
             }
@@ -430,8 +433,8 @@ export function printedPatternGeometriesByOverlayId(
  * @param atr - Average True Range for `bars`; `null`/non-positive degrades
  *   geometry to unavailable for every candidate, matching
  *   `computeCandidateGeometry` itself.
- * @param priceDp - Decimal places for every price in this section (same
- *   precision the rest of the technical prompt uses).
+ * @param quoting - How every price in this section is quoted (same quoting
+ *   the rest of the technical prompt uses).
  * @param timeframe - Bar resolution; key-point dates render date-only on
  *   `'1Day'` and `YYYY-MM-DD HH:MM UTC` on every intraday timeframe.
  * @param offeredOverlayIds - Ids of the `kind: 'pattern'` overlay candidates
@@ -445,7 +448,7 @@ export function formatChartPatternCandidatesSection(
     candidates: readonly QualifiedPattern[],
     bars: readonly Bar[],
     atr: number | null,
-    priceDp: number,
+    quoting: PriceQuoting,
     timeframe: Timeframe,
     offeredOverlayIds: ReadonlySet<string>,
     geometries: readonly (QualifiedPatternGeometry | null)[] = candidateGeometries(
@@ -471,7 +474,7 @@ export function formatChartPatternCandidatesSection(
             geometry !== null ? patternOverlayId(candidate, bars) : null,
             offeredOverlayIds,
             lastClose,
-            priceDp,
+            quoting,
             timeframe,
             geometry !== null &&
                 isFailedBreakout(
@@ -483,7 +486,7 @@ export function formatChartPatternCandidatesSection(
                               direction: geometry.direction,
                               breakoutLevel: printedPatternGeometry(
                                   geometry,
-                                  priceDp
+                                  quoting
                               ).breakoutLevel,
                           },
                     bars,

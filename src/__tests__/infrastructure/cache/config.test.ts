@@ -1105,7 +1105,8 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // p27 (2026-10-18): 끝난 C·꺾인 thrust의 목표와 깨진 피보 후보를 빼고, KRW 가격을 호가 단위로 찍는다.
         // p28 (2026-10-18): 넥라인 계열 패턴의 돌파 후 복귀를 `failed breakout`으로 찍는다.
         // p29 (2026-10-18): 끝난 A–B–C의 무효화를 C 끝으로 옮긴다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p29');
+        // p30 (2026-10-18): KRX ETF/ETN 호가 표, KRW 보수 목표가를 호가 단위 정수로 찍는다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p30');
     });
 });
 

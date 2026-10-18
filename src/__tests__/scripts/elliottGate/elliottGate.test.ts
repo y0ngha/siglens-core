@@ -7,7 +7,7 @@ import {
     structureOf,
 } from '../../../../scripts/elliottGate/metrics';
 
-const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+const FMT = { timeframe: '1Day' as const, quoting: { dp: 2, krxTick: null } };
 
 /**
  * The release gate (spec 2026-10-02 §검증) at the full sample size of

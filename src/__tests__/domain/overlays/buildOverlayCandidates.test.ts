@@ -12,7 +12,7 @@ interface Fixture {
     bars: Bar[];
 }
 
-const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+const FMT = { timeframe: '1Day' as const, quoting: { dp: 2, krxTick: null } };
 
 const EMPTY_HORIZON = {
     fibProjection: null,

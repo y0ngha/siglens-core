@@ -1,4 +1,5 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
+import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import type { BackgroundTaskOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
@@ -108,6 +109,20 @@ export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
      * calendar served from whichever request wrote the entry first.
      */
     currency?: CurrencyCode;
+    /**
+     * KRX tick table the listing's prices round to — `'etp'` for an ETF/ETN,
+     * `'share'` (default) otherwise. The consumer decides from the listing;
+     * ignored unless `currency` is `KRW`.
+     *
+     * `runAnalysis`, `runAnalysisForOverall`, `runOverallAnalysis` (and the
+     * chat path) must all be given the same table for a symbol.
+     *
+     * Like `currency`, deliberately NOT part of the analysis cache key: a
+     * symbol fixes whether it is a share or an ETF/ETN, so two requests for
+     * it should never disagree. The flip side is a caller contract — an entry
+     * written with the wrong table cannot be corrected until its TTL expires.
+     */
+    krxTickTable?: KrxTickTable;
     /**
      * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
      * `true` requests the model's default/spec reasoning depth; `false` or

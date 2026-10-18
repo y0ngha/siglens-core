@@ -1,4 +1,5 @@
 import type { ChatbotLimitError } from '@/application/usage/types';
+import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import type { CallAiProvider } from '@/domain/ports/aiProvider';
 import type {
     AnalysisResponse,
@@ -83,6 +84,13 @@ export interface RequestChatCompletionParams {
      * `'USD'`.
      */
     currency?: CurrencyCode;
+    /**
+     * KRX tick table the listing's prices round to — `'etp'` for an ETF/ETN,
+     * `'share'` (default) otherwise. The consumer decides from the listing;
+     * ignored unless `currency` is `KRW`. Pass the same table as the
+     * analysis calls for a symbol, so chat quotes the levels the card shows.
+     */
+    krxTickTable?: KrxTickTable;
 }
 
 /** Injectable dependencies for `requestChatCompletion`. */

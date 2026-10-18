@@ -10,8 +10,9 @@ import { GAP_MIN_ATR_MULT } from '@/domain/signals/constants';
 import { ADX_TRENDING_THRESHOLD } from '@/domain/analysis/marketReferenceConstants';
 import {
     formatNullableNumber,
-    formatPriceAtDp,
+    formatQuotedPrice,
     formatSignedNumber,
+    type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { classifyStackOrder } from '@/domain/analysis/trendStructure';
 import type {
@@ -466,6 +467,7 @@ function gapLine(
     last: BarRange | undefined,
     prev: BarRange | undefined,
     atr: number | null | undefined,
+    quoting: PriceQuoting,
     dp: number
 ): string {
     const label = '- Gap (last bar vs previous bar)';
@@ -479,10 +481,13 @@ function gapLine(
     const down = prev.low - last.high;
     if (up <= 0 && down <= 0) return `${label}: none (the two bars overlap)`;
     const size = up > 0 ? up : down;
+    // The bar prices print at the gap's own (difference) precision, as they
+    // always have, but still on the listing's KRX tick table.
+    const px = (n: number): string => formatQuotedPrice(n, { ...quoting, dp });
     const desc =
         up > 0
-            ? `up — last low ${formatPriceAtDp(last.low, dp)} above previous high ${formatPriceAtDp(prev.high, dp)} by ${formatNullableNumber(size, dp)}`
-            : `down — last high ${formatPriceAtDp(last.high, dp)} below previous low ${formatPriceAtDp(prev.low, dp)} by ${formatNullableNumber(size, dp)}`;
+            ? `up — last low ${px(last.low)} above previous high ${px(prev.high)} by ${formatNullableNumber(size, dp)}`
+            : `down — last high ${px(last.high)} below previous low ${px(prev.low)} by ${formatNullableNumber(size, dp)}`;
     if (!isFinitePositive(atr)) return `${label}: ${desc} (ATR N/A)`;
     const mult = size / atr;
     // Same comparison as `detectGapUp`/`detectGapDown` (size vs mult × ATR, not
@@ -522,6 +527,8 @@ export interface IndicatorStateInput {
     parabolicSar: ParabolicSARResult | undefined;
     /** Latest ATR value. */
     atr: number | null | undefined;
+    /** How prices are quoted (decimals and KRX tick table) — the gap line's bar prices. */
+    quoting: PriceQuoting;
     /** Decimal places for the MACD-cycle upper/middle/lower differences (same "difference precision" the rest of the technical prompt uses). */
     diffDp: number;
     /** Last bar's volume. */
@@ -578,6 +585,12 @@ export function buildIndicatorStateSection(input: IndicatorStateInput): string {
         atrPctLine(input.atr, input.price),
         macdCycleLine(input.ema, input.diffDp),
         volumeLine(input.lastVolume, input.priorVolumes),
-        gapLine(input.lastBar, input.prevBar, input.atr, input.diffDp),
+        gapLine(
+            input.lastBar,
+            input.prevBar,
+            input.atr,
+            input.quoting,
+            input.diffDp
+        ),
     ].join('\n');
 }
