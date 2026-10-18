@@ -258,13 +258,19 @@ export interface ExpirationSlot {
     key: ExpirationSlotKey;
     /** Korean label shown to users (e.g., "1개월"). */
     label: string;
-    /** Minimum days from today the chosen expiration must be at least. */
+    /**
+     * Ideal days from today for this slot (`0` for `0D`, which is chosen by ET
+     * calendar week instead). The mapped expiration is the one nearest this.
+     */
     targetDays: number;
     /**
-     * Optional upper bound (inclusive) on days-to-expiration. When set, the
-     * slot only accepts expirations within `[targetDays, maxDays]`. Used by
-     * `0D` so it doesn't steal a 1W-eligible expiration; standard slots
-     * (1W and onward) omit this field and behave as before.
+     * Optional inclusive lower bound on days-to-expiration. Absent on `0D`.
+     * An expiration below it is never used for the slot.
+     */
+    minDays?: number;
+    /**
+     * Inclusive upper bound on days-to-expiration. An expiration beyond it is
+     * never used; the slot is left unmapped instead.
      */
     maxDays?: number;
 }
