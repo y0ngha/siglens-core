@@ -47,6 +47,30 @@ describe('buildTriangleCandidates', () => {
         );
     });
 
+    it('drops the thrust target once the thrust has ended short of it and turned (2026-10-18 regression)', () => {
+        // Boundary: one pivot after E (the thrust running at 111, TRIANGLE
+        // itself) keeps the target — the test above.
+        // Two: the thrust from E (107.5) topped at 111, short of 125, and
+        // turned down to the provisional right-edge low 108 — that edge pivot
+        // counts, and the target is where the thrust could have gone.
+        expect(triangleFrom0(TRIANGLE)?.levels.map(l => l.label)).toEqual([
+            'invalidation',
+            'target',
+        ]);
+        const tri = triangleFrom0([...TRIANGLE, 108]);
+        expect(tri?.promptLine).toContain('; invalidation 104.00; score ');
+        expect(tri?.levels).toEqual([
+            { label: 'invalidation', price: 104, fromTime: 0 },
+        ]);
+        // The spent check still reads the target.
+        const { pivots, bars } = pivotsAt([...TRIANGLE, 108]);
+        expect(
+            buildTriangleCandidates(pivots, bars, 1, FMT)
+                .find(c => c.candidate.id === 'ew:down:0:tri')
+                ?.levels.map(l => l.label)
+        ).toEqual(['invalidation', 'target']);
+    });
+
     it("draws the invalidation and thrust target from the triangle's first pivot", () => {
         // From wave 0 (bar 0), across the whole triangle.
         expect(triangleFrom0(TRIANGLE)?.levels).toEqual([

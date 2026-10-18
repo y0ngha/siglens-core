@@ -1,5 +1,6 @@
 import type {
     AbcExtensionProjection,
+    Bar,
     FibonacciLevel,
     FibonacciProjection,
     SMCResult,
@@ -174,3 +175,40 @@ export const computeFibonacciProjection = (
         extensions: buildExtensions(high, low, direction),
     };
 };
+
+/**
+ * @internal
+ * Whether a close after the leg's end has gone past the leg's start — the
+ * 100% retracement. The leg's swings are confirmed with a lag, so a fast
+ * move can break the latest confirmed leg before a new swing confirms; its
+ * retracements then sit above (or below) the price as if it were still
+ * pulling back inside the leg, and its extensions project a move the price
+ * has already reversed (2026-10-18: an up-leg kept "pullback 23.6% / 61.8%"
+ * and "ext 127.2%" drawn while the price closed far under the leg's low).
+ * Any close counts, like a pattern's invalidation: a leg that closed through
+ * its start and came back has still failed.
+ */
+export const isBrokenFibLeg = (
+    fib: FibonacciProjection,
+    bars: readonly Bar[]
+): boolean =>
+    fib.direction === 'up'
+        ? bars.slice(fib.highIndex + 1).some(b => b.close < fib.low)
+        : bars.slice(fib.lowIndex + 1).some(b => b.close > fib.high);
+
+/**
+ * @internal
+ * Whether a close after C has gone past C. The extensions project the next
+ * A→B-direction leg from C as the end of the retracement; a close beyond C
+ * means the retracement did not end there, so every projection anchored on
+ * it is void (the same lag as `isBrokenFibLeg`).
+ */
+export const isBrokenAbcExtension = (
+    abc: AbcExtensionProjection,
+    bars: readonly Bar[]
+): boolean =>
+    bars
+        .slice(abc.cIndex + 1)
+        .some(b =>
+            abc.direction === 'up' ? b.close < abc.c : b.close > abc.c
+        );

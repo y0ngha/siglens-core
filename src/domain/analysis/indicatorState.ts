@@ -10,6 +10,7 @@ import { GAP_MIN_ATR_MULT } from '@/domain/signals/constants';
 import { ADX_TRENDING_THRESHOLD } from '@/domain/analysis/marketReferenceConstants';
 import {
     formatNullableNumber,
+    formatPriceAtDp,
     formatSignedNumber,
 } from '@/domain/analysis/promptFormat';
 import { classifyStackOrder } from '@/domain/analysis/trendStructure';
@@ -480,8 +481,8 @@ function gapLine(
     const size = up > 0 ? up : down;
     const desc =
         up > 0
-            ? `up — last low ${formatNullableNumber(last.low, dp)} above previous high ${formatNullableNumber(prev.high, dp)} by ${formatNullableNumber(size, dp)}`
-            : `down — last high ${formatNullableNumber(last.high, dp)} below previous low ${formatNullableNumber(prev.low, dp)} by ${formatNullableNumber(size, dp)}`;
+            ? `up — last low ${formatPriceAtDp(last.low, dp)} above previous high ${formatPriceAtDp(prev.high, dp)} by ${formatNullableNumber(size, dp)}`
+            : `down — last high ${formatPriceAtDp(last.high, dp)} below previous low ${formatPriceAtDp(prev.low, dp)} by ${formatNullableNumber(size, dp)}`;
     if (!isFinitePositive(atr)) return `${label}: ${desc} (ATR N/A)`;
     const mult = size / atr;
     // Same comparison as `detectGapUp`/`detectGapDown` (size vs mult × ATR, not

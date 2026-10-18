@@ -54,6 +54,7 @@ import {
     namedPoints,
     passesRules,
     pivotLabels,
+    projectedAbcLevels,
     recency,
     spansEnough,
     waveRatios,
@@ -237,7 +238,7 @@ function impulseLevels(count: Count, abcTag: AbcTag | null): ElliottLevel[] {
 
 /**
  * The count's invalidation (`levels[0]`), its finished waves' ratios and an
- * attached A–B–C's C targets, as prompt facts.
+ * attached A–B–C's C targets while C forms, as prompt facts.
  */
 function impulseFacts(
     count: Count,
@@ -251,7 +252,11 @@ function impulseFacts(
     return [
         `invalidation ${formatOverlayPrice(invalidation.price, fmt)}`,
         waveRatios(seq, forming),
-        ...(abc.length > 0 && abcTag !== null && abcTag.type !== null
+        // A done C's targets are history, not projections (`projectedAbcLevels`).
+        ...(abc.length > 0 &&
+        abcTag !== null &&
+        abcTag.type !== null &&
+        abcTag.cInProgress
             ? [abcTargets([seq[seq.length - 1], ...abc], fmt)]
             : []),
     ];
@@ -295,7 +300,12 @@ function toCandidate(
             ),
             ...correction,
         ],
-        levels: structureLevels(bars, all, levels, fmt),
+        levels: structureLevels(
+            bars,
+            all,
+            projectedAbcLevels(levels, abcTag?.cInProgress ?? false),
+            fmt
+        ),
         labels: pivotLabels(bars, all.slice(1), [...waves, ...abcNames]),
     };
 }

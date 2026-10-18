@@ -12,6 +12,7 @@ import {
     EW_TRI_E_OVERSHOOT,
     EW_TRI_LEG_RATIO_MIN,
     EW_TRI_LEG_TOLERANCE,
+    EW_TRI_THRUST_DONE_PIVOTS,
     EW_TRIANGLE_MIN_PIVOTS,
     EW_TRIANGLE_PIVOTS,
     EW_UNJUDGED_SCORE,
@@ -185,6 +186,19 @@ export function buildTriangleCandidates(
         const dir = firstLegDir(seq);
         const last = seq[n - 1].index;
         const levels = triangleLevels(seq, atEdge);
+        // Two pivots after E — the thrust's end, then any later pivot, the
+        // provisional right-edge one included: the thrust ran and turned at
+        // least 1.5 ATR short of its target (`isSpentCount` drops one that
+        // reached it). Its target is then history, not a price ahead — the
+        // same rule as a done A–B–C's C targets (`projectedAbcLevels`: C done
+        // once any pivot follows it). A thrust that later resumes is a new
+        // leg, not this target's run. The spent check keeps the target.
+        const thrustDone =
+            pivots.length - 1 - pivots.indexOf(seq[n - 1]) >=
+            EW_TRI_THRUST_DONE_PIVOTS;
+        const projected = thrustDone
+            ? levels.filter(l => l.label !== OVERLAY_LEVEL_LABELS.target)
+            : levels;
         return [
             {
                 structure: 'triangle',
@@ -198,7 +212,7 @@ export function buildTriangleCandidates(
                         `triangle (contracting), A ${dir}`,
                         state,
                         namedPoints(bars, seq, ['0', ...labels], fmt),
-                        triangleFacts(levels, fmt),
+                        triangleFacts(projected, fmt),
                         score
                     ),
                     segments: [
@@ -210,7 +224,7 @@ export function buildTriangleCandidates(
                         boundaryLine(bars, seq[1], seq[3], last, 'boundary_ac'),
                         boundaryLine(bars, seq[2], seq[4], last, 'boundary_bd'),
                     ],
-                    levels: structureLevels(bars, seq, levels, fmt),
+                    levels: structureLevels(bars, seq, projected, fmt),
                     labels: pivotLabels(bars, seq.slice(1), labels),
                 },
             },

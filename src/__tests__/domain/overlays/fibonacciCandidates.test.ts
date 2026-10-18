@@ -8,14 +8,21 @@ import type {
 import { buildFibonacciCandidates } from '@/domain/overlays/fibonacciCandidates';
 
 const FMT = { timeframe: '1Day' as const, priceDp: 2 };
+// Closes at 110: inside every leg (100–120) and exactly at each ABC's C, so
+// no fixture leg or ABC is broken (`isBrokenFibLeg`, `isBrokenAbcExtension`).
 const bars: Bar[] = Array.from({ length: 30 }, (_, i) => ({
     time: 5000 + i * 86400,
-    open: 1,
-    high: 1,
-    low: 1,
-    close: 1,
+    open: 110,
+    high: 110,
+    low: 110,
+    close: 110,
     volume: 1,
 }));
+/** `bars` with the close (and range) of bar `i` moved to `close`. */
+const withClose = (i: number, close: number): Bar[] =>
+    bars.map((b, k) =>
+        k === i ? { ...b, open: close, high: close, low: close, close } : b
+    );
 const fib = (lowIndex: number, highIndex: number): FibonacciProjection => ({
     high: 120,
     low: 100,
@@ -68,6 +75,58 @@ const abcDown = (): AbcExtensionProjection => ({
 });
 
 describe('buildFibonacciCandidates', () => {
+    it('drops a leg a close after its end has gone past its start (2026-10-18 regression)', () => {
+        const only = (f: FibonacciProjection, b: Bar[]) =>
+            buildFibonacciCandidates(
+                {
+                    short: horizon(f),
+                    medium: horizon(null),
+                    long: horizon(null),
+                } as MarketReference,
+                b,
+                FMT
+            ).map(c => c.id);
+        // Up-leg 100 (bar 10) → 120 (bar 20): a close under 100 after bar 20
+        // leaves its "pullback" levels and ext targets describing the past.
+        expect(only(fib(10, 20), withClose(25, 99))).toEqual([]);
+        // At the start is not through it; before the leg's end does not count.
+        expect(only(fib(10, 20), withClose(25, 100))).toHaveLength(1);
+        expect(only(fib(10, 20), withClose(15, 99))).toHaveLength(1);
+        // Down-leg 120 (bar 10) → 100 (bar 20): broken by a close over 120.
+        expect(only(fib(20, 10), withClose(25, 121))).toEqual([]);
+        expect(only(fib(20, 10), withClose(25, 119))).toHaveLength(1);
+    });
+
+    it('drops an ABC projection a close after C has gone past C, falling back to the next horizon', () => {
+        const ref = (b: AbcExtensionProjection) =>
+            ({
+                short: abcHorizon(abcUp()),
+                medium: abcHorizon(b),
+                long: horizon(null),
+            }) as MarketReference;
+        // abcUp's C is 110 at bar 12: a close at 109 after it voids it, and
+        // the medium horizon's ABC (C 108 at bar 26, nothing after 27) takes over.
+        const later = { ...abcUp(), c: 108, cIndex: 26 };
+        const out = buildFibonacciCandidates(
+            ref(later),
+            withClose(20, 109),
+            FMT
+        );
+        expect(out.map(c => c.id)).toEqual([`fib:abc:${bars[26].time}`]);
+        // Down ABC (C 110): a close at 111 after C voids it.
+        expect(
+            buildFibonacciCandidates(
+                {
+                    short: abcHorizon(abcDown()),
+                    medium: horizon(null),
+                    long: horizon(null),
+                } as MarketReference,
+                withClose(20, 111),
+                FMT
+            )
+        ).toEqual([]);
+    });
+
     it('one candidate per distinct anchor leg; horizons sharing a leg collapse', () => {
         const ref = {
             short: horizon(fib(10, 20)),

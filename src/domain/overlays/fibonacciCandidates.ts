@@ -11,6 +11,8 @@ import { formatFibRatio } from '@/domain/analysis/marketReference';
 import {
     buildExtensions,
     buildRetracements,
+    isBrokenAbcExtension,
+    isBrokenFibLeg,
 } from '@/domain/analysis/fibLevels';
 import {
     FIB_ABC_OVERLAY_RATIOS,
@@ -132,6 +134,12 @@ function abcCandidate(
  * Horizon fib legs (deduped by anchor pair) plus the first ABC projection
  * (spec 2026-09-28 §3.4). Level prices use the same formulas as
  * `fibLevels.ts` so the drawn lines equal the `Fib table:` rows.
+ *
+ * A leg or ABC the price has already closed through (`isBrokenFibLeg`,
+ * `isBrokenAbcExtension`) is not offered: drawn, its pullback levels and
+ * extension targets read as live levels on a structure that already failed.
+ * The prompt keeps such a leg's anchor line with its `(leg fully retraced)`
+ * note, so the model still knows it.
  */
 export function buildFibonacciCandidates(
     ref: MarketReference,
@@ -141,13 +149,15 @@ export function buildFibonacciCandidates(
     const seenLegs = new Set<string>();
     const legs = HORIZONS.flatMap(key => {
         const fib = ref[key].fibProjection;
-        if (!fib) return [];
+        if (!fib || isBrokenFibLeg(fib, bars)) return [];
         const legKey = `${fib.lowIndex}-${fib.highIndex}`;
         if (seenLegs.has(legKey)) return [];
         seenLegs.add(legKey);
         return [legCandidate(key, fib, bars, fmt)];
     });
-    const abc = HORIZONS.map(key => ref[key].abcExtension).find(x => x != null);
+    const abc = HORIZONS.map(key => ref[key].abcExtension).find(
+        x => x != null && !isBrokenAbcExtension(x, bars)
+    );
     return [...legs, ...(abc ? [abcCandidate(abc, bars, fmt)] : [])].slice(
         0,
         FIB_CANDIDATE_LIMIT

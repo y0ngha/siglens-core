@@ -28,6 +28,7 @@ import {
     formatOverlayPoint,
     formatOverlayPrice,
 } from '@/domain/overlays/format';
+import { roundPriceAtDp } from '@/domain/analysis/promptFormat';
 
 /**
  * Building blocks shared by the Elliott structure counters (spec
@@ -187,7 +188,9 @@ export const structureLevels = (
         .filter(l => l.price > 0)
         .map(({ label, price }) => ({
             label,
-            price: Number(price.toFixed(fmt.priceDp)),
+            price: Number(
+                roundPriceAtDp(price, fmt.priceDp).toFixed(fmt.priceDp)
+            ),
             fromTime: bars[pivots[0].index].time,
         }));
 
@@ -382,6 +385,25 @@ export function abcTargetLevels(seq: readonly PivotPoint[]): ElliottLevel[] {
         breach: breachOf(sign),
     }));
 }
+
+/**
+ * @internal
+ * The levels an A–B–C still projects ahead of the price. C's targets are
+ * where a FORMING C may run to; once a later pivot has followed C, C is over
+ * and its 100% / 161.8% projections only say where it could have ended — a
+ * finished C that stopped short left them hanging above or below the price
+ * as live targets (2026-10-18: an impulse-down + A–B–C-up count kept drawing
+ * "A–B–C target 100% / 161.8%" well above the price after C topped and the
+ * price fell back under B). The full list still feeds `isSpentCount`: a done
+ * C the price later carries to a target was not done after all.
+ */
+export const projectedAbcLevels = (
+    levels: readonly ElliottLevel[],
+    cInProgress: boolean
+): ElliottLevel[] =>
+    cInProgress
+        ? [...levels]
+        : levels.filter(l => !l.label.startsWith(OVERLAY_LEVEL_LABELS.target));
 
 /**
  * @internal

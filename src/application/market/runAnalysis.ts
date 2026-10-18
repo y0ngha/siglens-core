@@ -32,6 +32,7 @@ import { marketEventHorizonMs } from '@/domain/analysis/marketEvents';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { normalizeIdList } from '@/domain/analysis/normalize';
 import { asObject } from '@/domain/analysis/normalizePrimitives';
+import { roundAnalysisPrices } from '@/domain/analysis/roundAnalysisPrices';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
@@ -568,16 +569,26 @@ async function runAnalysisImpl(
         normalizeIdList(asObject(rawResult)?.trendlineIds),
         skills
     );
-    const reconciled = postProcessAnalysisWithReconcile(
-        alignPatternGeometry(
-            enriched,
-            resolvedOverlays.chartOverlays,
-            patternGeometries
+    // KRX prices are rounded to their tick on both sides of post-processing:
+    // before, so the plan check and the risk:reward line read the levels the
+    // card will show; after, for the measured pattern targets
+    // post-processing appends (`roundAnalysisPrices`).
+    const reconciled = roundAnalysisPrices(
+        postProcessAnalysisWithReconcile(
+            roundAnalysisPrices(
+                alignPatternGeometry(
+                    enriched,
+                    resolvedOverlays.chartOverlays,
+                    patternGeometries
+                ),
+                options.currency
+            ),
+            lastClose,
+            atr,
+            options.currency,
+            locale
         ),
-        lastClose,
-        atr,
-        options.currency,
-        locale
+        options.currency
     );
     if (overlayBuildFailures.length > 0) {
         console.warn('[ChartOverlays] candidate builder failed', {

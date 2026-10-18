@@ -129,6 +129,7 @@ import {
     equityListingContext,
     formatBarDateTime,
     formatNullableNumber,
+    formatPriceAtDp,
     formatSignedNumber,
     formatSignedPercent,
     priceDecimalPlaces,
@@ -302,7 +303,7 @@ const formatMarketSection = (bars: Bar[], priceDp: number): string => {
 
     return [
         '## Analysis Snapshot',
-        `- Snapshot Price (price captured at analysis time; not a live quote): ${formatNullableNumber(last.close, priceDp)}`,
+        `- Snapshot Price (price captured at analysis time; not a live quote): ${formatPriceAtDp(last.close, priceDp)}`,
         `- Price Change %: ${changeRate}`,
         `- Volume: ${formatVolume(last.volume)}`,
     ].join('\n');
@@ -330,7 +331,7 @@ const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
         return ['## Long-term Context', '- No data available'].join('\n');
     }
 
-    const px = (n: number): string => formatNullableNumber(n, priceDp);
+    const px = (n: number): string => formatPriceAtDp(n, priceDp);
     // One non-finite high or low would turn the whole period extreme into NaN.
     const highs = bars.map(b => b.high).filter(Number.isFinite);
     const lows = bars.map(b => b.low).filter(Number.isFinite);
@@ -360,7 +361,7 @@ const formatLongTermContext = (bars: Bar[], priceDp: number): string => {
 };
 
 const formatBarRow = (bar: Bar, priceDp: number): string => {
-    const px = (n: number): string => formatNullableNumber(n, priceDp);
+    const px = (n: number): string => formatPriceAtDp(n, priceDp);
     const datetime = formatBarDateTime(bar.time * MS_PER_SECOND);
     const pattern = detectCandlePattern(bar);
     return `[ts:${bar.time}] ${datetime} | O:${px(bar.open)} H:${px(bar.high)} L:${px(bar.low)} C:${px(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
@@ -631,7 +632,7 @@ const formatLiquidityLine = (
     price: number | null,
     atr: number | null
 ): string =>
-    `- ${label} at ${formatNullableNumber(eq.price, priceDp)} (${liquidityKind})${formatSmcDistanceSuffix(eq.price, price, atr)} (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
+    `- ${label} at ${formatPriceAtDp(eq.price, priceDp)} (${liquidityKind})${formatSmcDistanceSuffix(eq.price, price, atr)} (${barsAgoCount(eq.secondIndex, totalBars)} bars ago, span ${eq.secondIndex - eq.firstIndex} bars)`;
 
 // When adding a new field to SMCResult, update this check accordingly.
 const isSMCEmpty = (smc: SMCResult): boolean =>
@@ -652,7 +653,7 @@ const formatZoneLine = (
     priceDp: number
 ): string | null =>
     zone !== null
-        ? `- ${label}: ${formatNullableNumber(zone.low, priceDp)} ~ ${formatNullableNumber(zone.high, priceDp)}`
+        ? `- ${label}: ${formatPriceAtDp(zone.low, priceDp)} ~ ${formatPriceAtDp(zone.high, priceDp)}`
         : null;
 
 // Priority: premium > discount > equilibrium (most actionable first).
@@ -692,7 +693,7 @@ const formatSMCSection = (
         ].join('\n');
     }
 
-    const px = (n: number): string => formatNullableNumber(n, priceDp);
+    const px = (n: number): string => formatPriceAtDp(n, priceDp);
     const totalBars = bars.length;
     const currentPrice = totalBars > 0 ? bars[totalBars - 1].close : null;
 
@@ -945,7 +946,7 @@ const formatReferenceLevelLine = (
     level: ReferenceLevel,
     priceDp: number
 ): string =>
-    `- ${formatNullableNumber(level.price, priceDp)} (${level.label}; ${fmt(Math.abs(level.distancePercent))}% away${level.atPrice ? '; at price — inside bar noise, not a stop or target' : ''})`;
+    `- ${formatPriceAtDp(level.price, priceDp)} (${level.label}; ${fmt(Math.abs(level.distancePercent))}% away${level.atPrice ? '; at price — inside bar noise, not a stop or target' : ''})`;
 
 const HORIZON_LABEL: Record<HorizonKey, string> = {
     short: 'Short-term',
@@ -1007,7 +1008,7 @@ const cryptoHorizonSpan = (barCount: number, timeframe: Timeframe): string => {
  */
 export const formatTablePrice = (price: number, priceDp: number): string =>
     Number.isFinite(price) && price > 0
-        ? formatNullableNumber(price, priceDp)
+        ? formatPriceAtDp(price, priceDp)
         : 'N/A';
 
 /** @internal `Fib table:` line — every retracement and extension of the horizon's anchor leg. */
@@ -1079,8 +1080,8 @@ const formatHorizonBlock = (
             ? []
             : [
                   (fib.direction === 'up'
-                      ? `Fib anchor: swing low ${formatNullableNumber(fib.low, priceDp)} → swing high ${formatNullableNumber(fib.high, priceDp)} (up leg)`
-                      : `Fib anchor: swing high ${formatNullableNumber(fib.high, priceDp)} → swing low ${formatNullableNumber(fib.low, priceDp)} (down leg)`) +
+                      ? `Fib anchor: swing low ${formatPriceAtDp(fib.low, priceDp)} → swing high ${formatPriceAtDp(fib.high, priceDp)} (up leg)`
+                      : `Fib anchor: swing high ${formatPriceAtDp(fib.high, priceDp)} → swing low ${formatPriceAtDp(fib.low, priceDp)} (down leg)`) +
                       retracementDepthSuffix(fib, currentPrice),
               ];
     // Same reasoning as `fibLine`, for the separate A→B→C swing triplet the
@@ -1091,7 +1092,7 @@ const formatHorizonBlock = (
         abc == null
             ? []
             : [
-                  `Fib ABC anchor: A ${formatNullableNumber(abc.a, priceDp)} → B ${formatNullableNumber(abc.b, priceDp)} → C ${formatNullableNumber(abc.c, priceDp)} (${abc.direction})`,
+                  `Fib ABC anchor: A ${formatPriceAtDp(abc.a, priceDp)} → B ${formatPriceAtDp(abc.b, priceDp)} → C ${formatPriceAtDp(abc.c, priceDp)} (${abc.direction})`,
               ];
     // Complete Fib sets (spec 2026-09-18 analysis-prompt decision): the
     // nearest-level lists below are capped per side, so a far ratio the model
@@ -1487,8 +1488,8 @@ const formatChandelierLine = (
     }
     const activeStop =
         last.trend === 'long'
-            ? `long stop ${formatNullableNumber(last.longStop, priceDp)}`
-            : `short stop ${formatNullableNumber(last.shortStop, priceDp)}`;
+            ? `long stop ${formatPriceAtDp(last.longStop, priceDp)}`
+            : `short stop ${formatPriceAtDp(last.shortStop, priceDp)}`;
     return `- Chandelier Exit: ${activeStop} (trend: ${last.trend}) ${PRO_RELIABILITY_NOTE.chandelier}`;
 };
 
@@ -1525,7 +1526,7 @@ const formatIndicatorSection = (
     // differences (MACD, ATR) at the difference precision; bounded oscillators (RSI, DMI,
     // %K, CCI, MFI, CMF) keep `fmt`.
     const px = (n: number | null): string =>
-        formatNullableNumber(n, precision.price);
+        formatPriceAtDp(n, precision.price);
     const dx = (n: number | null): string =>
         formatNullableNumber(n, precision.difference);
     const lastRSI = lastNonNull(indicators.rsi);

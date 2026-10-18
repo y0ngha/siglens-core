@@ -29,6 +29,7 @@ import {
     namedPoints,
     pivotLabels,
     pivotRuns,
+    projectedAbcLevels,
     recency,
 } from '@/domain/overlays/elliottShared';
 import { formatOverlayPrice } from '@/domain/overlays/format';
@@ -57,16 +58,18 @@ const abcLevels = (
 ];
 
 /**
- * The same values as prompt facts: the C targets, and a zigzag's
- * `invalidation <price>`.
+ * The same values as prompt facts: the C targets while C forms, and a
+ * zigzag's `invalidation <price>`.
  */
 function abcFacts(
     seq: readonly PivotPoint[],
     type: AbcType,
+    cInProgress: boolean,
     fmt: OverlayFormat
 ): string[] {
     return [
-        abcTargets(seq, fmt),
+        // A done C's targets are history, not projections (`projectedAbcLevels`).
+        ...(cInProgress ? [abcTargets(seq, fmt)] : []),
         ...(type === 'zigzag'
             ? [`invalidation ${formatOverlayPrice(seq[0].price, fmt)}`]
             : []),
@@ -116,6 +119,7 @@ export function buildAbcCandidates(
                 3);
         const dir = firstLegDir(seq);
         const levels = abcLevels(seq, type);
+        const drawn = projectedAbcLevels(levels, inProgress);
         return [
             {
                 structure: 'abc',
@@ -129,7 +133,7 @@ export function buildAbcCandidates(
                         `A–B–C ${type}, A ${dir}`,
                         inProgress ? 'C in progress' : 'complete',
                         namedPoints(bars, seq, ['0', 'A', 'B', 'C'], fmt),
-                        abcFacts(seq, type, fmt),
+                        abcFacts(seq, type, inProgress, fmt),
                         score
                     ),
                     segments: legSegments(bars, seq, [
@@ -137,7 +141,7 @@ export function buildAbcCandidates(
                         'wave_B',
                         'wave_C',
                     ]),
-                    levels: structureLevels(bars, seq, levels, fmt),
+                    levels: structureLevels(bars, seq, drawn, fmt),
                     labels: pivotLabels(bars, seq.slice(1), ['A', 'B', 'C']),
                 },
             },
