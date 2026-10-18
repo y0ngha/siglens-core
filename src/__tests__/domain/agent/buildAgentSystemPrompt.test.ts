@@ -38,6 +38,32 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('a market analyst, not a broker');
     });
 
+    it('한국어 전망 질문 트리거를 분석 라우팅 행에 싣는다', () => {
+        const row = prompt
+            .split('\n')
+            .find(line => line.includes('Outlook, "how is it doing"'));
+        expect(row).toBeDefined();
+        for (const trigger of [
+            '전망',
+            '앞으로 어때',
+            '어떻게 될까',
+            '오를까',
+            '떨어질까',
+            '반등할까',
+            '분석해줘',
+            '사도 될까',
+        ]) {
+            expect(row).toContain(trigger);
+        }
+        expect(row).toContain('get_cached_analysis');
+        expect(prompt).toContain('matches the outlook row above');
+    });
+
+    it('눌림 기저율을 보유 승률로 말하지 않게 하고 caveat를 전한다', () => {
+        expect(prompt).toContain('never a holding-period win rate');
+        expect(prompt).toContain('pullback.caveat is a string');
+    });
+
     it('현재 시각(ET·KST)과 장 상태는 턴 컨텍스트에 주입한다', () => {
         const context = buildAgentTurnContext({
             locale: 'ko',
@@ -450,7 +476,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-18.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-18.2');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
@@ -464,7 +490,7 @@ describe('buildAgentSystemPrompt', () => {
     /** 앵간한 분석 질문엔 규칙 기반 컨플루언스를 반드시 확인·언급한다(사용자 결정 2026-09-15). */
     it('종목 분석 질문에는 get_bars_indicators 컨플루언스를 부르고 답에 밝히게 한다', () => {
         expect(prompt).toContain(
-            'about a symbol → get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
+            ') → get_cached_analysis and get_bars_indicators (timeframe 1Day unless the user names another) together'
         );
         expect(prompt).toContain('reflect how many indicator groups agree');
         // 컨플루언스는 예측이 아니라 서술용 집계다 — 측정된 우위가 없다(2026-09-25 재측정).

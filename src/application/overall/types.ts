@@ -282,6 +282,7 @@ export interface OverallDependencyInputs {
         | 'reasoning'
         | 'priorAnalyses'
         | 'marketEvents'
+        | 'earningsDates'
         | 'positionBucket'
         | 'session'
     > & {

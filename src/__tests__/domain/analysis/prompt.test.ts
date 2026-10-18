@@ -4885,7 +4885,7 @@ describe('prompt', () => {
         it('"enter"는 bullish confluence 대신 지지 근처를 근거로 받고, 옛 규칙 문구는 남지 않는다', () => {
             const out = result();
             expect(out).toContain(
-                '"enter" (other charts): price near support + risk level not high.'
+                '"enter" (other charts): price near support and no high-risk warning sign (very high ATR, a company event in the last sessions, a close under MA200).'
             );
             expect(out).not.toContain('bullish confluence from 2+ categories');
         });
@@ -4991,7 +4991,7 @@ describe('prompt', () => {
                 },
             ]);
             expect(withEarnings).toContain(
-                'Entry verdict (computed): none — a high-impact earnings event'
+                'Entry verdict (computed): none — a high-impact earnings-related news event'
             );
             expect(withEarnings).not.toContain(
                 'Entry verdict (computed): enter — sell-off path.'
@@ -5939,9 +5939,29 @@ describe('prompt', () => {
             const proSection = prompt.slice(prompt.indexOf(PRO_HEADER));
             const pctbLine = proSection
                 .split('\n')
-                .find(l => l.startsWith('- Bollinger %B:'));
+                .find(l => l.startsWith('- Bollinger %B'));
             expect(pctbLine).toBeDefined();
             expect(pctbLine).toContain(PRO_RELIABILITY_NOTE.bollingerPctB);
+        });
+
+        it('%B 라벨이 밴드 내 위치임을 밝히고 BandWidth와 구분한다', () => {
+            const prompt = buildRealisticPrompt();
+            const line = prompt
+                .split('\n')
+                .find(l => l.startsWith('- Bollinger %B'));
+            expect(line).toContain(
+                '%B (price position within the bands: 0 = lower band, 1 = upper band)'
+            );
+            if (line?.includes('BandWidth')) {
+                expect(line).toContain('a separate measure from %B');
+            }
+        });
+
+        it('washout Measured 줄 인용 시 SIGLENS 백테스트임을 밝히게 한다', () => {
+            const prompt = buildRealisticPrompt();
+            expect(prompt).toContain(
+                "say it is SIGLENS's backtest across many stocks since 2000, not this stock's own history"
+            );
         });
 
         it('advisory 지표 라인이 advisory 주석을 포함한다', () => {
@@ -6128,7 +6148,9 @@ describe('prompt', () => {
             expect(regimeSection).toContain('insufficient data');
             // Pro-indicator lines fall back to N/A while preserving the notes.
             const proSection = prompt.slice(prompt.indexOf(PRO_HEADER));
-            expect(proSection).toContain('Bollinger %B: N/A');
+            expect(proSection).toContain(
+                'Bollinger %B (price position within the bands: 0 = lower band, 1 = upper band): N/A'
+            );
             expect(proSection).toContain(PRO_RELIABILITY_NOTE.bollingerPctB);
         });
 
@@ -6264,7 +6286,9 @@ describe('marketEvents (buildAnalysisPrompt)', () => {
         const result = build([marketEvent(5)]);
 
         expect(result.dynamic).toContain('## Market Events');
-        expect(result.dynamic).toContain('earnings, bullish, high impact');
+        expect(result.dynamic).toContain(
+            'earnings-related news, bullish, high impact'
+        );
     });
 
     it('the section never reaches `stable`', () => {

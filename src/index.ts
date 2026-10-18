@@ -288,6 +288,9 @@ export {
     validateKeyLevels,
 } from './domain/analysis/keyLevels';
 export { computeMarketReference } from './domain/analysis/marketReference';
+export { isCompanyEarningsEvent } from './domain/analysis/earningsEvents';
+export { pullbackEventCaveat } from './domain/analysis/confluenceSection';
+export type { PullbackEventCaveatInput } from './domain/analysis/confluenceSection';
 export { krxTickSize, roundToKrxTick } from './domain/analysis/krxTick';
 export type { KrxTickTable } from './domain/analysis/krxTick';
 export { classifyMaStack } from './domain/analysis/trendStructure';

@@ -1,3 +1,4 @@
+import { eventCategoryLabel } from '@/domain/analysis/earningsEvents';
 import { selectMarketEvents } from '@/domain/analysis/marketEvents';
 import { barTimeMs, findAnchorBarIndex } from '@/domain/analysis/priorAnalysis';
 import {
@@ -17,7 +18,11 @@ import type { Bar, MarketEvent, Timeframe } from '@/domain/types';
  * test could exercise (CONVENTIONS.md#TE-5), matching how
  * `selectPriorAnalyses` handles the same invariant.
  */
-function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string {
+function formatEvent(
+    entry: MarketEvent,
+    bars: readonly Bar[],
+    earningsDates: readonly string[] | undefined
+): string {
     const anchorIndex = findAnchorBarIndex(bars, entry.publishedAt.getTime())!;
 
     const barsAgo = bars.length - 1 - anchorIndex;
@@ -26,7 +31,7 @@ function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string {
     // up with the candle it landed on.
     const at = formatBarDateTime(barTimeMs(bars[anchorIndex]));
 
-    return `- ${barsAgo} bars ago (${at}): ${entry.category}, ${entry.sentiment}, ${entry.impact} impact`;
+    return `- ${barsAgo} bars ago (${at}): ${eventCategoryLabel(entry, earningsDates)}, ${entry.sentiment}, ${entry.impact} impact`;
 }
 
 /**
@@ -48,17 +53,23 @@ function formatEvent(entry: MarketEvent, bars: readonly Bar[]): string {
  * @param bars - OHLCV history for the same symbol + timeframe, oldest-first.
  * @param symbol - Ticker symbol, for the section header.
  * @param timeframe - Chart timeframe, for the section header label.
+ * @param earningsDates - `YYYY-MM-DD` report dates of this company. An `earnings`
+ *   row off every date renders as earnings-themed news; when omitted no row is
+ *   ever presented as the company's own report (conservative default).
  */
 export function formatMarketEventsSection(
     events: readonly MarketEvent[],
     bars: readonly Bar[],
     symbol: string,
-    timeframe: Timeframe
+    timeframe: Timeframe,
+    earningsDates?: readonly string[]
 ): string {
     const selected = selectMarketEvents(events, bars);
     if (selected.length === 0) return '';
 
-    const lines = selected.map(entry => formatEvent(entry, bars));
+    const lines = selected.map(entry =>
+        formatEvent(entry, bars, earningsDates)
+    );
 
     const header = `## Market Events (${symbol} · ${TIMEFRAME_LABEL[timeframe]} · what landed on the bars above)`;
     return [header, ...lines].join('\n');

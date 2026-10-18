@@ -1049,9 +1049,17 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * the raw fraction (`205312.5`). Bytes change for KRW prompts with a pattern
  * whose halved height has a fraction, and for every `etp` prompt.
  *
+ * **`p31`** — company earnings events (2026-10-18). With `earningsDates`
+ * supplied, an `earnings` market event off every report date renders as
+ * "earnings-related news (not this company's report)" and no longer suspends
+ * the washout verdict; without it the row reads "earnings-related news".
+ * The sell-off base-rate text states it is the hit rate of a short trade, not a
+ * holding win rate. Bytes change for prompts with an `earnings` event or a
+ * pullback reading.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p30' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p31' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

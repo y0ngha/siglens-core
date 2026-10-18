@@ -18,6 +18,8 @@ import {
     buildPlanCheck,
     calculateMA,
     rsiZone,
+    isCompanyEarningsEvent,
+    pullbackEventCaveat,
     planEntryPrice,
     CONFLUENCE_HTF_MODE,
     CONFLUENCE_MIN,
@@ -131,6 +133,17 @@ describe('public API exports', () => {
         const snap: ConfluenceSnapshot | null = evaluateConfluence([], opts);
         expect(params.min).toBe(3);
         expect(snap).toBeNull();
+    });
+
+    it('exports the company-earnings helpers (server-only, API-1 asymmetry)', () => {
+        expect(typeof isCompanyEarningsEvent).toBe('function');
+        expect(
+            isCompanyEarningsEvent(new Date('2026-10-15'), ['2026-11-18'])
+        ).toBe(false);
+        expect(typeof pullbackEventCaveat).toBe('function');
+        expect(
+            pullbackEventCaveat({ events: [], earningsDates: [], bars: [] })
+        ).toBeNull();
     });
 
     it('exports rsiZone so consumers share one RSI zone boundary', () => {
