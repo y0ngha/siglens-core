@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.23.0](https://github.com/y0ngha/siglens-core/compare/v2.22.4...v2.23.0) (2026-10-18)
+
+### Features
+
+* KRX ETF·ETN 호가표(etp) 지원 — 가격 표기를 명시적 PriceQuoting으로, 잘못된 칸의 후보 ID를 unknown과 분리 ([#287](https://github.com/y0ngha/siglens-core/issues/287)) ([7232cb4](https://github.com/y0ngha/siglens-core/commit/7232cb40eeaafacb0b0c59672a8ed7d30aedea8d))
+
 ## [2.22.4](https://github.com/y0ngha/siglens-core/compare/v2.22.3...v2.22.4) (2026-10-18)
 
 ### Bug Fixes
