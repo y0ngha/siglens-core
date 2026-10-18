@@ -1311,6 +1311,13 @@ const doubleTop = calm(DOUBLE_TOP);
 const doubleScenarios: Scenario[] = [
     scenario(
         'double_top',
+        'e failure',
+        'a slide through the 102.9 neckline to 99, then back over it to 106.5: still drawn, printed as a failed breakout (2026-10-18)',
+        calm([...DOUBLE_TOP.slice(0, -1), [62, 99], [68, 106.5]], 0.05),
+        { drawn: 'double_top', status: 'failed breakout' }
+    ),
+    scenario(
+        'double_top',
         'a textbook',
         'peaks 110 / 110.5, 14 bars apart, trough 103',
         doubleTop,
@@ -1746,6 +1753,13 @@ const htfScenarios: Scenario[] = [
 
 const cup = calm(CUP_AND_HANDLE);
 const cupScenarios: Scenario[] = [
+    scenario(
+        'cup_and_handle',
+        'e failure',
+        'a rally through the 119.6 rim to 121, then back under it to 117.5: still drawn, printed as a failed breakout (2026-10-18)',
+        calm([...CUP_AND_HANDLE, [93, 121], [97, 117.5]], 0.05),
+        { drawn: 'cup_and_handle', status: 'failed breakout' }
+    ),
     scenario(
         'cup_and_handle',
         'a textbook',

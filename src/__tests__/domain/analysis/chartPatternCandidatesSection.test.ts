@@ -498,40 +498,164 @@ describe('printedPatternGeometry', () => {
 });
 
 describe('isFailedBreakout', () => {
+    const UNDIRECTED = { direction: null } as const;
+    const up = (breakoutLevel: number) =>
+        ({ direction: 'up', breakoutLevel }) as const;
+    const down = (breakoutLevel: number) =>
+        ({ direction: 'down', breakoutLevel }) as const;
     // undirectedRectangle: upper 20 touched at bars 1 and 3, lower 10 at 2 and 4.
     const closes = (tail: number[]): Bar[] =>
         makeBars([15, 15, 15, 15, 15, 15, ...tail]);
 
     it('an undirected pair: a close over the upper boundary after its last touch, then back inside, failed', () => {
         expect(
-            isFailedBreakout(undirectedRectangle, null, closes([21, 15]), 1)
+            isFailedBreakout(
+                undirectedRectangle,
+                UNDIRECTED,
+                closes([21, 15]),
+                1
+            )
         ).toBe(true);
     });
 
     it('is not failed while the last close is itself outside (that is broken)', () => {
         expect(
-            isFailedBreakout(undirectedRectangle, null, closes([15, 21]), 1)
+            isFailedBreakout(
+                undirectedRectangle,
+                UNDIRECTED,
+                closes([15, 21]),
+                1
+            )
         ).toBe(false);
     });
 
     it('a close beyond by no more than the containment slack is not a breakout', () => {
         expect(
-            isFailedBreakout(undirectedRectangle, null, closes([20.25, 15]), 1)
+            isFailedBreakout(
+                undirectedRectangle,
+                UNDIRECTED,
+                closes([20.25, 15]),
+                1
+            )
         ).toBe(false);
     });
 
     it('a directed pair only watches its breakout side', () => {
         expect(
-            isFailedBreakout(undirectedRectangle, 'up', closes([9, 15]), 1)
+            isFailedBreakout(undirectedRectangle, up(20), closes([9, 15]), 1)
         ).toBe(false);
         expect(
-            isFailedBreakout(undirectedRectangle, 'down', closes([9, 15]), 1)
+            isFailedBreakout(undirectedRectangle, down(10), closes([9, 15]), 1)
         ).toBe(true);
     });
 
-    it('never applies to families without a dashed boundary (a double top)', () => {
+    it('a neckline family: a close through the neckline after the last structural point, then back, failed (2026-10-18)', () => {
+        // tallDoubleTop: peaks 25 at bars 1 and 3, neckline 10 (breakout down).
+        // Closed at 8 (beyond 10 by more than the 0.25 slack), back at 15.
         expect(
-            isFailedBreakout(tallDoubleTop, 'down', closes([0, 15]), 1)
+            isFailedBreakout(tallDoubleTop, down(10), closes([8, 15]), 1)
+        ).toBe(true);
+        // Still under the neckline at the last bar: broken, not failed.
+        expect(
+            isFailedBreakout(tallDoubleTop, down(10), closes([15, 8]), 1)
         ).toBe(false);
+        // Within the slack is no breakout.
+        expect(
+            isFailedBreakout(tallDoubleTop, down(10), closes([9.8, 15]), 1)
+        ).toBe(false);
+        // Only after the last structural point (bar 3): the pattern's own
+        // trough at the neckline does not count.
+        expect(
+            isFailedBreakout(
+                tallDoubleTop,
+                down(10),
+                makeBars([15, 25, 8, 25, 15, 15, 15]),
+                1
+            )
+        ).toBe(false);
+    });
+
+    it('a retest of the neckline from the broken side is not a failure', () => {
+        // Broke to 8, retests to 9.9 — still under the 10 neckline (that is
+        // `broken`), though within the 0.25 slack of it.
+        expect(
+            isFailedBreakout(tallDoubleTop, down(10), closes([8, 9.9]), 1)
+        ).toBe(false);
+        expect(
+            isFailedBreakout(tallDoubleTop, down(10), closes([8, 10]), 1)
+        ).toBe(true);
+    });
+
+    it('an up-breaking neckline family mirrors it (a double bottom)', () => {
+        const doubleBottom: QualifiedPattern = {
+            ...tallDoubleTop,
+            id: 'double_bottom',
+            pivots: [
+                pivot(1, 5, 'low'),
+                pivot(2, 20, 'high'),
+                pivot(3, 5, 'low'),
+            ],
+            shape: { kind: 'extreme', neckline: pivot(2, 20, 'high') },
+        };
+        expect(
+            isFailedBreakout(doubleBottom, up(20), closes([22, 15]), 1)
+        ).toBe(true);
+        expect(
+            isFailedBreakout(doubleBottom, up(20), closes([22, 21]), 1)
+        ).toBe(false);
+        // The opposite side is not its breakout.
+        expect(isFailedBreakout(doubleBottom, up(20), closes([2, 15]), 1)).toBe(
+            false
+        );
+    });
+
+    it('every other directed family reads its printed breakout level from its last structural point', () => {
+        // The check reads only the family kind and `endIndex` (bar 3).
+        const shaped = (
+            shape: QualifiedPattern['shape']
+        ): QualifiedPattern => ({
+            ...tallDoubleTop,
+            shape,
+        });
+        const families = [
+            shaped({
+                kind: 'head_and_shoulders',
+                neckline: {
+                    start: { index: 1, price: 30 },
+                    end: { index: 3, price: 0 },
+                    touches: [],
+                },
+                breakoutIndex: 5,
+            }),
+            shaped({
+                kind: 'rounding',
+                leftRim: pivot(1, 25, 'high'),
+                rightRim: pivot(3, 25, 'high'),
+                extreme: { index: 2, price: 30 },
+                invalidation: { index: 2, price: 30 },
+                arc: [],
+            }),
+            shaped({
+                kind: 'high_tight_flag',
+                poleBase: pivot(0, 30, 'high'),
+                poleTop: pivot(2, 12, 'low'),
+                flagLow: { index: 3, price: 25 },
+            }),
+        ];
+        for (const family of families) {
+            expect(isFailedBreakout(family, down(10), closes([8, 15]), 1)).toBe(
+                true
+            );
+            // A close through the level at or before the last structural
+            // point (bar 3) is part of the pattern, not a breakout.
+            expect(
+                isFailedBreakout(
+                    family,
+                    down(10),
+                    makeBars([15, 15, 15, 8, 15, 15, 15]),
+                    1
+                )
+            ).toBe(false);
+        }
     });
 });
