@@ -113,6 +113,28 @@ describe('buildAgentSystemPrompt', () => {
         expect(p).not.toContain('- web_search');
     });
 
+    it('옵션 답변 규칙(맥스 페인 끌림 해석 금지·IV 이력 없는 평가 금지·센트 표기)은 get_options_summary가 있을 때만 넣는다', () => {
+        expect(prompt).toContain(
+            'never mention the pinning or gravitation idea that price drifts toward it'
+        );
+        expect(prompt).toContain(
+            'Never call implied volatility high, low or normal for this stock'
+        );
+        expect(prompt).toContain("not '9.5 cents', not 'half a cent'");
+        expect(prompt).toContain(
+            'beyond daysToExpiration and the expiration date'
+        );
+        const noOptions = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(
+                t => t.name !== 'get_options_summary'
+            ),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(noOptions).not.toContain('pinning or gravitation');
+    });
+
     it('도구 선택은 질문 유형 표로, 가용한 도구를 가리키는 행만 넣는다', () => {
         expect(prompt).toContain('### Which tools to call');
         expect(prompt).toContain('call the union of all matching rows');

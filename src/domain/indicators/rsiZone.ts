@@ -10,6 +10,9 @@ export type RsiZone = 'overbought' | 'neutral' | 'oversold';
  * oversold at or below {@link RSI_OVERSOLD_LEVEL}, neutral in between. Shared
  * by the analysis prompt and consumers (chart labels, agent tool results) so
  * every surface names the same zone for the same value.
+ *
+ * Expects a finite RSI (0–100): `NaN` fails both comparisons and reads as
+ * `'neutral'`, so callers with a possibly-missing value check it first.
  */
 export function rsiZone(rsi: number): RsiZone {
     if (rsi >= RSI_OVERBOUGHT_LEVEL) return 'overbought';

@@ -218,4 +218,22 @@ describe('buildOptionsAnalysisPrompt Interpretation Guide wording', () => {
     it('requires USD prices to the cent', () => {
         expect(stable).toContain('never write a fraction of a cent');
     });
+
+    it('forbids the max-pain pin/pull narrative', () => {
+        expect(stable).toContain(
+            'never say the price tends to be drawn, pinned or pulled toward it'
+        );
+    });
+
+    it('writes sub-cent premiums as "under one cent"', () => {
+        expect(stable).toContain('"under one cent"');
+    });
+
+    it('states ATM IV is a fraction to be written as a percentage', () => {
+        expect(stable).toContain('0.4243 = 42.43%');
+    });
+
+    it('names the ratio 풋/콜 비율 in Korean', () => {
+        expect(stable).toContain('never 콜·풋 비율');
+    });
 });
