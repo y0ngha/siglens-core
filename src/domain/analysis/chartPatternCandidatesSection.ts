@@ -159,8 +159,9 @@ export function isFailedBreakout(
         );
     }
     if (!('breakoutLevel' in geometry)) return false;
-    // Back means back on the pattern's side of the printed breakout level —
-    // the same level `isBroken` reads, so the two never disagree, and a
+    // Back means back on the pattern's side of the breakout level — the
+    // caller passes the printed (rounded) level `isBroken` reads, so the two
+    // never disagree, and a
     // throwback that retests the neckline from the broken side stays
     // `broken` rather than reading as a failure.
     const { breakoutLevel } = geometry;
@@ -473,7 +474,21 @@ export function formatChartPatternCandidatesSection(
             priceDp,
             timeframe,
             geometry !== null &&
-                isFailedBreakout(candidate, geometry, bars, atr)
+                isFailedBreakout(
+                    candidate,
+                    // The printed (rounded) breakout, as `isBroken` reads it.
+                    geometry.direction === null
+                        ? geometry
+                        : {
+                              direction: geometry.direction,
+                              breakoutLevel: printedPatternGeometry(
+                                  geometry,
+                                  priceDp
+                              ).breakoutLevel,
+                          },
+                    bars,
+                    atr
+                )
         );
     });
 

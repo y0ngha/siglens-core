@@ -629,10 +629,18 @@ describe('isFailedBreakout', () => {
             }),
             shaped({
                 kind: 'rounding',
-            } as unknown as QualifiedPattern['shape']),
+                leftRim: pivot(1, 25, 'high'),
+                rightRim: pivot(3, 25, 'high'),
+                extreme: { index: 2, price: 30 },
+                invalidation: { index: 2, price: 30 },
+                arc: [],
+            }),
             shaped({
                 kind: 'high_tight_flag',
-            } as unknown as QualifiedPattern['shape']),
+                poleBase: pivot(0, 30, 'high'),
+                poleTop: pivot(2, 12, 'low'),
+                flagLow: { index: 3, price: 25 },
+            }),
         ];
         for (const family of families) {
             expect(isFailedBreakout(family, down(10), closes([8, 15]), 1)).toBe(
