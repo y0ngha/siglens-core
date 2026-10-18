@@ -86,48 +86,90 @@ function isBroken(
         : lastClose < breakoutLevel;
 }
 
+/** What {@link isFailedBreakout} reads of a pattern's geometry. */
+type BreakoutGeometry =
+    | Pick<PatternGeometry, 'direction' | 'breakoutLevel'>
+    | Pick<UndirectedPatternGeometry, 'direction'>;
+
 /**
  * @internal
- * Whether a boundary pair or flag already broke out and failed: after the
- * breakout line's last touch, a close went beyond it by more than the
- * containment slack (either boundary, for an undirected pair), and the last
- * close is back inside. The chart shows that line continued dashed to the
- * last bar; printing such a pattern as plainly `forming` hid that price
- * already broke it once and came back (2026-10-08 sweep). The pattern stays
- * listed and drawn — its structure is intact — and prints `failed breakout`.
- * `false` for every other family and when the last close is itself outside
- * (that is `broken`).
+ * Whether a pattern already broke out and failed: after the breakout line's
+ * last touch (a boundary pair or flag) or the pattern's last structural point
+ * (every other directed family), a close went beyond the breakout line by
+ * more than the containment slack (either boundary, for an undirected pair),
+ * and the last close is back inside. Printing such a pattern as plainly
+ * `forming` hid that price already broke it once and came back (2026-10-08
+ * sweep). The pattern stays listed and drawn — its structure is intact, and
+ * only a close past its invalidation spends it (`isSpentPattern`) — and
+ * prints `failed breakout`.
+ *
+ * The neckline families (double/triple tops and bottoms, head and shoulders,
+ * cup and handle, rounding, high tight flag) read the printed breakout level
+ * (a head and shoulders' neckline at its break bar, as `isBroken` does) and
+ * count as back only once the last close is on the pattern's side of it, so
+ * a retest from the broken side stays `broken`. They were left out at first,
+ * so a double top that closed under its neckline and climbed back still
+ * printed `forming` with its measured target as a live projection
+ * (2026-10-18). `false` when the last close is itself outside (that is
+ * `broken`) and for an undirected pattern of any other family.
  */
 export function isFailedBreakout(
     candidate: QualifiedPattern,
-    direction: PatternGeometry['direction'] | null,
+    geometry: BreakoutGeometry,
     bars: readonly Bar[],
     atr: number | null
 ): boolean {
     const { shape } = candidate;
-    if (shape.kind !== 'trendline' && shape.kind !== 'flag') return false;
     if (atr === null || !(atr > 0) || bars.length === 0) return false;
     const slack = BOUNDARY_CONTAINMENT_ATR * atr;
     const lastIndex = bars.length - 1;
-    const sides: { line: PatternLine; sign: number }[] = [
-        ...(direction !== 'down' ? [{ line: shape.upper, sign: 1 }] : []),
-        ...(direction !== 'up' ? [{ line: shape.lower, sign: -1 }] : []),
-    ];
-    const beyond = (
-        line: PatternLine,
+    /**
+     * Broke out and came back: beyond `levelAt` by more than the slack after
+     * `start`, and at the last bar back `inside` — `inside` says what counts
+     * as back.
+     */
+    const brokeAndReturned = (
+        levelAt: (i: number) => number,
         sign: number,
-        bar: Bar,
-        i: number
-    ): boolean => sign * (bar.close - lineValueAt(line, i)) > slack;
-    return sides.some(({ line, sign }) => {
-        const start = line.end.index + 1;
+        start: number,
+        inside: (offset: number) => boolean
+    ): boolean => {
+        const offset = (bar: Bar, i: number): number =>
+            sign * (bar.close - levelAt(i));
         return (
-            !beyond(line, sign, bars[lastIndex], lastIndex) &&
+            inside(offset(bars[lastIndex], lastIndex)) &&
             bars
                 .slice(start, lastIndex)
-                .some((bar, k) => beyond(line, sign, bar, start + k))
+                .some((bar, k) => offset(bar, start + k) > slack)
         );
-    });
+    };
+    const { direction } = geometry;
+    if (shape.kind === 'trendline' || shape.kind === 'flag') {
+        const sides: { line: PatternLine; sign: number }[] = [
+            ...(direction !== 'down' ? [{ line: shape.upper, sign: 1 }] : []),
+            ...(direction !== 'up' ? [{ line: shape.lower, sign: -1 }] : []),
+        ];
+        return sides.some(({ line, sign }) =>
+            brokeAndReturned(
+                i => lineValueAt(line, i),
+                sign,
+                line.end.index + 1,
+                offset => offset <= slack
+            )
+        );
+    }
+    if (!('breakoutLevel' in geometry)) return false;
+    // Back means back on the pattern's side of the printed breakout level —
+    // the same level `isBroken` reads, so the two never disagree, and a
+    // throwback that retests the neckline from the broken side stays
+    // `broken` rather than reading as a failure.
+    const { breakoutLevel } = geometry;
+    return brokeAndReturned(
+        () => breakoutLevel,
+        geometry.direction === 'up' ? 1 : -1,
+        candidate.endIndex + 1,
+        offset => offset <= 0
+    );
 }
 
 /** Key points whose spacing the pattern skills gate on (double/triple tops and bottoms, head and shoulders). */
@@ -431,7 +473,7 @@ export function formatChartPatternCandidatesSection(
             priceDp,
             timeframe,
             geometry !== null &&
-                isFailedBreakout(candidate, geometry.direction, bars, atr)
+                isFailedBreakout(candidate, geometry, bars, atr)
         );
     });
 

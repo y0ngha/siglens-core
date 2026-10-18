@@ -1028,9 +1028,16 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * shared `formatPriceAtDp`. Bytes change for any prompt with such a
  * structure and for every KRW prompt.
  *
+ * **`p28`** — failed breakouts of neckline patterns (2026-10-18). A double
+ * or triple top/bottom, head and shoulders, cup and handle, rounding or high
+ * tight flag that closed through its breakout line after its last structural
+ * point and came back now prints `failed breakout` instead of `forming`, as
+ * boundary pairs and flags already did. Bytes change for any prompt with
+ * such a pattern.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p27' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p28' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest
