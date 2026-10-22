@@ -7,7 +7,7 @@ import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
 import cupAndHandle from '@/__tests__/domain/patterns/fixtures/cup-and-handle.json';
 
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
-// return with a flattening wrapper (spec §3.4 assembly split). `flat` is
+// return with a flattening wrapper. `flat` is
 // exposed separately for the dynamic `await import(...)` call sites below,
 // which bind directly to the real module export and bypass this shadow.
 const flat = ({ stable, dynamic }: AssembledPrompt): string =>
@@ -16,7 +16,7 @@ const buildAnalysisPrompt = (
     ...args: Parameters<typeof buildAnalysisPromptRaw>
 ): string => flat(buildAnalysisPromptRaw(...args));
 
-// ── Task 3.3: pattern-screener candidates wired into skill selection ────────
+// ── pattern-screener candidates wired into skill selection ────────
 // Covers the third event-trigger source (`patternCandidates`) added to
 // `SkillSelectionContext`: a real chart-pattern fixture firing a gated
 // pattern skill, the screener-throw exception-safety guarantee, and a
@@ -56,7 +56,7 @@ afterEach(() => {
 /**
  * Replaces the strict qualifier: nothing qualifies, every pre-screener hit
  * comes back as a shape hint. Qualification runs independently of the
- * screener (spec 2026-10-07), so a test about the screener's own hits must
+ * screener, so a test about the screener's own hits must
  * pin it.
  */
 const mockNothingQualifies = (): void => {
@@ -154,7 +154,7 @@ describe('buildAnalysisPrompt — pattern-screener exception safety', () => {
 });
 
 describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_on catalog (regression)', () => {
-    it('selects the identical skill catalog whether or not the screener finds candidates (spec 2026-09-18 §A1 narrowed this — see comments below)', async () => {
+    it('selects the identical skill catalog whether or not the screener finds candidates (see comments below)', async () => {
         const skills = [
             makeSkill({ name: 'B Pattern', type: 'pattern', gating: alwaysOn }),
             makeSkill({ name: 'A Pattern', type: 'pattern', gating: alwaysOn }),

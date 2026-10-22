@@ -213,7 +213,7 @@ describe('normalizeNewsCardAnalysis 함수는', () => {
     });
 });
 
-describe('stripInputMetaLead 함수는 (UX audit 2026-10-05 §C2)', () => {
+describe('stripInputMetaLead 함수는', () => {
     it('문장 첫머리의 "제공된 N건의 "를 걷어 낸다', () => {
         expect(
             stripInputMetaLead(

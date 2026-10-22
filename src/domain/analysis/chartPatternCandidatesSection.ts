@@ -27,13 +27,12 @@ import type {
     UndirectedPatternGeometry,
 } from '@/domain/types';
 
-/** @internal Section header — exported so callers/tests reference the exact string (spec 2026-09-18 §A1). */
+/** @internal Section header — exported so callers/tests reference the exact string. */
 export const CHART_PATTERN_CANDIDATES_SECTION_HEADER =
     '## Chart Pattern Candidates (computed)';
 
 /**
- * @internal Section intro (spec 2026-09-18 addendum, "hints not a verdict";
- * spec 2026-10-07 for the measured patterns). The listing must never read as
+ * @internal Section intro ("hints not a verdict" for pre-screener\n * hits; the measured patterns are qualified). The listing must never read as
  * a cap on what the model may report. Exported so the test can assert the
  * exact wording survives edits.
  *
@@ -217,7 +216,7 @@ function keyPointsLine(
 }
 
 /**
- * A boundary pair with no prior trend (spec 2026-10-07 §3.2): both
+ * A boundary pair with no prior trend: both
  * boundaries as they stand, no direction and no target — the status is
  * `broken` once the last close sits outside either printed boundary.
  */
@@ -290,7 +289,7 @@ function formatCandidate(
 
     // Recompute the anchor/targets through `computePatternTargets` — the ONE
     // shared math `ai-levels.ts` uses when a model copies breakout/extreme/
-    // direction into its own `geometry` (spec 2026-09-18). Reusing
+    // direction into its own `geometry`. Reusing
     // `geometry.measuredTarget`/`conservativeTarget` here (each family's own
     // raw, unrounded formula in `patternGeometry.ts`) could byte-mismatch
     // what the app later appends from the exact same two numbers.
@@ -418,8 +417,7 @@ export function printedPatternGeometriesByOverlayId(
 /**
  * @internal
  * Renders `## Chart Pattern Candidates (computed)` — the qualified patterns
- * with deterministic measured-move geometry (spec 2026-09-18 §A1, spec
- * 2026-10-07), so the siglens pattern skills can cite a computed target
+ * with deterministic measured-move geometry, so the siglens pattern skills can cite a computed target
  * instead of asking the model to work one out. Pre-screener hits that did not
  * qualify are not named (see {@link CHART_PATTERN_CANDIDATES_SECTION_INTRO}).
  * {@link NO_CHART_PATTERNS_LINE} when nothing qualified; a qualified pattern whose geometry is unavailable

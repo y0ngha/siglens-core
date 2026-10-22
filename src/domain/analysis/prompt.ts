@@ -143,8 +143,8 @@ type SkillGroupKey = SkillType | 'regular';
 const INDICATOR_DECIMAL_PLACES = 2;
 const PERCENTAGE_FACTOR = 100;
 
-// MACD-V "momentum lifecycle" inner band: research §1 places the weak/strong
-// transition at ±50, which is the ±150 OB/OS bound divided by 3. Deriving it
+// MACD-V "momentum lifecycle" inner band: the weak/strong
+// transition sits at ±50, which is the ±150 OB/OS bound divided by 3. Deriving it
 // from the shared MACDV_OVERBOUGHT keeps the two bands in lockstep if retuned.
 /** @internal Divisor from the ±150 MACD-V OB/OS bound to the ±50 transition band. */
 const MACDV_ZONE_INNER_DIVISOR = 3;
@@ -556,7 +556,7 @@ const barsAgo = (index: number, totalBars: number): string =>
     `(${barsAgoCount(index, totalBars)} bars ago)`;
 
 /**
- * @internal ` (+1.23% / +1.2 ATR from price)` — null/NaN rule (spec §0):
+ * @internal ` (+1.23% / +1.2 ATR from price)` — null/NaN rule:
  * `price` must be finite and positive for the % term; `atr` must
  * additionally be finite and positive for the ATR term to appear at all
  * (never a division by a zero/negative/missing ATR). Returns `''` when
@@ -1090,7 +1090,7 @@ const formatHorizonBlock = (
                       retracementDepthSuffix(fib, currentPrice),
               ];
     // Same reasoning as `fibLine`, for the separate A→B→C swing triplet the
-    // `Fib ABC ext …%` levels (above) are anchored on (spec 2026-09-18 §A3).
+    // `Fib ABC ext …%` levels (above) are anchored on.
     // Null far more often than `fib` — only renders once C has confirmed.
     const abc = horizon.abcExtension;
     const abcLine =
@@ -1099,7 +1099,7 @@ const formatHorizonBlock = (
             : [
                   `Fib ABC anchor: A ${formatQuotedPrice(abc.a, quoting)} → B ${formatQuotedPrice(abc.b, quoting)} → C ${formatQuotedPrice(abc.c, quoting)} (${abc.direction})`,
               ];
-    // Complete Fib sets (spec 2026-09-18 analysis-prompt decision): the
+    // Complete Fib sets: the
     // nearest-level lists below are capped per side, so a far ratio the model
     // may need for a second target can be missing there. One compact line per
     // set replaces "compute it yourself" with a number to quote.
@@ -1130,8 +1130,7 @@ const formatHorizonBlock = (
 
 /**
  * @internal
- * One line with every pivot family from the shared pivot bar (spec 2026-09-18
- * analysis-prompt decision) — the nearest-level lists are capped, so without
+ * One line with every pivot family from the shared pivot bar — the nearest-level lists are capped, so without
  * this a far pivot would be missing and the model would have to compute it.
  * `''` when no family could be computed.
  */
@@ -1144,7 +1143,7 @@ export const formatPivotTableLine = (
     const parts = [
         pivots.standard &&
             `Standard PP ${px(pivots.standard.pp)} R1 ${px(pivots.standard.r1)} R2 ${px(pivots.standard.r2)} R3 ${px(pivots.standard.r3)} S1 ${px(pivots.standard.s1)} S2 ${px(pivots.standard.s2)} S3 ${px(pivots.standard.s3)}`,
-        // "Pivot Fib" (not "Fib") — spec 2026-09-18: this label
+        // "Pivot Fib" (not "Fib"): this label
         // must not read as a Fib retracement/extension row.
         pivots.fibonacci &&
             `Pivot Fib PP ${px(pivots.fibonacci.pp)} R1 ${px(pivots.fibonacci.r1)} R2 ${px(pivots.fibonacci.r2)} R3 ${px(pivots.fibonacci.r3)} S1 ${px(pivots.fibonacci.s1)} S2 ${px(pivots.fibonacci.s2)} S3 ${px(pivots.fibonacci.s3)}`,
@@ -1236,7 +1235,7 @@ const VR_REGIME_VERDICT_MARGIN = 0.1;
 // Direction-blind R²: high → clean trend. The "visibly trending" floor uses the
 // shared REGRESSION_R2_SIGNIFICANT (domain/indicators/constants.ts) so the prompt
 // narrative and the skill gate never drift apart; see its JSDoc for the
-// window-scaled critical-R² rationale (research §10).
+// window-scaled critical-R² rationale.
 
 type RegimeVerdict = 'trending' | 'mean-reverting' | 'random';
 
@@ -1632,7 +1631,7 @@ const ANALYSIS_INTENT_BLOCK = [
 ].join('\n');
 
 // "provided above" — the Analysis Request preamble (this preface included)
-// lives at the END of `dynamic` (spec §3.4 / instruction-sandwiching fix), a
+// lives at the END of `dynamic`, a
 // tail position after every per-call data section (indicators, SMC, Market
 // Reference), so a spatial "above" is accurate again.
 const FIELD_GUIDANCE_PREFACE =
@@ -1852,7 +1851,7 @@ const CRITICAL_RESPONSE_RULES = [
  * candlePatterns / keyLevels / regular-skill enrichment), each ending in an
  * enumeration of the exact active skill names for that type.
  *
- * This entire block lives at the END of `dynamic` (spec §3.4 / the
+ * This entire block lives at the END of `dynamic` (the
  * instruction-sandwiching fix — see the "Output-contract" comment above
  * {@link buildAnalysisPrompt}'s `dynamicSections` assembly): an A/B test found
  * that moving the static preamble into the byte-stable prefix (ahead of the
@@ -1891,7 +1890,7 @@ const buildAnalysisRequest = (
                   "- You may also add any other chart pattern you can clearly see in the bars — one from the Pattern Index that was not listed here, or a well-established pattern outside the catalog (e.g. broadening formation, diamond, island reversal) — as a detected: true entry. For such an entry set skillName to the pattern's catalog id as the Pattern Index lists it (e.g. cup_and_handle) — or its standard English name when it is outside the catalog, never the name of the Pattern Index or of any other skill — ground every key price in the bars, and set candidateId and geometry to null. Do not add detected: false entries for unlisted patterns.",
                   '- **Do not include candle patterns (single/multi candle) in patternSummaries** — e.g. tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns, even when you add patterns beyond the listed ones. Candle patterns belong only in candlePatterns.',
                   '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. For a listed Skills pattern it MUST exactly match its pattern skill name from the list below; for an additional pattern you add, use its catalog id or standard English name as described above.',
-                  // Schema §3.5 dedup: the response schema's `required`
+                  // Schema-restatement dedup: the response schema's `required`
                   // list only API-enforces this for the forced-tool providers
                   // (Gemini/OpenAI/haiku). The thinking-Claude path (sonnet/opus,
                   // tool_choice: auto) is not schema-enforced and extractJsonWithRepair
@@ -1925,7 +1924,7 @@ const buildAnalysisRequest = (
                   '- The summary field must use the structured markdown format with **label**: value lines.',
                   '- Put each **label**: value item on its own line. When moving from status/inputs to interpretation/trading implication, insert \\n\\n.',
                   '- Never return strategyResults[].summary as one sentence containing many "**label**:" fragments separated only by periods.',
-                  // Schema §3.5 dedup: the verbose "REQUIRED FIELDS
+                  // Schema-restatement dedup: the verbose "REQUIRED FIELDS
                   // (never omit any)" header is dropped as pure scaffolding, but the
                   // trend enum/never-omit clause is kept — TREND_SCHEMA's enum is only
                   // API-enforced for forced-tool providers, not the thinking-Claude
@@ -1949,7 +1948,7 @@ const buildAnalysisRequest = (
                   '### indicatorResults Writing Rules for Indicator Guides',
                   '- Use the Indicator Signal Guides above to interpret the current indicator values in ## Indicator Values.',
                   '- For each indicator guide, evaluate whether the current values meet any signal condition described in its Signal Interpretation section.',
-                  // Schema §3.5 dedup: the literal JSON entry skeleton
+                  // Schema-restatement dedup: the literal JSON entry skeleton
                   // stays dropped — it only restated field names/nesting/types that
                   // TECHNICAL_RESPONSE_SCHEMA already fully specifies. The `type` enum
                   // rule is restored below (compact form): `enum: ['skill']` is only
@@ -2127,12 +2126,12 @@ function describeThrown(error: unknown): string {
 /**
  * The chart patterns for this chart, computed once and shared by skill
  * selection, `## Chart Pattern Candidates (computed)` and the pattern
- * overlays (spec 2026-09-18: the screener used to run twice per prompt
+ * overlays (the screener used to run twice per prompt
  * build). The loose pre-screener (`screenChartPatterns`) only feeds skill
  * selection (its unqualified hits are the shape hints, which never reach the
  * model-facing text); `qualifyPatterns` decides what is drawn,
  * printed with numbers and offered as a Candidate id, and has already
- * dropped hits the price failed or fulfilled (spec 2026-10-07). Skill
+ * dropped hits the price failed or fulfilled. Skill
  * selection sees the qualified ids and the shape hints, so a drawn pattern's
  * skill doc is always in the prompt.
  *
@@ -2277,8 +2276,8 @@ export const CORE_SKILL_REFERENCE_POINTER =
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
  *
  * Composes the prompt the worker LLM consumes to produce an
- * `AnalysisResponse`, split into a stable/dynamic pair (spec §3.4,
- * {@link TechnicalAssembledPrompt}) — Design C ("skills-to-system split") rather than
+ * `AnalysisResponse`, split into a stable/dynamic pair
+ * ({@link TechnicalAssembledPrompt}) — Design C ("skills-to-system split") rather than
  * the earlier stable-first designs:
  *
  * - `stable` — the fixed head blocks FIRST, none of which depend on the
@@ -2342,8 +2341,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  * @param assetClass - Instrument asset class controlling prompt framing. `'crypto'` drops
  *   U.S. equity context (earnings, fundamentals, analyst ratings) and adds 24/7 market
  *   context. Defaults to `'equity'` for backward compatibility.
- * @param positionBucket - Member position-bucket hint
- *   (personalized-analysis-by-position-bucket spec, Subsystem C). When
+ * @param positionBucket - Member position-bucket hint. When
  *   provided, a single neutral Korean reference line naming the member's
  *   coarse unrealized-P&L band is appended via
  *   {@link formatPositionHintSection} — into `dynamic` only, never `stable`,
@@ -2356,7 +2354,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   prompt to the one this builder emitted before the parameter existed —
  *   that byte identity is what keeps the existing Korean analysis cache valid.
  * @param priorAnalyses - Optional history of past analyses for this symbol +
- *   timeframe, supplied by the consumer (siglens / siglens-trader) from its
+ *   timeframe, supplied by the consumer (siglens or another consumer) from its
  *   own storage. When provided, narrowed via `selectPriorAnalyses` (bar
  *   anchor, per-bar dedup, newest-first, capped at
  *   `PRIOR_ANALYSIS_LIMIT`) and rendered via
@@ -2418,8 +2416,7 @@ export function buildAnalysisPrompt(
     // down) so both this ATR read and the screener call below happen once.
     const atrForPatternGeometry = lastNonNull(indicators.atr);
     // Screened and qualified once, shared by skill selection, `## Chart
-    // Pattern Candidates (computed)` and the pattern overlays below (spec
-    // 2026-09-18, spec 2026-10-07) — only qualified patterns are drawn.
+    // Pattern Candidates (computed)` and the pattern overlays below — only qualified patterns are drawn.
     const chartPatterns = screenPatternCandidatesSafely(
         bars,
         atrForPatternGeometry,
@@ -2491,8 +2488,7 @@ export function buildAnalysisPrompt(
         timeframe,
         { assetClass, currency }
     );
-    // Every drawable overlay candidate for this prompt (spec 2026-09-28
-    // §2.1) — printed into `## Chart Overlay Candidates (computed)` below and
+    // Every drawable overlay candidate for this prompt — printed into `## Chart Overlay Candidates (computed)` below and
     // handed back to the caller so `resolveChartOverlays` can join the
     // model's referenced ids against this exact list after the call.
     const {
@@ -2633,7 +2629,7 @@ export function buildAnalysisPrompt(
             diffDp: precision.difference,
             lastVolume: bars.length > 0 ? bars[bars.length - 1].volume : null,
             // Raw history, oldest-first, minus the last bar — `volumeLine`
-            // slices its own trailing 20-bar window (spec 2026-09-18), so
+            // slices its own trailing 20-bar window, so
             // this no longer needs to hand-size the slice itself.
             priorVolumes: bars.slice(0, -1).map(b => b.volume),
             rsi: lastNonNull(indicators.rsi),

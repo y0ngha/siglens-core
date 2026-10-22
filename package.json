@@ -1,8 +1,37 @@
 {
     "name": "@y0ngha/siglens-core",
     "version": "2.24.0",
-    "description": "Pure TypeScript core library for the Siglens stock analysis platform — indicators, candle patterns, analysis prompt builder, and thin infrastructure wrappers.",
-    "license": "UNLICENSED",
+    "description": "TypeScript technical analysis library for stocks and crypto: indicators (RSI, MACD, Bollinger Bands, Ichimoku), candlestick and chart pattern detection, trading signals, fear and greed index, and LLM analysis prompts with response validation.",
+    "license": "MIT",
+    "author": "y0ngha <dev.y0ngha@gmail.com>",
+    "homepage": "https://github.com/y0ngha/siglens-core#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/y0ngha/siglens-core.git"
+    },
+    "bugs": {
+        "url": "https://github.com/y0ngha/siglens-core/issues"
+    },
+    "keywords": [
+        "technical-analysis",
+        "stock-analysis",
+        "stock",
+        "crypto",
+        "trading-signals",
+        "trading",
+        "indicators",
+        "rsi",
+        "macd",
+        "bollinger-bands",
+        "candlestick-patterns",
+        "chart-patterns",
+        "pattern-recognition",
+        "fear-and-greed-index",
+        "ai-analysis",
+        "llm",
+        "korean-stocks",
+        "typescript"
+    ],
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "files": [
@@ -13,7 +42,7 @@
     },
     "publishConfig": {
         "registry": "https://npm.pkg.github.com",
-        "access": "restricted"
+        "access": "public"
     },
     "packageManager": "yarn@4.18.0",
     "scripts": {

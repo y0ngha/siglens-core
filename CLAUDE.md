@@ -11,8 +11,8 @@ Do not start implementation, run commands, or invoke agents until you have read 
 
 | User request pattern            | Examples                                                            | FIRST action                   |
 |---------------------------------|---------------------------------------------------------------------|--------------------------------|
-| Issue number + implementation   | "이슈 #42 설계해줘 > (설계 후 승인되면)" "이슈 #42 구현해줘", #42 구현해줘", "이슈 15번 작업해줘" | Read `docs/ISSUE_IMPL_FLOW.md` |
-| PR number + fix/review comments | "PR #216 수정해줘", "#200 코멘트 반영해줘"                                     | Read `docs/PR_FIX_FLOW.md`     |
+| Issue number + implementation   | "이슈 #42 설계해줘 > (설계 후 승인되면)" "이슈 #42 구현해줘", #42 구현해줘", "이슈 15번 작업해줘" | Read `docs/ISSUE_IMPL_FLOW.md` (local-only; if absent, proceed normally) |
+| PR number + fix/review comments | "PR #216 수정해줘", "#200 코멘트 반영해줘"                                     | Read `docs/PR_FIX_FLOW.md` (local-only; if absent, proceed normally) |
 | Issue creation                  | "이슈 만들어줘", "버그 리포트 생성해줘"                                            | Invoke `issue-agent`           |
 
 If the request does not match any pattern above, proceed normally.
@@ -200,7 +200,7 @@ Scripts are listed in `package.json`.
 
 | Document | Contents |
 |---|---|
-| `docs/SCOPE.md` | **siglens vs siglens-core 분담** — 결정 트리, 의존 방향, 안티 패턴 (양쪽 레포 공통 source-of-truth) |
+| `docs/SCOPE.md` (local-only) | **siglens vs siglens-core 분담** — 결정 트리, 의존 방향, 안티 패턴 (양쪽 레포 공통 source-of-truth) |
 | `docs/SERVICE.md` | Library overview, consumers, tech stack, Skills system |
 | `docs/ARCHITECTURE.md` | Layer structure, dependency direction rules, folder layout |
 | `docs/PUBLIC_API.md` | Tier-based public/internal classification, export inventory, semver policy |
@@ -210,6 +210,14 @@ Scripts are listed in `package.json`.
 | `docs/FF.md` | FF 4 principles in detail (Readability, Predictability, Cohesion, Coupling) |
 | `docs/GIT_CONVENTIONS.md` | Branch naming, commit message format, PR rules |
 | `src/{domain,application,infrastructure}/CLAUDE.md` | Layer rules, including the DOM / APP / INF gotchas |
+
+**Public vs local docs.** This repository is public. Only the docs listed above (except
+`docs/SCOPE.md`) are tracked; everything else under `docs/` — `SCOPE.md`, `ISSUE_IMPL_FLOW.md`,
+`PR_FIX_FLOW.md`, `SKILL_GATING.md`, `superpowers/` (design specs, plans) and
+`__agents_only__/` — is local-only (`.gitignore` allowlist), copied into new worktrees via
+`.worktreeinclude`, and rejected by the pre-commit hook. `.claude/agent-memory/` is local-only
+too. Never put secrets, infra IDs, local paths or production incident detail into a tracked
+doc, code comment or commit message.
 
 ---
 

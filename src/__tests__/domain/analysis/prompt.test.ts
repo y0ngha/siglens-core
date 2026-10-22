@@ -83,7 +83,7 @@ import type { PriceQuoting } from '@/domain/analysis/promptFormat';
 
 const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
 
-// `buildAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4 assembly
+// `buildAnalysisPrompt` now returns `{ stable, dynamic }` (assembly
 // split) — this file's ~240 call sites predate the split and assert against
 // the single legacy combined string (`stable + '\n\n' + dynamic`, exactly the
 // string dispatch still sends as the `prompt` fallback field). Shadowing the
@@ -2015,12 +2015,12 @@ describe('prompt', () => {
         });
     });
 
-    describe('출력 규칙 — 최소 JSON 지시문 (spec §3.5, PR5a 제약)', () => {
+    describe('출력 규칙 — 최소 JSON 지시문', () => {
         // Worker forces the structured tool only for non-thinking models
         // (haiku); thinking Claude (sonnet/opus) stays on `tool_choice: auto`
         // and relies on prose + JSON repair to produce valid JSON. This one-line
         // directive is therefore load-bearing for that path and must survive
-        // the §3.5 schema-restatement dedup even though the field-by-field
+        // the schema-restatement dedup even though the field-by-field
         // enumeration prose around it was cut.
         it('ANALYSIS_INTENT_BLOCK에 단일 JSON 객체 응답 지시문이 남아있다', () => {
             const result = buildAnalysisPrompt(
@@ -2087,7 +2087,7 @@ describe('prompt', () => {
             expect(result).not.toContain('"direction": "ascending"');
         });
 
-        it('가이드라인에 trendlineIds 지침이 포함된다 (spec 2026-09-28)', () => {
+        it('가이드라인에 trendlineIds 지침이 포함된다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -2101,7 +2101,7 @@ describe('prompt', () => {
         });
     });
 
-    describe('overlay candidates (spec 2026-09-28)', () => {
+    describe('overlay candidates', () => {
         it('every non-pattern overlay id is printed in dynamic; every pattern id lands as a "Candidate id" line', () => {
             const bars = doubleTopFixture.bars as Bar[];
             const indicators = calculateIndicators(bars);
@@ -2960,7 +2960,7 @@ describe('prompt', () => {
         });
     });
 
-    describe('분석 요청 섹션 - patternSummaries: skill 카탈로그는 경계가 아니다 (spec 2026-09-18 addendum)', () => {
+    describe('분석 요청 섹션 - patternSummaries: skill 카탈로그는 경계가 아니다', () => {
         it('미등재 패턴 추가를 허용하는 문구가 포함된다', () => {
             const skill = makeSkill({
                 type: 'pattern',
@@ -4240,7 +4240,7 @@ describe('prompt', () => {
             expect(result).not.toContain('bearish OB: 158.00 ~ 162.00');
         });
 
-        it('adds a ±% / ATR distance to each unmitigated order block, and tags only the single nearest-above and nearest-below one (spec 2026-09-18 §A5)', () => {
+        it('adds a ±% / ATR distance to each unmitigated order block, and tags only the single nearest-above and nearest-below one', () => {
             // bars fixture -> last close = 199; atr override = 2.45.
             const smc: SMCResult = {
                 ...EMPTY_SMC_RESULT,
@@ -4338,7 +4338,7 @@ describe('prompt', () => {
             expect(result).not.toContain('bearish FVG: 158.50 ~ 160.00');
         });
 
-        it('adds a ±% / ATR distance to each unmitigated FVG, and tags the nearest-above/nearest-below one (spec 2026-09-18 §A5)', () => {
+        it('adds a ±% / ATR distance to each unmitigated FVG, and tags the nearest-above/nearest-below one', () => {
             // bars fixture -> last close = 199; atr override = 2.45.
             const smc: SMCResult = {
                 ...EMPTY_SMC_RESULT,
@@ -4720,7 +4720,7 @@ describe('prompt', () => {
     describe('Confluence Assessment 가이드라인', () => {
         const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
 
-        // UX audit 2026-10-05 §C6: 모델이 "룰 엔진", "washout", "x / 100"을 사용자
+        // UX audit: 모델이 "룰 엔진", "washout", "x / 100"을 사용자
         // 문장에 그대로 옮겨 적었다. 내부 라벨은 설명하되 이름으로 쓰지 못하게 한다.
         it('tells the model that engine labels are internal and must not appear in output', () => {
             const result = buildAnalysisPrompt(
@@ -5187,7 +5187,7 @@ describe('prompt', () => {
         });
     });
 
-    describe('buildAnalysisPrompt — position bucket hint (personalized-analysis-by-position-bucket spec, Subsystem C)', () => {
+    describe('buildAnalysisPrompt — position bucket hint', () => {
         it('omits the position hint section when positionBucket is not provided', () => {
             const prompt = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -5304,7 +5304,7 @@ describe('prompt', () => {
         });
     });
 
-    describe('buildAnalysisPrompt — prior analyses (Task 3, prior-analysis-context spec)', () => {
+    describe('buildAnalysisPrompt — prior analyses (prior-analysis-context)', () => {
         // Fewer than PRIOR_ANALYSIS_LIMIT * PRIOR_ANALYSIS_SLACK (21) bars, so
         // `selectPriorAnalyses` anchors at bars[0] — every entry below is well
         // inside the window without needing to think about the slack math.
@@ -5831,7 +5831,7 @@ describe('prompt', () => {
             }
         });
 
-        it('renders a Fib ABC anchor line once a 3rd (C) swing confirms after B (spec 2026-09-18 §A3)', () => {
+        it('renders a Fib ABC anchor line once a 3rd (C) swing confirms after B', () => {
             const prompt = buildRealisticPrompt();
             // Realistic bars oscillate (Math.sin) enough to confirm a 3rd
             // swing after the Fib leg's B in at least one horizon window.
@@ -5844,7 +5844,7 @@ describe('prompt', () => {
             );
         });
 
-        // Complete Fib/pivot tables (spec 2026-09-18 analysis-prompt decision):
+        // Complete Fib/pivot tables:
         // the nearest-level lists are capped, so far levels are given as tables
         // instead of letting the model compute them.
         it('renders a Fib table line whose prices follow from the anchor swing', () => {
@@ -5855,7 +5855,7 @@ describe('prompt', () => {
             const anchor = lines[anchorIdx]!;
             const table = lines[anchorIdx + 1]!;
             expect(table.startsWith('Fib table: ')).toBe(true);
-            // (spec 2026-09-18): a trailing `.0` is dropped —
+            //: a trailing `.0` is dropped —
             // `50%`/`100%`/`200%`, not `50.0%`/`100.0%`/`200.0%`.
             for (const ratio of ['23.6%', '38.2%', '50%', '61.8%', '78.6%'])
                 expect(table).toContain(`${ratio} `);
@@ -5904,7 +5904,7 @@ describe('prompt', () => {
             expect(line).toMatch(
                 /Standard PP [\d.]+ R1 [\d.]+ R2 [\d.]+ R3 [\d.]+ S1/
             );
-            // "Pivot Fib" (not "Fib") — spec 2026-09-18: must not
+            // "Pivot Fib" (not "Fib"): must not
             // be confusable with a Fib retracement/extension row.
             expect(line).toContain('| Pivot Fib PP ');
             expect(line).not.toContain('| Fib PP ');
@@ -6213,7 +6213,7 @@ describe('buildAnalysisPrompt — 출력 로케일', () => {
      */
     /**
      * keyPrices 라벨과 Step 3 산문은 **과업 규칙**으로 언어를 못 박고 있었다 —
-     * 말미 리마인더로는 뒤집힌다고 볼 수 없는 자리다(리뷰 4라운드).
+     * 말미 리마인더로는 뒤집힌다고 볼 수 없는 자리다.
      */
     it.each(['en', 'ja', 'zh'] as const)(
         '%s: 가이드라인의 언어 지시가 그 언어를 가리킨다',

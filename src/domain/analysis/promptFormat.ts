@@ -78,7 +78,7 @@ export function formatBarDate(
 /**
  * @internal Whole calendar days between two `Date`s' UTC dates — today is
  * `0`, tomorrow `1`, yesterday `-1` — regardless of either `Date`'s
- * time-of-day (spec 2026-09-18). A raw `Math.round(ms diff / MS_PER_DAY)`
+ * time-of-day. A raw `Math.round(ms diff / MS_PER_DAY)`
  * drifted: at `now = …T20:00Z`, a target dated "today" (parsed as UTC
  * midnight) is 20 hours in the PAST, rounding to `-1` — "1 day ago" for an
  * event still happening today.
@@ -87,7 +87,7 @@ export function formatBarDate(
  * caller that already holds a parsed `Date` — in particular one normalized
  * to UTC via {@link parseCalendarDate} for a naive `YYYY-MM-DD HH:mm:ss`
  * timestamp, where `new Date(targetIso)` would silently reparse as local
- * time (spec 2026-09-28 — the news prompt's macro-calendar section hit this
+ * time (the news prompt's macro-calendar section hit this
  * exact bug before routing through `parseCalendarDate` first).
  */
 export function calendarDayDiffFromDate(target: Date, now: Date): number {
@@ -106,7 +106,7 @@ export function calendarDayDiffFromDate(target: Date, now: Date): number {
 
 /**
  * @internal Whole calendar days from `now`'s UTC date to `targetIso`'s UTC
- * date (spec 2026-09-18). `null` when `targetIso` cannot be parsed.
+ * date. `null` when `targetIso` cannot be parsed.
  *
  * Parses `targetIso` with a bare `new Date(...)`, which is only safe for a
  * date-only (`YYYY-MM-DD`) or already-zoned string — both are UTC per the
@@ -134,7 +134,7 @@ export function calendarDayDiff(targetIso: string, now: Date): number | null {
  * Shared by {@link buildMacroBriefingPrompt} (`economy/macroBriefingPrompt.ts`)
  * and the news prompt's macro-calendar section (`analysis/newsPrompt.ts`) —
  * both render FMP calendar rows and must not silently drift by the
- * runtime's UTC offset (spec 2026-09-28).
+ * runtime's UTC offset.
  *
  * `labelUtc` is true when the printed string is a naive time, so the caller
  * can name its zone in the rendered text.

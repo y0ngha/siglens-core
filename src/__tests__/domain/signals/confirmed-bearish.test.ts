@@ -631,7 +631,7 @@ describe('detectMfiOverboughtReversal', () => {
     });
 });
 
-// ─── detectMfiOversoldBounce — lookback-cross rewrite (Task 1.4) ───────────────
+// ─── detectMfiOversoldBounce — lookback-cross rewrite ───────────────────────
 
 describe('detectMfiOversoldBounce (lookback cross)', () => {
     it('직전 bar가 아니라 lookback 내 cross에서도 발화한다', () => {

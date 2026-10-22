@@ -8,13 +8,13 @@ import {
     ARBITRATION_MIN_SHARED_PIVOTS,
 } from '@/domain/patterns/constants';
 
-// ─── Arbitration (§2.5) ─────────────────────────────────────────────────────
+// ─── Arbitration ────────────────────────────────────────────────────────────
 
 /**
- * Rank among overlapping qualified hits — lower wins. Encodes the spec's
+ * Rank among overlapping qualified hits — lower wins. Encodes these
  * chains (H&S > triple > double; high tight flag > flags > triangles/wedges;
  * cup > rounding; triangles/wedges > channels/broadening > rectangle) as one
- * order. Where the spec gives no order, every boundary pattern ranks above
+ * order. Where no order is given, every boundary pattern ranks above
  * doubles and triples: a boundary pair needs five interleaved touches
  * (`boundariesInterleave`) and a rectangle three per side, so when one
  * qualifies it describes the range more fully than a double or triple built
@@ -75,7 +75,7 @@ export interface ArbitrationLoss {
  * @internal
  * {@link arbitrate}, also returning each dropped hit with the first kept hit
  * that overlapped it — for logging which drawings the one-pivot overlap rule
- * removes (spec 2026-10-07 §8: that rule's losers were never counted).
+ * removes (that rule's losers were never counted).
  */
 export function arbitrateWithLosers(contenders: readonly Contender[]): {
     kept: Contender[];

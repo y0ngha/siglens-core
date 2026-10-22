@@ -4,8 +4,7 @@
  * The three provider SDKs report usage under different field names and
  * different nesting. This module normalizes them to one shape so
  * `[Usage]` log lines are comparable across providers regardless of which
- * model served a given job — see
- * siglens-core docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md §3.4.
+ * model served a given job.
  */
 import type { NormalizedUsage } from '@/domain/types';
 

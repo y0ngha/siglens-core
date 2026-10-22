@@ -42,7 +42,7 @@ function fakeBar(time: number, close: number, volume: number): Bar {
 }
 
 /**
- * 250+ bars with mild variance so the spec's strict guards (volume std != 0,
+ * 250+ bars with mild variance so the function's strict guards (volume std != 0,
  * POC has ≥ 30 bars, MA200/RANGE have ≥ 30 bars) are all satisfied. Without
  * variance the rolling-volume std becomes 0 and the function correctly returns null.
  */

@@ -53,7 +53,7 @@ describe('computeFibonacciProjection', () => {
 });
 
 // ─────────────────────────────────────────
-// computeAbcExtension (spec 2026-09-18 §A3)
+// computeAbcExtension
 // ─────────────────────────────────────────
 
 function swingSmc(

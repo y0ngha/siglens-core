@@ -378,7 +378,7 @@ describe('OVERALL_RESPONSE_SCHEMA drift guard', () => {
         optionsOiStale: false,
         analyzedAt: '2026-05-30T00:00:00Z',
     };
-    // `analyzedAt` is server-set by `runOverallAnalysis` (spec 2026-09-18 §2.5),
+    // `analyzedAt` is server-set by `runOverallAnalysis`,
     // never emitted by the LLM — same pattern as `AnalysisResponse.analyzedAt`
     // below. The expected LLM-output key-set is the response's keys minus it.
     const llmSampleKeys = sortedKeys(sample).filter(
@@ -585,11 +585,11 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
     // expected LLM-output key-set is the response's keys minus `analyzedAt`.
     // `dataAsOf` (last bar's start time + close) is stamped by `runAnalysis` from
     // the bars it fetched — likewise never model-authored.
-    // `chartOverlays` (spec 2026-09-28) is likewise absent from the schema —
+    // `chartOverlays` is likewise absent from the schema —
     // it is resolved by core from the model's referenced ids
     // (`resolveChartOverlays`, Task A9/A10), never authored directly by the model.
     // `trendlines` (id-bearing `Trendline[]`) is replaced by `trendlineIds`
-    // (spec 2026-09-28 §2.4) — the model picks ids from the overlay candidate
+    // — the model picks ids from the overlay candidate
     // list instead of authoring coordinates; `resolveChartOverlays` derives
     // `trendlines` from the resolved ids after the model call.
     const expectedLlmKeys = Object.keys(sample)
@@ -737,7 +737,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         expect(nestedEnumValues(candle, 'trend')).toEqual(TREND_VALUES);
     });
 
-    it('trendlineIds is a plain string array (spec 2026-09-28 §2.4 — the model picks overlay candidate ids, never authors coordinates)', () => {
+    it('trendlineIds is a plain string array (the model picks overlay candidate ids, never authors coordinates)', () => {
         const trendlineIds = TECHNICAL_RESPONSE_SCHEMA.properties
             .trendlineIds as { type: string; items: { type: string } };
         expect(trendlineIds.type).toBe('array');

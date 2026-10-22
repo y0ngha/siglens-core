@@ -22,7 +22,7 @@ export interface CounterStore {
      * Atomically claim one unit. Returns `false` only when `limit` would be
      * exceeded. Fail-closed implementations throw
      * {@link CounterStoreUnavailableError} when the store is unreachable —
-     * an outage must not look like an exhausted quota (spec §2-10).
+     * an outage must not look like an exhausted quota.
      */
     consume(subject: string, limit: number): Promise<boolean>;
     /** Release one previously claimed unit (never below zero). */

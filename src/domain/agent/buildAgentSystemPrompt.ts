@@ -29,7 +29,7 @@ export interface BuildAgentSystemPromptInput {
     /** @deprecated Ignored — see {@link BuildAgentSystemPromptInput.now}. */
     etSessionStatus?: EtSessionStatus;
     /**
-     * Symbols the signed-in user holds (spec §4-3 item 6); quantities stay
+     * Symbols the signed-in user holds; quantities stay
      * behind `get_my_portfolio`. Callers must pass only symbols that passed
      * the consumer's symbol-shape validation; values are inserted verbatim
      * into the system prompt.
@@ -298,7 +298,7 @@ function routingTable(available: ReadonlySet<string>): string {
 }
 
 /**
- * System prompt for the ai.siglens.io agent (spec §4-3). Provider-neutral;
+ * System prompt for the ai.siglens.io agent. Provider-neutral;
  * tool schemas are passed separately via the `tools` API field, so the
  * prompt only lists names and usage rules.
  *

@@ -80,14 +80,13 @@ PR 본문에 이유를 적는다. 리뷰 범위가 흐려지고, 되돌려야 �
 #### G-2 — publish 워크플로 성공은 패키지 사용 가능을 뜻하지 않는다
 
 워크플로가 `success`로 끝나도 레지스트리의 tarball이 깨져 있을 수 있다(메타데이터는
-정상인데 다운로드가 `409 Package file checksum mismatch`). 소비자(`siglens`,
-`siglens-worker`, `siglens-trader`)의 코어 버전을 올리기 **전에** `dist.tarball`을
-인증 헤더로 직접 받아 본다. `302`가 정상이다.
+정상인데 다운로드가 체크섬 불일치로 실패한다). 소비자의 코어 버전을
+올리기 **전에** `dist.tarball`을 인증 헤더로 직접 받아 본다. `302`가 정상이다.
 
 ```bash
 curl -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TOKEN" <dist.tarball>
 ```
 
-같은 버전은 재발행할 수 없으므로 `409`가 고정되면(수 분 폴링해도 그대로면 전파 지연이
+같은 버전은 재발행할 수 없으므로 다운로드 오류가 고정되면(수 분 폴링해도 그대로면 전파 지연이
 아니다) 버전을 건너뛰어 다시 발행한다. 소비자 쪽 `yarn install`의 `quarantined`
 메시지는 인증 문제처럼 보이지만 "tarball을 받을 수 없다"는 뜻이다.

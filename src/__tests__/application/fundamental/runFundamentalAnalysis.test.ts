@@ -345,7 +345,7 @@ describe('runFundamentalAnalysis', () => {
         });
     });
 
-    describe('currentPrice as a lazy getter (spec 2026-09-18)', () => {
+    describe('currentPrice as a lazy getter', () => {
         it('calls the getter and threads its resolved value onto the snapshot on a cache MISS', async () => {
             mockCacheGet.mockResolvedValue(null);
             const getter = vi.fn().mockResolvedValue(190.5);

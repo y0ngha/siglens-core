@@ -407,7 +407,7 @@ describe('buildAgentSystemPrompt', () => {
     /**
      * 사용자 결정 2026-09-19(항상 더 깊게 볼 선택지를 제안한다)는 유지하되,
      * 제안을 본문 문장("더 깊게 볼까요? ① ② ③")이 아니라 마지막 줄의
-     * `[[followups]] A | B | C` 마커로 옮긴다(UX audit 2026-10-05 §E5-d).
+     * `[[followups]] A | B | C` 마커로 옮긴다(UX audit).
      * 앱이 마커 줄을 버튼으로 바꾸고 본문에서는 감춘다.
      */
     it('깊게 볼 선택지를 마지막 줄 [[followups]] 마커로 내놓게 한다 (기본 2~3개, Detailed 1개)', () => {
@@ -606,8 +606,8 @@ describe('buildAgentSystemPrompt', () => {
         });
 
         /**
-         * Measured 2026-10-16: buy/sell-decision asks ("AAPL 지금 사도 될까?")
-         * called get_investor_flows 0/4 while broad "종합" asks did 12/12, so
+         * Measured: buy/sell-decision asks ("AAPL 지금 사도 될까?") rarely
+         * called get_investor_flows while broad "종합" asks always did, so
          * both the outlook row and the flows row name the decision wording.
          */
         it('pairs it with the outlook tools for a buy, sell or hold decision', () => {

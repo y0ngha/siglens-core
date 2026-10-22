@@ -88,7 +88,7 @@ describe('peekOverallAnalysisCache 함수는', () => {
         expect(result).toBeNull();
     });
 
-    it('reasoning=true이면 :reason=on peek 키로 읽는다 (member-reasoning-toggle spec)', async () => {
+    it('reasoning=true이면 :reason=on peek 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedOverall);
 
         await peekOverallAnalysisCache(SYMBOL, COMPANY, TIMEFRAME, MODEL, true);

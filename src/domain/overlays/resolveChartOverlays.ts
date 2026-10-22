@@ -91,11 +91,10 @@ const isStrategyOverlayKind = (
  * The model often cites a Fibonacci leg from the Elliott card (or a
  * multi-timeframe card). Drawn under the citing card it is mislabelled —
  * the chart menu names a drawing after its card, so "Elliott wave" showed a
- * Fibonacci ladder; dropped, real drawings vanished (replaying 552
- * production analyses on 2026-10-01: 65 of the 264 analyses showing a
- * Fibonacci ladder lost it, and 56 of 74 analyses with an Elliott-cited leg
- * had no Fibonacci card at all). So the id goes to the analysis' own card of
- * that kind when there is one, else to {@link STRATEGY_KIND_SOURCE_REF} —
+ * Fibonacci ladder; dropped, real drawings vanished (replaying stored
+ * analyses, a noticeable share of those showing a Fibonacci ladder lost it, and
+ * most analyses with an Elliott-cited leg had no Fibonacci card at all). So the id
+ * goes to the analysis' own card of that kind when there is one, else to {@link STRATEGY_KIND_SOURCE_REF} —
  * either way the label matches what is drawn.
  *
  * These refs come after every card's own citations, so a card's own ids
@@ -279,8 +278,7 @@ function toTrendline(o: ChartOverlay): Trendline[] {
 
 /**
  * @internal
- * Joins the model's candidate ids to the candidates the prompt offered
- * (spec 2026-09-28 §2.5). Pure; an id the prompt never offered is returned in
+ * Joins the model's candidate ids to the candidates the prompt offered. Pure; an id the prompt never offered is returned in
  * `unknownIds` for logging and otherwise ignored, and an offered id cited from
  * a slot that does not accept it (wrong kind for the card, another pattern's
  * candidate) in `misplacedIds` — rejected the same way, but not "unknown".
@@ -394,7 +392,7 @@ function withoutTarget(p: PatternResult): PatternResult {
  *   of the drawn breakout line. A resolved overlay with no entry in
  *   `patternGeometries` keeps the model's geometry.
  * - A card that resolved to an undirected pattern overlay (a `null` entry —
- *   a boundary pair with no prior trend, spec 2026-10-07 §3.2) loses its
+ *   a boundary pair with no prior trend) loses its
  *   geometry and any target-labelled `keyPrices`: the prompt printed only
  *   the two boundaries, so no target may be derived for it.
  * - A card that resolved to no pattern overlay — a pattern the model

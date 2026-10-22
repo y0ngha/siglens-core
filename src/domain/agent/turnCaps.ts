@@ -1,7 +1,7 @@
 /**
- * Per-turn hard caps (spec §4-2). Ceilings, not targets: the model decides how
+ * Per-turn hard caps. Ceilings, not targets: the model decides how
  * many lookups a question needs, so simple questions still end in one or two
- * steps. Raised 2026-09-13 so a "news + overall + options + technical +
+ * steps. Sized so a "news + overall + options + technical +
  * fundamentals" question on a few symbols fits in one turn. `maxWebSearch`
  * stays low because the global Brave budget (`AGENT_GLOBAL_LIMITS` by default) is shared
  * by every user.

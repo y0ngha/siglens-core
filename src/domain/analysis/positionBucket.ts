@@ -7,8 +7,7 @@ const NEAR_BREAKEVEN_THRESHOLD = 0.05;
 
 /**
  * Derive the coarse {@link PositionBucket} for a member's holding from the
- * average cost basis and the current price — pure, no I/O
- * (personalized-analysis-by-position-bucket spec, Subsystem C).
+ * average cost basis and the current price — pure, no I/O.
  *
  * Based on the unrealized return `r = (currentPrice - avgPrice) / avgPrice`:
  * - `r >= 0.20` → `'deep-profit'`
@@ -18,8 +17,7 @@ const NEAR_BREAKEVEN_THRESHOLD = 0.05;
  * - `r <= -0.20` → `'deep-loss'`
  *
  * The caller (siglens action layer) is responsible for reading `avgPrice`
- * server-side and never trusting a client-supplied value — see the spec's
- * cross-repo split. This function only performs the pure math; it has no
+ * server-side and never trusting a client-supplied value. This function only performs the pure math; it has no
  * opinion on tier gating or where the inputs came from.
  *
  * @param avgPrice - Member's average cost basis for the holding.

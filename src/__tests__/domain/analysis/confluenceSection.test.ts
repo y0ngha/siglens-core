@@ -222,8 +222,8 @@ describe('formatDeterministicMetricsSection', () => {
 
     it('renders the daily rule as descriptive, with the re-measurement instead of the old win rate', () => {
         // The old 70% came from a rule that counted signal TYPES and was never compared
-        // with a baseline; re-measured (2000–2026) the daily entry rule trailed the
-        // baseline in every period. The prompt must say so rather than lend it authority.
+        // with a baseline; re-measured out of sample the daily entry rule did not
+        // beat the baseline. The prompt must say so rather than lend it authority.
         const out = formatDeterministicMetricsSection(
             enough,
             '1Day',

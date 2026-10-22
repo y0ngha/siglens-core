@@ -725,7 +725,7 @@ describe('composite summaryKo', () => {
     });
 });
 
-// ─── B1 (PR #153 round 3): equality-neutral margin trend ─────────────────────
+// ─── equality-neutral margin trend ────────────────────────────────────────────
 //
 // When latest netMargin === prev netMargin the scorecard must emit NO trend
 // signal (neither margin_expansion nor margin_contraction) and apply 0 delta.

@@ -147,7 +147,7 @@ describe('normalizeOverallAnalysisResponse 함수는', () => {
 
     // `analyzedAt`은 LLM이 절대 채우지 않는 필드다 — `runOverallAnalysis`가
     // 생성 시점에 한 번 써 넣고, 이 정규화 함수는 캐시에서 읽어온 값을 그대로
-    // 통과시키는 역할만 한다(스펙 2026-09-18 §2.5).
+    // 통과시키는 역할만 한다.
     describe('analyzedAt (캐시에서 읽어온 값을 그대로 통과)', () => {
         it('입력에 있으면 그대로 통과시킨다', () => {
             const result = normalizeOverallAnalysisResponse({

@@ -1221,12 +1221,12 @@ state the same behavior, so changing one without the other leaves contradicting
 instructions (the intro says unlisted patterns get `geometry: null`, the rules still say
 to fill the geometry). After editing either, re-read the other.
 
-Tracked design specs (`docs/superpowers/specs/`) restate contracts too: grep them for the
-old behavior when an invalidation, qualification or threshold rule changes.
+Local design notes, if any, restate contracts too: grep them for the old behavior when an
+invalidation, qualification or threshold rule changes.
 
-`PUBLIC_API.md` restates the surface in several places: the export inventory, the change
-log, and itemized counts or lists ("16 models", "N exports"). A new export, a removed
-entry or a prompt-version bump updates all of them; grep the old count and list.
+`PUBLIC_API.md` restates the surface in several places: the export inventory and itemized
+counts or lists ("16 models", "N exports"). A new export or a removed entry updates all of
+them; grep the old count and list.
 
 <a id="DS-6"></a>
 #### DS-6 — No process residue in code

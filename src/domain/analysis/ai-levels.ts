@@ -308,7 +308,7 @@ export function buildBullishRiskRewardText(
     // `slPct` is always < 0 here (the `stopLoss >= entryPrice` guard above
     // returns '' otherwise) — but a stop only fractionally below entry can
     // still round to `-0.0%` at 1dp. `formatNullableNumber` strips that sign
-    // the same way every other delta in this codebase does (spec §0/§B6).
+    // the same way every other delta in this codebase does.
     const slLabel = `${formatNullableNumber(slPct, 1)}%`;
     const tpLabel =
         tpPct >= 0 ? `+${tpPct.toFixed(1)}%` : `${tpPct.toFixed(1)}%`;
@@ -477,8 +477,7 @@ export function planEntryPrice(
 
 /**
  * @internal
- * Localized `keyPrices` labels for the two pattern-geometry-derived targets
- * (spec 2026-09-18 §A6). Exact-match strings — {@link applyPatternGeometryTarget}
+ * Localized `keyPrices` labels for the two pattern-geometry-derived targets. Exact-match strings — {@link applyPatternGeometryTarget}
  * filters `keyPrices` by these exact labels before re-appending, so
  * re-running this over an already-processed response is idempotent.
  */
@@ -499,7 +498,7 @@ const PATTERN_TARGET_LABELS: Record<
  * @internal
  * Whether `label` is one of the measured/conservative target labels this
  * module appends, in any locale — so a caller can strip targets a card must
- * not carry (an undirected pattern, spec 2026-10-07 §3.2).
+ * not carry (an undirected pattern).
  */
 export function isPatternTargetLabel(label: string): boolean {
     return Object.values(PATTERN_TARGET_LABELS).some(
@@ -514,7 +513,7 @@ export function isPatternTargetLabel(label: string): boolean {
  * model-computed target string. Any existing entries carrying these exact
  * labels are dropped first, so re-processing (e.g. a cache round-trip) does
  * not duplicate them. Returns `pattern` unchanged when it has no `geometry`
- * OR the pattern is `detected: false` (spec 2026-09-18 — a
+ * OR the pattern is `detected: false` (a
  * not-detected entry has no real breakout to project a target from; the
  * schema still allows `geometry` there and a model occasionally fills it).
  */
@@ -557,7 +556,7 @@ function applyPatternGeometryTarget(
  * `patternSummaries`. Returns `response` unchanged (same reference) when no
  * `detected: true` pattern carries `geometry` — preserves the "no-op
  * returns the original object" contract {@link postProcessAnalysisWithReconcile}'s
- * early returns already promise callers (spec 2026-09-18: a
+ * early returns already promise callers (a
  * `detected: false` pattern with `geometry` alone must not trip this either
  * — {@link applyPatternGeometryTarget} would leave it unchanged anyway, but
  * `.map()` still allocates a new array).
@@ -607,8 +606,7 @@ export function postProcessAnalysisWithReconcile(
      */
     currency: CurrencyCode = 'USD',
     /**
-     * Output locale for the deterministic risk:reward line (spec 2026-09-18
-     * §2.3). Defaults to `'ko'` so callers that omit it keep the pre-existing
+     * Output locale for the deterministic risk:reward line. Defaults to `'ko'` so callers that omit it keep the pre-existing
      * Korean line.
      */
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,

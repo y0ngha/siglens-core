@@ -5,7 +5,7 @@ import type { SkillUsageRole } from '@/domain/types';
  * @internal
  * Low/Medium 경계. 제거된 `MIN_CONFIDENCE_WEIGHT`(하한 *필터*)와 같은 0.5 값이지만
  * 의미가 다르다 — 포함/제외가 아니라 표시 *등급* 경계다. 등급 경계는 이 모듈이
- * 단일 소유한다(스펙 §4.2). Medium/High 경계는 `HIGH_CONFIDENCE_WEIGHT`를 재사용한다.
+ * 단일 소유한다. Medium/High 경계는 `HIGH_CONFIDENCE_WEIGHT`를 재사용한다.
  */
 export const MEDIUM_CONFIDENCE_THRESHOLD = 0.5;
 

@@ -131,8 +131,7 @@ function abcCandidate(
 
 /**
  * @internal
- * Horizon fib legs (deduped by anchor pair) plus the first ABC projection
- * (spec 2026-09-28 §3.4). Level prices use the same formulas as
+ * Horizon fib legs (deduped by anchor pair) plus the first ABC projection. Level prices use the same formulas as
  * `fibLevels.ts` so the drawn lines equal the `Fib table:` rows.
  *
  * A leg or ABC the price has already closed through (`isBrokenFibLeg`,

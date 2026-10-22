@@ -27,7 +27,7 @@ import { calculateRSI } from '@/domain/indicators/rsi';
 **Prohibited:**
 ```typescript
 // ❌ Importing from application
-import { submitAnalysis } from '@/application/market/submitAnalysis';
+import { runAnalysis } from '@/application/market/runAnalysis';
 
 // ❌ Circular cross-module dependency (A → B → A)
 // If two infra modules share state, extract to a third file
@@ -44,8 +44,8 @@ its contract.
   `MarketDataProvider`, `SkillsProvider`, …). Owned by the domain because the
   domain is the side that declares its needs.
 - `infrastructure/<module>/types.ts` — **adapter-internal types only**. Examples:
-  cached payload shapes (`CachedBriefingData`), validated config (`WorkerConfig`),
-  result wrappers (`LoadSkillsCachedResult`). Do **not** redeclare port interfaces
+  cached payload shapes (`CachedBriefingData`), result wrappers
+  (`LoadSkillsCachedResult`). Do **not** redeclare port interfaces
   here.
 
 **Adapter authoring:**
@@ -102,7 +102,7 @@ const key = process.env.API_KEY; // prohibited
 #### INF-3 — One config module per external system reads its env
 
 Each external system's environment reads live in a single config module (for example
-`infrastructure/cache/config.ts` for `UPSTASH_*`); other modules import from it instead of
+`infrastructure/upstash/config.ts` (`readUpstashConfig`) for `UPSTASH_*`); other modules import from it instead of
 reading `process.env` themselves. When an env var or endpoint changes, update
 `docs/API.md` (the full required and optional list) in the same change.
 

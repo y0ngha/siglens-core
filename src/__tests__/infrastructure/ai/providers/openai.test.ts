@@ -113,7 +113,7 @@ describe('callChatGPT', () => {
         });
     });
 
-    // Reasoning toggle (spec §A.2): options.effort overrides spec.effort.
+    // Reasoning toggle: options.effort overrides spec.effort.
     describe('effort override (reasoning toggle)', () => {
         it('uses the effort override when provided (low), instead of spec.effort (high)', async () => {
             mockCreate.mockResolvedValueOnce(SUCCESS);

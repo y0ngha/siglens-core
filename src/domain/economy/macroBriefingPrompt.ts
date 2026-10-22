@@ -24,14 +24,14 @@ const RATE_UNIT = '%';
 function formatSignedInteger(n: number): string {
     const rounded = Math.round(n);
     const text = Math.abs(rounded).toLocaleString('en-US');
-    if (rounded === 0) return `+${text}`; // never -0 (spec §0)
+    if (rounded === 0) return `+${text}`; // never -0
     return rounded > 0 ? `+${text}` : `-${text}`;
 }
 
 /**
  * `latest`/`previous` are both whole numbers — e.g. weekly claims or an
  * unregistered integer series — so their delta reads better as `-10,000` than
- * `-10000.00` (spec 2026-09-18 §B3). Registry series with `decimals` (payroll,
+ * `-10000.00`. Registry series with `decimals` (payroll,
  * claims, GDP) never reach this path; see {@link formatScaledLevelDelta}.
  */
 function isIntegerSeries(latest: number, previous: number): boolean {
@@ -41,9 +41,8 @@ function isIntegerSeries(latest: number, previous: number): boolean {
 /**
  * `(Δ ±x.xxpp)` for a rate-type series (`unit === '%'`) or
  * `(Δ ±delta[ unit][, ±x.xx%])` for a level-type series, or `''` when either
- * input is non-finite (null rule, spec §0). The percent-change term is only
- * appended when `previous > 0` (a ratio needs a positive base) — spec
- * 2026-09-18 §B3. `levelUnitLabel` (registry-known series only) is appended
+ * input is non-finite (null rule). The percent-change term is only
+ * appended when `previous > 0` (a ratio needs a positive base). `levelUnitLabel` (registry-known series only) is appended
  * to the level delta so the change reads in the same unit as the values.
  * Used for rate series and for series the registry does not scale (index
  * points, unknown names).
@@ -240,7 +239,7 @@ function hoursText(hours: number): string {
 }
 
 /**
- * Relative-time suffix for a calendar row (spec 2026-09-18 §B3):
+ * Relative-time suffix for a calendar row:
  * future within 24h → `(today, in Nh)` on the same UTC date, else `(in Nh)`;
  * past within 24h → `(Nh ago)` (the economy snapshot is cached up to 24h, so
  * events earlier today reach the prompt); beyond 24h → `(in N days)` /
@@ -274,7 +273,7 @@ function formatCalendarTime(isoDate: string, now: Date): string {
 
 /**
  * @internal 거시 AI 브리핑 LLM 프롬프트를 빌드한다. 스킬 없음, 캐시할 다른
- * catalog-level 지식도 없음(spec §3.2/Design C) — `stable`은 빈 문자열이고
+ * catalog-level 지식도 없음(Design C) — `stable`은 빈 문자열이고
  * `dynamic`이 전체 프롬프트다. assembly split(v0.31) 이전 production과
  * byte-for-byte 동일한 순서를 유지한다.
  *
@@ -289,9 +288,8 @@ function formatCalendarTime(isoDate: string, now: Date): string {
 export function buildMacroBriefingPrompt(
     snapshot: EconomySnapshot,
     /**
-     * Reference clock for the calendar relative-time suffix (spec
-     * 2026-09-18 §2.10). Required — domain code must never read the wall
-     * clock itself (spec 2026-09-18); the one caller
+     * Reference clock for the calendar relative-time suffix. Required — domain code must never read the wall
+     * clock itself; the one caller
      * (`runMacroBriefing.ts`) already passes it.
      */
     now: Date

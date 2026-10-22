@@ -519,7 +519,7 @@ describe('evaluateInvestorFlows — purity', () => {
     });
 });
 
-describe('evaluateInvestorFlows — directional-input sufficiency (reviewer probe)', () => {
+describe('evaluateInvestorFlows — directional-input sufficiency', () => {
     const accumulation = {
         quarters: [accumulationQuarter()],
         topHolders: topHolders(10, 8, 0),

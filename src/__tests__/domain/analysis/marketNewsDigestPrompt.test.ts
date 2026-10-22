@@ -3,8 +3,8 @@ import { buildMarketNewsDigestPrompt as buildMarketNewsDigestPromptRaw } from '@
 import { DRIVER_READER_FACING_RULE } from '@/domain/analysis/newsPrompt';
 import type { EnrichedNewsItem, Skill } from '@/domain/types';
 
-// `buildMarketNewsDigestPrompt` now returns `{ stable, dynamic }` (spec §3.4
-// assembly split) — this file's call sites predate the split and assert
+// `buildMarketNewsDigestPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildMarketNewsDigestPrompt = (
@@ -92,7 +92,7 @@ describe('buildMarketNewsDigestPrompt — 출력 로케일', () => {
     /**
      * 이 축은 프롬프트 **본문**에 필드 언어 지시를 하드코딩하고 있었다.
      * 말미 리마인더는 필드 설명을 덮으려고 만든 것이라 과업 규칙으로 적힌
-     * 지시까지 뒤집는다고 볼 수 없다 — 소스에서 갈라야 한다(리뷰 6라운드).
+     * 지시까지 뒤집는다고 볼 수 없다 — 소스에서 갈라야 한다.
      */
     it('로케일을 생략하면 ko와 바이트가 같다', () => {
         expect(buildMarketNewsDigestPrompt('미국 암호화폐', [ITEM], [])).toBe(
@@ -113,7 +113,7 @@ describe('buildMarketNewsDigestPrompt — 출력 로케일', () => {
             expect(prompt).not.toContain('in Korean (존댓말)');
 
             // 스키마 예시는 모델이 그대로 흉내 내는 자리라 지시문보다 힘이 셀
-            // 수 있다 — `(한국어)` 표기가 남으면 리마인더가 무력해진다(리뷰 7라운드).
+            // 수 있다 — `(한국어)` 표기가 남으면 리마인더가 무력해진다.
             expect(prompt).not.toContain('한국어');
         }
     );
@@ -125,7 +125,7 @@ describe('buildMarketNewsDigestPrompt — 출력 로케일', () => {
     });
 });
 
-describe('buildMarketNewsDigestPrompt — sentiment tally + age (spec 2026-09-18 §2.8)', () => {
+describe('buildMarketNewsDigestPrompt — sentiment tally + age', () => {
     const NOW = new Date('2026-06-15T18:00:00Z');
 
     it("renders the sentiment tally header and each item's age suffix", () => {

@@ -20,7 +20,7 @@ export const runsForward = (c: OverlayCandidate): boolean =>
 
 /**
  * @internal
- * Every overlay candidate for one prompt (spec 2026-09-28 §2.1). Each builder
+ * Every overlay candidate for one prompt. Each builder
  * is isolated: one throwing never costs the others or the analysis. The
  * domain layer cannot log, so a failed builder's kind is returned in
  * `failedBuilders` for the application layer to report.

@@ -193,7 +193,7 @@ function isFinitePositive(n: number | undefined): n is number {
 
 /**
  * @internal Normalizes a model-authored pattern-geometry object
- * (`PatternSummary.geometry`, spec 2026-09-18 §A6). Dropped (returns
+ * (`PatternSummary.geometry`). Dropped (returns
  * `undefined`) unless every present number is finite and positive, the
  * direction is a valid enum member, AND the geometry is internally
  * consistent with that direction: a `'down'` pattern's extreme must sit
@@ -404,7 +404,7 @@ export function normalizeActionRecommendation(
     };
 }
 
-// --- Chart overlays (spec 2026-09-28) ---
+// --- Chart overlays ---
 
 /** @internal A string[] of non-empty strings; anything else → []. */
 export function normalizeIdList(v: unknown): string[] {

@@ -18,8 +18,7 @@ import { lineValueAt, trendlineHeight } from '@/domain/patterns/boundaryLines';
 
 /**
  * @internal
- * Deterministic measured-move geometry for one QUALIFIED pattern (spec
- * 2026-09-18 §A1, reworked by spec 2026-10-07) — the numbers the siglens
+ * Deterministic measured-move geometry for one QUALIFIED pattern — the numbers the siglens
  * pattern skills used to ask the model to compute itself.
  *
  * Every level comes from the fixed inputs `qualifyPatterns` attached
@@ -109,7 +108,7 @@ function extremeGeometry(
 // ─── Head & shoulders ───────────────────────────────────────────────────────
 
 /**
- * Breakout, height and status all read the SLOPED neckline (§3.3): breakout
+ * Breakout, height and status all read the SLOPED neckline: breakout
  * is the neckline at the break bar (or the last bar before a break), height
  * is the head's distance from the neckline at the head's own bar.
  */
@@ -144,7 +143,7 @@ function headAndShouldersGeometry(
 // ─── Triangles / wedges / channels / rectangle / broadening ────────────────
 
 /**
- * §3.1/§3.2: the breakout side's boundary read at the last bar, the opposite
+ * Boundary pairs: the breakout side's boundary read at the last bar, the opposite
  * boundary's last touch as the invalidation, and the fixed
  * {@link trendlineHeight}. `null` once the boundaries have crossed at the
  * last bar — a pattern past its apex has nothing left to break out of.
@@ -232,7 +231,7 @@ function highTightFlagGeometry(
 
 // ─── Cup & handle and rounding ──────────────────────────────────────────────
 
-/** §3.6: breakout = right rim, height = right rim − bottom, invalidation = handle low. */
+/** Cup & handle: breakout = right rim, height = right rim − bottom, invalidation = handle low. */
 function cupGeometry(
     shape: CupPatternShape,
     bars: readonly Bar[]
@@ -252,7 +251,7 @@ function cupGeometry(
 }
 
 /**
- * §3.7: breakout at the lip (the higher rim of a bottom, the lower rim of a
+ * Rounding: breakout at the lip (the higher rim of a bottom, the lower rim of a
  * top), height = lip to extreme, invalidation at the most recent confirmed
  * swing on the right side.
  */

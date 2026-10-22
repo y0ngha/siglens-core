@@ -10,8 +10,7 @@ import type {
 } from '@/domain/types';
 
 /**
- * @internal `N up / N down / N flat` from a list of percent changes (spec
- * 2026-09-18 §2.9). Filters to finite values first (spec 2026-09-18 — a
+ * @internal `N up / N down / N flat` from a list of percent changes. Filters to finite values first (a
  * non-finite change matches none of `>0`/`<0`/`===0`, so it silently
  * dropped out of the count without the caller's `MIN_FINITE_SECTORS`-style
  * intent being visible at this call site too).
@@ -30,7 +29,7 @@ const MIN_ROWS_FOR_SPREAD = 2;
 
 /**
  * @internal `Best − worst sector spread: x.xx%p`, or `'N/A'` (fewer than
- * {@link MIN_ROWS_FOR_SPREAD} finite rows — null rule, spec 2026-09-18).
+ * {@link MIN_ROWS_FOR_SPREAD} finite rows — null rule).
  * `%p` matches this file's existing percentage-point suffix.
  */
 function formatBestWorstSpread(changes: readonly number[]): string {
@@ -43,8 +42,7 @@ function formatBestWorstSpread(changes: readonly number[]): string {
 }
 
 /**
- * Canonical `symbol` of the volatility-index row inside `indices` (spec
- * 2026-09-18 §B2) — the VIX is a fear gauge, not a directional market
+ * Canonical `symbol` of the volatility-index row inside `indices` — the VIX is a fear gauge, not a directional market
  * index, and it dominates every other index's move (its typical daily swing
  * runs several times an equity index's), so folding it into the average
  * reports a number that tracks VIX's own noise more than the market.
@@ -53,8 +51,7 @@ const VOLATILITY_INDEX_SYMBOL = 'VIX';
 
 /**
  * @internal `Index average change: ±x.xx%`, or `'N/A'` (no non-volatility
- * indices — null rule). Excludes the {@link VOLATILITY_INDEX_SYMBOL} row —
- * spec 2026-09-18 §B2.
+ * indices — null rule). Excludes the {@link VOLATILITY_INDEX_SYMBOL} row.
  */
 function formatIndexAverageChange(indices: readonly MarketIndexData[]): string {
     const changes = indices
@@ -70,8 +67,7 @@ function formatIndexAverageChange(indices: readonly MarketIndexData[]): string {
  * @internal Builds the market-briefing LLM prompt.
  *
  * Build the AI market-briefing prompt from the dashboard summary data. This
- * builder has no skills and no other catalog-level knowledge to cache (spec
- * §3.2/Design C), so `stable` is empty and `dynamic` is the full prompt,
+ * builder has no skills and no other catalog-level knowledge to cache, so `stable` is empty and `dynamic` is the full prompt,
  * byte-for-byte the same production order as before the assembly split
  * (v0.31): role framing + Data Boundary, the JSON schema, then the per-call
  * index and sector rows at the tail.
@@ -130,8 +126,7 @@ export function buildMarketBriefingPrompt(
      */
     // A non-finite change (a quote the provider failed to fill) cannot be
     // ranked against real numbers — listed after the ranked rows, with no
-    // `#N`, rather than sorting arbitrarily among the real ones (spec
-    // 2026-09-18).
+    // `#N`, rather than sorting arbitrarily among the real ones.
     const finiteSectors = sectors.filter(s =>
         Number.isFinite(s.changesPercentage)
     );
@@ -221,6 +216,6 @@ ${breadthLine}
 ${spreadLine}`;
 
     // `stable` is empty — this builder has no skills and no other
-    // catalog-level knowledge to cache (spec §3.2/Design C).
+    // catalog-level knowledge to cache.
     return { stable, dynamic };
 }

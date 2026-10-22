@@ -33,7 +33,7 @@ import {
 
 /**
  * @internal
- * Strict chart-pattern qualification (spec 2026-10-07) — what may be drawn,
+ * Strict chart-pattern qualification — what may be drawn,
  * printed with numbers and offered as a Candidate id. The pre-screener
  * (`screenChartPatterns`) stays loose and only picks skill docs; its hits
  * that do not qualify come back as `shapeHints`.
@@ -49,7 +49,7 @@ import {
  * tolerances (containment, touches, heights) use the latest `atr`.
  *
  * Hits the price has already failed or fulfilled (`isSpentPattern`) are
- * dropped before the §2.5 arbitration, so a spent hit cannot knock out a
+ * dropped before the overlap arbitration, so a spent hit cannot knock out a
  * live one.
  *
  * Pure and deterministic; never mutates its inputs.

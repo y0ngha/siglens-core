@@ -781,7 +781,7 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
     });
 });
 
-describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-toggle spec Part A)', () => {
+describe('reasoning 토글이 캐시 키에 반영될 때', () => {
     it('buildAnalysisCacheKey: reasoning=true는 :reason=on suffix를 추가한다', () => {
         const off = buildAnalysisCacheKey('AAPL', '1Day', 'gemini-3.6-flash');
         const on = buildAnalysisCacheKey(
@@ -996,7 +996,7 @@ describe('reasoning 토글이 캐시 키에 반영될 때 (member-reasoning-togg
     });
 });
 
-describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-by-position-bucket spec, Subsystem C)', () => {
+describe('positionBucket이 캐시 키에 반영될 때', () => {
     it('buildAnalysisCacheKey: positionBucket 미지정 시 기존(레거시) 키와 byte-identical하다', () => {
         const legacy = buildAnalysisCacheKey(
             'AAPL',
@@ -1108,18 +1108,17 @@ describe('positionBucket이 캐시 키에 반영될 때 (personalized-analysis-b
         // 결정론적 손익비 줄 + 모델 산문으로 바꾼다(모든 경로에서, 보정 경로뿐 아니라).
         // p15 는 Chart Pattern Candidates(computed) 섹션·Fib/Woodie/DeMark
         // 피벗·Fib ABC 확장·MACD 사이클/Bollinger %B/Volume 배수·SMC 거리
-        // 라인을 추가한다(정밀도 2번째 웨이브, spec §A1-A5).
+        // 라인을 추가한다(정밀도 2번째 웨이브).
         // p16 은 컨플루언스 신뢰도 문구를 "측정된 우위 없음"으로 바꾸고, 1Day에
         // Short-Term Washout 블록을 추가하며 entryRecommendation 규칙을 고친다.
         // p17 은 washout 진입 판정을 룰 엔진이 내리게 하고, p18 은 뉴스로 인한
         // 하락에서 그 판정을 유보한다. p20 은 차트 오버레이 후보 id를 추가한다.
-        // p21 은 모델이 직접 셈하다 틀리던 비교값(MA 간 격차·배열, 대순환 단계, 갭, 되돌림 깊이, 패턴 간격 등)을 계산해 넣는다
-        // (spec 2026-09-28-chart-overlays). p19 는 탐지 목록을 넓힌다(캔들 6종·차트 패턴 5종·신호 4종).
+        // p21 은 모델이 직접 셈하다 틀리던 비교값(MA 간 격차·배열, 대순환 단계, 갭, 되돌림 깊이, 패턴 간격 등)을 계산해 넣는다. p19 는 탐지 목록을 넓힌다(캔들 6종·차트 패턴 5종·신호 4종).
         // p22 는 기술적 분석 프롬프트에서 고정 Intent·Guidelines 블록을 유저 프롬프트 머리에서
         // 시스템 메시지(stable) 머리로 옮긴다(문구 변경 없음, 심볼 간 공통 접두사 확대).
-        // p23 (UX audit 2026-10-05 §C6): Confluence Assessment에 내부 라벨 비노출 규칙을
+        // p23 (UX audit): Confluence Assessment에 내부 라벨 비노출 규칙을
         // 추가하고 "rule engine"/"washout"을 이름으로 인용하라던 두 지시를 고쳤다.
-        // p24 (spec 2026-10-07): 차트 패턴은 엄격한 작도 자격을 얻은 것만 숫자·Candidate id와
+        // p24: 차트 패턴은 엄격한 작도 자격을 얻은 것만 숫자·Candidate id와
         // 함께 싣고, 나머지 프리스크리너 hit은 "shape hint — not drawable" 한 줄로만 남긴다.
         // p25 (2026-10-08 A/B 후속): 차트 패턴 섹션이 목록을 만드는 과정을 말하지 않고
         // (모델이 "사전 스크리너"·"그리기 검증"을 사용자 문장에 옮겨 적었다), 형태만 닮은
@@ -1211,7 +1210,7 @@ describe('locale이 캐시 키에 반영될 때', () => {
     });
 
     /**
-     * options 키만 이 규약을 빠뜨렸다가 리뷰에서 잡혔다(PR #184). 형제 빌더가
+     * options 키가 이 규약을 빠뜨리기 쉬운 자리다. 형제 빌더가
      * 여덟이라 하나를 놓쳐도 tsc가 잡아주지 않는다 — 각 빌더를 직접 고정한다.
      */
     it('options 키도 로케일을 가른다', () => {
@@ -1228,8 +1227,8 @@ describe('locale이 캐시 키에 반영될 때', () => {
     });
 
     /**
-     * 형제 빌더가 아홉이라 하나를 놓쳐도 tsc가 잡아주지 않는다 — 실제로
-     * options 키를 빠뜨렸다가 리뷰에서 잡혔다. **각각을 직접 고정한다.**
+     * 형제 빌더가 아홉이라 하나를 놓쳐도 tsc가 잡아주지 않는다 — options 키처럼
+     * 하나를 빠뜨리기 쉽다. **각각을 직접 고정한다.**
      */
     it('나머지 분석 키도 전부 로케일을 가른다', () => {
         const cases: Array<[string, string]> = [
@@ -1289,7 +1288,7 @@ describe('locale이 캐시 키에 반영될 때', () => {
     });
 });
 
-describe('narrowPriorAnalysesForCacheKey (prior-analysis-context, Task 5a)', () => {
+describe('narrowPriorAnalysesForCacheKey (prior-analysis-context)', () => {
     const WINDOW_SECONDS = 300; // 5 minutes, arbitrary but representative of ANALYSIS_CACHE_TTL['5Min']
     // A bucket edge for a 300s window (00:10:00 is a multiple of 5 minutes),
     // so the anchored bucket start below equals NOW_MS itself.
@@ -1596,7 +1595,7 @@ describe('priorAnalysisWindowStartMs (session-aware day bucket)', () => {
     });
 });
 
-describe('historyFingerprint이 캐시 키에 반영될 때 (prior-analysis-context, Task 5b)', () => {
+describe('historyFingerprint이 캐시 키에 반영될 때 (prior-analysis-context)', () => {
     it('historyFingerprint 생략 시 기존 키와 byte-identical하다', () => {
         const legacy = buildAnalysisCacheKey(
             'AAPL',
@@ -1749,7 +1748,7 @@ describe('analysisHistoryQuery', () => {
             ).toBe(Date.parse('2026-09-29T20:00:00.000Z'));
         });
 
-        // Regression (PLTR 1Day, 2026-09-29): with `ORDER BY generated_at DESC
+        // Regression (daily chart): with `ORDER BY generated_at DESC
         // LIMIT limit` applied before the window filter, each fresh generation
         // evicted the oldest in-key row and changed the `:hist=` fingerprint,
         // so every request missed. Excluding the bucket in the query keeps the

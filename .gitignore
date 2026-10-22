@@ -47,6 +47,27 @@ yarn-error.log*
 /.superpowers/
 /.claire/
 
+# .claude/agent-memory/는 로컬 전용이다(sub-agent가 쌓는 작업 메모 — 로컬 경로·운영
+# 관찰이 섞여 공개 레포에 올리지 않는다). 끝에 `/`를 붙이지 않는다 — 워크트리에서
+# 심볼릭 링크로 걸면 git에게는 파일이라 `/` 패턴이 놓친다.
+/.claude/agent-memory
+# 마케팅 맥락 메모(로컬 전용).
+/.claude/product-marketing-context.md
+
+# docs/는 로컬 전용이다. 라이브러리 사용자·기여자에게 필요한 문서(서비스 소개·도메인 명세·
+# 아키텍처·공개 API·외부 서비스·코딩 규칙)만 아래에서 예외로 열어 추적한다. CI 리뷰 봇과
+# ruleReferences 가드가 이 문서들을 읽으므로 체크아웃에 있어야 한다. 나머지(설계 spec·플랜,
+# 레포 분담·에이전트 워크플로, fix-log)는 새 워크트리에 .worktreeinclude로 복사된다.
+/docs/*
+!/docs/SERVICE.md
+!/docs/DOMAIN.md
+!/docs/ARCHITECTURE.md
+!/docs/PUBLIC_API.md
+!/docs/API.md
+!/docs/CONVENTIONS.md
+!/docs/FF.md
+!/docs/GIT_CONVENTIONS.md
+
 # local-only TODO file
 /TODO.md
 

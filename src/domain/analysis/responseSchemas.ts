@@ -514,7 +514,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                         items: KEY_PRICE_SCHEMA,
                     },
                     // Id of the `## Chart Pattern Candidates (computed)` block
-                    // this pattern was confirmed from (spec 2026-09-28 §2.3);
+                    // this pattern was confirmed from;
                     // `null` for a pattern that section does not list (the
                     // qualified patterns only — not the loose pre-screener).
                     candidateId: { type: ['string', 'null'] },
@@ -533,8 +533,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                         required: ['show', 'type', 'color', 'label'],
                         additionalProperties: false,
                     },
-                    // Measured-move anchor for THIS pattern (spec 2026-09-18
-                    // §A6) — the app computes 측정 목표가/보수 목표가(50%)
+                    // Measured-move anchor for THIS pattern — the app computes 측정 목표가/보수 목표가(50%)
                     // from it; the model never computes a target itself.
                     geometry: {
                         type: ['object', 'null'],
@@ -580,7 +579,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     summary: { type: 'string' },
                     confidenceWeight: { type: 'number' },
                     // Ids of the `## Chart Overlay Candidates (computed)`
-                    // entries this verdict relies on (spec 2026-09-28 §2.4).
+                    // entries this verdict relies on.
                     candidateIds: { type: 'array', items: { type: 'string' } },
                 },
                 required: [
@@ -610,7 +609,7 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
             },
         },
         // Ids picked from the `### Trendlines` group of `## Chart Overlay
-        // Candidates (computed)` (spec 2026-09-28 §2.4); `resolveChartOverlays`
+        // Candidates (computed)`; `resolveChartOverlays`
         // joins these against the offered candidates after the model call.
         trendlineIds: { type: 'array', items: { type: 'string' } },
         actionRecommendation: {

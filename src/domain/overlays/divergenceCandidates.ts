@@ -11,7 +11,7 @@ const KINDS: readonly RsiDivergenceKind[] = ['bullish', 'bearish'];
 
 /**
  * @internal
- * RSI regular divergences as drawable candidates (spec 2026-09-28 §3.3) — only
+ * RSI regular divergences as drawable candidates — only
  * when the same rule that fires `rsi_*_divergence` fires, so the divergence
  * skill's gate and the candidate list always agree.
  */

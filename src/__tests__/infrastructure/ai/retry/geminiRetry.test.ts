@@ -37,7 +37,7 @@ const mockWithRetry = vi.mocked(withRetry);
 const MODEL: GeminiModelId = 'gemini-3.5-flash-lite';
 
 /**
- * 바닥이 `'low'`인 모델 — `'minimal'`을 400으로 거부한다(2026-09-06 실측).
+ * 바닥이 `'low'`인 모델 — `'minimal'`을 400으로 거부한다(실측).
  * 축소 시퀀스가 모델별 바닥을 존중하는지 검증하는 데 쓴다.
  */
 const MODEL_FLOOR_LOW: GeminiModelId = 'gemini-3.8-flash';

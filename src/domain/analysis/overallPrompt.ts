@@ -119,7 +119,7 @@ function formatTechnical(
     tech: AnalysisResponse,
     currency: CurrencyCode,
     assetClass: AssetClass,
-    /** Last bar close, when the caller has bars for this symbol/timeframe (spec §2.5). */
+    /** Last bar close, when the caller has bars for this symbol/timeframe. */
     bars?: readonly Bar[],
     krxTick: KrxTickTable = 'share'
 ): string {
@@ -138,7 +138,7 @@ function formatTechnical(
         krxTick
     );
     const px = (n: number): string => formatQuotedPrice(n, quoting);
-    // Null rule (spec §0): a 0/negative/non-finite close is "unknown", never
+    // Null rule: a 0/negative/non-finite close is "unknown", never
     // a real snapshot price — `isUsablePrice` mirrors the same gate `prompt.ts`
     // uses for the analogous Analysis Snapshot section.
     const lastClose =
@@ -494,9 +494,8 @@ function koTerminologyRule(
  * @internal Builds the multi-axis overall-analysis LLM prompt.
  *
  * Build the 4-axis overall analysis prompt, split into a stable/dynamic pair
- * (spec §3.4, {@link AssembledPrompt}). This builder is mostly per-call data
- * (it only consumes already-computed axis summaries — spec §7 calls it
- * "already good as a summary-consumer"), so the split here is intentionally
+ * ({@link AssembledPrompt}). This builder is mostly per-call data
+ * (it only consumes already-computed axis summaries), so the split here is intentionally
  * small: `stable` is empty — the Output Schema was the only part with zero
  * interpolation of any kind, but it lives at the tail of `dynamic` now (see
  * below), so there is no remaining catalog-level content to cache; `dynamic`
@@ -587,7 +586,7 @@ function koTerminologyRule(
  *   gate. Optional, and only consulted together with `priorAnalyses` — see
  *   that param.
  * @param priorAnalyses - Optional history of past analyses for this symbol +
- *   timeframe, supplied by the consumer (siglens / siglens-trader) from its
+ *   timeframe, supplied by the consumer (siglens or another consumer) from its
  *   own storage. Rendered into `dynamic` via `selectPriorAnalyses` +
  *   `formatPriorAnalysisSection` only when BOTH `bars` and
  *   `priorAnalyses` are provided and non-empty — one without the other
@@ -683,8 +682,7 @@ export function buildOverallAnalysisPrompt(
     // 크립토는 fundamental·options·financials 축이 구조적으로 없다. 뉴스 축까지
     // 비면(창 안에 기사 0건인 알트코인) 남는 건 technical 하나뿐인데, 그때도
     // "technical + news로 종합하라"고 지시하면 비어 있는 축에서 근거를 만들어내라는
-    // 말이 된다 — crypto fundamental 축이 예전에 같은 모순으로 수정된 적이 있다
-    // (docs/PUBLIC_API.md 2026-06-22 "Gemini-1 bugfix").
+    // 말이 된다 — crypto fundamental 축이 예전에 같은 모순으로 수정된 적이 있다.
     const cryptoAvailableAxes =
         news !== null ? 'technical + news axes' : 'the technical axis';
     const assetContext = isCrypto

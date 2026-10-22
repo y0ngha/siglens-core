@@ -43,7 +43,7 @@ export const WOODIE_PIVOT_KEYS = ['pp', 'r1', 'r2', 's1', 's2'] as const;
 /** @internal DeMark-pivot field keys surfaced as reference levels. */
 export const DEMARK_PIVOT_KEYS = ['pp', 'r1', 's1'] as const;
 
-/** @internal Fibonacci ratios applied to `pp ± ratio * range` (spec 2026-09-18 §A2). */
+/** @internal Fibonacci ratios applied to `pp ± ratio * range`. */
 const FIB_PIVOT_R1_RATIO = 0.382;
 const FIB_PIVOT_R2_RATIO = 0.618;
 const FIB_PIVOT_R3_RATIO = 1.0;
@@ -106,7 +106,7 @@ export function computeCamarillaPivot(bar: Bar): CamarillaPivotLevels | null {
 /**
  * @internal Fibonacci pivot set (PP, R1–R3, S1–S3 = `pp ± 0.382/0.618/1.000
  * × range`) from the same prior bar the Standard/Camarilla levels use, or
- * `null` on bad OHLC (spec 2026-09-18 §A2).
+ * `null` on bad OHLC.
  */
 export function computeFibonacciPivot(bar: Bar): FibonacciPivotLevels | null {
     const base = resolvePivotBase(bar);

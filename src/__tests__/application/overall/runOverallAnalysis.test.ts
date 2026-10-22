@@ -265,7 +265,7 @@ describe('runOverallAnalysis', () => {
             expect(mockCallAnalysisAi).not.toHaveBeenCalled();
         });
 
-        it('캐시 히트 결과가 analyzedAt을 이미 가지고 있으면 그대로 통과시킨다 (스펙 §2.5)', async () => {
+        it('캐시 히트 결과가 analyzedAt을 이미 가지고 있으면 그대로 통과시킨다', async () => {
             mockCacheGet.mockResolvedValueOnce({
                 ...mockOverallResult,
                 analyzedAt: '2026-05-30T00:00:00.000Z',
@@ -512,7 +512,7 @@ describe('runOverallAnalysis', () => {
             expect(result.status).toBe('done');
         });
 
-        it('새로 생성된 결과에 analyzedAt(ISO 문자열)을 부착한다 (스펙 §2.5)', async () => {
+        it('새로 생성된 결과에 analyzedAt(ISO 문자열)을 부착한다', async () => {
             const before = Date.now();
             const result = await runOverallAnalysis(baseOptions());
             const after = Date.now();
@@ -655,7 +655,7 @@ describe('runOverallAnalysis', () => {
                 expect.stringContaining('onPromptAssembled'),
                 expect.any(Error)
             );
-            // `analyzedAt` (spec 2026-09-18 §2.5) is a real wall-clock
+            // `analyzedAt` is a real wall-clock
             // timestamp attached fresh on each call — two genuinely separate
             // `runOverallAnalysis` invocations can land in different
             // milliseconds, which is not the thing this test is checking.
@@ -780,9 +780,9 @@ describe('runOverallAnalysis', () => {
     /**
      * `options.priorAnalyses`가 `narrowPriorAnalysesForCacheKey`를 거쳐
      * `inputHash`(→ `buildOverallCacheKey`)에 접히는지, 그리고 생략했을 때
-     * 기존 캐시 키와 바이트가 같은지 확인한다 (Task 6c).
+     * 기존 캐시 키와 바이트가 같은지 확인한다.
      */
-    describe('prior-analysis-context (Task 6c)', () => {
+    describe('prior-analysis-context', () => {
         it('priorAnalyses를 생략하면 캐시 키가 예전과 동일하다', async () => {
             await runOverallAnalysis(baseOptions());
             const omittedKey = mockCacheGet.mock.calls[0]![0] as string;
@@ -878,7 +878,7 @@ describe('runOverallAnalysis', () => {
         /**
          * 상위 프롬프트만 로케일을 받고 축은 안 받으면, 축은 늘 한국어로 답하고
          * 그 한국어가 `Summary (KO): …`로 상위 프롬프트에 박힌다 — "다른 언어로
-         * 쓰라"는 지시와 **모순되는 입력**이 만들어진다(PR #184 리뷰 1라운드).
+         * 쓰라"는 지시와 **모순되는 입력**이 만들어진다.
          */
         it('로케일을 하위 축(technical·news)에 그대로 넘긴다', async () => {
             await runOverallAnalysis({ ...baseOptions(), locale: 'en' });
@@ -1065,8 +1065,8 @@ describe('runOverallAnalysis', () => {
          * `priorAnalyses`/`marketEvents`는 technical 축 캐시 키의 `:hist=`·`:evt=`
          * 구간으로 접힌다. 소비자가 자기 단독 `runAnalysis` 호출에는 넘기면서
          * 여기에는 안 넘기면 같은 분석에 키가 둘 생기고, overall이 캐시에서 읽을 수
-         * 있었을 technical을 다시 생성한다 — siglens가 2026-09-11부터 실제로 그
-         * 모양이었고 심볼당 매일 밤 ~5k 토큰을 중복 지불했다.
+         * 있었을 technical을 다시 생성한다 — 소비자가 실제로 그
+         * 모양이었고 심볼마다 토큰을 중복 지불했다.
          *
          * 이 테스트가 지키는 것은 "전달된다"이지 "키가 같다"가 아니다. 키 조립은
          * `runAnalysisImpl` 안에 있고 여기서는 목이라 볼 수 없다 — 전달만 끊기지
@@ -1112,7 +1112,7 @@ describe('runOverallAnalysis', () => {
 
         // 보유 종목이 있는 회원의 technical 탭은 `:pos=` 키로 캐시된다. overall의
         // technical 축이 버킷을 못 받으면 그 키를 영원히 못 맞혀 매번 다시
-        // 생성했다(2026-09-29 감사). `technical.positionBucket`이 그대로 전달돼야 한다.
+        // 생성했다(감사에서 확인). `technical.positionBucket`이 그대로 전달돼야 한다.
         it('technical.positionBucket을 technical 축 호출에 그대로 넘긴다', async () => {
             await runOverallAnalysis({
                 ...baseOptions(),
@@ -1296,7 +1296,7 @@ describe('runOverallAnalysis', () => {
         });
     });
 
-    describe('macroCalendar (spec 2026-09-28 §5)', () => {
+    describe('macroCalendar', () => {
         const MACRO_EVENT: EconomicCalendarEvent = {
             date: '2026-08-01 12:00:00',
             event: 'CPI MoM',
@@ -1327,12 +1327,12 @@ describe('runOverallAnalysis', () => {
         });
     });
 
-    describe('assetClass 전달 (review round 1 finding 9)', () => {
+    describe('assetClass 전달', () => {
         // baseOptions()는 assetClass: 'crypto' — 이 값이 news 축까지 전달되지
         // 않으면 crypto로 돌린 overall 호출이 equity로 프레이밍된 뉴스
         // 프롬프트를 만들고, buildNewsCacheKey가 assetClass를 키에 넣지
         // 않으므로 그 결과가 실제 crypto `/news` 호출과 같은 캐시 키에
-        // 쓰일 수 있었다(발견된 기존 버그).
+        // 쓰일 수 있다.
         it('crypto 최상위 assetClass를 news 축의 runNewsAnalysis 호출에 그대로 전달한다', async () => {
             await runOverallAnalysis(baseOptions());
 

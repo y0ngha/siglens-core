@@ -48,7 +48,7 @@ interface DiagonalCount {
 
 /**
  * Whether a count passing every rule but rule 3 is a contracting diagonal
- * (spec 2026-10-02 §3): wave 4 overlaps wave 1; the 1–3 and 2–4 boundary
+ *: wave 4 overlaps wave 1; the 1–3 and 2–4 boundary
  * lines converge (the 1–3 line rises with the trend, so the 2–4 line rises
  * faster: wave 4 stays beyond wave 2's end); waves 1 > 3 (> 5) within
  * EW_DIAG_WAVE_TOLERANCE. The wedge holds its ends (EW_DIAG_LINE_TOLERANCE)
@@ -197,7 +197,7 @@ function toDiagonalCandidate(
 
 /**
  * @internal
- * Contracting diagonals (spec 2026-10-02 §3): full 0–5 counts that pass
+ * Contracting diagonals: full 0–5 counts that pass
  * every impulse rule but rule 3 and form a wedge (`isContractingDiagonal`).
  * A forming wave 4 cannot be told from noise yet, so only counts with wave 5
  * complete or forming qualify. Drawn as waves 1–5 + the 1–3 and 2–4

@@ -42,9 +42,9 @@ export const MARKET_EVENT_CACHE_KEY_CAP = 20;
  * @internal
  * Impact levels worth telling the model about, ranked most significant first.
  *
- * `low` and `negligible` are dropped: on production data they are 13.5% and
- * 60.8% of all articles, so keeping them would bury the handful of events that
- * actually moved price. Articles with no impact rating (not yet analysed) never
+ * `low` and `negligible` are dropped: they are the large majority of
+ * articles, so keeping them would bury the handful of events that actually
+ * moved price. Articles with no impact rating (not yet analysed) never
  * reach here — an unrated article presented as an event would invent a fact.
  *
  * Exported because the cache-key stage filters on the same set before bars are

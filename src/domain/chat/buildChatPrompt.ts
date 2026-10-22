@@ -73,7 +73,7 @@ function quoteLevels(
 
 /**
  * `(±x.xx% from <label>)`, or `''` when `basePrice` is unusable (undefined,
- * non-finite, or non-positive) — null rule, spec §0.
+ * non-finite, or non-positive) — null rule.
  */
 function formatDistanceFromBase(
     price: number,
@@ -132,7 +132,7 @@ function formatPriceTargets(
 
 /**
  * `YYYY-MM-DD HH:MM UTC` from an ISO 8601 timestamp, instead of the raw
- * `2026-09-18T12:34:56.789Z` string (spec 2026-09-18 §B1) — the model
+ * `2026-09-18T12:34:56.789Z` string — the model
  * otherwise echoed the millisecond/offset punctuation verbatim into a
  * user-facing Korean answer. Falls back to the raw string on an unparseable
  * date rather than throwing (`new Date(NaN).toISOString()` throws).
@@ -154,8 +154,8 @@ function formatRatio(n: number | null): string {
 /**
  * `## Structured Plan (computed)` — entry range, stop, and targets with a %
  * distance from the entry reference, plus the deterministic
- * `planCheck` risk:reward ratios and flags (spec 2026-09-18 §2.12). Every
- * distance/ratio follows the null rule (spec §0). Returns `''` when there is
+ * `planCheck` risk:reward ratios and flags. Every
+ * distance/ratio follows the null rule. Returns `''` when there is
  * no `ActionRecommendation` to report.
  */
 function formatStructuredPlan(
@@ -168,8 +168,7 @@ function formatStructuredPlan(
     // `planEntryPrice` is the SAME single entry reference `buildPlanCheck` uses
     // for `riskRewardAtEntry` (mean of finite positive entryPrices, else the
     // analysis-time price) — reused here so "% from entry" and the printed
-    // risk:reward ratio never disagree about what "entry" means (spec
-    // 2026-09-18 §B1; they previously used different bases — entryZoneTop, the
+    // risk:reward ratio never disagree about what "entry" means (they previously used different bases — entryZoneTop, the
     // MAX of entryPrices, vs this mean — and printed two different %s).
     const entryRef = planEntryPrice(rec, analysisTimePrice);
     const entryRangeText =
@@ -179,7 +178,7 @@ function formatStructuredPlan(
               ? formatQuotedPrice(entryPrices[0], quoting)
               : `${formatQuotedPrice(entryPrices[0], quoting)} ~ ${formatQuotedPrice(entryPrices[entryPrices.length - 1], quoting)} (mid ${formatQuotedPrice(entryRef ?? null, quoting)})`;
     // Reconciled levels win where they exist — the SAME preference
-    // `buildPlanCheck` applies internally (spec 2026-09-18), so
+    // `buildPlanCheck` applies internally, so
     // this block and its own `planCheck` ratios below never disagree about
     // which stop/targets are actually in play.
     const effectiveStopLoss = rec.reconciledLevels?.stopLoss ?? rec.stopLoss;
@@ -539,7 +538,7 @@ export function buildChatPrompt(
         companyName === symbol ? symbol : `${symbol} (${companyName})`;
     // `planCheck.currentPrice` is the last close `buildPlanCheck` measured
     // against at analysis time — the same reference every distance/ratio in
-    // this prompt is computed from (spec 2026-09-18 §2.12).
+    // this prompt is computed from.
     const analysisTimePrice = rec?.planCheck?.currentPrice;
 
     const systemPrompt = `You are an AI assistant helping a user understand a technical analysis report for ${subject} (${assetKind}).

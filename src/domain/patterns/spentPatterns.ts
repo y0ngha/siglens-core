@@ -11,8 +11,7 @@ import { PATTERN_SPENT_SLACK_ATR } from '@/domain/patterns/constants';
  * past and is neither offered to the model nor drawn (2026-10-02: 1.4% of
  * real-data hits had already failed, 1.4% had already hit their target).
  *
- * - Failed: any close beyond the FIXED invalidation level (spec 2026-10-07
- *   §4), with no slack, counted from the bar that set it
+ * - Failed: any close beyond the FIXED invalidation level, with no slack, counted from the bar that set it
  *   (`invalidationIndex`) — earlier bars of the pattern legitimately sit
  *   beyond it, like a rising support's earlier lows. A level that followed
  *   the last close down could never be crossed. No slack because the prompt

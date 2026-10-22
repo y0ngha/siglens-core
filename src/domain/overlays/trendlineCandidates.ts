@@ -96,7 +96,7 @@ function toCandidate(
 
 /**
  * @internal
- * Two-pivot trendline candidates over the screener window (spec 2026-09-28 §3.2):
+ * Two-pivot trendline candidates over the screener window:
  * rising support through lows, falling resistance through highs, invalidated
  * by repeated closes through the line, ranked by touches then recency.
  */

@@ -34,9 +34,9 @@ export interface RunAgentTurnParams {
     history: readonly AgentMessage[];
     /** The new user message for this turn. */
     userMessage: string;
-    /** Tool names the consumer can execute right now (spec §4-2 step 2). */
+    /** Tool names the consumer can execute right now. */
     availableTools: ReadonlySet<string>;
-    /** Symbols the user holds, for the system prompt (spec §4-3 item 6). */
+    /** Symbols the user holds, for the system prompt. */
     portfolioSymbols?: readonly string[];
     /** Injectable clock for tests; defaults to `new Date()`. */
     now?: Date;
@@ -95,7 +95,7 @@ export interface RunAgentTurnDependencies {
     onEvent: (event: AgentTurnEvent) => void;
     /** Optional premium-model usage log writer; omitted turns are not tracked. */
     usageLogs?: UsageLogRepository;
-    /** Max output tokens per provider call (spec §5: 4,096 with reasoning off). */
+    /** Max output tokens per provider call. */
     maxOutputTokens?: number;
     /** Service-wide web-search caps; defaults to `AGENT_GLOBAL_LIMITS`. */
     globalLimits?: AgentGlobalLimits;

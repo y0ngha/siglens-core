@@ -27,8 +27,7 @@ import type { Bar, PatternCandidate } from '@/domain/types';
 const ATR = 1;
 
 /**
- * Drops each candidate's `pivots` (spec 2026-09-18 real-data fix —
- * classifiers now additively attach the pivots they matched, consumed by
+ * Drops each candidate's `pivots` (classifiers now additively attach the pivots they matched, consumed by
  * `patternGeometry.ts`) so this file's id/startIndex/endIndex shape
  * assertions don't have to hand-author an exact pivot array per case.
  * `pivots` itself is covered by `patternGeometry.test.ts`.
@@ -856,7 +855,7 @@ describe('classifyCurvaturePatterns', () => {
         expect(classifyCurvaturePatterns(pivots, bars, ATR)).toEqual([]);
     });
 
-    it('핸들 저점이 컵의 마지막 저점보다 높아도 컵 상단 절반에 있으면 cup_and_handle이다 (spec 2026-10-07 §3.6 규칙 반전 수정)', () => {
+    it('핸들 저점이 컵의 마지막 저점보다 높아도 컵 상단 절반에 있으면 cup_and_handle이다', () => {
         // Same cup as the textbook rounding_bottom case (lows at
         // (2,10),(4,4),(6,2),(8,9)), plus a 5th low at 15 — ABOVE the cup's
         // right-edge low (9). A real handle forms in the cup's upper half,

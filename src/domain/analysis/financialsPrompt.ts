@@ -71,7 +71,7 @@ function fmtGrowthPct(n: number | null | undefined): string {
 /**
  * A percentage-point delta (`+x.xpp` / `-x.xpp`), or `'N/A'` for a
  * non-finite value. Delegates to {@link formatSignedNumber} for the sign/
- * `-0` handling (spec §0) — a raw `n.toFixed()` printed `-0.0pp` for a tiny
+ * `-0` handling — a raw `n.toFixed()` printed `-0.0pp` for a tiny
  * negative delta that rounds to zero.
  */
 function fmtPp(n: number | null): string {
@@ -256,7 +256,7 @@ function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
  * @internal Builds the financial-statement analysis LLM prompt.
  *
  * Build the financial-statement analysis LLM prompt, split into a
- * stable/dynamic pair (spec §3.4, {@link AssembledPrompt}) — Design C
+ * stable/dynamic pair ({@link AssembledPrompt}) — Design C
  * ("skills-to-system split"):
  *
  * - `stable`: ONLY the Financial Analysis Frameworks (Active Skills)

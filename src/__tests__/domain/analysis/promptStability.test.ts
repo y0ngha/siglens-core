@@ -42,7 +42,7 @@ import type {
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
 import type { OptionsSnapshot } from '@/domain/options/types';
 
-// Spec §3.4 / plan Task 4.2 Step 1 — Design C ("skills-to-system split"): the
+// Design C ("skills-to-system split"): the
 // assembly-split stability invariants. `stable` leads with the fixed
 // Timeframe-independent blocks (Analysis Intent, Analysis Guidelines — p22) and
 // then carries the always_on skill digests; it depends only on (locale,
@@ -94,7 +94,7 @@ const BRIEFING_CONTEXT = {
     volatility: { label: 'VIX', level: 18.3 },
 } as const;
 
-describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec §3.4)', () => {
+describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () => {
     it('stable part is byte-identical across symbols/bars and contains no per-call values', () => {
         const skills = [
             makeSkill({
@@ -523,7 +523,7 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants (spec
     });
 });
 
-// Spec §3.4 / plan Task 4.2 Step 1 — only `buildAnalysisPrompt` (technical) had
+// Only `buildAnalysisPrompt` (technical) had
 // a dedicated stable-boundary test above. The remaining 12 worker-dispatched
 // split builders share the same `{ stable, dynamic }` contract but had no
 // test pinning it, so any of them could silently start leaking a per-call
@@ -600,7 +600,7 @@ const EMPTY_FINANCIALS: FinancialsSnapshot = {
     cashFlowGrowth: [],
 };
 
-describe('split builders — stable/dynamic assembly-split boundary invariants (spec §3.4)', () => {
+describe('split builders — stable/dynamic assembly-split boundary invariants', () => {
     it('buildFundamentalAnalysisPrompt: stable is symbol/company invariant', () => {
         const a = buildFundamentalAnalysisPrompt(
             'AAPL',
@@ -997,7 +997,7 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
             [],
             BRIEFING_CONTEXT
         );
-        // Design C: this builder has no skills (spec §3.2), so it was fully
+        // Design C: this builder has no skills, so it was fully
         // reverted to the exact v0.31 production order — the JSON schema
         // precedes the index/sector data rows, which sit at the true tail.
         expect(dynamic.indexOf('Schema (')).toBeLessThan(
@@ -1006,7 +1006,7 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(dynamic.indexOf('주요 지수:')).toBeLessThan(
             dynamic.indexOf('섹터 등락률 (rank')
         );
-        // Precomputed prompt data (spec 2026-09-18 §2.9): the sector rows are
+        // Precomputed prompt data: the sector rows are
         // followed by Breadth + Best-worst-spread lines, which are now the
         // true tail (empty sectors here, so the spread line renders N/A).
         expect(
@@ -1046,7 +1046,7 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
         expect(a.stable).not.toContain('Globex Inc.');
     });
 
-    // No skills, no other catalog-level knowledge (spec §3.2) — `stable` is
+    // No skills, no other catalog-level knowledge — `stable` is
     // empty, and the Output Schema + Interpretation Guide sit at the tail of
     // `dynamic`, after the Key Metrics data.
     it('buildOptionsAnalysisPrompt: stable is empty; Output Schema + Interpretation Guide sit at the tail of dynamic', () => {
@@ -1119,7 +1119,7 @@ describe('split builders — stable/dynamic assembly-split boundary invariants (
             snap,
             new Date('2026-06-15T00:00:00Z')
         );
-        // Design C: this builder has no skills (spec §3.2), so it was fully
+        // Design C: this builder has no skills, so it was fully
         // reverted to the exact v0.31 production order — the JSON schema
         // precedes the indicator/calendar data rows, which sit at the true
         // tail.

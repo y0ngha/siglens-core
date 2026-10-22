@@ -32,8 +32,7 @@ export interface EconomicIndicatorSeries {
      * supplied — this series carries no built-in per-`name` registry, so the
      * caller (which does know each indicator's unit) is the only source.
      * Drives the macro-briefing prompt's rate-type (`%` -> percentage-point
-     * delta) vs level-type (delta + `%` change) formatting (spec 2026-09-18
-     * §B3/§B7). `undefined` renders as level-type.
+     * delta) vs level-type (delta + `%` change) formatting. `undefined` renders as level-type.
      */
     unit?: string;
 }

@@ -195,7 +195,7 @@ describe('runNewsCardAnalysis — 출력 로케일', () => {
     );
 
     /**
-     * 페르소나가 `"Korean summary"`를 못 박고 있었다(PR #184 리뷰 2라운드).
+     * 페르소나가 `"Korean summary"`를 못 박고 있었다.
      * 출력 언어는 OUTPUT FORMAT 계약만이 정한다.
      */
     it.each(['en', 'ja', 'zh'] as const)(
@@ -208,7 +208,7 @@ describe('runNewsCardAnalysis — 출력 로케일', () => {
 
     /**
      * in-flight 키가 로케일을 안 가르면 언어가 다른 동시 요청이 하나로 합쳐져
-     * **늦게 부른 쪽이 요청하지 않은 언어를 받는다**(PR #184 리뷰 1라운드).
+     * **늦게 부른 쪽이 요청하지 않은 언어를 받는다**.
      */
     it('언어가 다른 동시 요청은 합쳐지지 않는다', async () => {
         let resolveFirst: (v: string) => void = () => {};

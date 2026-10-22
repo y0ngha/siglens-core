@@ -320,9 +320,9 @@ describe('withRetry', () => {
      * wall-clock 예산 가드.
      *
      * `abortIfCumulativeDelayReachesMs`는 **sleep 시간만** 세므로 느린 실패를 못 막는다.
-     * 2026-08-09 프로덕션에서 `deepseek-v4.1-pro`가 248.5초 만에 실패했는데 그 시점
-     * 누적 delay는 0이라 delay cap(30s)을 통과해 재시도가 시작됐고, 호출자 마감(300초)을
-     * 넘겨 대기 중이던 4건이 한꺼번에 실패했다.
+     * 큰 프롬프트에서 호출이 수백 초 만에 실패했는데 그 시점
+     * 누적 delay는 0이라 delay cap(30s)을 통과해 재시도가 시작됐고, 호출자 마감을
+     * 넘겨 대기 중이던 요청들이 한꺼번에 실패할 수 있다.
      */
     /** 지정한 시간만큼 fake time을 태우고 5xx로 죽는 호출. */
     function slowFailure(durationMs: number): () => Promise<string> {
@@ -333,7 +333,7 @@ describe('withRetry', () => {
     }
 
     it('does not start a retry when the previous attempt was slow enough to blow the budget', async () => {
-        // 250초 소요 후 실패 — 위 실측 재현. 기본 예산(240s)을 이미 넘겼다.
+        // 250초 소요 후 실패 — 위 상황 재현. 기본 예산(240s)을 이미 넘겼다.
         const fn = vi
             .fn<() => Promise<string>>()
             .mockImplementation(slowFailure(250_000));

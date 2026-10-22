@@ -77,7 +77,7 @@ export interface OverallDependencyInputs {
     /** LLM model identifier scoped across all four axes. */
     modelId: ModelId;
     /**
-     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A),
+     * Per-request deep-thinking toggle,
      * scoped across all four axes AND the overall job's own AI call — mirrors
      * how `modelId` propagates uniformly to every axis submit. Folded into
      * {@link buildOverallCacheKey} (and the peek key) so overall's own ON/OFF
@@ -96,7 +96,7 @@ export interface OverallDependencyInputs {
     locale?: AnalysisLocale;
     /**
      * Prior-analysis-context history for this symbol + timeframe, supplied
-     * by the consumer (siglens / siglens-trader) from its own database —
+     * by the consumer (siglens or another consumer) from its own database —
      * mirrors `SubmitAnalysisOptions.priorAnalyses`, but feeds the OVERALL
      * prompt's own `## Prior Analyses` section directly (via
      * `buildOverallAnalysisPrompt`'s `priorAnalyses` param), NOT the
@@ -221,7 +221,7 @@ export interface OverallDependencyInputs {
     /**
      * Scheduled macro-economic releases (FOMC, CPI, etc.), forwarded
      * unchanged to the news axis (`runNewsAnalysis`'s `macroCalendar`
-     * option — spec 2026-09-28 §5). Kept top-level (mirroring
+     * option). Kept top-level (mirroring
      * `upcomingCalendar`) rather than folded into the `news` per-axis
      * options object, so a standalone `runNewsAnalysis` call and this
      * overall call built from the same top-level inputs produce the same
@@ -252,15 +252,13 @@ export interface OverallDependencyInputs {
      * `buildAnalysisCacheKey`). A consumer that supplies them to its own
      * `runAnalysis` call but NOT here gets two keys for one analysis, and the
      * overall pipeline regenerates a technical analysis it could have read
-     * from cache. That is not hypothetical: siglens ran exactly that shape
-     * from 2026-09-11 (the day its `analysis_history` table started
-     * returning rows, so its standalone key grew a `:hist=` segment this one
-     * never had) and paid for a duplicate ~5k-token technical generation per
-     * symbol per nightly pre-warm. Supply the same values in both places, or
+     * from cache. That is not hypothetical: a consumer ran exactly that shape
+     * (its standalone key grew a `:hist=` segment this one never had) and paid
+     * for a duplicate technical generation per symbol per nightly pre-warm. Supply the same values in both places, or
      * in neither.
      *
      * NOTE on `positionBucket`: same rule — it folds into the technical key as
-     * `:pos=`. Until 2026-09-29 this Pick did not accept it at all, so a member
+     * `:pos=`. This Pick once did not accept it at all, so a member
      * with a holding (whose technical tab is cached under `:pos=`) regenerated
      * the technical axis on every overall request. Pass the bucket the
      * consumer's standalone technical call uses, or omit it in both.
@@ -438,7 +436,7 @@ export interface OverallDependencyInputs {
      *   absent rather than missing data.
      *
      * Also forwarded verbatim to the news axis's `runNewsAnalysis` call
-     * (review round 1 finding 9, spec 2026-09-28) — a standalone
+     * — a standalone
      * `runNewsAnalysis` call and this overall call must build the SAME news
      * prompt from the same `assetClass`, since `buildNewsCacheKey` does not
      * fold `assetClass` into the cache key: an overall call that omitted it
@@ -503,7 +501,7 @@ export interface DependencyStateCached {
     /**
      * Options axis result. `null` indicates a graceful skip (NoChains symbol
      * or absent snapshot). Optional so existing consumers that constructed
-     * `DependencyStateCached` without options before this PR (e.g. test mocks
+     * `DependencyStateCached` without options before this field existed (e.g. test mocks
      * from prior versions) still type-check; the resolver always sets it.
      */
     options?: OptionsAnalysisResponse | null;

@@ -272,7 +272,7 @@ describe('selectSkills — fail-closed gating', () => {
     });
 });
 
-describe('selectSkills — category whitelist (spec §3.2 invariants)', () => {
+describe('selectSkills — category whitelist', () => {
     const catalogWithAllCategories: Skill[] = [
         alwaysOnSkill('indicator-core', { type: 'indicator_guide' }),
         alwaysOnSkill('candle-primer', {
