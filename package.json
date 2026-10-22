@@ -1,6 +1,6 @@
 {
     "name": "@y0ngha/siglens-core",
-    "version": "2.24.0",
+    "version": "2.25.0",
     "description": "TypeScript technical analysis library for stocks and crypto: indicators (RSI, MACD, Bollinger Bands, Ichimoku), candlestick and chart pattern detection, trading signals, fear and greed index, and LLM analysis prompts with response validation.",
     "license": "MIT",
     "author": "y0ngha <dev.y0ngha@gmail.com>",
