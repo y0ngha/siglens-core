@@ -396,3 +396,34 @@ describe('tool description wording', () => {
         expect(description('get_bars_indicators')).toContain('latest.rsiZone');
     });
 });
+
+describe('tool descriptions — benchmark dev defects (2026-10-22)', () => {
+    const desc = (name: string) =>
+        AGENT_TOOL_SPECS.find(t => t.name === name)!.description;
+    it('bars: changePct는 봉 개수이지 달력 기간이 아니고, 달력 변화·고저점 날짜·50/200 교차를 설명한다', () => {
+        const d = desc('get_bars_indicators');
+        expect(d).not.toContain('roughly 1 day/1 week/1 month/3 months');
+        expect(d).toContain('not calendar periods');
+        expect(d).toContain("calendarChange['1month'|'3months'|'1year']");
+        expect(d).toContain('highDate/lowDate');
+        expect(d).toContain('maCross50_200');
+        expect(d).toContain('never that no cross happened');
+    });
+    it('fundamentals: 확정 여부·분기 행·실적 반응·신뢰할 수 없는 P/E를 설명한다', () => {
+        const d = desc('get_fundamentals');
+        expect(d).toContain('earningsDateConfirmed');
+        expect(d).toContain('recentQuarters');
+        expect(d).toContain('earningsReactions');
+        expect(d).toContain(
+            'A null P/E means the source figure was not trustworthy'
+        );
+    });
+    it('quote·options·economy: 해석된 종목, 낡은 상장, 호가 없는 내재 변동폭, 국채 기준일', () => {
+        expect(desc('get_quote')).toContain('stale_listing');
+        expect(desc('get_quote')).toContain('resolvedName');
+        expect(desc('get_options_summary')).toContain(
+            'when there are no live option quotes'
+        );
+        expect(desc('get_economy')).toContain('treasury.date');
+    });
+});

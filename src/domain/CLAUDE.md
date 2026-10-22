@@ -265,6 +265,11 @@ computing derived values, so a recomputation from the rendered text matches.
 - A rule restated in two places (section intro and writing rules) changes in both together.
 - Before adding a prohibition ("never say X"), read every existing rule that mentions the
   same output; a new ban must not contradict gap-reporting or required-wording rules.
+- Positional or exclusive wording ("the very last line", "only", "always") is checked
+  against every other rule that places content at that position or names that kind of
+  source (a source line vs a follow-up marker line, source attribution vs a plain-language
+  step); give the competing rule an explicit order or carve-out instead of leaving two
+  rules that cannot both hold.
 - Keep internal-only signals (resemblance hints, scoring artifacts) out of the prompt
   instead of instructing the model not to mention them; listed text gets narrated.
 - When content is split into stable and dynamic halves, each half reads on its own (a moved
@@ -333,6 +338,22 @@ without a usable key stay separate.
 ```typescript
 // ❌ groupBy(rows, r => r.url)                          // '' groups every blank-URL row together
 // ✅ r.accession ? groupBy key `${r.accession}` : keep the row as its own group
+```
+
+<a id="DOM-15"></a>
+#### DOM-15 — A prompt rule's condition names a fact the tool output actually carries
+
+An instruction of the form "when X, do Y" or "use field F" is only followable if X and F
+appear in what the model sees: the tool's real return shape, not the shape you intend a
+consumer to add later. Check each condition against the tool description and the payload the
+consumer returns today; if the field is not there yet, word the rule so it degrades safely
+when the field is absent, and name the consumer action in the `PUBLIC_API.md` row. A rule
+that holds at only one of the answer levels it governs (summary vs detail) is applied at
+all of them.
+
+```typescript
+// ❌ 'Judge the zone from latest.rsiZone.'            // consumers do not return rsiZone yet
+// ✅ 'Use latest.rsiZone when present; otherwise treat 30-70 as neutral.'
 ```
 
 ## Overall axis weighting (`analysis/overallScore.ts`)

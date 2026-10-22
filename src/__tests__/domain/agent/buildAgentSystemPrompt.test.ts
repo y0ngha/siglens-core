@@ -537,7 +537,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-18.3');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-23.1');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
@@ -903,6 +903,57 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'Never close with a second reminder that the decision is the user'
         );
+    });
+
+    it('벤치마크 dev 결함(2026-10-22) 규칙: 부재 단정·전제 교정·수치 정합·기간·출처 위치·몰빵 질문', () => {
+        expect(prompt).toContain('never chain several calculations');
+        expect(prompt).toContain(
+            'Never state that something did not happen, never happened or always held over a period the tool results do not cover'
+        );
+        expect(prompt).toContain(
+            'Premises: when the question states a fact as its premise'
+        );
+        expect(prompt).toContain('say so plainly in the first sentence');
+        expect(prompt).toContain(
+            'Levels and direction must agree with your own numbers'
+        );
+        expect(prompt).toContain(
+            'call it "the last 20 sessions", not "1 month"'
+        );
+        expect(prompt).toContain('compare their dates first');
+        expect(prompt).toContain(
+            'as one line at the end of the answer body — before the follow-up marker line when there is one'
+        );
+        // the follow-up marker stays the very last line (Plain step 6 / Detailed)
+        expect(prompt).toContain(
+            'nothing — not even the source line — comes after it'
+        );
+        expect(prompt).toContain(
+            'It stays the very last line, after the source line.'
+        );
+        expect(prompt).toContain(
+            "call them SIGLENS's only when a SIGLENS analysis tool returned them"
+        );
+        expect(prompt).toContain(
+            'a tool that covers the period in question finds no trace of it'
+        );
+        expect(prompt).toContain(
+            'Rounding this way is the only change allowed'
+        );
+        expect(prompt).toContain(
+            'including any tool result with the error or reason "stale_listing"'
+        );
+        expect(prompt).toContain(
+            'Naming the period a figure covers ("the last 20 sessions") is not a bar count'
+        );
+        expect(prompt).toContain(
+            'one trigger level per scenario, and the summary line repeats those'
+        );
+        expect(prompt).toContain('at most two decimals');
+        expect(prompt).toContain(
+            'Asked whether to put all or most of their money into one symbol'
+        );
+        expect(prompt).toContain('Never use order-execution words');
     });
 
     it('계산 금지·수평선·컨플루언스 명칭·상위 타임프레임 규칙이 들어 있다', () => {
