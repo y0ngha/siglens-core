@@ -52,7 +52,13 @@ export function agentLimit(tier: Tier, feature: AgentPerTierLimit): number {
     return AGENT_LIMITS[feature][tier];
 }
 
-/** Shape of the service-wide caps; a consumer may pass its own through `RunAgentTurnDependencies.globalLimits`. */
+/**
+ * Shape of the service-wide caps; a consumer may pass its own through
+ * `RunAgentTurnDependencies.globalLimits`. Each value is a non-negative integer
+ * (`0` refuses every `web_search`) or `Infinity` (uncapped: the counter is not
+ * touched at all). The consumer validates what it reads from config; core does
+ * not clamp NaN or negative numbers.
+ */
 export interface AgentGlobalLimits {
     webSearchPerDay: number;
     webSearchPerMonth: number;
