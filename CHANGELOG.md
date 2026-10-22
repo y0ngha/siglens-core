@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.24.0](https://github.com/y0ngha/siglens-core/compare/v2.23.3...v2.24.0) (2026-10-22)
+
+### Features
+
+* 에이전트 공용 웹 검색 예산을 소비자가 주입할 수 있게 (globalLimits) ([#292](https://github.com/y0ngha/siglens-core/issues/292)) ([eed2fff](https://github.com/y0ngha/siglens-core/commit/eed2fffe2af801fc41230a630aa6ce8226d3d170))
+
 ## [2.23.3](https://github.com/y0ngha/siglens-core/compare/v2.23.2...v2.23.3) (2026-10-18)
 
 ### Bug Fixes
