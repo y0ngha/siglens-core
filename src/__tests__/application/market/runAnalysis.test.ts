@@ -257,6 +257,78 @@ describe('runAnalysis', () => {
         });
     });
 
+    describe('options.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedSet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: injectedSet,
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+            injectedSet.mockReset();
+            injectedGet.mockResolvedValue(null);
+            injectedSet.mockResolvedValue(undefined);
+        });
+
+        it('주입한 캐시에서 읽고, env 캐시는 만들지도 읽지도 않는다', async () => {
+            injectedGet.mockResolvedValueOnce(mockRawResult);
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { cache: injectedCache }
+            );
+
+            expect(result.status).toBe('cached');
+            expect(injectedGet).toHaveBeenCalledTimes(1);
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+
+        it('캐시 미스 시 결과를 주입한 캐시에 기록하고 env 캐시에는 쓰지 않는다', async () => {
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, cache: injectedCache }
+            );
+
+            expect(result.status).toBe('done');
+            expect(injectedSet).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ summary: '테스트 요약' }),
+                3600
+            );
+            expect(mockCacheSet).not.toHaveBeenCalled();
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 env 캐시로 폴백하지 않고 캐시 없이 실행한다', async () => {
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, cache: null }
+            );
+
+            expect(result.status).toBe('done');
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('skipEnqueueIfMiss (bot path)', () => {
         it('cache miss + skipEnqueueIfMiss → returns {status:"miss_no_trigger"}, LLM not called', async () => {
             const result = await runAnalysis(

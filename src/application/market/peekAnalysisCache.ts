@@ -1,3 +1,4 @@
+import type { CacheOptions } from '@/application/types';
 import {
     EMPTY_ANALYSIS_FALLBACK_SUMMARY,
     normalizeCachedAnalysisResponse,
@@ -18,7 +19,7 @@ import {
     buildAnalysisPeekCacheKey,
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 
 /**
  * `true` when a normalized analysis carries no analytical content — i.e. an
@@ -117,6 +118,9 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * ```
  *
  * @see submitAnalysis
+ *
+ * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
+ *   cache from env, `null` → no cache. See {@link CacheOptions}.
  */
 export async function peekAnalysisCache(
     symbol: string,
@@ -127,11 +131,12 @@ export async function peekAnalysisCache(
     tier: Tier = DEFAULT_TIER,
     tierConfig: TierConfig = TIER_CONFIG,
     positionBucket?: PositionBucket,
-    locale?: AnalysisLocale
+    locale?: AnalysisLocale,
+    cacheOptions?: CacheOptions
 ): Promise<FilteredAnalysisResult | null> {
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
 
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(cacheOptions?.cache);
     if (cache === null) return null;
 
     const effectiveModelId = modelId ?? DEFAULT_ANALYSIS_MODEL_ID;

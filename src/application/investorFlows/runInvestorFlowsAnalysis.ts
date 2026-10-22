@@ -32,7 +32,7 @@ import {
     buildInvestorFlowsCacheKey,
     INVESTOR_FLOWS_CACHE_TTL_SECONDS,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { reasoningSeedPart } from '@/infrastructure/skills/sampling';
 
@@ -113,7 +113,7 @@ export async function runInvestorFlowsAnalysis(
         usSources ? includeExchangeLists : undefined,
         usSources && options.squeezeContext !== undefined
     );
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options.cache);
 
     if (!options.force && cache !== null) {
         try {

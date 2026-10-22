@@ -1,4 +1,4 @@
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { KeyPolicy } from '@/domain/keyRouting';
 import type { InvestorFlowsDataProvider } from '@/domain/ports/investorFlowsDataProvider';
@@ -18,7 +18,8 @@ import type {
  * check — tier gating for `modelId` is the caller's responsibility, as with
  * congress. `userApiKey` is forwarded to the AI call unchanged.
  */
-export interface RunInvestorFlowsAnalysisOptions extends BackgroundTaskOptions {
+export interface RunInvestorFlowsAnalysisOptions
+    extends BackgroundTaskOptions, CacheOptions {
     /** Ticker (`"AAPL"`, or a Korean listing such as `"005930.KS"` whose snapshot is `market: 'kr'`). */
     symbol: string;
     /** LLM model identifier used for the analysis and cache scoping. */

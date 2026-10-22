@@ -1,5 +1,5 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type { CongressTradesProvider } from '@/domain/ports/congressTradesProvider';
 import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
@@ -25,7 +25,8 @@ import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
  * `modelId` stays the caller's (siglens) responsibility, same as the rest of
  * this options type.
  */
-export interface SubmitCongressTrendOptions extends BackgroundTaskOptions {
+export interface SubmitCongressTrendOptions
+    extends BackgroundTaskOptions, CacheOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
     /** LLM model identifier used for the analysis and cache scoping. */

@@ -340,4 +340,72 @@ describe('getSectorSignals', () => {
         // line 90: non-null 결과가 유지된다.
         expect(result.stocks).toEqual([signalResult]);
     });
+
+    describe('cacheOptions.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedSet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: injectedSet,
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+            injectedSet.mockReset();
+            injectedSet.mockResolvedValue(undefined);
+        });
+
+        it('주입한 캐시에서 읽고 env 캐시는 만들지 않는다', async () => {
+            const cached: SectorSignalsResult = {
+                computedAt: fixedNow.toISOString(),
+                stocks: [],
+            };
+            injectedGet.mockResolvedValue(cached);
+
+            const result = await getSectorSignals(
+                fakeProvider,
+                TEST_SECTOR_STOCKS,
+                '1Day',
+                fixedNow,
+                { cache: injectedCache }
+            );
+
+            expect(result).toBe(cached);
+            expect(createCacheProviderMock).not.toHaveBeenCalled();
+            expect(mockCache.get).not.toHaveBeenCalled();
+        });
+
+        it('미스 시 결과를 주입한 캐시에 쓰고 env 캐시에는 쓰지 않는다', async () => {
+            injectedGet.mockResolvedValue(null);
+            computeStockSignalResultMock.mockReturnValue(nonEmptySignal);
+
+            await getSectorSignals(
+                fakeProvider,
+                TEST_SECTOR_STOCKS,
+                '1Day',
+                fixedNow,
+                { cache: injectedCache }
+            );
+
+            expect(injectedSet).toHaveBeenCalledTimes(1);
+            expect(mockCache.set).not.toHaveBeenCalled();
+            expect(createCacheProviderMock).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 env 캐시로 폴백하지 않고 provider에서 계산한다', async () => {
+            const result = await getSectorSignals(
+                fakeProvider,
+                TEST_SECTOR_STOCKS,
+                '1Day',
+                fixedNow,
+                { cache: null }
+            );
+
+            expect(result.computedAt).toBe(fixedNow.toISOString());
+            expect(createCacheProviderMock).not.toHaveBeenCalled();
+            expect(mockCache.get).not.toHaveBeenCalled();
+            expect(mockGetBars).toHaveBeenCalled();
+        });
+    });
 });

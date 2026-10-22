@@ -1,5 +1,5 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     AnalysisLimitError,
@@ -20,7 +20,8 @@ import type { FinancialStatementsProvider } from '@/domain/ports/financialStatem
 // ─────────────────────────────────────────
 
 /** Options controlling financials analysis submission behavior. */
-export interface SubmitFinancialsAnalysisOptions extends BackgroundTaskOptions {
+export interface SubmitFinancialsAnalysisOptions
+    extends BackgroundTaskOptions, CacheOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
     /** LLM model identifier used for the analysis and cache scoping. */

@@ -283,4 +283,46 @@ describe('peekBriefingCache 함수는', () => {
         expect(mockCacheSet).not.toHaveBeenCalled();
         expect(mockCacheDelete).not.toHaveBeenCalled();
     });
+
+    describe('cacheOptions.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: vi.fn(),
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+        });
+
+        it('주입한 캐시에서 읽고 env 캐시는 만들지 않는다', async () => {
+            injectedGet.mockResolvedValueOnce(mockCachedData);
+
+            const result = await peekBriefingCache(
+                mockData,
+                CTX,
+                BRIEFING_MODEL_ID,
+                { cache: injectedCache }
+            );
+
+            expect(result).toBe(mockBriefing);
+            expect(injectedGet).toHaveBeenCalledTimes(1);
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 env 캐시로 폴백하지 않고 null을 반환한다', async () => {
+            const result = await peekBriefingCache(
+                mockData,
+                CTX,
+                BRIEFING_MODEL_ID,
+                { cache: null }
+            );
+
+            expect(result).toBeNull();
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+    });
 });

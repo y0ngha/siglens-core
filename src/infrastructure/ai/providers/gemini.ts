@@ -1,5 +1,6 @@
 import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
-import { GoogleGenAI, ThinkingLevel } from '@google/genai';
+import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import type { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import type { GeminiModelId } from '@/domain/analysis/modelSpecs';
@@ -22,18 +23,36 @@ const GEMINI_TIMEOUT_MS = 3600_000;
  * back uppercased in its 400 message), but the SDK types the field as this
  * enum, so map at the boundary rather than casting.
  */
-const THINKING_LEVEL_TO_SDK: Record<GeminiThinkingLevel, ThinkingLevel> = {
-    minimal: ThinkingLevel.MINIMAL,
-    low: ThinkingLevel.LOW,
-    medium: ThinkingLevel.MEDIUM,
-    high: ThinkingLevel.HIGH,
-};
-
-const clientCache = createClientCache<GoogleGenAI>(
-    apiKey => new GoogleGenAI({ apiKey })
+const loadGenAI = loadOptionalSdk(
+    '@google/genai',
+    'Gemini models',
+    () => import('@google/genai')
 );
 
-function getClient(apiKey: string): GoogleGenAI {
+let clientCache: ReturnType<typeof createClientCache<GoogleGenAI>> | undefined;
+
+/**
+ * The enum is a runtime value of the lazily loaded SDK, so the mapping is
+ * resolved from the loaded module instead of a module-level constant.
+ */
+function toSdkThinkingLevel(
+    level: GeminiThinkingLevel,
+    sdk: { ThinkingLevel: typeof ThinkingLevel }
+): ThinkingLevel {
+    const map: Record<GeminiThinkingLevel, ThinkingLevel> = {
+        minimal: sdk.ThinkingLevel.MINIMAL,
+        low: sdk.ThinkingLevel.LOW,
+        medium: sdk.ThinkingLevel.MEDIUM,
+        high: sdk.ThinkingLevel.HIGH,
+    };
+    return map[level];
+}
+
+async function getClient(apiKey: string): Promise<GoogleGenAI> {
+    const sdk = await loadGenAI();
+    clientCache ??= createClientCache<GoogleGenAI>(
+        key => new sdk.GoogleGenAI({ apiKey: key })
+    );
     return clientCache.get(apiKey);
 }
 
@@ -82,7 +101,11 @@ export async function callGemini(
     // Gemini has no native multi-block prompt-caching API here — implicit
     // caching (2.5+) keys on an identical byte-for-byte prefix formed by
     // `system` (persona + folded skill digest, design C) + this `prompt`.
-    const client = getClient(apiKey);
+    const sdk = await loadGenAI();
+    const client = await getClient(apiKey);
+    // getClient는 이제 SDK 지연 로드로 await 한다 — 그 사이 도착한 abort는 아래에서 다는
+    // 리스너가 보지 못하므로 로드 직후 한 번 더 확인한다.
+    options.signal?.throwIfAborted();
     // Widened to the interface (not the literal row type) so
     // `resolveReasoningConfig` infers its config type from both toggle states.
     const spec = MODEL_SPECS[model] as GeminiModelSpec | undefined;
@@ -134,7 +157,7 @@ export async function callGemini(
                 // `3.6-flash`가 0에 400) 에러 없이 무시한다(`3.8-flash`).
                 // 조용한 무시가 특히 위험해서 level로 전환했다.
                 thinkingConfig: {
-                    thinkingLevel: THINKING_LEVEL_TO_SDK[thinkingLevel],
+                    thinkingLevel: toSdkThinkingLevel(thinkingLevel, sdk),
                     includeThoughts: false,
                 },
             },
