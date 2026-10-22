@@ -85,9 +85,8 @@ export interface SubmitOptionsAnalysisOptions
      */
     skipEnqueueIfMiss?: boolean;
     /**
-     * When true, bypass the cache and enqueue a fresh analysis. Mirrors
-     * submitAnalysis's positional force parameter so all four axes accept
-     * the same re-analyze lever.
+     * When true, bypass the cache and enqueue a fresh analysis. All four
+     * analysis axes accept the same re-analyze lever.
      */
     force?: boolean;
     /**
@@ -108,8 +107,7 @@ export interface SubmitOptionsAnalysisOptions
     /**
      * Cancellation signal for the in-flight LLM call (used by `runOptionsAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
-     * can abort the underlying AI provider request. Has no effect on
-     * `submitOptionsAnalysis` (the worker-based path does not accept a signal).
+     * can abort the underlying AI provider request.
      */
     signal?: AbortSignal;
     /**
@@ -175,7 +173,7 @@ export interface SubmitOptionsAnalysisNoChainsError {
  */
 export type SubmitOptionsAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
 
-/** Union of all possible outcomes from `submitOptionsAnalysis`. */
+/** Union of all possible outcomes from the retired queued options analysis submit step. */
 export type SubmitOptionsAnalysisResult =
     | SubmitOptionsAnalysisCached
     | SubmitOptionsAnalysisSubmitted
@@ -211,7 +209,7 @@ export interface PollOptionsAnalysisError {
     error: string;
 }
 
-/** Outcome of `pollOptionsAnalysis`: still processing, finished, or errored. */
+/** Outcome of the retired queued options analysis poll step: still processing, finished, or errored. */
 export type PollOptionsAnalysisResult =
     | PollOptionsAnalysisProcessing
     | PollOptionsAnalysisDone
@@ -222,8 +220,7 @@ export type PollOptionsAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
- * Result of a `runOptionsAnalysis` call — the direct (non-queued) successor
- * to the `submitOptionsAnalysis` + `pollOptionsAnalysis` pair.
+ * Result of a `runOptionsAnalysis` call.
  *
  * - `cached`: a recent analysis was found in the cache and returned as-is.
  * - `done`: the LLM completed and the result is ready.

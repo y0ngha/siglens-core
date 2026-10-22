@@ -1027,27 +1027,25 @@ written in either language.
 
 ```typescript
 /**
- * Submit an analysis job for a given symbol/timeframe.
+ * Run a technical analysis for a symbol/timeframe and return the finished result.
  *
- * Returns immediately with one of two outcomes:
- * - `cached`: a recent analysis is reused (within `ANALYSIS_CACHE_TTL`).
- * - `submitted`: a new job has been enqueued; poll with {@link pollAnalysis}.
+ * Resolves with one of three outcomes:
+ * - `cached`: a recent analysis is reused from the cache.
+ * - `done`: a fresh analysis was generated and cached.
+ * - `error`: a tier gate or provider failure, returned rather than thrown.
  *
- * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
- * @param timeframe - Alpaca timeframe literal (`"5Min" | "15Min" | ... | "1Day"`).
- * @returns Submission outcome — see {@link SubmitAnalysisResult}.
- *
- * @throws {Error} If FMP/Alpaca credentials are missing in env.
+ * @param symbol - Ticker (e.g. `"AAPL"`).
+ * @param companyName - Display name used in the prompt.
+ * @param timeframe - Chart timeframe literal (`"5Min" | "15Min" | ... | "1Day"`).
+ * @returns The analysis outcome — see {@link RunAnalysisResult}.
  *
  * @example
  * ```ts
- * const result = await submitAnalysis("AAPL", "1Day");
- * if (result.status === "cached") return result.data;
- * const polled = await pollAnalysis(result.jobId);
+ * const result = await runAnalysis("AAPL", "Apple Inc.", "1Day");
+ * if (result.status !== "error") render(result.result);
  * ```
  *
- * @see pollAnalysis
- * @see cancelAnalysisJob
+ * @see peekAnalysisCache
  */
 ```
 

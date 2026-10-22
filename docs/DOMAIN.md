@@ -181,13 +181,13 @@ free-tier analysis gating부터 `timeframes`/`infoDepth`는 `member`와 `pro`가
 `isTimeframeAllowed`, `isInfoDepthAllowed`, `isModelAllowed`가 항상 허용 결과를
 반환하고 `getAllowedTimeframes(tier)`는 전체 `Timeframe[]`을, `getAllowedModels`는
 모든 tier에 설정된 모델의 합집합을 반환한다. 켜진 축은 `TIER_CONFIG`의 각 tier별
-값만 허용하며, `submitAnalysis`는 요청자의 tier가 잠긴 타임프레임에 접근할 때
+값만 허용하며, `runAnalysis`는 요청자의 tier가 잠긴 타임프레임에 접근할 때
 `status: 'error'`와 `code: 'timeframe_not_allowed'`를 반환한다. `limits`(일일
 사용량 상한)는 모두 `Infinity`라서 usage 제한은 fully open이다.
 
 일일 사용량 제한은 `application/usage`의 `checkAnalysisLimit`와
 `checkChatbotLimit`에서 `UsageRepository.getUsageToday()` 결과와
-`TIER_CONFIG.limits`를 비교한다. 플래그가 꺼져 있어도 `submitAnalysis`와
+`TIER_CONFIG.limits`를 비교한다. 플래그가 꺼져 있어도 `runAnalysis`와
 `requestChatCompletion`에 usage 옵션/저장소를 주입하면 성공한 요청은
 `usage_logs`에 사용량 집계 목적 로그로 기록된다.
 

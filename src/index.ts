@@ -301,7 +301,7 @@ export {
 } from './domain/overlays/constants';
 // Position bucket — pure P&L-band bucketizer + its domain type. Consumers
 // (siglens server action) compute the bucket, then pass the finished enum to
-// submitAnalysis; the cache-key/prompt wiring stays internal.
+// runAnalysis; the cache-key/prompt wiring stays internal.
 //
 // Intentionally NOT mirrored to `index.client.ts` (documented exclusion,
 // same "document instead of mirror" precedent as `buildMacroBriefingPrompt`/
@@ -319,8 +319,8 @@ export type { PositionBucket } from './domain/types';
 
 // Prior-analysis-context — the flat, language-neutral shape the consumer
 // (the siglens web app or another consumer) reads out of its own database and passes back
-// in via `options.priorAnalyses` on `submitAnalysis`/`runAnalysis` and
-// `submitOverallAnalysis`/`runOverallAnalysis`. Only the TYPE is public: the
+// in via `options.priorAnalyses` on `runAnalysis` and
+// `runOverallAnalysis`. Only the TYPE is public: the
 // narrowing/rendering internals (`selectPriorAnalyses`,
 // `formatPriorAnalysisSection` in `domain/`; `narrowPriorAnalysesForCacheKey`
 // in `infrastructure/`) all stay internal, so a version bump is free to
@@ -1237,3 +1237,26 @@ export type {
     SqueezeRiskScore,
 } from './domain/types';
 export { INVESTOR_FLOWS_AXES } from './domain/investorFlows/constants';
+
+// Public-signature closure (PUBLIC_API.md#API-3): types referenced by exported
+// function parameters/returns or by exported result unions must be nameable.
+export type {
+    BaseModelSpec,
+    FilteredActionRecommendation,
+    NewsSourceLanguage,
+    OverlayCandidate,
+} from './domain/types';
+export type { RunBriefingOptions } from './application/market/types';
+export type { RunCongressTrendDone } from './application/congress/types';
+export type {
+    RunEconomicEventAnalysisOptions,
+    RunIndicatorTranslationOptions,
+    RunMacroBriefingOptions,
+} from './application/economy/types';
+export type { RunMarketNewsDigestDone } from './application/news/marketNewsDigestTypes';
+export type { RunNewsAnalysisDone } from './application/news/types';
+export type {
+    RunOverallAnalysisDone,
+    RunOverallAnalysisOptions,
+} from './application/overall/types';
+export type { SubmitOptionsAnalysisSubmitted } from './application/options/types';

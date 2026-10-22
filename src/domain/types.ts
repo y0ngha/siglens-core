@@ -228,7 +228,7 @@ export interface MarketBriefingResponse {
     riskSentiment: string;
 }
 
-/** Outcome of {@link submitBriefing}: cached result or a `jobId` to poll. */
+/** Outcome of the retired queued briefing submit step: cached result or a `jobId` to poll. */
 export type SubmitBriefingResult =
     | {
           status: 'cached';
@@ -237,7 +237,7 @@ export type SubmitBriefingResult =
       }
     | { status: 'submitted'; jobId: string };
 
-/** Outcome of {@link pollBriefing}: still processing, finished, or errored. */
+/** Outcome of the retired queued briefing poll step: still processing, finished, or errored. */
 export type PollBriefingResult =
     | { status: 'processing' }
     | { status: 'done'; briefing: MarketBriefingResponse; generatedAt: string }
@@ -1701,7 +1701,6 @@ export interface ReconciledActionLineData {
 }
 
 /**
- * @internal
  * Long-position recommendation after tier-based field filtering.
  */
 export interface FilteredActionRecommendation extends Omit<
@@ -1855,7 +1854,7 @@ export interface FilteredAnalysisResponse {
 /**
  * Tier-filtered analysis payload plus fragments that should render as locked.
  * Returned by {@link filterAnalysisResult} and by cache-read paths
- * (`peekAnalysisCache`, `submitAnalysis`'s cached branch) that apply the same
+ * (`peekAnalysisCache`, the cache-hit branch of `runAnalysis`) that apply the same
  * tier gate.
  */
 export interface FilteredAnalysisResult {
@@ -2112,7 +2111,7 @@ export interface RawOverallAnalysisResponse {
 
 // --- Job Result Types (submit + poll 패턴) ---
 
-/** Outcome of {@link pollAnalysis}: still processing, finished, or errored. */
+/** Outcome of the retired queued analysis poll step: still processing, finished, or errored. */
 export type PollAnalysisResult =
     | { status: 'processing' }
     | {
@@ -2475,7 +2474,7 @@ export interface ReasoningModes<TConfig> {
     toggleable?: boolean;
 }
 
-interface BaseModelSpec {
+export interface BaseModelSpec {
     /**
      * Actual model identifier sent to the provider API.
      *

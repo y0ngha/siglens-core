@@ -77,8 +77,7 @@ function hashNewsInput(
  * Run a news analysis end-to-end: gate checks → cache lookup → LLM call
  * → normalize → cache write → return.
  *
- * This is the direct (non-queued) replacement for the `submitNewsAnalysis` +
- * `pollNewsAnalysis` pair. The caller awaits a single promise; no job IDs, no
+ * The caller awaits a single promise; no job IDs, no
  * Redis meta, no polling loop.
  *
  * Skills are loaded once and serve both the sampling plan (cache key / prompt
@@ -101,9 +100,6 @@ function hashNewsInput(
  *
  * @throws If the AI provider call fails (network, 5xx, abort). Gate denials
  *   are returned as `{status:'error'}` or `{status:'key_error'}`, not thrown.
- *
- * @see submitNewsAnalysis — the queued predecessor; still exported for the
- *   existing production path until siglens switches to runNewsAnalysis.
  */
 export async function runNewsAnalysis(
     options: SubmitNewsAnalysisOptions
@@ -293,7 +289,7 @@ export async function runNewsAnalysis(
         }
     );
 
-    // ── 8. Inline post-processing (formerly in pollNewsAnalysis) ──
+    // ── 8. Inline post-processing ──
     // callAnalysisAi returns normalized JSON; JSON.parse gives an object, so
     // normalizeNewsAnalysisResponse receives a non-string and skips re-parsing.
     // raw를 미리 JSON.parse하지 않는다 — 이 normalize 함수는 parseLlmPayload로

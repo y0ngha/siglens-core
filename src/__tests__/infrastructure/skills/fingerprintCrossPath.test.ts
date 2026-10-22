@@ -128,7 +128,7 @@ describe('C1: shared skill-catalog fingerprint determinism (order/dedupe/project
             .mockResolvedValueOnce(EVENT_GATED)
             .mockResolvedValueOnce(STATE_GATED);
 
-        // The write-path shape pollAnalysis/submitAnalysis use: a direct
+        // A write-path shape (a prior implementation used it): a direct
         // `createSkillsProvider().loadSkills()` fed to `hashSkillCatalog`.
         const pollSkills = await createSkillsProvider().loadSkills();
         const pollFingerprint = hashSkillCatalog(pollSkills);
@@ -202,7 +202,7 @@ describe('C1: shared skill-catalog fingerprint determinism (order/dedupe/project
         mockReadFile
             .mockResolvedValueOnce(EVENT_GATED)
             .mockResolvedValueOnce(STATE_GATED);
-        // Conceptual write path: submitAnalysis loads via loadSkillsCached()
+        // Conceptual write path: runAnalysis loads via loadSkillsCached()
         // then tier-samples the loaded catalog.
         const { skills: writeSkills } = await loadSkillsCached();
         const writePlan = createSkillSamplingPlan(writeSkills, 'free', [

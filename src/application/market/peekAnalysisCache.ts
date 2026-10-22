@@ -25,7 +25,7 @@ import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider'
  * `true` when a normalized analysis carries no analytical content — i.e. an
  * empty or fallback summary and every analytical array empty. Such a shape is
  * the by-product of normalizing a poisoned / empty cached payload (the writer
- * never persists it; see `pollAnalysis`'s `isFallbackAnalysis` skip), so the
+ * never persists it; see `runAnalysis`'s `isFallbackAnalysis` skip), so the
  * peek treats it as a cache miss rather than serving an empty body.
  *
  * @internal Shared with `runAnalysis`'s overall reuse path; not exported from
@@ -74,7 +74,7 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * all arrays empty). The internal `isEmptyAnalysis` check detects that shape so a
  * poisoned or empty cache entry surfaces as a miss (`null`) rather than as an
  * empty body.
- * (`pollAnalysis` already refuses to *write* such fallback shapes — see its
+ * (`runAnalysis` already refuses to *write* such fallback shapes — see its
  * `isFallbackAnalysis` guard — so a valid HIT always carries real content.)
  *
  * @param symbol - U.S. equity ticker (canonical uppercase, matching the writer).

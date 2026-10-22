@@ -312,9 +312,6 @@ export interface SubmitAnalysisOptions
      * When provided, passed through to `callAnalysisAi` so a dropped SSE
      * connection can abort the underlying AI provider request rather than
      * letting it run to completion against a gone client.
-     *
-     * Has no effect on `submitAnalysis` / `pollAnalysis` (the worker-based
-     * submit/poll pair does not accept a signal).
      */
     signal?: AbortSignal;
     /**
@@ -367,9 +364,8 @@ export interface TierGateErrorResult {
 /**
  * @internal
  * Build the human-readable "timeframe not allowed" message shared by the
- * submit-path {@link buildTimeframeNotAllowedError} and both poll paths
- * (`pollAnalysis`, `pollOverallAnalysis`) so the wording never drifts between
- * the three call sites that report the same denial.
+ * {@link buildTimeframeNotAllowedError} and the poll-side denial
+ * paths so the wording never drifts between the call sites that report the same denial.
  *
  * @param tier - Tier used for the access decision.
  * @param timeframe - Timeframe requested by the caller.
@@ -385,9 +381,8 @@ export function timeframeNotAllowedMessage(
 /**
  * @internal
  * Build the {@link TierTimeframeAccessError} payload for a denied timeframe
- * request. Shared by every submit use-case that runs the timeframe gate
- * (`submitAnalysis`'s `submitAnalysisWithVisibility` and
- * `submitOverallAnalysis`) so the error shape stays byte-identical across
+ * request. Shared by every use-case that runs the timeframe gate
+ * (`runAnalysis`, `runOverallAnalysis`) so the error shape stays byte-identical across
  * axes instead of being hand-duplicated at each call site.
  *
  * @param tier - Tier used for the access decision.
@@ -429,8 +424,7 @@ export interface SubmitAnalysisMissNoTrigger {
 }
 
 /**
- * Result of a `runAnalysis` call — the direct (non-queued) successor to the
- * `submitAnalysis` + `pollAnalysis` pair.
+ * Result of a `runAnalysis` call.
  *
  * - `cached`: a recent analysis was found in the cache and returned as-is.
  * - `done`: the LLM completed and the result is ready.
@@ -479,8 +473,7 @@ export type RunAnalysisResult =
     | SubmitAnalysisErrorResult;
 
 /**
- * Options for a `runBriefing` call — the direct (non-queued) successor to the
- * `submitBriefing` + `pollBriefing` pair.
+ * Options for a `runBriefing` call.
  */
 export interface RunBriefingOptions extends CacheOptions {
     /**

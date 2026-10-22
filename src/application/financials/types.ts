@@ -79,8 +79,8 @@ export interface SubmitFinancialsAnalysisOptions
      */
     skipEnqueueIfMiss?: boolean;
     /**
-     * When true, bypass the cache and enqueue a fresh analysis. Mirrors
-     * submitFundamentalAnalysis's force lever.
+     * When true, bypass the cache and enqueue a fresh analysis. Same re-analyze lever
+     * as the other analysis axes.
      */
     force?: boolean;
     /**
@@ -109,8 +109,7 @@ export interface SubmitFinancialsAnalysisOptions
     /**
      * Cancellation signal for the in-flight LLM call (used by `runFinancialsAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
-     * can abort the underlying AI provider request. Has no effect on
-     * `submitFinancialsAnalysis` (the worker-based path does not accept a signal).
+     * can abort the underlying AI provider request.
      */
     signal?: AbortSignal;
     /**
@@ -161,7 +160,7 @@ export interface SubmitFinancialsAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
 }
 
-/** Union of all possible outcomes from {@link submitFinancialsAnalysis}. */
+/** Union of all possible outcomes from the retired queued financials analysis submit step. */
 export type SubmitFinancialsAnalysisResult =
     | SubmitFinancialsAnalysisCached
     | SubmitFinancialsAnalysisSubmitted
@@ -185,8 +184,7 @@ export type PollFinancialsAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
- * Result of a `runFinancialsAnalysis` call — the direct (non-queued) successor
- * to the `submitFinancialsAnalysis` + `pollFinancialsAnalysis` pair.
+ * Result of a `runFinancialsAnalysis` call.
  *
  * - `cached`: a recent analysis was found in the cache and returned as-is.
  * - `done`: the LLM completed and the result is ready.

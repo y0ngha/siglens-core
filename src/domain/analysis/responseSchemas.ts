@@ -428,8 +428,8 @@ const PRICE_SCENARIO_SCHEMA = {
  *   - pattern `keyPrices?` / `renderConfig?`,
  *     and every optional `actionRecommendation` field → nullable.
  *
- * `analyzedAt` is intentionally omitted: it is server-set during polling
- * (`pollAnalysis` sets `analyzedAt = now.toISOString()` and spreads it over the
+ * `analyzedAt` is intentionally omitted: it is server-set after generation
+ * (`runAnalysis` sets `analyzedAt = now.toISOString()` and spreads it over the
  * reconciled result), so any LLM-supplied value is discarded. Asking the model
  * to produce it would only waste output tokens.
  *

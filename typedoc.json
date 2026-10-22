@@ -1,6 +1,6 @@
 {
     "$schema": "https://typedoc.org/schema.json",
-    "entryPoints": ["src/index.ts"],
+    "entryPoints": ["src/index.ts", "src/index.client.ts"],
     "out": "docs/api",
     "tsconfig": "tsconfig.json",
     "name": "@y0ngha/siglens-core",

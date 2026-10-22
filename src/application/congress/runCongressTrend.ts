@@ -75,8 +75,7 @@ async function fetchProviderData(
  * cache lookup → provider fetch → prompt build → LLM call → normalize →
  * cache write → return.
  *
- * This is the direct (non-queued) replacement for `submitCongressTrend` +
- * `pollCongressTrend`. The caller awaits a single promise; no job IDs, no
+ * The caller awaits a single promise; no job IDs, no
  * Redis meta, no polling loop.
  *
  * Congress data is fully public, so **there is no usage-limit gate** and
@@ -107,9 +106,6 @@ async function fetchProviderData(
  *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
  *   Thrown after the cache read — a cached result is still returned keyless —
  *   and before any data fetch, Redis lock or provider call.
- *
- * @see submitCongressTrend — the queued predecessor; still exported for
- *   the existing production path until siglens switches to runCongressTrend.
  */
 export async function runCongressTrend(
     options: SubmitCongressTrendOptions
@@ -226,7 +222,7 @@ export async function runCongressTrend(
         }
     );
 
-    // Inline post-processing (formerly in pollCongressTrend). No job queue involved.
+    // Inline post-processing. No job queue involved.
     // raw를 미리 JSON.parse하지 않는다 — 이 normalize 함수는 parseLlmPayload로
     // 코드펜스 제거·파싱·garbage 방어를 스스로 수행한다. 앞에서 파싱하면 LLM이
     // 비-JSON을 뱉었을 때 예외가 호출자까지 올라가 그 방어가 무력해진다
@@ -239,7 +235,7 @@ export async function runCongressTrend(
         });
     }
 
-    // Cache the normalized result. Mirrors pollCongressTrend: write even when
+    // Cache the normalized result. Write even when
     // the result is content-empty. Fire-and-forget so the cache write does not
     // delay the response.
     if (cache !== null) {
