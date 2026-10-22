@@ -102,9 +102,8 @@ export interface SubmitNewsAnalysisOptions
      */
     skipEnqueueIfMiss?: boolean;
     /**
-     * When true, bypass the cache and enqueue a fresh analysis. Mirrors
-     * submitAnalysis's positional force parameter so all four axes accept
-     * the same re-analyze lever.
+     * When true, bypass the cache and enqueue a fresh analysis. All four
+     * analysis axes accept the same re-analyze lever.
      */
     force?: boolean;
     /**
@@ -141,9 +140,6 @@ export interface SubmitNewsAnalysisOptions
      * When provided, passed through to `callAnalysisAi` so a dropped connection
      * can abort the underlying AI provider request rather than letting it run
      * to completion against a gone client.
-     *
-     * Has no effect on `submitNewsAnalysis` (the worker-based path does not
-     * accept a signal).
      */
     signal?: AbortSignal;
     /**
@@ -203,7 +199,7 @@ export interface SubmitNewsAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
 }
 
-/** Union of all possible outcomes from {@link submitNewsAnalysis}. */
+/** Union of all possible outcomes from the retired queued news analysis submit step. */
 export type SubmitNewsAnalysisResult =
     | SubmitNewsAnalysisCached
     | SubmitNewsAnalysisSubmitted
@@ -216,7 +212,7 @@ export type SubmitNewsAnalysisResult =
 // Poll News Analysis
 // ─────────────────────────────────────────
 
-/** Outcome of {@link pollNewsAnalysis}: still processing, finished, or errored. */
+/** Outcome of the retired queued news analysis poll step: still processing, finished, or errored. */
 export type PollNewsAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: NewsAnalysisResponse }
@@ -251,8 +247,6 @@ export interface SubmitNewsCardAnalysisOptions extends BackgroundTaskOptions {
      * Cancellation signal for the in-flight LLM call (used by `runNewsCardAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
      * can abort the underlying AI provider request.
-     *
-     * Has no effect on `submitNewsCardAnalysis` (the worker-based path).
      */
     signal?: AbortSignal;
     /**
@@ -280,7 +274,7 @@ export interface SubmitNewsCardAnalysisSubmitted {
 }
 
 /**
- * Result of {@link submitNewsCardAnalysis}.
+ * Result of the queued news-card submit step.
  *
  * Always `submitted`. The caller is responsible for filtering
  * already-analyzed items via their own persistence layer before calling
@@ -292,7 +286,7 @@ export type SubmitNewsCardAnalysisResult = SubmitNewsCardAnalysisSubmitted;
 // Poll News Card Analysis
 // ─────────────────────────────────────────
 
-/** Outcome of {@link pollNewsCardAnalysis}: still processing, finished, or errored. */
+/** Outcome of the retired queued news card analysis poll step: still processing, finished, or errored. */
 export type PollNewsCardAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: NewsCardAnalysis }
@@ -311,8 +305,7 @@ export interface RunNewsAnalysisDone {
 }
 
 /**
- * Result of a `runNewsAnalysis` call — the direct (non-queued) successor to the
- * `submitNewsAnalysis` + `pollNewsAnalysis` pair.
+ * Result of a `runNewsAnalysis` call.
  *
  * - `cached`: a recent analysis was found in the cache and returned as-is.
  * - `done`: the LLM completed and the result is ready.
@@ -336,8 +329,7 @@ export type RunNewsAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
- * Result of a `runNewsCardAnalysis` call — the direct (non-queued) successor
- * to the `submitNewsCardAnalysis` + `pollNewsCardAnalysis` pair.
+ * Result of a `runNewsCardAnalysis` call.
  *
  * Always `done` on success. LLM-level failures propagate as thrown exceptions
  * so the caller can map them to appropriate HTTP responses. There are no tier

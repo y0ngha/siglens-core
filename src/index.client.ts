@@ -78,7 +78,7 @@ export {
     requiresByokKey,
 } from './domain/tier';
 
-// Options analysis — domain helpers (server-only submit/poll use-cases are
+// Options analysis — domain helpers (server-only `run*` use-cases are
 // intentionally omitted; only pure domain functions belong on the browser
 // entry).
 export { summarizeChainForLlm } from './domain/options/summarizeChainForLlm';
@@ -116,7 +116,7 @@ export {
 } from './domain/agent/agentFollowUps';
 export type { SplitAgentFollowUps } from './domain/agent/agentFollowUps';
 
-// Economy (macro) — domain helpers (server-only submit/poll/peek use-cases are
+// Economy (macro) — domain helpers (server-only `run*`/peek use-cases are
 // intentionally omitted; only pure domain functions belong on the browser
 // entry, mirroring the options/financials patterns).
 export { normalizeEconomicIndicatorSeries } from './domain/economy/normalizeEconomicIndicators';
@@ -142,9 +142,9 @@ export type {
     EconomicEventAnalysis,
 } from './domain/economy/types';
 // Application result types live alongside the use-cases (Architecture #0); the
-// server-only `submitMacroBriefing`/`pollMacroBriefing` functions stay omitted
+// server-only `runMacroBriefing` function stays omitted
 // from the browser entry, but their pure result-type shapes are safe to expose.
-// Likewise for the economic-event analysis submit/poll use-cases.
+// Likewise for the economic-event analysis use-case.
 export type {
     SubmitMacroBriefingResult,
     SubmitMacroBriefingCached,
@@ -169,7 +169,7 @@ export type {
     PollIndicatorTranslationDone,
 } from './application/economy/types';
 
-// Financials analysis — domain helpers (server-only submit/poll/cancel use-cases
+// Financials analysis — domain helpers (server-only `run*` use-cases
 // are intentionally omitted; only pure domain functions belong on the browser
 // entry, mirroring the options analysis pattern above).
 export { computeFinancialsScorecard } from './domain/analysis/financialsScorecard';
@@ -201,7 +201,7 @@ export type {
     NormalizeFinancialsSnapshotInput,
 } from './domain/types';
 
-// Congress analysis — domain helpers (server-only submit/poll/cancel use-cases
+// Congress analysis — domain helpers (server-only `run*` use-cases
 // are intentionally omitted from the browser entry; only pure domain functions
 // belong here, mirroring the financials analysis pattern above).
 export { normalizeCongressTrades } from './domain/analysis/normalizeCongressTrades';
@@ -744,3 +744,37 @@ export type {
     LlmProvider,
     WaitUntil,
 } from './domain/types';
+
+// Public-signature closure (PUBLIC_API.md#API-3): types referenced by exported
+// function parameters/returns or by exported result unions must be nameable.
+export type {
+    BaseModelSpec,
+    CurrencyCode,
+    CurrentAnalysisContext,
+    FilteredActionRecommendation,
+    NewsImpact,
+    NewsSourceLanguage,
+    OverlayCandidate,
+    PlanCheck,
+    SkillGating,
+    SkillStateFeature,
+    SkillStatePredicate,
+    SkillStatePredicateKind,
+    UsageActionType,
+    UsageCounts,
+    UsageLogRecord,
+} from './domain/types';
+export type { BackgroundTaskOptions } from './application/types';
+export type {
+    CreateUsageLogInput,
+    UsageLogRepository,
+} from './domain/ports/usageLogRepository';
+export type {
+    RecordUsageInput,
+    UsageRepository,
+} from './domain/ports/usageRepository';
+export type {
+    SubmitAnalysisErrorResult,
+    TierGateErrorResult,
+    TierTimeframeAccessError,
+} from './application/market/types';

@@ -114,7 +114,7 @@ export interface FundamentalDataProvider {
      *   method, and consumers (e.g. siglens FMP adapter) MAY implement it as
      *   a no-op or omit it entirely (the field is optional). The aggregated
      *   {@link FundamentalDataProvider.getGradesConsensus} is sufficient for
-     *   `submitFundamentalAnalysis` today. Will be re-promoted to required
+     *   `runFundamentalAnalysis` today. Will be re-promoted to required
      *   in a future minor release once a caller exists.
      *
      * @param symbol - Ticker symbol.

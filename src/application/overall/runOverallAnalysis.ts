@@ -125,10 +125,8 @@ function stripVolatileOptionsFields(
  * Run an overall (4-axis: technical + fundamental + news + options) analysis
  * end-to-end, server-side.
  *
- * This is the direct (non-queued) replacement for the `submitOverallAnalysis` +
- * `pollOverallAnalysis` pair. All four dependency axes are awaited server-side
- * via `Promise.all`, so the `pending_dependencies` state from the submit path
- * can never occur here.
+ * All four dependency axes are awaited server-side via `Promise.all`, so no
+ * "pending dependencies" state can occur here.
  *
  * Signal threading: `options.signal` is forwarded to every dependency `run*`
  * call and to the overall `callAnalysisAi` call. When the client disconnects,
@@ -145,9 +143,6 @@ function stripVolatileOptionsFields(
  *
  * @throws If the overall AI provider call fails (network, 5xx, AbortError).
  *   Gate denials are returned as discriminated-union variants, not thrown.
- *
- * @see submitOverallAnalysis — the queued predecessor; still exported for the
- *   existing production path until siglens switches to runOverallAnalysis.
  */
 export async function runOverallAnalysis(
     options: RunOverallAnalysisOptions

@@ -71,16 +71,37 @@ describe('requireFmpApiKey', () => {
         expect(mockExistsSync).not.toHaveBeenCalled();
     });
 
-    it('throws a descriptive error when the key is absent everywhere', () => {
+    it('throws a descriptive error when no key and no env file are given', () => {
         vi.stubEnv('FMP_API_KEY', '');
-        mockExistsSync.mockReturnValue(false);
-        expect(() => requireFmpApiKey()).toThrow('FMP_API_KEY not found');
+        vi.stubEnv('SIGLENS_ENV_FILE', '');
+        expect(() => requireFmpApiKey()).toThrow(
+            'set FMP_API_KEY or SIGLENS_ENV_FILE'
+        );
+        expect(mockExistsSync).not.toHaveBeenCalled();
     });
 
-    it('falls back to the .env.local file when process.env is empty', () => {
+    it('throws naming the file when the env file lacks the key', () => {
+        vi.stubEnv('FMP_API_KEY', '');
+        mockExistsSync.mockReturnValue(false);
+        expect(() => requireFmpApiKey('/some/.env.local')).toThrow(
+            'env file /some/.env.local'
+        );
+    });
+
+    it('reads the explicit env file argument when process.env is empty', () => {
         vi.stubEnv('FMP_API_KEY', '');
         mockExistsSync.mockReturnValue(true);
         mockReadFileSync.mockReturnValue('FMP_API_KEY=from-file');
-        expect(requireFmpApiKey()).toBe('from-file');
+        expect(requireFmpApiKey('/some/.env.local')).toBe('from-file');
+        expect(mockExistsSync).toHaveBeenCalledWith('/some/.env.local');
+    });
+
+    it('falls back to SIGLENS_ENV_FILE when no argument is given', () => {
+        vi.stubEnv('FMP_API_KEY', '');
+        vi.stubEnv('SIGLENS_ENV_FILE', '/env/path/.env.local');
+        mockExistsSync.mockReturnValue(true);
+        mockReadFileSync.mockReturnValue('FMP_API_KEY=from-env-file');
+        expect(requireFmpApiKey()).toBe('from-env-file');
+        expect(mockExistsSync).toHaveBeenCalledWith('/env/path/.env.local');
     });
 });

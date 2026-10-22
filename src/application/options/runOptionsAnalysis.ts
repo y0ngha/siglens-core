@@ -50,10 +50,8 @@ const LOG_PREFIX = '[RunOptions]';
  * Derive a short deterministic hash of the options snapshot and expiration
  * date selection.
  *
- * Mirrors the private helper in `submitOptionsAnalysis.ts` — intentionally
- * not shared so that the two modules remain independently deployable.
- * See `submitOptionsAnalysis.ts` for the full rationale of what fields are
- * included in the hash (structural identity only; volatile fields excluded).
+ * Only structural identity is hashed; volatile fields are excluded so the
+ * hash stays stable across refetches of the same chain.
  */
 function hashOptionsInput(
     snapshot: OptionsSnapshot,
@@ -81,11 +79,10 @@ function hashOptionsInput(
  * Run an options analysis end-to-end: no-chains guard → cache lookup → tier
  * gate → LLM call → normalisation → cache write → return.
  *
- * This is the direct (non-queued) replacement for the
- * `submitOptionsAnalysis` + `pollOptionsAnalysis` pair. The caller awaits a
+ * The caller awaits a
  * single promise; no job IDs, no Redis meta, no polling loop.
  *
- * Gate order matches `submitOptionsAnalysis`:
+ * Gate order:
  *  1. No-chains guard (sanitise chains; return `no_chains_error` immediately
  *     if no usable chain exists — before any cache or tier check).
  *  2. Cache lookup (a cached result is returned without a BYOK or usage gate).
@@ -96,7 +93,7 @@ function hashOptionsInput(
  *
  * `normalizeOptionsAnalysisResponse` never throws — every field has a fallback.
  * An empty response (summary blank, no expirations, no signals) is logged as a
- * warning and still written to cache (matches `pollOptionsAnalysis` behaviour).
+ * warning and still written to cache.
  *
  * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
@@ -111,9 +108,6 @@ function hashOptionsInput(
  *
  * @throws If the AI provider call fails (network, 5xx, abort). Gate denials
  *   are returned as discriminated-union variants, not thrown.
- *
- * @see submitOptionsAnalysis — the queued predecessor; still exported for
- *   the existing production path until siglens switches to runOptionsAnalysis.
  */
 export async function runOptionsAnalysis(
     options: SubmitOptionsAnalysisOptions
@@ -128,7 +122,7 @@ export async function runOptionsAnalysis(
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
 
-    // ── 1. No-chains guard (before cache — same order as submitOptionsAnalysis) ──
+    // ── 1. No-chains guard (before cache) ──
     const usableChains = snapshot.chains
         .map(c => sanitizeOptionsChain(c))
         .filter((c): c is NonNullable<typeof c> => c !== null);
@@ -159,7 +153,7 @@ export async function runOptionsAnalysis(
     // ── 2. Hash snapshot → build cache key → check cache ──
     // Cache check runs BEFORE the BYOK gate and usage limit so a cached result
     // (which involves no new AI computation) is never blocked by a missing user
-    // API key or an exhausted daily quota. Mirrors submitOptionsAnalysis.
+    // API key or an exhausted daily quota.
     const inputHash = hashOptionsInput(snapshot, expirationDate);
     const cacheKey = buildOptionsCacheKey(
         symbol,
@@ -189,7 +183,7 @@ export async function runOptionsAnalysis(
         return { status: 'miss_no_trigger' };
     }
 
-    // ── 3. BYOK gate (after cache miss — same order as submitOptionsAnalysis) ──
+    // ── 3. BYOK gate (after cache miss) ──
     const tier = options.tier ?? DEFAULT_TIER;
     const tierConfig = options.tierConfig ?? TIER_CONFIG;
 
@@ -276,7 +270,7 @@ export async function runOptionsAnalysis(
         }
     );
 
-    // Inline post-processing (formerly in pollOptionsAnalysis). No job queue involved.
+    // Inline post-processing. No job queue involved.
     // normalizeOptionsAnalysisResponse never throws — every field has a fallback.
     const rawResult = JSON.parse(raw) as unknown;
     const result: OptionsAnalysisResponse = normalizeOptionsAnalysisResponse(
@@ -292,7 +286,7 @@ export async function runOptionsAnalysis(
         console.warn(`${LOG_PREFIX} Empty options analysis`, { symbol });
     }
 
-    // Cache the normalized result. Matches pollOptionsAnalysis: write even
+    // Cache the normalized result. Write even
     // when the result is content-empty. Fire-and-forget so the cache write
     // does not delay the response.
     if (cache !== null) {

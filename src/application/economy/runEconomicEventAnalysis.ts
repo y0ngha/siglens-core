@@ -66,8 +66,7 @@ function hashEconomicEventInput(input: EconomicEventAnalysisInput): string {
  * Run an economic-event AI analysis end-to-end: cache lookup → LLM call →
  * normalize → cache write → return.
  *
- * This is the direct (non-queued) replacement for `submitEconomicEventAnalysis`
- * + `pollEconomicEventAnalysis`. The caller awaits a single promise; no job
+ * The caller awaits a single promise; no job
  * IDs, no Redis meta, no polling loop.
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to

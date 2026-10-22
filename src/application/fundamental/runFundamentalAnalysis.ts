@@ -53,9 +53,7 @@ type ProviderFetchResult =
 
 /**
  * Fetch all 13 FMP sub-calls in parallel and normalise them into a
- * {@link FundamentalSnapshot}. Mirrors the private helper in
- * `submitFundamentalAnalysis.ts` — kept private to this module because the
- * provider contract stays stable across submit and run paths.
+ * {@link FundamentalSnapshot}.
  */
 async function fetchProviderData(
     dataProvider: FundamentalDataProvider,
@@ -164,9 +162,7 @@ async function resolveCurrentPriceOption(
  * Run a fundamental analysis end-to-end: tier gate → cache lookup → provider
  * fetch → LLM call → normalisation → cache write → return.
  *
- * This is the direct (non-queued) replacement for the
- * `submitFundamentalAnalysis` + `pollFundamentalAnalysis` pair. The caller
- * awaits a single promise; no job IDs, no Redis meta, no polling loop.
+ * The caller * awaits a single promise; no job IDs, no Redis meta, no polling loop.
  *
  * Concurrent calls sharing the same in-flight key are deduplicated via
  * `dedupeGeneration` (in-process and cross-instance): only one LLM call fires; all waiting callers
@@ -182,9 +178,6 @@ async function resolveCurrentPriceOption(
  * @throws If the provider fetch or normalisation fails (network, 5xx, abort).
  *   Gate denials (BYOK, usage limit, fetch error) are returned as
  *   discriminated-union variants, not thrown.
- *
- * @see submitFundamentalAnalysis — the queued predecessor; still exported for
- *   the existing production path until siglens switches to runFundamentalAnalysis.
  */
 export async function runFundamentalAnalysis(
     options: SubmitFundamentalAnalysisOptions
@@ -211,7 +204,7 @@ export async function runFundamentalAnalysis(
     }
 
     // ── 0b. Usage limit check ──
-    // Only when both tier and usage are provided — matches submitFundamentalAnalysis.
+    // Only when both tier and usage are provided.
     if (options.tier !== undefined && usage !== undefined) {
         const allowed = await checkAnalysisUsageAllowed(
             usage,
@@ -368,7 +361,7 @@ export async function runFundamentalAnalysis(
         }
     );
 
-    // Inline post-processing (formerly in pollFundamentalAnalysis). No job queue involved.
+    // Inline post-processing. No job queue involved.
     const rawResult = JSON.parse(raw) as unknown;
     const result = normalizeFundamentalAnalysisResponse(rawResult);
 
@@ -379,7 +372,7 @@ export async function runFundamentalAnalysis(
         console.warn('[RunFundamental] Empty fundamental analysis', { symbol });
     }
 
-    // Cache the normalized result. Matches pollFundamentalAnalysis: write even
+    // Cache the normalized result. Write even
     // when the result is content-empty (no skip — see the poll function's
     // empty-response handling comment for the rationale). Fire-and-forget so
     // the cache write does not delay the response.

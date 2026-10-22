@@ -65,7 +65,7 @@ describe('peekOverallAnalysisCache 함수는', () => {
         expect(result?.riskFactorsKo).toEqual(['금리 인상 리스크']);
     });
 
-    it('writer(pollOverallAnalysis)와 동일한 peek 키로 읽는다', async () => {
+    it('writer(runOverallAnalysis)와 동일한 peek 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedOverall);
 
         await peekOverallAnalysisCache(SYMBOL, COMPANY, TIMEFRAME, MODEL);

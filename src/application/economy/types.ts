@@ -7,7 +7,7 @@ import type { EconomicEventAnalysis } from '@/domain/economy/types';
 // Submit
 // ─────────────────────────────────────────
 
-/** `submitMacroBriefing` (retired queued API) cache-hit variant — briefing already produced for today's UTC-day bucket. */
+/** Cache-hit variant of the retired queued macro briefing submit step — briefing already produced for today's UTC-day bucket. */
 export interface SubmitMacroBriefingCached {
     /** Discriminator: cache hit returned a previously produced briefing. */
     status: 'cached';
@@ -17,15 +17,15 @@ export interface SubmitMacroBriefingCached {
     generatedAt: string;
 }
 
-/** `submitMacroBriefing` (retired queued API) cache-miss variant — a fresh job was enqueued. */
+/** Cache-miss variant of the retired queued macro briefing submit step — a fresh job was enqueued. */
 export interface SubmitMacroBriefingSubmitted {
     /** Discriminator: cache miss; a worker job was enqueued and the caller should poll. */
     status: 'submitted';
-    /** Worker job identifier — pass to `pollMacroBriefing` (retired queued API) to await the result. */
+    /** Worker job identifier; the retired queued macro briefing flow polled it for the result. */
     jobId: string;
 }
 
-/** Result of `submitMacroBriefing` (retired queued API) — either a cache hit or a freshly submitted job. */
+/** Result of the retired queued macro briefing submit step — either a cache hit or a freshly submitted job. */
 export type SubmitMacroBriefingResult =
     SubmitMacroBriefingCached | SubmitMacroBriefingSubmitted;
 
@@ -33,13 +33,13 @@ export type SubmitMacroBriefingResult =
 // Poll
 // ─────────────────────────────────────────
 
-/** `pollMacroBriefing` (retired queued API) variant — worker still running; the caller should retry. */
+/** Variant of the retired queued macro briefing poll step — worker still running; the caller should retry. */
 export interface PollMacroBriefingProcessing {
     /** Discriminator: worker job has not finished yet; caller should poll again. */
     status: 'processing';
 }
 
-/** `pollMacroBriefing` (retired queued API) variant — worker failed or returned an unusable result. */
+/** Variant of the retired queued macro briefing poll step — worker failed or returned an unusable result. */
 export interface PollMacroBriefingError {
     /** Discriminator: worker reported failure or the result was missing/malformed. */
     status: 'error';
@@ -47,7 +47,7 @@ export interface PollMacroBriefingError {
     error: string;
 }
 
-/** `pollMacroBriefing` (retired queued API) variant — worker finished successfully with a normalized briefing. */
+/** Variant of the retired queued macro briefing poll step — worker finished successfully with a normalized briefing. */
 export interface PollMacroBriefingDone {
     /** Discriminator: worker finished successfully and a normalized briefing is available. */
     status: 'done';
@@ -57,7 +57,7 @@ export interface PollMacroBriefingDone {
     generatedAt: string;
 }
 
-/** Result of `pollMacroBriefing` (retired queued API). */
+/** Result of the retired queued macro briefing poll step. */
 export type PollMacroBriefingResult =
     | PollMacroBriefingProcessing
     | PollMacroBriefingError
@@ -67,7 +67,7 @@ export type PollMacroBriefingResult =
 // Submit Economic Event Analysis
 // ─────────────────────────────────────────
 
-/** `submitEconomicEventAnalysis` (retired queued API) cache-hit variant — analysis already cached. */
+/** Cache-hit variant of the retired queued economic event analysis submit step — analysis already cached. */
 export interface SubmitEconomicEventAnalysisCached {
     /** Discriminator: cache hit returned a previously produced analysis. */
     status: 'cached';
@@ -75,15 +75,15 @@ export interface SubmitEconomicEventAnalysisCached {
     result: EconomicEventAnalysis;
 }
 
-/** `submitEconomicEventAnalysis` (retired queued API) cache-miss variant — a fresh job was enqueued. */
+/** Cache-miss variant of the retired queued economic event analysis submit step — a fresh job was enqueued. */
 export interface SubmitEconomicEventAnalysisSubmitted {
     /** Discriminator: cache miss; a worker job was enqueued and the caller should poll. */
     status: 'submitted';
-    /** Worker job identifier — pass to `pollEconomicEventAnalysis` (retired queued API) to await the result. */
+    /** Worker job identifier; the retired queued economic event analysis flow polled it for the result. */
     jobId: string;
 }
 
-/** Result of `submitEconomicEventAnalysis` (retired queued API) — either a cache hit or a freshly submitted job. */
+/** Result of the retired queued economic event analysis submit step — either a cache hit or a freshly submitted job. */
 export type SubmitEconomicEventAnalysisResult =
     SubmitEconomicEventAnalysisCached | SubmitEconomicEventAnalysisSubmitted;
 
@@ -91,13 +91,13 @@ export type SubmitEconomicEventAnalysisResult =
 // Poll Economic Event Analysis
 // ─────────────────────────────────────────
 
-/** `pollEconomicEventAnalysis` (retired queued API) variant — worker still running; the caller should retry. */
+/** Variant of the retired queued economic event analysis poll step — worker still running; the caller should retry. */
 export interface PollEconomicEventAnalysisProcessing {
     /** Discriminator: worker job has not finished yet; caller should poll again. */
     status: 'processing';
 }
 
-/** `pollEconomicEventAnalysis` (retired queued API) variant — worker failed or returned an unusable result. */
+/** Variant of the retired queued economic event analysis poll step — worker failed or returned an unusable result. */
 export interface PollEconomicEventAnalysisError {
     /** Discriminator: worker reported failure or the result was missing/malformed. */
     status: 'error';
@@ -105,7 +105,7 @@ export interface PollEconomicEventAnalysisError {
     error: string;
 }
 
-/** `pollEconomicEventAnalysis` (retired queued API) variant — worker finished successfully with a normalized analysis. */
+/** Variant of the retired queued economic event analysis poll step — worker finished successfully with a normalized analysis. */
 export interface PollEconomicEventAnalysisDone {
     /** Discriminator: worker finished successfully and a normalized analysis is available. */
     status: 'done';
@@ -113,7 +113,7 @@ export interface PollEconomicEventAnalysisDone {
     result: EconomicEventAnalysis;
 }
 
-/** Result of `pollEconomicEventAnalysis` (retired queued API). */
+/** Result of the retired queued economic event analysis poll step. */
 export type PollEconomicEventAnalysisResult =
     | PollEconomicEventAnalysisProcessing
     | PollEconomicEventAnalysisError
@@ -123,7 +123,7 @@ export type PollEconomicEventAnalysisResult =
 // Submit Indicator Translation
 // ─────────────────────────────────────────
 
-/** `submitIndicatorTranslation` (retired queued API) cache-hit variant — translation already cached. */
+/** Cache-hit variant of the retired queued indicator translation submit step — translation already cached. */
 export interface SubmitIndicatorTranslationCached {
     /** Discriminator: cache hit returned a previously produced translation. */
     status: 'cached';
@@ -131,15 +131,15 @@ export interface SubmitIndicatorTranslationCached {
     nameKo: string;
 }
 
-/** `submitIndicatorTranslation` (retired queued API) cache-miss variant — a fresh job was enqueued. */
+/** Cache-miss variant of the retired queued indicator translation submit step — a fresh job was enqueued. */
 export interface SubmitIndicatorTranslationSubmitted {
     /** Discriminator: cache miss; a worker job was enqueued and the caller should poll. */
     status: 'submitted';
-    /** Worker job identifier — pass to `pollIndicatorTranslation` (retired queued API) to await the result. */
+    /** Worker job identifier; the retired queued indicator translation flow polled it for the result. */
     jobId: string;
 }
 
-/** Result of `submitIndicatorTranslation` (retired queued API) — either a cache hit or a freshly submitted job. */
+/** Result of the retired queued indicator translation submit step — either a cache hit or a freshly submitted job. */
 export type SubmitIndicatorTranslationResult =
     SubmitIndicatorTranslationCached | SubmitIndicatorTranslationSubmitted;
 
@@ -147,13 +147,13 @@ export type SubmitIndicatorTranslationResult =
 // Poll Indicator Translation
 // ─────────────────────────────────────────
 
-/** `pollIndicatorTranslation` (retired queued API) variant — worker still running; the caller should retry. */
+/** Variant of the retired queued indicator translation poll step — worker still running; the caller should retry. */
 export interface PollIndicatorTranslationProcessing {
     /** Discriminator: worker job has not finished yet; caller should poll again. */
     status: 'processing';
 }
 
-/** `pollIndicatorTranslation` (retired queued API) variant — worker failed or returned an unusable result. */
+/** Variant of the retired queued indicator translation poll step — worker failed or returned an unusable result. */
 export interface PollIndicatorTranslationError {
     /** Discriminator: worker reported failure or the result was missing/malformed. */
     status: 'error';
@@ -161,7 +161,7 @@ export interface PollIndicatorTranslationError {
     error: string;
 }
 
-/** `pollIndicatorTranslation` (retired queued API) variant — worker finished successfully with a Korean name. */
+/** Variant of the retired queued indicator translation poll step — worker finished successfully with a Korean name. */
 export interface PollIndicatorTranslationDone {
     /** Discriminator: worker finished successfully and a Korean name is available. */
     status: 'done';
@@ -169,7 +169,7 @@ export interface PollIndicatorTranslationDone {
     nameKo: string;
 }
 
-/** Result of `pollIndicatorTranslation` (retired queued API). */
+/** Result of the retired queued indicator translation poll step. */
 export type PollIndicatorTranslationResult =
     | PollIndicatorTranslationProcessing
     | PollIndicatorTranslationError
@@ -180,8 +180,7 @@ export type PollIndicatorTranslationResult =
 // ─────────────────────────────────────────
 
 /**
- * Options for a `runMacroBriefing` call — the direct (non-queued) successor to
- * the `submitMacroBriefing` + `pollMacroBriefing` pair.
+ * Options for a `runMacroBriefing` call.
  */
 export interface RunMacroBriefingOptions extends CacheOptions {
     /**
@@ -204,8 +203,7 @@ export type RunMacroBriefingResult =
     | { status: 'done'; briefing: MacroBriefingResponse; generatedAt: string };
 
 /**
- * Options for a `runEconomicEventAnalysis` call — the direct (non-queued)
- * successor to the `submitEconomicEventAnalysis` + `pollEconomicEventAnalysis` pair.
+ * Options for a `runEconomicEventAnalysis` call.
  */
 export interface RunEconomicEventAnalysisOptions extends CacheOptions {
     /**
@@ -243,8 +241,7 @@ export type RunEconomicEventAnalysisResult =
     | { status: 'done'; result: EconomicEventAnalysis };
 
 /**
- * Options for a `runIndicatorTranslation` call — the direct (non-queued)
- * successor to the `submitIndicatorTranslation` + `pollIndicatorTranslation` pair.
+ * Options for a `runIndicatorTranslation` call.
  */
 export interface RunIndicatorTranslationOptions extends CacheOptions {
     /**

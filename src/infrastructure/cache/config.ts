@@ -2030,7 +2030,7 @@ export const NEWS_PROMPT_TEMPLATE_VERSION = 'p9' as const;
  * models, prompt-template generations, and article sets cache independently.
  *
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
- *   inside `submitMarketNewsDigest`. Do not depend on this function from outside
+ *   inside `runMarketNewsDigest`. Do not depend on this function from outside
  *   the core library.
  * @param category  - Feed-category bucket.
  * @param modelId   - LLM model identifier.
@@ -2073,7 +2073,7 @@ export function buildMarketNewsDigestCacheKey(
  * generation can be invalidated independently of the other analysis types.
  *
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
- *   inside `submitNewsAnalysis`. Do not depend on this function from outside
+ *   inside `runNewsAnalysis`. Do not depend on this function from outside
  *   the core library.
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
@@ -2209,7 +2209,7 @@ export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p10' as const;
  * when the overall prompt template changes.
  *
  * @internal Consumer cannot construct `inputHash` themselves — it is derived
- *   inside `submitOverallAnalysis`. Do not depend on this function from outside
+ *   inside `runOverallAnalysis`. Do not depend on this function from outside
  *   the core library.
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param timeframe - Bar resolution used for the technical axis.
@@ -2449,8 +2449,8 @@ export function buildIndicatorTranslationCacheKey(nameHash: string): string {
  * change would leave this pointer serving the stale overall result until
  * something else overwrites it.
  *
- * {@link pollOverallAnalysis} writes the normalized result under **both** keys:
- * the canonical hashed key (for the exact-input cache the submit path looks up)
+ * `runOverallAnalysis` writes the normalized result under **both** keys:
+ * the canonical hashed key (for the exact-input cache the normal path looks up)
  * and this peek key (an overwrite-latest pointer to the most recently generated
  * overall analysis for the symbol/timeframe/model). `peekOverallAnalysisCache`
  * reads this key to surface a cached overall analysis in SSR HTML at zero LLM

@@ -54,8 +54,8 @@ function normalizeScenario(item: unknown): OverallScenario | null {
 /**
  * @internal Optional normalization context for
  * {@link normalizeOverallAnalysisResponse}. The `optionsOiStale` value is
- * captured by {@link submitOverallAnalysis} at job-submit time (caller-
- * supplied) and echoed back here from `JobMeta` so the normalizer can attach
+ * captured by `runOverallAnalysis` (caller-
+ * supplied) and passed back here so the normalizer can attach
  * `optionsOiStale: true` to the response — letting the UI render a "stale OI"
  * badge without the LLM having to remember the flag.
  *

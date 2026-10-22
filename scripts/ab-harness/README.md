@@ -57,8 +57,8 @@ npx tsx scripts/ab-harness/buildPrompts.ts --mode full   --out /tmp/prompts-full
 npx tsx scripts/ab-harness/buildPrompts.ts --mode digest --out /tmp/prompts-digest.json --skills <skills-dir>
 
 # 2. Run both prompt sets through the production default analysis model
-#    (gemini-3.5-flash-lite — resolved from the siglens frontend's
-#    useSelectedModel DEFAULT_MODEL, NOT infrastructure/cache/config.ts's
+#    (gemini-3.5-flash-lite — the default of the consumer app's
+#    model selector, NOT infrastructure/cache/config.ts's
 #    DEFAULT_ANALYSIS_MODEL_ID, which is just a cache-key placeholder string).
 GEMINI_API_KEY=... npx tsx scripts/ab-harness/runModels.ts --in /tmp/prompts-full.json   --out /tmp/results-full.json
 GEMINI_API_KEY=... npx tsx scripts/ab-harness/runModels.ts --in /tmp/prompts-digest.json --out /tmp/results-digest.json

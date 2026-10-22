@@ -26,9 +26,8 @@ import { parseArgs, parsePositiveIntArg } from './cliArgs';
 import type { AnalysisTypeUnderTest, PromptCaseOutput } from './buildPrompts';
 
 /**
- * Production default technical-analysis model, resolved from the siglens
- * frontend's `useSelectedModel` hook (`DEFAULT_MODEL = GEMINI_FLASH_LITE_MODEL`,
- * `src/features/symbol-model/hooks/useSelectedModel.ts`) — NOT
+ * Production default technical-analysis model, i.e. the default of the
+ * consumer app's model selector (`GEMINI_FLASH_LITE_MODEL`) — NOT
  * `DEFAULT_ANALYSIS_MODEL_ID` from `infrastructure/cache/config.ts`, which is
  * just the cache-key placeholder string `'analysis-worker'`, not a real model id.
  */

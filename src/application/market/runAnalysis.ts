@@ -82,15 +82,14 @@ import {
  * into the overall prompt builder.
  *
  * Unlike `RunAnalysisResult`, the `result` field is always the unfiltered
- * `AnalysisResponse` — `filterAnalysisResult` is NOT called. This mirrors the
- * `submitAnalysisForOverall` → `submitAnalysisWithVisibility('internal')` pattern
- * from the queued path: the overall prompt builder accesses `tech.keyLevels.*`
+ * `AnalysisResponse` — `filterAnalysisResult` is NOT called. The
+ * overall prompt builder accesses `tech.keyLevels.*`
  * and similar fields directly, which would crash if those fields were null
  * (as they are in `FilteredAnalysisResponse` for lower tiers).
  *
  * Tier-level access control for the overall analysis is therefore enforced at
  * the overall layer (timeframe gate, usage gate, BYOK gate) rather than at the
- * per-field filtering level — consistent with the queued predecessor.
+ * per-field filtering level.
  */
 export type RunAnalysisForOverallResult =
     | { status: 'cached'; result: AnalysisResponse }
@@ -104,11 +103,11 @@ export type RunAnalysisForOverallResult =
  * `DEFAULT_ANALYSIS_MODEL_ID`('analysis-worker')는 **캐시 키 센티널이지 호출 가능한
  * 모델이 아니다** — `TIER_CONFIG.models` 어디에도 등록돼 있지 않다. 구 worker는
  * `isSupportedModel` 가드에서 이 토큰을 400으로 거부했으므로, "modelId 없이 dispatch"
- * 경로는 사실상 도달 불가능했다(차트 탭은 `useSelectedModel`이 항상 실제 모델을 넘기고,
+ * 경로는 사실상 도달 불가능했다(소비자 앱의 모델 선택기는 항상 실제 모델을 넘기고,
  * 봇/SSR 경로는 `skipEnqueueIfMiss`로 dispatch 전에 빠진다).
  *
- * 그래서 여기엔 "구 동작 보존"이라는 기준이 없다 — 보존할 동작이 400뿐이다. 대신 UI가
- * 실제로 쓰는 기본값(`useSelectedModel`의 `DEFAULT_MODEL`)과 일치시켜, modelId를 생략한
+ * 그래서 여기엔 "구 동작 보존"이라는 기준이 없다 — 보존할 동작이 400뿐이다. 대신 소비자 앱의
+ * 모델 선택기가 실제로 쓰는 기본값과 일치시켜, modelId를 생략한
  * 호출이 사용자가 UI에서 받았을 결과와 같은 모델로 수행되게 한다.
  *
  * 캐시 키는 계속 `DEFAULT_ANALYSIS_MODEL_ID`를 쓴다(기존 캐시 호환).
@@ -556,7 +555,7 @@ async function runAnalysisImpl(
         }
     );
 
-    // Inline post-processing (formerly in pollAnalysis). No job queue involved.
+    // Inline post-processing. No job queue involved.
     const rawResult = JSON.parse(raw) as unknown;
     const enriched = enrichAnalysisWithConfidence(rawResult, skills);
     // Resolved against `enriched`, before post-processing: the pattern
@@ -717,8 +716,7 @@ async function runAnalysisImpl(
  * Run a technical analysis end-to-end: tier gate → cache lookup → LLM call
  * → post-processing → cache write → tier-filtered return.
  *
- * This is the direct (non-queued) replacement for the `submitAnalysis` +
- * `pollAnalysis` pair. The caller awaits a single promise; no job IDs, no
+ * The caller awaits a single promise; no job IDs, no
  * Redis meta, no polling loop.
  *
  * Concurrent calls sharing the same in-flight key are deduplicated via
@@ -735,9 +733,6 @@ async function runAnalysisImpl(
  * @throws If `options.marketDataProvider` is absent on a cache miss, or if
  *   the AI provider call fails (network, 5xx, abort). Gate denials are
  *   returned as `{status:'error'}`, not thrown.
- *
- * @see submitAnalysis — the queued predecessor; still exported for the
- *   existing production path until siglens switches to runAnalysis.
  */
 export async function runAnalysis(
     symbol: string,
@@ -766,9 +761,6 @@ export async function runAnalysis(
  * required because `buildOverallAnalysisPrompt` accesses `tech.keyLevels.*`,
  * `tech.indicatorResults`, and other fields that `FilteredAnalysisResponse` can
  * set to `null` for lower tiers, causing a runtime crash.
- *
- * Mirrors the `submitAnalysisForOverall` → `submitAnalysisWithVisibility('internal')`
- * pattern from the queued path.
  *
  * Unlike `runAnalysis`, an exact-key miss (without `force`) falls back to the
  * latest generation for the same symbol/timeframe/model/tier (the peek
