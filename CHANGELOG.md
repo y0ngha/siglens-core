@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.25.1](https://github.com/y0ngha/siglens-core/compare/v2.25.0...v2.25.1) (2026-10-22)
+
+### Bug Fixes
+
+* SiglensAI 사전 점검 결함 — 프롬프트 규칙 보강, 도구 설명 갱신, 50/200일선 교차 탐지(findMaCrosses) ([#295](https://github.com/y0ngha/siglens-core/issues/295)) ([bf331e3](https://github.com/y0ngha/siglens-core/commit/bf331e336c9ba07c37d0aa7b15192cfdfcc57241))
+
 # [2.25.0](https://github.com/y0ngha/siglens-core/compare/v2.24.0...v2.25.0) (2026-10-22)
 
 ### Code Refactoring
