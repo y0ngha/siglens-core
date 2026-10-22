@@ -304,6 +304,91 @@ describe('runOverallAnalysis', () => {
         });
     });
 
+    describe('options.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedSet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: injectedSet,
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+            injectedSet.mockReset();
+            injectedGet.mockResolvedValue(null);
+            injectedSet.mockResolvedValue(undefined);
+        });
+
+        it('주입한 캐시를 네 축 전부에 그대로 전달한다', async () => {
+            await runOverallAnalysis({
+                ...equityOptions(),
+                optionsSnapshot: futureOptionsSnapshot,
+                cache: injectedCache,
+            });
+
+            expect(mockRunAnalysisForOverall).toHaveBeenCalledWith(
+                'AAPL',
+                'AAPL',
+                '1Day',
+                false,
+                undefined,
+                expect.objectContaining({ cache: injectedCache })
+            );
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ cache: injectedCache })
+            );
+            expect(mockRunFundamentalAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ cache: injectedCache })
+            );
+            expect(mockRunOptionsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ cache: injectedCache })
+            );
+        });
+
+        it('종합 결과의 읽기·쓰기도 주입한 캐시를 쓰고 env 캐시는 만들지 않는다', async () => {
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                cache: injectedCache,
+            });
+
+            expect(result.status).toBe('done');
+            expect(injectedGet).toHaveBeenCalledTimes(1);
+            expect(injectedSet).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ headlineKo: '종합 분석 헤드라인.' }),
+                OVERALL_CACHE_TTL_SECONDS
+            );
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 축에도 null을 넘기고 env 캐시로 폴백하지 않는다', async () => {
+            const result = await runOverallAnalysis({
+                ...baseOptions(),
+                cache: null,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ cache: null })
+            );
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+        });
+
+        it('cache 를 생략하면 env 캐시를 한 번 만들어 축에 전달한다', async () => {
+            await runOverallAnalysis(baseOptions());
+
+            expect(mockCreateCacheProvider).toHaveBeenCalledTimes(1);
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ cache: mockCacheProvider })
+            );
+        });
+    });
+
     describe('skipEnqueueIfMiss', () => {
         it('모든 축 resolved 후 overall cache miss + skipEnqueueIfMiss → miss_no_trigger', async () => {
             const result = await runOverallAnalysis({

@@ -122,7 +122,7 @@ npmScopes:
 yarn add @y0ngha/siglens-core
 ```
 
-Node.js 22 or later is required. `@upstash/redis` is an optional peer dependency: install it only if you use the Redis-backed cache or counters.
+Node.js 22 or later is required. The AI provider SDKs and `@upstash/redis` are optional peer dependencies, so install only what you use: `@anthropic-ai/sdk` for Claude, `@google/genai` for Gemini, `openai` for ChatGPT and DeepSeek, and `@upstash/redis` for the Redis-backed cache or counters. Importing the package never loads an SDK; calling a model whose SDK is missing fails with an install hint.
 
 ## Runtime configuration
 
@@ -133,7 +133,7 @@ The infrastructure layer reads these environment variables, only when the matchi
 | Variable | Used for | Required |
 |---|---|---|
 | `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` | Server-owned AI keys, read when a model of that provider is called without a user key (BYOK) | Only for providers you call with a server key |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Redis cache, usage counters, and the re-analysis cooldown; `createCacheProvider()` returns `null` when unset | Optional |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Redis cache, usage counters, and the re-analysis cooldown; `createCacheProvider()` returns `null` when unset. Use cases also accept your own `CacheProvider` (or `null` for no cache) through the `cache` option | Optional |
 | `UPSTASH_REDIS_REST_READONLY_TOKEN` | Read-only token for cache reads, if you split credentials | Optional |
 | `FMP_API_KEY` | Read by `readFmpConfig()` / `tryReadFmpConfig()` | Optional |
 

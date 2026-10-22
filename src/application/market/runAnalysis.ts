@@ -68,7 +68,7 @@ import {
     narrowPriorAnalysesForCacheKey,
     PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import {
@@ -339,7 +339,7 @@ async function runAnalysisImpl(
         marketEventHorizonMs(timeframe, options.session, priorAnalysisNow)
     );
 
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options.cache);
     const cacheKey = buildAnalysisCacheKey(
         symbol,
         timeframe,

@@ -458,7 +458,7 @@ use-case option/result 타입 (모두 `src/index.ts`에서 export. `src/index.cl
 
 **시장 브리핑 컨텍스트** — `MarketBriefingContext`(`domain/types.ts`, `index.ts`/`index.client.ts` 양쪽 노출). `runBriefing(data, context, options?)`의 두 번째 인자로 시장 이름과 변동성 지수 판독값을 받는다. `volatility: null`이면 프롬프트에서 변동성 블록을 통째로 제거한다. 섹터는 프롬프트 입력 행이 `한국어명 (티커)` 형태이며 **괄호 앞 이름을 "복사"로만** 답한다 — `leadingSectors`/`laggingSectors`는 티커가 아니라 표시용 한국어명이다.
 
-**인터페이스**: `CacheProvider` (optional `setIfAbsent?(key, value, ttlSeconds): Promise<boolean>` — atomic `SET NX EX` — and optional `deleteIfEquals?(key, value): Promise<boolean>` — atomic compare-and-delete; `createCacheProvider` implements both on Upstash, the latter with a Lua `EVAL`. A consumer-built provider without `setIfAbsent` gets **in-process generation dedupe only**; one without `deleteIfEquals` never has its locks released explicitly — they expire by TTL), `ChatTokenStore`, `FmpConfig`, `AnalysisHistoryQuery`(`infrastructure/cache/types.ts` — `analysisHistoryQuery`의 named 반환 타입 `{ limit: number; sinceMs: number }`), Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn`; 모두 `domain/ports/aiProvider.ts`), LLM 키 저장 provider 타입(`LlmProvider`; `domain/llm/providers.ts`가 소비하는 `getProviderForModel`의 반환 타입; `'anthropic' | 'google' | 'openai' | 'deepseek'`; 지원 모델 id 목록은 `TierModel`/`ModelId` union(`domain/types.ts`)이 정본이다), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, 채팅 application 타입. (`SkillsProvider`·`UserTierRepository`는 `@internal` — public에서 도달 불가.) `RunAnalysisResult`의 `cached`/`done` variant는 `result: AnalysisResponse | FilteredAnalysisResponse`와 `lockedInfoDepth: readonly TierInfoDepth[]` 필드를 가진다(`application/market/types.ts`). `PollAnalysisOptions`/`PollOverallAnalysisOptions`(`tier?`/`tierConfig?`)는 export되지만 이를 받는 공개 함수는 없다(위 "공개 함수 미사용" 참고).
+**인터페이스**: `CacheProvider` (optional `setIfAbsent?(key, value, ttlSeconds): Promise<boolean>` — atomic `SET NX EX` — and optional `deleteIfEquals?(key, value): Promise<boolean>` — atomic compare-and-delete; `createCacheProvider` implements both on Upstash, the latter with a Lua `EVAL`. A consumer-built provider without `setIfAbsent` gets **in-process generation dedupe only**; one without `deleteIfEquals` never has its locks released explicitly — they expire by TTL), `ChatTokenStore`, `FmpConfig`, `AnalysisHistoryQuery`(`infrastructure/cache/types.ts` — `analysisHistoryQuery`의 named 반환 타입 `{ limit: number; sinceMs: number }`), Usage repository 인터페이스(`UsageRepository`, `UsageLogRepository`), 관련 record/input 타입(`RecordUsageInput`, `CreateUsageLogInput`, `UsageLogRecord`, `UsageCounts`), enum union 타입(`UsageActionType`, `UserTier`), AI provider 포트 타입(`CallAiProvider`, `CallAiProviderOptions`, `AiContents`, `ConversationRole`, `ConversationTurn`; 모두 `domain/ports/aiProvider.ts`), LLM 키 저장 provider 타입(`LlmProvider`; `domain/llm/providers.ts`가 소비하는 `getProviderForModel`의 반환 타입; `'anthropic' | 'google' | 'openai' | 'deepseek'`; 지원 모델 id 목록은 `TierModel`/`ModelId` union(`domain/types.ts`)이 정본이다), tier 관련 타입(`Tier*`, `ModelId`, `UserTierContext`), usage limit 타입(`UsageLimit*`, `AnalysisUsageOptions`, `SubmitAnalysisOptions`, `SubmitAnalysisGatedResult`, `SubmitAnalysisErrorResult`, `TierTimeframeAccessError`, `UserApiKeyRequiredError`), `BackgroundTaskOptions`, `CacheOptions`(`application/types.ts` — `{ cache?: CacheProvider \| null }`; `run*` 옵션 타입이 모두 확장하고, `peek*`·`getSectorSignals`는 마지막 인자로 받는다. 생략 = env의 Upstash, `CacheProvider` = 그 캐시, `null` = 캐시 없음. `runOverallAnalysis`는 같은 캐시를 하위 축에 전달), 채팅 application 타입. (`SkillsProvider`·`UserTierRepository`는 `@internal` — public에서 도달 불가.) `RunAnalysisResult`의 `cached`/`done` variant는 `result: AnalysisResponse | FilteredAnalysisResponse`와 `lockedInfoDepth: readonly TierInfoDepth[]` 필드를 가진다(`application/market/types.ts`). `PollAnalysisOptions`/`PollOverallAnalysisOptions`(`tier?`/`tierConfig?`)는 export되지만 이를 받는 공개 함수는 없다(위 "공개 함수 미사용" 참고).
 
 **대시보드 상수** — public 표면 없음. `DEFAULT_DASHBOARD_TIMEFRAME`은 core 내부 기본값이며 export하지 않는다. 시장 지수·섹터 ETF·스캔 종목 목록은 consumer-owned 입력이다.
 
@@ -527,6 +527,17 @@ use-case option/result 타입 (모두 `src/index.ts`에서 export. `src/index.cl
 **판정 보조 질문**:
 - "이 함수를 호출하지 못하면 consumer가 라이브러리를 사용할 수 없는가?" → **YES**면 Tier 1~3 중 하나.
 - "이 함수가 사라지거나 이름이 바뀌어도 다른 public 함수가 정상 동작하는가?" → **YES**면 internal로 묶어도 안전.
+
+---
+
+## AI provider SDK (optional peer dependency)
+
+`@anthropic-ai/sdk`, `@google/genai`, `openai`는 **optional peerDependencies**다. 패키지
+진입점(`index.ts`·`index.client.ts`)을 import하는 것만으로는 어떤 SDK도 로드되지 않으며,
+provider 어댑터가 처음 호출될 때 해당 SDK를 지연 로드한다. 소비자는 실제로 쓰는 모델의
+SDK만 설치한다(Claude → `@anthropic-ai/sdk`, Gemini → `@google/genai`, ChatGPT·DeepSeek →
+`openai`). 설치되지 않은 SDK의 모델을 호출하면 설치 안내 메시지를 담은 에러(`name === 'MissingSdkError'`)로
+실패하며, 재시도 대상이 아니다.
 
 ---
 

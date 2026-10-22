@@ -1,3 +1,4 @@
+import type { CacheOptions } from '@/application/types';
 import type { MacroBriefingCacheEntry } from '@/application/economy/types';
 import { withComputedRegime } from '@/domain/economy/deriveMacroRegime';
 import { normalizeMacroBriefing } from '@/domain/economy/normalizeMacroBriefing';
@@ -7,7 +8,7 @@ import {
     buildMacroBriefingCacheKey,
     buildMacroBriefingDateBucket,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import type { CachedMacroBriefingData } from '@/infrastructure/cache/types';
 import { hashMacroBriefingInput } from './macroBriefingInputHash';
 
@@ -35,6 +36,8 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  *   resolve to `null` immediately.
  * @param modelId - Briefing model id; defaults to BRIEFING_MODEL_ID so an
  *   un-modelled peek reads the same key the writer uses.
+ * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
+ *   cache from env, `null` → no cache. See {@link CacheOptions}.
  * @returns Normalized briefing on a hit, or `null` on miss/cold/error.
  *
  * @example
@@ -47,9 +50,14 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  */
 export async function peekMacroBriefingCache(
     data: EconomySnapshot | null | undefined,
-    modelId: string = BRIEFING_MODEL_ID
+    modelId: string = BRIEFING_MODEL_ID,
+    cacheOptions?: CacheOptions
 ): Promise<MacroBriefingResponse | null> {
-    const entry = await peekMacroBriefingCacheEntry(data, modelId);
+    const entry = await peekMacroBriefingCacheEntry(
+        data,
+        modelId,
+        cacheOptions
+    );
     return entry === null ? null : entry.briefing;
 }
 
@@ -68,14 +76,17 @@ export async function peekMacroBriefingCache(
  *
  * @param data - The economy snapshot the briefing was generated from (its hash is part of the key).
  * @param modelId - Briefing model id used in the cache key; defaults to `BRIEFING_MODEL_ID`.
+ * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
+ *   cache from env, `null` → no cache. See {@link CacheOptions}.
  * @returns `{ briefing, generatedAt }` on a hit, or `null` on miss/cold/error.
  */
 export async function peekMacroBriefingCacheEntry(
     data: EconomySnapshot | null | undefined,
-    modelId: string = BRIEFING_MODEL_ID
+    modelId: string = BRIEFING_MODEL_ID,
+    cacheOptions?: CacheOptions
 ): Promise<MacroBriefingCacheEntry | null> {
     if (!data) return null;
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(cacheOptions?.cache);
     if (cache === null) return null;
 
     const dateBucket = buildMacroBriefingDateBucket(new Date());

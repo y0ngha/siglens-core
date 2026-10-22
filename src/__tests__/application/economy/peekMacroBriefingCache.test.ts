@@ -198,4 +198,41 @@ describe('peekMacroBriefingCacheEntry 함수는', () => {
             mockCacheGet.mock.calls[1][0]
         );
     });
+
+    describe('cacheOptions.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: vi.fn(),
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+        });
+
+        it('주입한 캐시에서 읽고 env 캐시는 만들지 않는다', async () => {
+            injectedGet.mockResolvedValueOnce(VALID_CACHED);
+
+            // 얇은 래퍼(peekMacroBriefingCache)도 Entry 쪽으로 옵션을 넘겨야 한다.
+            const result = await peekMacroBriefingCache(SNAP, undefined, {
+                cache: injectedCache,
+            });
+
+            expect(result?.summary).toBe('동결 국면이에요');
+            expect(injectedGet).toHaveBeenCalledTimes(1);
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 env 캐시로 폴백하지 않고 null을 반환한다', async () => {
+            const result = await peekMacroBriefingCacheEntry(SNAP, undefined, {
+                cache: null,
+            });
+
+            expect(result).toBeNull();
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+    });
 });

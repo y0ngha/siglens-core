@@ -1,6 +1,6 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
 import type { KrxTickTable } from '@/domain/analysis/krxTick';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     SubmitAnalysisOptions,
@@ -750,7 +750,8 @@ export type SubmitOverallAnalysisResult =
  * news, options) AND the overall LLM call in one shot. The signal is threaded
  * through to every axis's `run*` function and to `callAnalysisAi`.
  */
-export interface RunOverallAnalysisOptions extends SubmitOverallAnalysisOptions {
+export interface RunOverallAnalysisOptions
+    extends SubmitOverallAnalysisOptions, CacheOptions {
     /**
      * Cancellation signal. When the client disconnects, all four dependency
      * `run*` calls and the overall `callAnalysisAi` call are aborted via

@@ -1,8 +1,9 @@
+import type { CacheOptions } from '@/application/types';
 import { resolveMarketNewsDigestCacheKey } from '@/application/news/marketNewsDigestCacheKey';
 import type { MarketNewsDigestCacheKeyOptions } from '@/application/news/marketNewsDigestTypes';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
 import type { NewsAnalysisResponse } from '@/domain/types';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 
 const LOG_TAG = '[MarketNewsDigest/Peek]' as const;
 
@@ -45,13 +46,17 @@ const LOG_TAG = '[MarketNewsDigest/Peek]' as const;
  * ```
  *
  * @see runMarketNewsDigest
+ *
+ * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
+ *   cache from env, `null` → no cache. See {@link CacheOptions}.
  */
 export async function peekMarketNewsDigestCache(
-    options: MarketNewsDigestCacheKeyOptions
+    options: MarketNewsDigestCacheKeyOptions,
+    cacheOptions?: CacheOptions
 ): Promise<NewsAnalysisResponse | null> {
     if (options.news.length === 0) return null;
 
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(cacheOptions?.cache);
     if (cache === null) return null;
 
     const { cacheKey } = resolveMarketNewsDigestCacheKey(options);

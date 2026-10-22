@@ -396,4 +396,68 @@ describe('peekAnalysisCache 함수는', () => {
         expect(mockCacheSet).not.toHaveBeenCalled();
         expect(mockCacheDelete).not.toHaveBeenCalled();
     });
+
+    describe('cacheOptions.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: vi.fn(),
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+        });
+
+        it('주입한 캐시에서 peek 키로 읽고 env 캐시는 만들지 않는다', async () => {
+            injectedGet.mockResolvedValueOnce(cachedResult);
+
+            const result = await peekAnalysisCache(
+                SYMBOL,
+                TIMEFRAME,
+                undefined,
+                'gemini-3.6-flash',
+                undefined,
+                DEFAULT_TIER,
+                TIER_CONFIG,
+                undefined,
+                undefined,
+                { cache: injectedCache }
+            );
+
+            expect(result?.result.summary).toBe('강세 우위 기술적 분석');
+            expect(injectedGet).toHaveBeenCalledWith(
+                buildAnalysisPeekCacheKey(
+                    SYMBOL,
+                    TIMEFRAME,
+                    'gemini-3.6-flash',
+                    DEFAULT_TIER,
+                    undefined,
+                    undefined,
+                    undefined
+                )
+            );
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 env 캐시로 폴백하지 않고 null을 반환한다', async () => {
+            const result = await peekAnalysisCache(
+                SYMBOL,
+                TIMEFRAME,
+                undefined,
+                undefined,
+                undefined,
+                DEFAULT_TIER,
+                TIER_CONFIG,
+                undefined,
+                undefined,
+                { cache: null }
+            );
+
+            expect(result).toBeNull();
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+    });
 });

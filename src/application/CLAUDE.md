@@ -52,7 +52,8 @@ export async function runAnalysis(
     fmpSymbol?: string,
     options: SubmitAnalysisOptions = {}
 ): Promise<RunAnalysisResult> {
-    const cache = createCacheProvider();           // adapter factory → CacheProvider | null
+    // injected cache, or the env factory → CacheProvider | null
+    const cache = resolveCacheProvider(options.cache);
     const cached = await cache?.get<AnalysisResponse>(cacheKey);
     if (cached) return { status: 'cached', ...filterAnalysisResult(cached, tier, tierConfig) };
     const { stable, dynamic } = buildAnalysisPrompt(/* … */);
@@ -65,11 +66,10 @@ in that infrastructure module instead. Do not promote it to `application/` prema
 
 ## Adapter Composition
 
-Use-cases call **infrastructure adapter factories** directly (e.g. `createCacheProvider()`).
-Factories return values typed as the corresponding **domain port** (`CacheProvider`,
-`MarketDataProvider`, …), so the contract between application and infrastructure is
-enforced by the compiler — application code is written against the port, never
-against an adapter's concrete shape.
+Use-cases call **infrastructure adapter factories** directly. Factories return values typed
+as the corresponding **domain port** (`CacheProvider`, `MarketDataProvider`, …), so the
+contract between application and infrastructure is enforced by the compiler — application
+code is written against the port, never against an adapter's concrete shape.
 
 For modules that have not yet been migrated to a domain port, the adapter is still
 constructed directly. Treat those as temporary — they should be replaced with a
@@ -89,6 +89,13 @@ These parameters are required when a cache miss occurs (the fetch path) and must
 be supplied by the consumer's call site.
 This is an intentional, permanent exception to the "library owns wiring" rule —
 do not revert it to a factory call.
+
+**Cache is injectable.** Every use-case resolves its cache through
+`resolveCacheProvider(options.cache)` (`application/shared/`): a consumer may pass its own
+`CacheProvider`, or `null` for no cache, via `CacheOptions`; omitting it keeps the Upstash
+factory default. Never call `createCacheProvider()` directly in a use-case, never collapse
+`null` into the default with `??`, and forward the resolved cache to any use-case you compose
+(`runOverallAnalysis` → axis use-cases).
 
 The general test-seam exception still applies: when a factory's return value is a
 singleton or otherwise hard to substitute at runtime, mock the factory module with

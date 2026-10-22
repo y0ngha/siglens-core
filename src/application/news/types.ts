@@ -1,5 +1,5 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     AnalysisLimitError,
@@ -25,7 +25,8 @@ import type {
 // ─────────────────────────────────────────
 
 /** Options controlling news analysis submission behavior. */
-export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
+export interface SubmitNewsAnalysisOptions
+    extends BackgroundTaskOptions, CacheOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
     /** Full company name forwarded to the news analysis prompt. Defaults to `symbol` when omitted. */

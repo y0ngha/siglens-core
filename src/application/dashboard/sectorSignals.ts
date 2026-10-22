@@ -1,3 +1,4 @@
+import type { CacheOptions } from '@/application/types';
 import { DEFAULT_DASHBOARD_TIMEFRAME } from '@/domain/constants/dashboard-tickers';
 import {
     bucketedTimestamp,
@@ -19,7 +20,7 @@ import {
     SECTOR_SIGNALS_TTL_BY_TIMEFRAME,
 } from '@/infrastructure/cache/config';
 import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 // 시장 데이터 provider 동시 요청 제한 — 429 회피를 위한 청크 크기
 const FETCH_CONCURRENCY = 10;
 
@@ -109,6 +110,8 @@ function combineResults(
  *   `DEFAULT_DASHBOARD_TIMEFRAME`.
  * @param now - Override the "now" reference used to compute the time bucket
  *   and lookback window. Useful in tests; defaults to `new Date()`.
+ * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
+ *   cache from env, `null` → no cache. See {@link CacheOptions}.
  * @returns Computation timestamp plus per-stock signal results —
  *   see {@link SectorSignalsResult}.
  *
@@ -119,9 +122,10 @@ export async function getSectorSignals(
     provider: MarketDataProvider,
     sectorStocks: readonly SectorStock[],
     timeframe: DashboardTimeframe = DEFAULT_DASHBOARD_TIMEFRAME,
-    now: Date = new Date()
+    now: Date = new Date(),
+    cacheOptions?: CacheOptions
 ): Promise<SectorSignalsResult> {
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(cacheOptions?.cache);
     const bucket = bucketedTimestamp(timeframe, now);
     const stockListHash = hashAnalysisInput(JSON.stringify(sectorStocks));
     const cacheKey = buildSectorSignalsCacheKey(

@@ -122,7 +122,7 @@ npmScopes:
 yarn add @y0ngha/siglens-core
 ```
 
-Node.js 22 이상이 필요합니다. `@upstash/redis`는 선택적 peer dependency이며, Redis 기반 캐시·카운터를 쓸 때만 설치하면 됩니다.
+Node.js 22 이상이 필요합니다. AI 제공사 SDK와 `@upstash/redis`는 선택적 peer dependency라 쓰는 것만 설치하면 됩니다. Claude는 `@anthropic-ai/sdk`, Gemini는 `@google/genai`, ChatGPT와 DeepSeek는 `openai`, Redis 기반 캐시·카운터는 `@upstash/redis`입니다. 패키지를 import하는 것만으로는 SDK를 불러오지 않으며, SDK가 없는 모델을 호출하면 설치 안내와 함께 실패합니다.
 
 ## 실행 환경 설정
 
@@ -133,7 +133,7 @@ infrastructure 계층은 해당 기능을 쓸 때만 아래 환경 변수를 읽
 | 변수 | 용도 | 필수 여부 |
 |---|---|---|
 | `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` | 서버가 가진 AI 키. 사용자 키(BYOK) 없이 해당 제공사 모델을 호출할 때 읽음 | 서버 키로 호출하는 제공사만 |
-| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Redis 캐시, 사용량 카운터, 재분석 쿨다운. 없으면 `createCacheProvider()`는 `null` 반환 | 선택 |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Redis 캐시, 사용량 카운터, 재분석 쿨다운. 없으면 `createCacheProvider()`는 `null` 반환. use-case에는 `cache` 옵션으로 직접 만든 `CacheProvider`(캐시를 끄려면 `null`)를 넘길 수도 있음 | 선택 |
 | `UPSTASH_REDIS_REST_READONLY_TOKEN` | 자격 증명을 나눌 때 캐시 읽기에 쓰는 읽기 전용 토큰 | 선택 |
 | `FMP_API_KEY` | `readFmpConfig()` / `tryReadFmpConfig()`가 읽음 | 선택 |
 

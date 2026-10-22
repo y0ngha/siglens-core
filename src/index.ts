@@ -85,7 +85,7 @@ export {
 // Economy — indicator-name AI translation (submit/poll worker-job pattern)
 
 // Application background-task options (used by market / dashboard use-cases)
-export type { BackgroundTaskOptions } from './application/types';
+export type { BackgroundTaskOptions, CacheOptions } from './application/types';
 
 // Chat
 export {

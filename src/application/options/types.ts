@@ -1,5 +1,5 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     AnalysisLimitError,
@@ -22,7 +22,8 @@ import type {
 /**
  * Options controlling options analysis submission behavior.
  */
-export interface SubmitOptionsAnalysisOptions extends BackgroundTaskOptions {
+export interface SubmitOptionsAnalysisOptions
+    extends BackgroundTaskOptions, CacheOptions {
     /** U.S. equity ticker (e.g. `"AAPL"`). */
     symbol: string;
     /** Company display name for the prompt. Defaults to `symbol` when omitted. */

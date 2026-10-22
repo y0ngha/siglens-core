@@ -283,4 +283,56 @@ describe('peekOverallAnalysisCache 함수는', () => {
         expect(mockCacheSet).not.toHaveBeenCalled();
         expect(mockCacheDelete).not.toHaveBeenCalled();
     });
+
+    describe('cacheOptions.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: vi.fn(),
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+        });
+
+        it('주입한 캐시에서 읽고 env 캐시는 만들지 않는다', async () => {
+            injectedGet.mockResolvedValueOnce(cachedOverall);
+
+            const result = await peekOverallAnalysisCache(
+                SYMBOL,
+                COMPANY,
+                TIMEFRAME,
+                MODEL,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                { cache: injectedCache }
+            );
+
+            expect(result?.headlineKo).toBe('3축 종합 분석 결과');
+            expect(injectedGet).toHaveBeenCalledTimes(1);
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 env 캐시로 폴백하지 않고 null을 반환한다', async () => {
+            const result = await peekOverallAnalysisCache(
+                SYMBOL,
+                COMPANY,
+                TIMEFRAME,
+                MODEL,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                { cache: null }
+            );
+
+            expect(result).toBeNull();
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+        });
+    });
 });

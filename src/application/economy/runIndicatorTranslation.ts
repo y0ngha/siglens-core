@@ -16,7 +16,7 @@ import {
     buildIndicatorTranslationCacheKey,
     INDICATOR_TRANSLATION_CACHE_TTL,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import {
     analysisSeed,
     hashAnalysisInput,
@@ -81,7 +81,7 @@ export async function runIndicatorTranslation(
     const nameHash = hashAnalysisInput(normalizedName);
     const cacheKey = buildIndicatorTranslationCacheKey(nameHash);
 
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options?.cache);
     if (cache !== null) {
         try {
             const cached = await cache.get<unknown>(cacheKey);

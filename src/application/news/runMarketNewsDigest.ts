@@ -22,7 +22,7 @@ import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { ActiveModelId, NewsAnalysisResponse } from '@/domain/types';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 
 const LOG_TAG = '[RunMarketNewsDigest]' as const;
@@ -75,7 +75,7 @@ export async function runMarketNewsDigest(
     // 바이트 단위로 같은 키를 읽고 쓰기 위한 유일한 출처.
     const { cacheKey, skills: sampledSkills } =
         resolveMarketNewsDigestCacheKey(options);
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options.cache);
 
     if (!options.force && cache !== null) {
         try {

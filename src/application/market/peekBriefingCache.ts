@@ -1,3 +1,4 @@
+import type { CacheOptions } from '@/application/types';
 import { normalizeMarketBriefing } from '@/domain/analysis/normalizeMarketBriefing';
 import { ISO_DATE_HOUR_PREFIX_LENGTH } from '@/domain/constants/format';
 import type {
@@ -9,7 +10,7 @@ import {
     BRIEFING_MODEL_ID,
     buildBriefingCacheKey,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { hashBriefingInput } from './briefingInputHash';
 
@@ -43,16 +44,20 @@ import { hashBriefingInput } from './briefingInputHash';
  *
  * @see runBriefing
  * @see peekAnalysisCache
+ *
+ * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
+ *   cache from env, `null` → no cache. See {@link CacheOptions}.
  */
 export async function peekBriefingCache(
     data: MarketSummaryData,
     context: MarketBriefingContext,
-    modelId: string = BRIEFING_MODEL_ID
+    modelId: string = BRIEFING_MODEL_ID,
+    cacheOptions?: CacheOptions
 ): Promise<MarketBriefingResponse | null> {
     if (!data || !Array.isArray(data.indices) || !Array.isArray(data.sectors)) {
         return null;
     }
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(cacheOptions?.cache);
     if (cache === null) return null;
 
     const now = new Date();

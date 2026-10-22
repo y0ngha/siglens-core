@@ -57,7 +57,7 @@ import {
     narrowPriorAnalysesForCacheKey,
     OVERALL_CACHE_TTL_SECONDS,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import {
     analysisSeed,
     hashAnalysisInput,
@@ -213,6 +213,11 @@ export async function runOverallAnalysis(
         }
     }
 
+    // One cache for the whole run: resolved once here and forwarded to every
+    // dependency axis, so an injected cache (or an explicit `null`) is honoured
+    // by the axes, the overall read/write, the peek pointer and the in-flight lock.
+    const cache = resolveCacheProvider(options.cache);
+
     // ── 3. Resolve all four dependency axes in parallel ──
     // Signal is threaded through so a client disconnect aborts the whole tree.
     // `usage` is intentionally omitted from every axis call (owned at this layer).
@@ -297,6 +302,7 @@ export async function runOverallAnalysis(
                   signal,
                   providerFallback: options.providerFallback,
                   keyPolicy: options.keyPolicy,
+                  cache,
               })
             : Promise.resolve({
                   status: 'no_chains_error' as const,
@@ -330,6 +336,7 @@ export async function runOverallAnalysis(
               signal,
               providerFallback: options.providerFallback,
               keyPolicy: options.keyPolicy,
+              cache,
           });
 
     const [technicalResult, fundamentalResult, newsResult, optionsResult] =
@@ -365,6 +372,7 @@ export async function runOverallAnalysis(
                     signal,
                     providerFallback: options.providerFallback,
                     keyPolicy: options.keyPolicy,
+                    cache,
                 }
             ),
             fundamentalRun,
@@ -393,6 +401,7 @@ export async function runOverallAnalysis(
                 signal,
                 providerFallback: options.providerFallback,
                 keyPolicy: options.keyPolicy,
+                cache,
             }),
             optionsRun,
         ]);
@@ -563,8 +572,6 @@ export async function runOverallAnalysis(
         reasoning,
         options.locale
     );
-    const cache = createCacheProvider();
-
     if (cache !== null) {
         try {
             const cached = await cache.get<OverallAnalysisResponse>(cacheKey);

@@ -32,7 +32,7 @@ import {
     buildCongressTrendCacheKey,
     CONGRESS_CACHE_TTL_SECONDS,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import {
@@ -136,7 +136,7 @@ export async function runCongressTrend(
         options.reasoning,
         options.locale
     );
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options.cache);
 
     if (!options.force && cache !== null) {
         try {

@@ -3,7 +3,8 @@ import type { ChatGPTModelSpec, ChatGptReasoningConfig } from '@/domain/types';
 import { resolveReasoningConfig } from '@/domain/types';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
-import OpenAI from 'openai';
+import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import type OpenAI from 'openai';
 import type { ChatGPTModelId } from '@/domain/analysis/modelSpecs';
 import { extractOpenAIUsage, logUsage } from '@/infrastructure/ai/usage';
 
@@ -33,9 +34,21 @@ function isTransientResponseErrorCode(
     return code != null && TRANSIENT_RESPONSE_ERROR_CODES.has(code);
 }
 
-const clientCache = createClientCache<OpenAI>(apiKey => new OpenAI({ apiKey }));
+const loadOpenAI = loadOptionalSdk(
+    'openai',
+    'ChatGPT models',
+    () => import('openai')
+);
 
-function getClient(apiKey: string): OpenAI {
+let clientCache: ReturnType<typeof createClientCache<OpenAI>> | undefined;
+
+async function getClient(apiKey: string): Promise<OpenAI> {
+    if (clientCache === undefined) {
+        const { default: OpenAIClient } = await loadOpenAI();
+        clientCache ??= createClientCache<OpenAI>(
+            key => new OpenAIClient({ apiKey: key })
+        );
+    }
     return clientCache.get(apiKey);
 }
 
@@ -73,7 +86,10 @@ export async function callChatGPT(
     // 전파되지 않는다 — 어떤 준비 작업보다 먼저 여기서 끊는다(재시도 대상 아님: status·retryable 없음).
     options.signal?.throwIfAborted();
     const { model, apiKey } = options;
-    const client = getClient(apiKey);
+    const client = await getClient(apiKey);
+    // getClient는 이제 SDK 지연 로드로 await 한다 — 그 사이 도착한 abort는 아래에서 다는
+    // 리스너가 보지 못하므로 로드 직후 한 번 더 확인한다.
+    options.signal?.throwIfAborted();
     const spec = MODEL_SPECS[model] as ChatGPTModelSpec | undefined;
     if (!spec) {
         throw new Error(`[ChatGPT] Unknown model: ${model}`);

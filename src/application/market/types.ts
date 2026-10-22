@@ -1,6 +1,6 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
 import type { KrxTickTable } from '@/domain/analysis/krxTick';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { UserApiKeyRequiredError } from '@/application/byok/types';
 import type {
     AnalysisLimitError,
@@ -43,7 +43,8 @@ export type { AnalysisUsageOptions };
 /**
  * Options controlling analysis submission behavior.
  */
-export interface SubmitAnalysisOptions extends BackgroundTaskOptions {
+export interface SubmitAnalysisOptions
+    extends BackgroundTaskOptions, CacheOptions {
     /**
      * Market data provider injected by the consumer (siglens app).
      *
@@ -481,7 +482,7 @@ export type RunAnalysisResult =
  * Options for a `runBriefing` call — the direct (non-queued) successor to the
  * `submitBriefing` + `pollBriefing` pair.
  */
-export interface RunBriefingOptions {
+export interface RunBriefingOptions extends CacheOptions {
     /**
      * Cancellation signal. When provided, forwarded to `callBriefingAi` so a
      * dropped connection aborts the underlying AI provider request.

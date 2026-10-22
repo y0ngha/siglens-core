@@ -34,7 +34,7 @@ import {
     buildNewsCacheKey,
     NEWS_CACHE_TTL_SECONDS,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import {
     analysisSeed,
     hashAnalysisInput,
@@ -202,7 +202,7 @@ export async function runNewsAnalysis(
         options.reasoning,
         options.locale
     );
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options.cache);
 
     // ── 5. Cache check ──
     if (!options.force && cache !== null) {
