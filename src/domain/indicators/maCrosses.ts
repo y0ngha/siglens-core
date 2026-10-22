@@ -42,7 +42,10 @@ export interface MaCrossScan {
  * @param bars - Bars ordered oldest → newest.
  * @param fastPeriod - Fast SMA period (default 50).
  * @param slowPeriod - Slow SMA period (default 200).
- * @param lookbackBars - How many of the most recent bars to search (default 252).
+ * @param lookbackBars - How many of the most recent bars to search (default 252). A
+ *   non-positive period or window returns no crossings with `complete: false`. `fastPeriod`
+ *   is normally shorter than `slowPeriod`; the function does not enforce it, it just compares
+ *   the two SMAs as given.
  * @returns The crossings and the window coverage.
  */
 export function findMaCrosses(
@@ -51,6 +54,9 @@ export function findMaCrosses(
     slowPeriod = 200,
     lookbackBars = 252
 ): MaCrossScan {
+    // A non-positive period or window has nothing to evaluate; never report it as complete.
+    if (lookbackBars <= 0 || fastPeriod <= 0 || slowPeriod <= 0)
+        return { crosses: [], evaluatedBars: 0, complete: false };
     const fast = calculateMA(bars, fastPeriod);
     const slow = calculateMA(bars, slowPeriod);
     const windowStart = Math.max(0, bars.length - lookbackBars);

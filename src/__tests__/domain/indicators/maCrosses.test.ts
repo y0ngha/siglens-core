@@ -67,6 +67,22 @@ describe('findMaCrosses', () => {
         expect(findMaCrosses(wave(451)).complete).toBe(false);
     });
 
+    it('기간·창이 0 이하면 교차 없이 complete=false', () => {
+        const b = bars(UP_DOWN_UP);
+        for (const args of [
+            [2, 4, 0],
+            [0, 4, 100],
+            [2, 0, 100],
+            [2, 4, -1],
+        ] as const) {
+            expect(findMaCrosses(b, ...args)).toEqual({
+                crosses: [],
+                evaluatedBars: 0,
+                complete: false,
+            });
+        }
+    });
+
     it('짧은 데이터·빈 배열·비정상 가격', () => {
         expect(findMaCrosses(bars([1, 2, 3]), 2, 4, 100)).toEqual({
             crosses: [],
