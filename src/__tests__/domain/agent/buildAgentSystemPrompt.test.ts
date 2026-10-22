@@ -537,7 +537,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-23.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-23.2');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
