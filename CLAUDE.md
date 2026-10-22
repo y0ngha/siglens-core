@@ -200,7 +200,7 @@ Scripts are listed in `package.json`.
 
 | Document | Contents |
 |---|---|
-| `docs/SCOPE.md` | **siglens vs siglens-core 분담** — 결정 트리, 의존 방향, 안티 패턴 (양쪽 레포 공통 source-of-truth) |
+| `docs/SCOPE.md` (local-only) | **siglens vs siglens-core 분담** — 결정 트리, 의존 방향, 안티 패턴 (양쪽 레포 공통 source-of-truth) |
 | `docs/SERVICE.md` | Library overview, consumers, tech stack, Skills system |
 | `docs/ARCHITECTURE.md` | Layer structure, dependency direction rules, folder layout |
 | `docs/PUBLIC_API.md` | Tier-based public/internal classification, export inventory, semver policy |
@@ -210,6 +210,14 @@ Scripts are listed in `package.json`.
 | `docs/FF.md` | FF 4 principles in detail (Readability, Predictability, Cohesion, Coupling) |
 | `docs/GIT_CONVENTIONS.md` | Branch naming, commit message format, PR rules |
 | `src/{domain,application,infrastructure}/CLAUDE.md` | Layer rules, including the DOM / APP / INF gotchas |
+
+**Public vs local docs.** This repository is public. Only the docs listed above (except
+`docs/SCOPE.md`) are tracked; everything else under `docs/` — `SCOPE.md`, `ISSUE_IMPL_FLOW.md`,
+`PR_FIX_FLOW.md`, `SKILL_GATING.md`, `superpowers/` (design specs, plans) and
+`__agents_only__/` — is local-only (`.gitignore` allowlist), copied into new worktrees via
+`.worktreeinclude`, and rejected by the pre-commit hook. `.claude/agent-memory/` is local-only
+too. Never put secrets, infra IDs, local paths or production incident detail into a tracked
+doc, code comment or commit message.
 
 ---
 

@@ -2,7 +2,26 @@
     "name": "@y0ngha/siglens-core",
     "version": "2.24.0",
     "description": "Pure TypeScript core library for the Siglens stock analysis platform — indicators, candle patterns, analysis prompt builder, and thin infrastructure wrappers.",
-    "license": "UNLICENSED",
+    "license": "MIT",
+    "author": "y0ngha <dev.y0ngha@gmail.com>",
+    "homepage": "https://github.com/y0ngha/siglens-core#readme",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/y0ngha/siglens-core.git"
+    },
+    "bugs": {
+        "url": "https://github.com/y0ngha/siglens-core/issues"
+    },
+    "keywords": [
+        "stock",
+        "technical-analysis",
+        "indicators",
+        "candlestick-patterns",
+        "chart-patterns",
+        "trading-signals",
+        "ai-analysis",
+        "typescript"
+    ],
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "files": [
@@ -13,7 +32,7 @@
     },
     "publishConfig": {
         "registry": "https://npm.pkg.github.com",
-        "access": "restricted"
+        "access": "public"
     },
     "packageManager": "yarn@4.18.0",
     "scripts": {

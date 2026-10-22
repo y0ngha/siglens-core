@@ -8,7 +8,7 @@ import type { Bar } from '@/domain/types';
  *
  * The reading siglens-trader switched its trading rule to on 2026-09-24 (daily RSI(2) < 10
  * above the 200-day average, replacing the confluence rule), re-measured on independent data
- * for the analysis products (docs/superpowers/specs/2026-09-25-pullback-washout-design.md).
+ * for the analysis products.
  *
  * Named as readings of the chart, never as instructions — the same rule that keeps the
  * confluence trigger states out of the agent's tool output altogether.

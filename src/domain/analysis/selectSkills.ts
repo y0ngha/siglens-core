@@ -139,7 +139,7 @@ export function selectSkills(
             throw new Error(
                 `selectSkills: skill "${skill.name}" has no gating metadata — ` +
                     `selection is fail-closed (tag the skill's frontmatter with a ` +
-                    `gating block; see docs/SKILL_GATING.md)`
+                    `gating block that sets its tier)`
             );
         }
 

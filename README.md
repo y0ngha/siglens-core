@@ -1,142 +1,138 @@
-# @y0ngha/siglens-core
+# SIGLENS CORE
 
-Pure TypeScript core library for the [Siglens](https://github.com/y0ngha/siglens) stock analysis platform — technical indicators, candle patterns, AI analysis prompt builders, and thin infrastructure wrappers.
+<div align="center">
 
-This package contains **no UI, no React, no Next.js**. It is consumed by other projects (web apps, workers, CLIs) via npm and exposes a stable, tier-classified API surface.
+**The pure TypeScript analysis engine behind SIGLENS: indicators, patterns, signals, and AI analysis building blocks.**
+
+[![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
+[![Node](https://img.shields.io/badge/node-%3E%3D22-339933)](./package.json)
+
+[![siglens.io](https://img.shields.io/badge/siglens.io-Analysis-2563eb?style=for-the-badge)](https://siglens.io)
+[![SIGLENS app](https://img.shields.io/badge/GitHub-siglens-181717?style=for-the-badge)](https://github.com/y0ngha/siglens)
+[![한국어](https://img.shields.io/badge/README-한국어-white?style=for-the-badge)](./README.ko.md)
+
+</div>
+
+---
+
+## What it is
+
+`@y0ngha/siglens-core` is the analysis domain of [SIGLENS](https://siglens.io), an AI analysis service for US stocks, Korean stocks, and crypto. It holds everything that decides what a chart means: how indicators are calculated, which patterns and signals are present, how an AI prompt is assembled, and how the model's answer is checked before anyone sees it.
+
+It is a plain TypeScript library with no UI, no React, and no Next.js. The [SIGLENS web app](https://github.com/y0ngha/siglens), background workers, and the AI agent at [ai.siglens.io](https://ai.siglens.io) all depend on the same package, so the numbers and rules stay identical wherever they are used.
+
+This package never places an order and never makes a recommendation. It produces analysis inputs and validated analysis results; what to do with them is up to the consumer.
+
+## What it can do
+
+### Technical indicators
+
+A wide set of indicators is computed from a single array of price bars and returned as one structured result. It covers trend, momentum, volatility, and volume: moving averages, RSI, MACD, Bollinger Bands, Ichimoku, Supertrend, Smart Money Concepts, squeeze momentum, and many more. All of the math is implemented in the package itself, without a third-party indicator library.
+
+### Candle and chart patterns
+
+Single- and multi-candle patterns are detected directly from the bars. Larger chart patterns are first screened by geometry, then qualified and arbitrated so that only plausible shapes reach the chart or the AI prompt. Chart overlays such as trendlines, Fibonacci levels, divergences, and Elliott wave candidates can be derived from the same data.
+
+### Signal detection
+
+Pure detectors turn indicator state into named signals: confirmed crossovers and breakouts, anticipation signals that appear before a move completes, pullbacks, and trend classification. A confluence step shows where several signals agree.
+
+### Skills system
+
+Analysis techniques are written as Markdown files with frontmatter, not as code. The package loads these files, samples and gates them by market state, and feeds the selected techniques into the prompt. A new technique can be added by adding a file, with no change to calculation code. The skill files themselves are supplied by the consumer.
+
+### AI analysis prompts and validation
+
+Prompts are built as pure functions for technical, fundamental, financial, news, options, congressional trading, investor flows, and overall analysis, as well as for market and macro briefings. Model responses go through JSON repair, normalization, and sanity checks, so a malformed or inconsistent answer is corrected or rejected rather than displayed. A model registry describes each supported model, covering Anthropic, Google, OpenAI, and DeepSeek.
+
+### Analysis orchestration
+
+Ready-made use cases tie the pieces together: submit an analysis, poll its job, cancel it, and read a cached result. They handle caching, in-flight de-duplication, a job queue, re-analysis cooldowns, usage limits by tier, and user-supplied API keys (BYOK). Heavy work can be delegated to an external worker over HTTP.
+
+### Market sentiment
+
+Fear and greed indices are built from weighted factors for the equity market and for crypto, with percentile and regime statistics. Forward-looking validation helpers measure whether a signal has had an edge in the past.
+
+### Agent building blocks
+
+For the conversational agent, the package supplies the tool catalog, argument validation, the system prompt, history windowing, and a turn loop with step limits, cancellation, and refunds.
+
+## Architecture
+
+```mermaid
+flowchart TB
+    APP[application<br/>use cases that compose the layers below] --> INFRA
+    APP --> DOMAIN
+    INFRA[infrastructure<br/>Redis cache and queue, AI SDK adapters, skills loader] --> DOMAIN
+    DOMAIN[domain<br/>pure calculations, prompts, validation, ports]
+
+    classDef app fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
+    classDef infra fill:#ede9fe,stroke:#7c3aed,color:#4c1d95
+    classDef domain fill:#ecfdf5,stroke:#10b981,color:#064e3b
+    class APP app
+    class INFRA infra
+    class DOMAIN domain
+```
+
+- **domain** is pure TypeScript with no I/O, no clock, and no environment access. It also declares the ports (cache, market data, news, repositories, and so on) that the outside world must satisfy.
+- **infrastructure** talks to the outside: Upstash Redis, AI provider SDKs, and the filesystem for skills. It may import only from domain.
+- **application** composes the two into end-to-end use cases. Nothing below it imports it.
+
+Consumers own presentation and runtime concerns, as well as the database adapters and market data fetchers that implement the ports. Everything public is exported from a single entry point; deep imports are not supported.
 
 ## Installation
+
+The package is published to GitHub Packages. Map the `@y0ngha` scope to that registry and authenticate with a GitHub token that has the `read:packages` scope.
+
+```yaml
+# .yarnrc.yml
+npmScopes:
+    y0ngha:
+        npmRegistryServer: 'https://npm.pkg.github.com'
+        npmAuthToken: '${GITHUB_TOKEN}'
+```
 
 ```bash
 yarn add @y0ngha/siglens-core
 ```
 
-Node 20 or newer is required.
-
-### Peer dependencies
-
-The package declares an optional peer dependency for the only external system it wraps directly. Install it if you use cache / job queue / cooldown features.
-
-```bash
-yarn add @upstash/redis
-```
-
-> AI provider SDKs (Gemini, Claude, etc.) are no longer peer dependencies of
-> `siglens-core`. The library only exposes type contracts (`callAiProvider`,
-> `AiContents`); consumers supply a concrete adapter that calls their chosen
-> SDK. Database adapters (Drizzle/Neon, etc.) are likewise consumer-owned —
-> the library exposes only abstract repository interfaces.
-
-## Quick start
-
-The public API is grouped into four tiers. See [`docs/PUBLIC_API.md`](./docs/PUBLIC_API.md) for the full classification, semver policy, and rationale.
-
-### Tier 1 — Application entrypoints
-
-High-level use-case functions called from Server Actions / API handlers / workers.
-
-```typescript
-import { submitAnalysis, pollAnalysis } from '@y0ngha/siglens-core';
-
-const submission = await submitAnalysis('AAPL', '1Day');
-if (submission.status === 'cached') {
-    return submission.result;
-}
-
-const result = await pollAnalysis(submission.jobId);
-```
-
-### Tier 2 — Domain building blocks
-
-Synchronous pure-function entry points for indicator and signal computation.
-
-```typescript
-import { calculateIndicators, detectSignals, classifyTrend } from '@y0ngha/siglens-core';
-import type { Bar } from '@y0ngha/siglens-core';
-
-declare const bars: Bar[];
-
-const indicators = calculateIndicators(bars);
-const signals = detectSignals(bars, indicators);
-const trend = classifyTrend(bars, indicators);
-```
-
-### Tier 3 — Infrastructure factories
-
-Dependency-injection entry points for cache, AI providers, and other external systems.
-
-```typescript
-import {
-    createCacheProvider,
-    createMarketDataProvider,
-    FileSkillsLoader,
-} from '@y0ngha/siglens-core';
-
-const cache = createCacheProvider();
-const market = createMarketDataProvider();
-const skills = new FileSkillsLoader('./skills');
-```
-
-### Tier 4 — Types
-
-Every public function's parameter and return types are exported from the package root.
-
-```typescript
-import type {
-    Bar,
-    Timeframe,
-    IndicatorResult,
-    Signal,
-    AnalysisResponse,
-    SubmitAnalysisResult,
-} from '@y0ngha/siglens-core';
-```
-
-## API documentation
-
-Generated TypeDoc reference is available locally:
-
-```bash
-yarn doc          # generate to docs/api/
-yarn doc:watch    # regenerate on change
-```
-
-Open `docs/api/index.html` in a browser. Internal helpers are filtered out automatically — only symbols re-exported from `src/index.ts` appear in the documentation. See [`docs/PUBLIC_API.md`](./docs/PUBLIC_API.md) for the full public/internal classification policy.
-
-## Public vs. internal API
-
-This package distinguishes between **public** (Tier 1–4, exported from `src/index.ts`) and **internal** (helper modules not re-exported) symbols.
-
-- **Public symbols** have stable signatures. Breaking changes follow [semver](https://semver.org).
-- **Internal symbols** can be renamed, restructured, or removed in any minor release.
-
-**Do not deep-import internals.** The following is unsupported and will break:
-
-```typescript
-// ❌ Unsupported — will break in a future minor release
-import { calculateRSI } from '@y0ngha/siglens-core/dist/domain/indicators/rsi';
-```
-
-If you need behaviour that is currently encapsulated inside a public function, open an issue or PR adding a new public entry point — never depend on internals via deep import.
-
-The complete classification rules and per-symbol inventory live in [`docs/PUBLIC_API.md`](./docs/PUBLIC_API.md).
+Node.js 22 or later is required. `@upstash/redis` is an optional peer dependency: install it only if you use the Redis-backed cache, job queue, or counters.
 
 ## Development
 
 ```bash
-yarn typecheck      # tsc --noEmit
-yarn lint           # eslint
-yarn test           # vitest run
-yarn build          # emit dist/
-yarn doc            # regenerate docs/api/
+yarn install
+yarn test        # unit tests (Vitest)
+yarn typecheck   # TypeScript, server and browser entry points
+yarn lint        # ESLint
+yarn build       # compile to dist/
 ```
 
-For the architecture, layer dependency rules, and conventions, see:
+The project uses Yarn only. `npm` and `pnpm` are not used.
 
-- [`docs/ARCHITECTURE.md`](./docs/ARCHITECTURE.md) — layer structure & dependency rules
-- [`docs/PUBLIC_API.md`](./docs/PUBLIC_API.md) — public/internal classification & semver policy
-- [`docs/CONVENTIONS.md`](./docs/CONVENTIONS.md) — coding conventions, JSDoc rules
-- [`docs/DOMAIN.md`](./docs/DOMAIN.md) — indicator specs, candle patterns, business rules
+## Documentation
+
+Project documentation is written in Korean.
+
+| Document | Contents |
+|---|---|
+| [SERVICE.md](./docs/SERVICE.md) | What the library provides and what it leaves to consumers |
+| [DOMAIN.md](./docs/DOMAIN.md) | Indicators, patterns, prompts, and business rules |
+| [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Layers, dependency direction, and folder layout |
+| [PUBLIC_API.md](./docs/PUBLIC_API.md) | Public API tiers and versioning policy |
+| [API.md](./docs/API.md) | External services used by the infrastructure layer |
+| [CONVENTIONS.md](./docs/CONVENTIONS.md) | Coding and testing conventions |
+| [FF.md](./docs/FF.md) | Design principles: readability, predictability, cohesion, coupling |
+| [GIT_CONVENTIONS.md](./docs/GIT_CONVENTIONS.md) | Branch, commit, and pull request rules |
+
+## Security
+
+Please do not report a vulnerability in a public issue. Follow the process in [SECURITY.md](./SECURITY.md).
+
+## Disclaimer
+
+Output built with this library is analysis for information only. It is not investment advice, and nothing here recommends buying or selling any asset. Investment decisions remain your own.
 
 ## License
 
-UNLICENSED — internal use within the Siglens project.
+[MIT License](./LICENSE) © 2026 y0ngha

@@ -1,7 +1,7 @@
 # Service Overview
 
 `@y0ngha/siglens-core` is the **pure TypeScript core library** behind Siglens —
-a U.S. stock AI analysis platform. It contains the technical analysis domain
+an AI analysis platform for U.S. stocks, Korean stocks and crypto. It contains the technical analysis domain
 (indicators, candle patterns, chart patterns, analysis prompt builder) plus the
 thin infrastructure wrappers needed to feed those functions.
 

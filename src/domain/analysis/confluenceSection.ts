@@ -63,8 +63,7 @@ import type {
  * the entry rule met followed by *below*-baseline 10-day returns in all five periods, and
  * exit-rule days by returns above the baseline in three of five periods and level with it in a
  * fourth (2000–07, 0.01 point below; 2007–09 was below). The tally is rendered as a
- * description of indicator agreement, not as evidence for or against entering
- * (docs/superpowers/specs/2026-09-25-pullback-washout-design.md).
+ * description of indicator agreement, not as evidence for or against entering.
  *
  * **Why the washout reading is here.** The same re-measurement found the reading
  * siglens-trader switched to — a short-term washout inside a long-term uptrend — ahead of
@@ -250,7 +249,7 @@ const PULLBACK_HEADER = '### Short-term sell-off check (computed, 1Day bars)';
  * measurement found costs the edge (waiting for %R to cross back lost it in every
  * period). Rewriting the rule alone moved 8–14 of 25 washout days to "enter"; printing the
  * verdict as a rule-engine value, like the tally and the ratio, moved 25 of 25 and left
- * every near-washout day at "wait" (docs/superpowers/specs/2026-09-26-washout-entry-verdict-design.md).
+ * every near-washout day at "wait".
  */
 /**
  * Sessions, counted back from the last bar and including it, in which a company event

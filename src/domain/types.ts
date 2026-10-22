@@ -1921,7 +1921,6 @@ export interface PromptConfig {
 
 /**
  * Prompt-assembly output, split along the stable/dynamic caching boundary
- * (spec §3.4, `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`)
  * — Design C ("skills-to-system split"):
  *
  * - `stable` — the `always_on` skill digests for this `(analysisType,
