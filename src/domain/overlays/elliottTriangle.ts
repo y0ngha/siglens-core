@@ -131,7 +131,7 @@ const triangleFacts = (levels: readonly ElliottLevel[], fmt: OverlayFormat) =>
 
 /**
  * @internal
- * A–B–C–D–E triangles (spec 2026-10-02 §1): 6 pivots, or 5 at the right edge
+ * A–B–C–D–E triangles: 6 pivots, or 5 at the right edge
  * (D forming, E next). Contracting: every leg shorter than the one two back
  * (highs fall, lows rise; a flat barrier side is tolerated) yet retracing at
  * least half the previous one (sideways); A starts beyond the B–D line and E

@@ -7,7 +7,7 @@ import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
  * @internal — not yet re-exported from src/index.ts.
  * The chart-pattern pre-screener facade — the entry point for
  * analysis-submission observation logging and AI skill-doc selection. It
- * never decides what is drawn: `qualifyPatterns` does (spec 2026-10-07), and
+ * never decides what is drawn: `qualifyPatterns` does, and
  * a hit that does not qualify is only a "shape hint" in the prompt.
  *
  * Recall-biased by design (see {@link CLASSIFIERS} JSDoc): this is a coarse

@@ -40,13 +40,13 @@ const OK = '{"ok":true}';
 const GEMINI_FREE = 'gemini-3.6-flash';
 /**
  * 추론을 완전히 끌 수 있는 Gemini 모델 — `reasoning.off`가 `'minimal'`이고
- * 실측 사고 토큰이 0이다(2026-09-06).
+ * 실측 사고 토큰이 0이다.
  */
 const GEMINI_HARD_OFF = 'gemini-3.6-flash';
 /**
  * 추론을 완전히 끄지 못하는 Gemini 모델 — `'minimal'`을 400으로 거부해
  * `reasoning.off`가 `'low'`이고, 그 상태에서도 사고 토큰을 소비한다
- * (`hardOff: false`, 2026-09-06 실측).
+ * (`hardOff: false`, 실측).
  */
 const GEMINI_PARTIAL_OFF = 'gemini-3.1-pro-preview';
 const DEEPSEEK_FREE = 'deepseek-v4.1-flash';

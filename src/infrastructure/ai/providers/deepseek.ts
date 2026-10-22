@@ -21,12 +21,12 @@ const DEEPSEEK_BASE_URL = 'https://api.deepseek.com';
  * event (text, reasoning, usage) for this long aborts the call.
  *
  * The 1h {@link DEEPSEEK_TIMEOUT_MS} only bounds the *total* duration, and a
- * stalled connection never trips it in any useful time: on 2026-09-14
- * 20:30–21:28 UTC DeepSeek sent neither a response nor an error for ~an hour,
+ * stalled connection never trips it in any useful time: DeepSeek has been seen to
+ * send neither a response nor an error for ~an hour,
  * every prewarm unit waited out its own 2-minute cap, and the abandoned calls
  * stayed open in the background. A live call streams continuously (reasoning
  * deltas included), so 90s of silence is a stall, not a slow answer — the
- * slowest observed healthy call (248s, pro model) streamed the whole time.
+ * slowest observed healthy call (several minutes, pro model) streamed the whole time.
  *
  * @internal
  */
@@ -94,12 +94,12 @@ export interface DeepSeekCallOptions {
      * **Responses API(`POST /responses`)는 `text.format`으로 지원한다.** 그래서
      * 스키마가 있으면 그쪽으로 라우팅한다 ({@link callDeepSeekResponses}).
      *
-     * 강제하지 않던 시절의 실측 피해: 30k 토큰짜리 기술 분석 프롬프트에서
-     * `indicatorResults[].signals`와 `patternSummaries`가 **824건 전부 빈 배열**로
-     * 돌아왔다. 같은 프롬프트를 gemini는 143건 100% 채웠고, DeepSeek도 3줄짜리
-     * 짧은 프롬프트에서는 정상 생성한다 — 모델 능력이 아니라 긴 프롬프트에서
-     * 지시를 놓치는 문제이고, 스키마 강제가 그것을 막는다. 같은 프롬프트로 실측:
-     * `json_object` 신호 0 / `json_schema` 신호 9~17.
+     * 강제하지 않을 때의 피해: 아주 긴 기술 분석 프롬프트에서
+     * `indicatorResults[].signals`와 `patternSummaries`가 **전부 빈 배열**로
+     * 돌아왔다. 같은 프롬프트를 gemini는 정상적으로 채웠고, DeepSeek도 짧은
+     * 프롬프트에서는 정상 생성한다 — 모델 능력이 아니라 긴 프롬프트에서
+     * 지시를 놓치는 문제이고, 스키마 강제가 그것을 막는다. 같은 프롬프트에서
+     * `json_object`는 신호가 비었고 `json_schema`는 신호가 채워졌다.
      */
     responseSchema?: unknown;
     /**
@@ -130,9 +130,9 @@ function reasoningEffort(useThinking: boolean): 'high' | 'none' {
  * ({@link DeepSeekCallOptions.responseSchema} 참고). 스키마가 없는 호출은
  * 종전 경로를 그대로 타므로 이 변경의 영향 범위는 스키마 호출로 한정된다.
  *
- * 스트리밍을 쓰는 것은 `/chat/completions`와 같은 이유다 — 실측 155초짜리 호출이
- * 스트리밍으로 완주했다. 비스트리밍도 124초까지는 성공했지만, 종전 어댑터가
- * ~50-60초 종료를 겪은 전례가 있어 안전한 쪽을 고른다.
+ * 스트리밍을 쓰는 것은 `/chat/completions`와 같은 이유다 — 매우 긴 호출(수 분 단위)도
+ * 스트리밍으로는 완주했다. 비스트리밍도 상당히 긴 호출까지는 성공했지만, 종전 어댑터가
+ * 1분 안팎에서 연결이 끊긴 전례가 있어 안전한 쪽을 고른다.
  */
 async function callDeepSeekResponses(
     prompt: string,
@@ -178,8 +178,8 @@ async function callDeepSeekResponses(
     let outcome: DeepSeekResponsesResult['outcome'] = 'no_terminal';
     let incompleteReason: string | undefined;
     // Characters per (output_index:content_index) part. Diagnostic only — text is
-    // still concatenated in stream order. Production saw complete JSON followed by
-    // extra content after the Responses-API switch; if that comes from a second
+    // still concatenated in stream order. Complete JSON followed by
+    // extra content has been observed after the Responses-API switch; if that comes from a second
     // output part, this log says so. Dropping parts here instead would truncate a
     // legitimately split answer, so the recovery lives in `normalizeJsonResponse`.
     const charsByPart = new Map<string, number>();

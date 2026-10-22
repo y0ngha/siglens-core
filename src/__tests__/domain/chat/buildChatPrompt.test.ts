@@ -760,7 +760,7 @@ describe('buildChatPrompt — currentAnalysisContext', () => {
     });
 });
 
-describe('buildChatPrompt — analysis-time price, computed distances, structured plan (spec 2026-09-18 §2.12)', () => {
+describe('buildChatPrompt — analysis-time price, computed distances, structured plan', () => {
     const analysisWithPlan: AnalysisResponse = {
         ...MINIMAL_ANALYSIS,
         analyzedAt: '2026-05-30T00:00:00Z',
@@ -807,7 +807,7 @@ describe('buildChatPrompt — analysis-time price, computed distances, structure
             [],
             'q'
         );
-        // spec 2026-09-18 §B1 — `YYYY-MM-DD HH:MM UTC`, not the raw ISO string.
+        // `YYYY-MM-DD HH:MM UTC`, not the raw ISO string.
         expect(result.systemPrompt).toContain(
             'Analysis generated: 2026-05-30 00:00 UTC'
         );
@@ -882,7 +882,7 @@ describe('buildChatPrompt — analysis-time price, computed distances, structure
         );
     });
 
-    it('the entry mid is the mean of ALL entryPrices, not the midpoint of the displayed range (spec §B1 — matches planEntryPrice)', () => {
+    it('the entry mid is the mean of ALL entryPrices, not the midpoint of the displayed range (matches planEntryPrice)', () => {
         // entryPrices=[100, 110, 130]: mean=113.33, but the naive midpoint of
         // the displayed range endpoints (100, 130) would be 115 — a different
         // number. `entryRef` must come from `planEntryPrice`'s true mean.
@@ -926,7 +926,7 @@ describe('buildChatPrompt — analysis-time price, computed distances, structure
         );
         expect(result.systemPrompt).toContain('Structured Plan (computed):');
         // entry mid = mean(188, 190) = 189 — the same reference `planCheck`'s
-        // riskRewardAtEntry uses (spec 2026-09-18 §B1), not entryZoneTop (190).
+        // riskRewardAtEntry uses, not entryZoneTop (190).
         expect(result.systemPrompt).toContain(
             '- Entry range: 188.00 ~ 190.00 (mid 189.00)'
         );
@@ -940,7 +940,7 @@ describe('buildChatPrompt — analysis-time price, computed distances, structure
         );
     });
 
-    it('Stop/Targets use reconciledLevels when present, not the raw AI values (spec 2026-09-18 — same preference planCheck applies)', () => {
+    it('Stop/Targets use reconciledLevels when present, not the raw AI values (same preference planCheck applies)', () => {
         const reconciled: AnalysisResponse = {
             ...analysisWithPlan,
             actionRecommendation: {

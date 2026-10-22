@@ -109,7 +109,7 @@ const doubleTop = buildBars(100, [
 ]);
 
 // ─── ascending_triangle ─────────────────────────────────────────────────────
-// A textbook ascending triangle (spec 2026-10-07): flat resistance at 120
+// A textbook ascending triangle: flat resistance at 120
 // touched three times, support rising through 100 -> 106 -> 111, then a
 // pullback to 115 that confirms the third resistance touch and stays inside
 // the triangle. The series opens with a decline into the first support low
@@ -129,7 +129,7 @@ const ascendingTriangle = buildBars(108, [
 ]);
 
 // ─── bull_flag ───────────────────────────────────────────────────────────────
-// A textbook bull flag (spec 2026-10-07): a confirmed swing low at 98, a
+// A textbook bull flag: a confirmed swing low at 98, a
 // 10-bar pole to 118 (20 ATR), then an 18-bar flag oscillating 116 <-> 118
 // in a flat channel — nine 2-bar legs, so the flag's own swings are pivots
 // the pre-screener's 8-pivot consolidation window can see (each leg clears
@@ -153,7 +153,7 @@ const bullFlag = buildBars(
 );
 
 // ─── cup_and_handle ──────────────────────────────────────────────────────────
-// A textbook cup & handle (spec 2026-10-07 §3.6): rims at 120 and 119.5
+// A textbook cup & handle: rims at 120 and 119.5
 // (confirmed swing highs 64 bars apart, within 5%), a rounded base whose
 // swings bottom at 100 and spend a good share of the cup in its lower third
 // (a U, not a V), then a 6-bar handle pulling back to 115 — in the cup's

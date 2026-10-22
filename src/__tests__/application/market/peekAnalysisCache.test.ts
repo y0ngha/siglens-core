@@ -87,7 +87,7 @@ describe('peekAnalysisCache 함수는', () => {
         );
     });
 
-    it('reasoning=true이면 :reason=on suffix가 붙은 키로 읽는다 (member-reasoning-toggle spec)', async () => {
+    it('reasoning=true이면 :reason=on suffix가 붙은 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedResult);
 
         await peekAnalysisCache(
@@ -129,7 +129,7 @@ describe('peekAnalysisCache 함수는', () => {
         );
     });
 
-    it('positionBucket이 있으면 :pos=<bucket> suffix가 붙은 키로 읽는다 (personalized-analysis-by-position-bucket spec)', async () => {
+    it('positionBucket이 있으면 :pos=<bucket> suffix가 붙은 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedResult);
 
         await peekAnalysisCache(

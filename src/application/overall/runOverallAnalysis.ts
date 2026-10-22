@@ -380,11 +380,10 @@ export async function runOverallAnalysis(
                 reasoning,
                 locale: options.locale,
                 currency: options.currency,
-                // review round 1 finding 9: this was missing — a crypto
-                // overall run built an equity-framed news prompt that,
-                // since `assetClass` is not part of the news cache key,
-                // could be written under the exact key a standalone
-                // crypto `/news` call reads.
+                // Must be forwarded: without it a crypto overall run builds
+                // an equity-framed news prompt that, since `assetClass` is
+                // not part of the news cache key, could be written under the
+                // exact key a standalone crypto `/news` call reads.
                 assetClass,
                 ...(newsFieldIsArray
                     ? undefined
@@ -434,9 +433,9 @@ export async function runOverallAnalysis(
      * (`buildOverallAnalysisPrompt`의 `newsBody` 주석).
      *
      * 그럼에도 이걸 error로 올리지 않는 이유는 **관측된 모집단** 때문이다.
-     * 2026-09 siglens 실측: 41개 심볼(레버리지 ETF·뮤추얼펀드·저커버리지 OTC가
-     * 다수)이 이 경로로 `overall`·`news` 스냅샷을 한 번도 생성하지 못한 채 prewarm
-     * 슬롯을 계속 점유했다 — 기술적·펀더멘털 데이터는 멀쩡했는데도 그렇다.
+     * 레버리지 ETF·뮤추얼펀드·저커버리지 OTC 같은 심볼은 뉴스가 거의 없어, error로
+     * 올리면 기술적·펀더멘털 데이터가 멀쩡해도 `overall`·`news` 스냅샷을 끝내
+     * 만들지 못한다.
      *
      * `fundamental` 축이 크립토에서 이미 같은 모양으로 빠진다. 점수 쪽은
      * `OverallScoreInput.news`가 이미 nullable이라 abstain(weight 0)으로 처리된다.
@@ -775,7 +774,7 @@ export async function runOverallAnalysis(
         }
     );
     // `analyzedAt` marks when THIS result was produced, so a peek/cache hit
-    // can report its age (spec 2026-09-18 §2.5 / B11) — mirrors
+    // can report its age — mirrors
     // `runAnalysis.ts`'s `analyzedAt` on the technical axis. A fresh clock
     // read here (not the request-start `occurredAt`) because the LLM call
     // above can take up to the poll timeout.

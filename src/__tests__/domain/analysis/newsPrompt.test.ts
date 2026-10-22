@@ -13,8 +13,8 @@ import type {
 } from '@/domain/types';
 import newsPromptPreMacroCalendarGolden from './fixtures/newsPromptPreMacroCalendar.golden.json';
 
-// `buildNewsAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4
-// assembly split) — this file's call sites (both the 4-arg and 5-arg
+// `buildNewsAnalysisPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites (both the 4-arg and 5-arg
 // overloads) predate the split and assert against the single legacy combined
 // string (`stable + '\n\n' + dynamic`, exactly the string dispatch still
 // sends as the `prompt` fallback field). The wrapper mirrors both overloads
@@ -365,7 +365,7 @@ describe('buildNewsAnalysisPrompt — 출력 로케일', () => {
 
     /**
      * 이 축은 프롬프트 **본문**에 필드 언어 지시를 하드코딩하고 있었다 —
-     * 말미 리마인더로는 뒤집힌다고 볼 수 없는 과업 규칙이다(리뷰 6라운드).
+     * 말미 리마인더로는 뒤집힌다고 볼 수 없는 과업 규칙이다.
      */
     it('로케일을 생략하면 ko와 바이트가 같다', () => {
         expect(build()).toBe(build('ko'));
@@ -456,7 +456,7 @@ describe('buildNewsAnalysisPrompt — 독자용 문구 규칙', () => {
     });
 });
 
-describe('formatAgeSuffix (spec 2026-09-18 §2.8)', () => {
+describe('formatAgeSuffix', () => {
     const NOW = new Date('2025-04-28T12:00:00Z');
 
     it('renders "<N>h ago" under 24h', () => {
@@ -476,7 +476,7 @@ describe('formatAgeSuffix (spec 2026-09-18 §2.8)', () => {
     });
 });
 
-describe('formatSentimentTally (spec 2026-09-18 §2.8)', () => {
+describe('formatSentimentTally', () => {
     it('tallies bullish/bearish/neutral and high-impact bullish/bearish', () => {
         // NEWS_ITEM_1 bullish/high, NEWS_ITEM_2 bearish/high
         expect(formatSentimentTally([NEWS_ITEM_1, NEWS_ITEM_2])).toBe(
@@ -501,7 +501,7 @@ describe('formatSentimentTally (spec 2026-09-18 §2.8)', () => {
     });
 });
 
-describe('buildNewsAnalysisPrompt — sentiment tally + age + calendar offsets (spec 2026-09-18 §2.8)', () => {
+describe('buildNewsAnalysisPrompt — sentiment tally + age + calendar offsets', () => {
     const NOW = new Date('2025-04-28T12:00:00Z');
 
     it('renders the sentiment tally header inside ## Recent News Articles', () => {
@@ -592,9 +592,9 @@ describe('buildNewsAnalysisPrompt — sentiment tally + age + calendar offsets (
     });
 });
 
-// ─── Macro Calendar (spec 2026-09-28) ─────────────────────────────────────────
+// ─── Macro Calendar ─────────────────────────────────────────
 
-describe('buildNewsAnalysisPrompt — macro calendar (spec 2026-09-28)', () => {
+describe('buildNewsAnalysisPrompt — macro calendar', () => {
     const MACRO_NOW = new Date('2025-04-28T12:00:00Z');
 
     const MACRO_EVENT_CPI: EconomicCalendarEvent = {
@@ -619,7 +619,7 @@ describe('buildNewsAnalysisPrompt — macro calendar (spec 2026-09-28)', () => {
 
     describe('backward compatibility — byte-identical to the pre-macro-calendar baseline', () => {
         // Captured by running the 9-arg overload BEFORE macroCalendar existed
-        // (spec 2026-09-28 backward-compat requirement) — same fixtures as
+        // — same fixtures as
         // the top-level describe block above.
         const GOLDEN = newsPromptPreMacroCalendarGolden;
 
@@ -715,8 +715,8 @@ describe('buildNewsAnalysisPrompt — macro calendar (spec 2026-09-28)', () => {
     });
 
     it('caps at 12 rows even when more are supplied, keeping the earliest (fed out of order so only sort-then-cap can pass)', () => {
-        // Deliberately reversed + shuffled (not ascending) — review round 1
-        // finding 3: an already-ascending fixture would still pass if the
+        // Deliberately reversed + shuffled (not ascending): an
+        // already-ascending fixture would still pass if the
         // sort step were silently dropped and only `.slice(0, 12)` ran on
         // the input order, since the earliest 12 happen to also be first.
         const ascending: EconomicCalendarEvent[] = Array.from(
@@ -786,7 +786,7 @@ describe('buildNewsAnalysisPrompt — macro calendar (spec 2026-09-28)', () => {
         );
     });
 
-    it('computes the relative-day offset from the UTC-normalized timestamp, exact at a day-boundary-crossing hour (review round 1 finding 1)', () => {
+    it('computes the relative-day offset from the UTC-normalized timestamp, exact at a day-boundary-crossing hour', () => {
         // 00:30:00 is the boundary-crossing case: interpreted as *local* time
         // (the pre-fix bug) instead of UTC, a positive-offset zone (e.g.
         // KST, UTC+9) rolls this back onto the PREVIOUS UTC calendar day —

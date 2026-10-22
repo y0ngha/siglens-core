@@ -45,7 +45,7 @@ const POSITION_BUCKET_MGMT_KO: Record<PositionBucket, string> = {
 
 /**
  * @internal Formats the member position-bucket hint section; not part of the
- * public API (personalized-analysis-by-position-bucket spec, Subsystem C).
+ * public API.
  *
  * Emits an **instructive, holder-consistent** position-management framing: it
  * tells the model to treat the reader AS the holder in this band THROUGHOUT the

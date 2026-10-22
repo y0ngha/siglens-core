@@ -1,6 +1,6 @@
 # Security Policy
 
-`@y0ngha/siglens-core` is the analysis engine behind [Siglens](https://siglens.io). It runs inside the Siglens web app, its workers and the `ai.siglens.io` agent, where it handles user-supplied LLM API keys, analysis caches and job queues. Vulnerability reports are genuinely welcome.
+`@y0ngha/siglens-core` is the analysis engine behind [Siglens](https://siglens.io). It runs inside the Siglens web app, its background workers and the `ai.siglens.io` agent, where it handles user-supplied LLM API keys, analysis caches, re-analysis cooldowns and usage counters. Vulnerability reports are genuinely welcome.
 
 ## Reporting a vulnerability
 
@@ -37,8 +37,8 @@ Fixes ship as a new package release. You will be credited in the advisory unless
 
 - This repository's source code and the published `@y0ngha/siglens-core` package
 - Handling of API keys passed to the AI provider adapters (leaking a key into logs, cache keys, prompts or error messages)
-- Injection through data the library puts into AI prompts or cache/queue keys
-- Cache, job queue, cooldown and usage-limit logic that lets one caller read or exhaust another caller's data or quota
+- Injection through data the library puts into AI prompts or cache keys
+- Cache, cooldown and usage-limit logic that lets one caller read or exhaust another caller's data or quota
 - The build and publish configuration in `.github/workflows/`
 
 **Out of scope**

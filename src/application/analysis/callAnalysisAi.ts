@@ -32,11 +32,10 @@ const ANALYSIS_MAX_RETRY_DELAY_MS = 30_000;
  * Model a failed server-key DeepSeek analysis is retried on, once.
  *
  * DeepSeek is the default free-tier analysis provider, so when it degrades the
- * whole prewarm and every free analysis degrades with it — 2026-09-14 20:30–21:28
- * UTC it went silent for an hour and four prewarm batches hit their deadline
- * with nothing harvested. Gemini is on a separate vendor, already a server-key
+ * whole prewarm and every free analysis degrades with it — it has gone silent for an hour,
+ * and prewarm batches hit their deadline with nothing harvested. Gemini is on a separate vendor, already a server-key
  * analysis model with the same response contract, and the flash tier keeps the
- * fallback cheap (사용자 결정 2026-09-15: Gemini 3.6).
+ * fallback cheap (product decision: Gemini 3.6).
  *
  * @internal
  */

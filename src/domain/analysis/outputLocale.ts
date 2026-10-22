@@ -167,8 +167,8 @@ export function outputLanguageReminder(locale: AnalysisLocale): string {
  *
  * 여섯 축(financials·fundamental·congress·marketNewsDigest·news·overall)이
  * 글자 그대로 같은 문장을 각자 하드코딩하고 있었다. 한 곳으로 모으면
- * 다음에 축이 늘어도 이 줄을 빠뜨릴 자리가 없다 — 실제로 이 PR이 세 축만
- * 고치고 여섯을 놓쳤다(리뷰 6라운드).
+ * 다음에 축이 늘어도 이 줄을 빠뜨릴 자리가 없다 — 축마다 따로 고치면
+ * 일부 축을 놓치기 쉽다.
  *
  * `Ko`/`KO` 접미는 **스키마 필드명**이지 언어 주장이 아니다. 그래서 문장은
  * 필드명을 그대로 두고 내용 언어만 말한다.
@@ -188,7 +188,7 @@ export function localizedFieldDirective(locale: AnalysisLocale): string {
  *
  * 스키마 예시는 모델이 그대로 흉내 내는 자리라, 지시문보다 힘이 셀 수 있다.
  * 예시가 `(한국어)`라고 적혀 있으면 말미 리마인더가 영어를 말해도 모델은
- * 예시를 따라간다 — 실제로 여덟 축 중 여섯이 이 상태였다(리뷰 7라운드).
+ * 예시를 따라간다 — 축마다 따로 두면 일부 축에 `(한국어)`가 남기 쉽다.
  *
  * **기본 로케일은 `한국어` 문자열 그대로다.** 예시가 한 글자라도 바뀌면
  * 기본 로케일 프롬프트의 바이트가 달라져 기존 캐시가 통째로 낡는다.

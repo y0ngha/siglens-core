@@ -133,7 +133,7 @@ describe('runMacroBriefing', () => {
         });
     });
 
-    describe('regime은 코드가 정한 값으로 덮어쓴다 (UX audit 2026-10-05)', () => {
+    describe('regime은 코드가 정한 값으로 덮어쓴다', () => {
         const SLOWDOWN_SNAP: EconomySnapshot = {
             indicators: [
                 {
@@ -192,7 +192,7 @@ describe('runMacroBriefing', () => {
         });
     });
 
-    describe('캐시 키 날짜 버킷 (UX audit 2026-10-05 §C1)', () => {
+    describe('캐시 키 날짜 버킷', () => {
         const keyUsedAt = async (iso: string): Promise<string> => {
             vi.setSystemTime(new Date(iso));
             mockCacheGet.mockClear();

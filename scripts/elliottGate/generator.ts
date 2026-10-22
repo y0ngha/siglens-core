@@ -2,8 +2,7 @@ import type { Bar, ElliottStructure } from '@/domain/types';
 import { calculateATR } from '@/domain/indicators/atr';
 
 /**
- * Deterministic synthetic charts for the Elliott structure gate (spec
- * 2026-10-02 §검증). Each sample is a textbook pivot ladder (sizes and
+ * Deterministic synthetic charts for the Elliott structure gate. Each sample is a textbook pivot ladder (sizes and
  * durations randomised from a seeded PRNG), linearly interpolated bar by
  * bar, with Gaussian close noise σ = k·ATR and random wicks, framed by
  * zero-drift random-walk padding so the structure sits mid-chart or is cut

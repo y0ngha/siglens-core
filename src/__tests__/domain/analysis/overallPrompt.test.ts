@@ -31,8 +31,8 @@ import type {
     Timeframe,
 } from '@/domain/types';
 
-// `buildOverallAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4
-// assembly split) — this file's call sites predate the split and assert
+// `buildOverallAnalysisPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildOverallAnalysisPrompt = (
@@ -1147,7 +1147,7 @@ describe('buildOverallAnalysisPrompt', () => {
     });
 });
 
-describe('buildOverallAnalysisPrompt — Snapshot Price + distance-from-snapshot (spec 2026-09-18 §2.5)', () => {
+describe('buildOverallAnalysisPrompt — Snapshot Price + distance-from-snapshot', () => {
     const snapshotBars = (close: number): Bar[] => [
         {
             time: 1_700_000_000,
@@ -1278,7 +1278,7 @@ describe('buildOverallAnalysisPrompt — Snapshot Price + distance-from-snapshot
     });
 });
 
-describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-context spec)', () => {
+describe('buildOverallAnalysisPrompt — prior analyses (prior-analysis-context)', () => {
     /** Bars sorted oldest-first, 1 day apart, starting at a fixed Unix-seconds base. */
     const makePriorBars = (
         count: number,
@@ -1334,7 +1334,7 @@ describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-
         expect(explicitlyUndefined).toEqual(preExisting);
     });
 
-    it('bars without priorAnalyses renders no "## Prior Analyses" section (but bars alone still drives Snapshot Price, spec §2.5)', () => {
+    it('bars without priorAnalyses renders no "## Prior Analyses" section (but bars alone still drives Snapshot Price)', () => {
         const bars = makePriorBars(10);
         const withoutHistory = buildOverallAnalysisPromptRaw(...baseArgs);
         const withBarsOnly = buildOverallAnalysisPromptRaw(
@@ -1448,7 +1448,7 @@ describe('buildOverallAnalysisPrompt — prior analyses (Task 4, prior-analysis-
         expect(priorIndex).toBeGreaterThan(fgIndex);
     });
 
-    it('a history that narrows to nothing (outside the bar window) renders no "## Prior Analyses" section (bars still drive Snapshot Price, spec §2.5)', () => {
+    it('a history that narrows to nothing (outside the bar window) renders no "## Prior Analyses" section (bars still drive Snapshot Price)', () => {
         // 10 bars is well inside the always-anchor-to-bars[0] fallback, so to
         // exercise the "narrowed to empty" path, use candidates that all
         // predate every bar entirely.

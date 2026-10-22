@@ -50,7 +50,7 @@ export interface CallAnalysisAiOptions {
      * retried once on the Gemini fallback model. **Off by default.** Only callers
      * where the user cannot choose the model (SEO prewarm, the ai.siglens.io agent)
      * set it — a user-chosen model must not change silently; its failure should
-     * surface so the user can switch models (product decision 2026-09-15).
+     * surface so the user can switch models (product decision).
      *
      * Ignored when `keyPolicy` is `'byok-only'`.
      */

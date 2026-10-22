@@ -78,7 +78,7 @@ describe('normalizeEconomicIndicatorSeries', () => {
         expect(s.latest?.date).toBe('2026-05-01');
     });
 
-    describe('unit (spec 2026-09-18 §B3)', () => {
+    describe('unit', () => {
         it('carries the caller-supplied unit through', () => {
             const s = normalizeEconomicIndicatorSeries(
                 'federalFunds',

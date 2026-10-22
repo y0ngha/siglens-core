@@ -3,8 +3,8 @@ import { describe, it, expect } from 'vitest';
 import { buildOptionsAnalysisPrompt as buildOptionsAnalysisPromptRaw } from '@/domain/options/optionsPrompt';
 import type { OptionsSnapshot } from '@/domain/options/types';
 
-// `buildOptionsAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4
-// assembly split) — this file's call sites predate the split and assert
+// `buildOptionsAnalysisPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildOptionsAnalysisPrompt = (
@@ -119,7 +119,7 @@ describe('buildOptionsAnalysisPrompt', () => {
 
         /**
          * 역할 문장과 톤 지시가 프롬프트 본문에 "한국어로 쓰라"고 박혀 있었다 —
-         * 말미 리마인더로는 뒤집힌다고 볼 수 없는 과업 수준 지시다(리뷰 4라운드).
+         * 말미 리마인더로는 뒤집힌다고 볼 수 없는 과업 수준 지시다.
          */
         it.each(['en', 'ja', 'zh'] as const)(
             '%s: 한국어로 쓰라는 지시가 남지 않는다',
@@ -127,7 +127,7 @@ describe('buildOptionsAnalysisPrompt', () => {
                 const prompt = build(locale);
                 expect(prompt).not.toContain('write your analysis in Korean');
                 expect(prompt).not.toContain('accurate Korean tone');
-                // 스키마 예시의 `(한국어)` 표기도 남으면 안 된다(리뷰 7라운드).
+                // 스키마 예시의 `(한국어)` 표기도 남으면 안 된다.
                 expect(prompt).not.toContain('한국어');
             }
         );

@@ -40,7 +40,7 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
     /** Upcoming or recent earnings calendar entries for the symbol. */
     upcomingCalendar: readonly EarningsCalendarItem[];
     /**
-     * Scheduled macro-economic releases (FOMC, CPI, etc.) — spec 2026-09-28.
+     * Scheduled macro-economic releases (FOMC, CPI, etc.).
      * Filtering (country, impact, date window) is the caller's responsibility;
      * this option only sorts ascending and caps at 12 rows for the prompt.
      * Renders a `## Macro Calendar` section when non-empty and folds a
@@ -121,7 +121,7 @@ export interface SubmitNewsAnalysisOptions extends BackgroundTaskOptions {
      */
     currency?: CurrencyCode;
     /**
-     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+     * Per-request deep-thinking toggle.
      * `true` requests the model's default/spec reasoning depth; `false` or
      * omitted requests the provider-minimized setting — the pre-toggle
      * default. Folded into the cache key so ON and OFF results never

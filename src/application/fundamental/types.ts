@@ -84,7 +84,7 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      */
     force?: boolean;
     /**
-     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+     * Per-request deep-thinking toggle.
      * `true` requests the model's default/spec reasoning depth; `false` or
      * omitted requests the provider-minimized setting — the pre-toggle
      * default. Folded into the cache key so ON and OFF results never
@@ -118,7 +118,7 @@ export interface SubmitFundamentalAnalysisOptions extends BackgroundTaskOptions 
      * this is a point-in-time reading, not a property the cached prompt
      * should be keyed on.
      *
-     * May also be a lazy getter (spec 2026-09-18):
+     * May also be a lazy getter:
      * `runFundamentalAnalysis` only calls it AFTER the cache check misses, so
      * a cache HIT never pays for a quote fetch the caller would otherwise
      * have to do eagerly on every call regardless of whether it was needed.

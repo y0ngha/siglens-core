@@ -87,8 +87,7 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * @param modelId - LLM model identifier. Defaults to the internal
  *   `DEFAULT_ANALYSIS_MODEL_ID` — the same default `submitAnalysis`
  *   applies — so an un-modelled peek reads the same key the writer wrote.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) key — the
+ * @param reasoning - Per-request deep-thinking toggle. Omit to read the reasoning-OFF (pre-toggle) key — the
  *   default every existing caller reads today.
  * @param tier - Caller's resolved subscription tier. Gates which timeframes may
  *   be peeked, mirroring {@link peekOverallAnalysisCache}'s tier gate (invariant 5): a
@@ -97,8 +96,7 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *   analysis that a member/pro submitter generated. Defaults to {@link DEFAULT_TIER}.
  * @param tierConfig - Tier configuration override, mainly for tests and
  *   controlled rollouts. Defaults to {@link TIER_CONFIG}.
- * @param positionBucket - Member position-bucket hint
- *   (personalized-analysis-by-position-bucket spec, Subsystem C). Must be
+ * @param positionBucket - Member position-bucket hint. Must be
  *   passed IDENTICALLY to how the writer (`submitAnalysis`) derived it so
  *   peek and submit read/write the same cache entry. Pass `undefined` for
  *   the anonymous/SSR no-bucket path, which keeps the cache key byte-identical

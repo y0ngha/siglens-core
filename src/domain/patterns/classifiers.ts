@@ -298,7 +298,7 @@ function sameDirectionPairShape(
  * @internal
  * Fits independent least-squares trendlines through the last
  * `TRENDLINE_PIVOT_WINDOW` pivots' highs and lows and classifies the pair by
- * the flat/rising/falling table in the design doc. Emits at most one
+ * the flat/rising/falling classification table. Emits at most one
  * candidate — the nine shapes are mutually exclusive by construction: the
  * slope categories pick the row, and within the both-rising / both-falling
  * rows the channel (parallel) and wedge (converging) conditions cannot both
@@ -744,8 +744,7 @@ function fitRounding(
  * `CUP_HANDLE_MAX_DEPTH_RATIO * cup depth` below the highest cup low (the
  * cup-and-handle skill: the handle forms in the upper half of the cup). A
  * handle usually sits ABOVE the cup's last low, so the earlier rule that
- * required it to sit below that low rejected textbook cups (spec 2026-10-07
- * §3.6). If that succeeds, ONLY cup_and_handle is emitted — the cup doc
+ * required it to sit below that low rejected textbook cups. If that succeeds, ONLY cup_and_handle is emitted — the cup doc
  * already covers the base, so re-emitting rounding_bottom would be redundant,
  * not extra recall. Otherwise falls back to a plain rounding_bottom fit over
  * all the lows.

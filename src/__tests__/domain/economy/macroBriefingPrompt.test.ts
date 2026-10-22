@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { buildMacroBriefingPrompt as buildMacroBriefingPromptRaw } from '@/domain/economy/macroBriefingPrompt';
 import type { EconomySnapshot } from '@/domain/types';
 
-// `buildMacroBriefingPrompt` now returns `{ stable, dynamic }` (spec §3.4
-// assembly split) — this file's call sites predate the split and assert
+// `buildMacroBriefingPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildMacroBriefingPrompt = (
@@ -13,7 +13,7 @@ const buildMacroBriefingPrompt = (
     return `${stable}\n\n${dynamic}`;
 };
 
-// `now` is required (spec 2026-09-18 — domain must never read the
+// `now` is required (domain must never read the
 // wall clock itself); this file's date-agnostic assertions pin an arbitrary
 // fixed instant rather than depending on real time.
 const DEFAULT_NOW = new Date('2026-06-15T00:00:00Z');
@@ -140,12 +140,12 @@ describe('buildMacroBriefingPrompt numeric rendering', () => {
     });
 });
 
-describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (spec 2026-09-18 §2.10)', () => {
+describe('buildMacroBriefingPrompt — indicator delta + calendar days-until', () => {
     const NOW = new Date('2026-06-15T00:00:00Z');
 
     it('renders a signed delta (latest − previous) next to the previous value, in pp for a rate-type series', () => {
         const p = buildMacroBriefingPromptRaw(SNAP, NOW).dynamic;
-        // 3.63 - 3.58 = 0.05; unit '%' -> percentage-point delta, no % term (spec §B3/§B7).
+        // 3.63 - 3.58 = 0.05; unit '%' -> percentage-point delta, no % term.
         expect(p).toContain(
             'Effective federal funds rate (monthly average) [federalFunds] (unit: %): 3.63% (2026-05-01) ← 3.58% (Δ +0.05pp)'
         );
@@ -197,7 +197,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
         expect(p).toContain('(Δ +1.50, +1.47%)');
     });
 
-    it('omits the % change term when previous <= 0 (zero-base guard, null rule §0)', () => {
+    it('omits the % change term when previous <= 0 (zero-base guard, null rule)', () => {
         const p = buildMacroBriefingPromptRaw(
             {
                 ...SNAP,
@@ -218,7 +218,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
         expect(p).not.toContain('(Δ -10,');
     });
 
-    it('formats an integer-series delta with thousands separators and no decimals (spec §B3)', () => {
+    it('formats an integer-series delta with thousands separators and no decimals', () => {
         const p = buildMacroBriefingPromptRaw(
             {
                 ...SNAP,
@@ -236,7 +236,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
         expect(p).toContain('(Δ -10,000,');
     });
 
-    it('never renders -0.00pp for a rate-type delta that rounds to exactly zero (spec §B6)', () => {
+    it('never renders -0.00pp for a rate-type delta that rounds to exactly zero', () => {
         const p = buildMacroBriefingPromptRaw(
             {
                 ...SNAP,
@@ -288,7 +288,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
         expect(p).toContain('2026-06-20 (in 5 days) Fed Rate Decision');
     });
 
-    it('appends "(today, in Nh)" for a same-UTC-date event within 24h (spec §B3)', () => {
+    it('appends "(today, in Nh)" for a same-UTC-date event within 24h', () => {
         const p = buildMacroBriefingPromptRaw(
             {
                 ...SNAP,
@@ -315,7 +315,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
         );
     });
 
-    it('parses a naive FMP datetime (no zone suffix) as UTC, not local time (spec §B3)', () => {
+    it('parses a naive FMP datetime (no zone suffix) as UTC, not local time', () => {
         // NOW is 2026-06-15T00:00:00Z; a naive '2026-06-15 12:00:00' event is
         // 12h away in UTC. Misparsing it as local time would shift the
         // computed offset by the runtime's UTC offset instead.
@@ -375,7 +375,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
         expect(p).not.toContain('2026-06-20 UTC');
     });
 
-    it('`now` is required — domain never reads the wall clock itself (spec 2026-09-18)', () => {
+    it('`now` is required — domain never reads the wall clock itself', () => {
         // A fixed 3-day-out date against a fixed `now`, not `Date.now()` —
         // this used to default `now` silently; that default is gone.
         const p = buildMacroBriefingPromptRaw(
@@ -389,7 +389,7 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until (sp
     });
 });
 
-describe('buildMacroBriefingPrompt — unit registry rows (UX audit 2026-10-05 §C1)', () => {
+describe('buildMacroBriefingPrompt — unit registry rows', () => {
     const NOW = new Date('2026-06-15T00:00:00Z');
     const rowsFor = (indicators: EconomySnapshot['indicators']): string =>
         buildMacroBriefingPromptRaw(
@@ -574,7 +574,7 @@ describe('buildMacroBriefingPrompt — unit registry rows (UX audit 2026-10-05 �
         expect(p).toMatch(/Fed Rate Decision/);
     });
 
-    describe('computed regime line (UX audit 2026-10-05 A/B follow-up)', () => {
+    describe('computed regime line', () => {
         const promptFor = (snapshot: EconomySnapshot): string =>
             buildMacroBriefingPromptRaw(snapshot, NOW).dynamic;
 

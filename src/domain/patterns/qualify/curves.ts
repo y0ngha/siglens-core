@@ -36,7 +36,7 @@ import {
     isRecent,
 } from '@/domain/patterns/qualify/context';
 
-// ─── Cup & handle and rounding (§3.6, §3.7) ────────────────────────────────
+// ─── Cup & handle and rounding ──────────────────────────────────────────────
 
 /** Which way a curved base opens: a bottom holds a U under high rims, a top a dome over low rims. */
 type CurveShape = 'bottom' | 'top';
@@ -172,7 +172,7 @@ function isUShaped(
 
 /**
  * @internal
- * §3.6: rims are confirmed highs, the right rim `HANDLE_MIN_BARS`–
+ * Cup & handle: rims are confirmed highs, the right rim `HANDLE_MIN_BARS`–
  * `HANDLE_MAX_BARS` bars back; the handle low — the lowest confirmed swing
  * low after the right rim, so it does not follow a falling current leg —
  * sits at or above the cup's midpoint: no deeper than
@@ -244,7 +244,7 @@ function qualifyCupAt(
 
 /**
  * @internal
- * §3.7: the most recent rim pivot is the right rim; the earliest earlier rim
+ * Rounding: the most recent rim pivot is the right rim; the earliest earlier rim
  * that passes is the left one. A quadratic fitted on the closes between the
  * rims must open the right way, put its vertex in the middle half of the
  * span and explain at least `ROUNDING_MIN_R2` of the variance, and the

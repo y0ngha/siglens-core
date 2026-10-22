@@ -62,8 +62,7 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  * @param timeframe - Bar resolution used for the technical axis.
  * @param modelId - LLM model identifier. The peek key is model-scoped; pass the
  *   same `modelId` the overall analysis was generated under.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) "latest"
+ * @param reasoning - Per-request deep-thinking toggle. Omit to read the reasoning-OFF (pre-toggle) "latest"
  *   pointer — the default every existing caller reads today.
  * @param tier - Caller's resolved subscription tier. Gates which timeframes may
  *   be peeked, mirroring {@link peekAnalysisCache}'s tier gate (invariant 5),

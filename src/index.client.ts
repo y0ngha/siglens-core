@@ -683,7 +683,7 @@ export type {
     Trendline,
     TrendlineDirection,
     TrendlinePoint,
-    // Chart overlays (spec 2026-09-28) — logic-drawn coordinates the model selects by id.
+    // Chart overlays — logic-drawn coordinates the model selects by id.
     ChartOverlay,
     OverlayKind,
     StrategyOverlayKind,

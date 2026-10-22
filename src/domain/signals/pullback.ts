@@ -6,9 +6,8 @@ import type { Bar } from '@/domain/types';
 /**
  * Short-term washout reading of a daily chart.
  *
- * The reading siglens-trader switched its trading rule to on 2026-09-24 (daily RSI(2) < 10
- * above the 200-day average, replacing the confluence rule), re-measured on independent data
- * for the analysis products.
+ * The classic short-term mean-reversion reading (daily RSI(2) < 10 above the
+ * 200-day average), re-measured on independent out-of-sample data.
  *
  * Named as readings of the chart, never as instructions — the same rule that keeps the
  * confluence trigger states out of the agent's tool output altogether.
@@ -31,7 +30,7 @@ export interface PullbackSnapshot {
     /** Williams %R over {@link PULLBACK_WILLIAMS_R_PERIOD} bars — the input the reading is classified on. */
     williamsR: number;
     /**
-     * RSI over {@link PULLBACK_RSI_PERIOD} bars — siglens-trader's formulation of the same
+     * RSI over {@link PULLBACK_RSI_PERIOD} bars — the trading-rule formulation of the same
      * washout. Reported for reference; the reading is classified on Williams %R, which
      * measured as well or better and is the oscillator the chart prompt already prints.
      */
@@ -44,7 +43,7 @@ export const PULLBACK_TREND_MA_PERIOD = 200;
 export const PULLBACK_EXIT_MA_PERIOD = 5;
 /** Williams %R lookback — the standard 14, the same series the chart prompt prints. */
 export const PULLBACK_WILLIAMS_R_PERIOD = 14;
-/** RSI lookback of siglens-trader's formulation. */
+/** RSI lookback of the trading-rule formulation. */
 export const PULLBACK_RSI_PERIOD = 2;
 /** Williams %R at or below this closes in the bottom tenth of the lookback range. */
 export const PULLBACK_WASHOUT_WILLIAMS_R = -90;
@@ -57,10 +56,9 @@ export const PULLBACK_NEAR_WILLIAMS_R = -80;
  *
  * Keep in sync: the "66-75% is the share of such short trades exited at the first close above MA5 (or after about 10 days) that ended in profit, never a win rate or a holding-period result" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and the agent pullback rule (domain/agent/buildAgentSystemPrompt.ts). Change all three together.
  *
- * Measured on daily bars, entry at the signal day's close, 0.1% cost per side:
- * point-in-time S&P 500 members 2000-01 → 2020-11 (615 symbols) plus nine large caps and
- * SPY/QQQ 2024-07 → 2026-09, split into five periods (2000–07, 2007–09, 2009–14,
- * 2015–20, 2024–26). "Baseline" is any day above MA200.
+ * Measured on daily bars, entry at the signal day's close, 0.1% cost per side, over a
+ * long multi-decade history split into five periods (the period labels appear in the
+ * sentences below). "Baseline" is any day above MA200.
  */
 export const PULLBACK_BASE_RATES: Readonly<
     Record<Exclude<PullbackReading, 'none'>, string>

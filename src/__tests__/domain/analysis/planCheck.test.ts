@@ -91,7 +91,7 @@ describe('riskRewardFrom', () => {
     });
 
     it('produces the sub-1.0 ratio that the measured failure looks like', () => {
-        // 426 production ticks: median upside to the first obstacle was 0.74%.
+        // Measured failure shape: the first obstacle sits well under 1% above the price.
         const rr = riskRewardFrom(100, 97.3, [100.74]);
         expect(rr).not.toBeNull();
         expect(rr as number).toBeLessThan(1);

@@ -34,7 +34,7 @@ interface ScoredLine {
 
 /**
  * @internal
- * The boundary through a pattern's touches (spec 2026-10-07 §2.2) — the one
+ * The boundary through a pattern's touches — the one
  * routine every line family uses (triangles, wedges, channels, rectangle,
  * broadening formation, the head & shoulders neckline, the flag channel).
  *
@@ -197,7 +197,7 @@ function containsBars(
     return true;
 }
 
-/** @internal How a boundary moves over the pattern span (spec 2026-10-07 §2.3). */
+/** @internal How a boundary moves over the pattern span. */
 export type LineDrift = 'flat' | 'rising' | 'falling' | 'ambiguous';
 
 /**
@@ -226,7 +226,7 @@ export function classifyLineDrift(
 
 /**
  * @internal
- * Measured-move height of a boundary pair (spec 2026-10-07 §3.1): the width
+ * Measured-move height of a boundary pair: the width
  * at the first touch — the widest point of a converging pattern, and the
  * same as anywhere else for parallel lines. A broadening formation widens, so
  * its height is the width at its last touch. Both points are fixed once the

@@ -1,6 +1,5 @@
 /**
- * Deterministic fixture generator for the A/B prompt-quality harness (plan
- * Task 2.5). Produces the 6 technical (`tech-*.json`) fixtures consumed by
+ * Deterministic fixture generator for the A/B prompt-quality harness. Produces the 6 technical (`tech-*.json`) fixtures consumed by
  * `buildPrompts.ts`. Modeled directly on
  * `src/__tests__/domain/patterns/fixtures/generate.ts`: linear-ramp/
  * oscillation "segments" with small deterministic sinusoidal noise layered

@@ -16,7 +16,7 @@ import { detectSignals } from '@/domain/signals';
  * rule counts (the four 52-week-extreme and gap types are left out of the tally) derive
  * from only 14 indicators — RSI contributes 4 types, MACD 4, Bollinger 6 — so
  * counting types treats transforms of the same close series as independent votes. In
- * production 16% of the snapshots that reached "3 types" spanned only two indicators
+ * practice a sizeable share of the snapshots that reached "3 types" spanned only two indicators
  * (`bollinger_lower_bounce` + `bollinger_percentb_oversold` + `rsi_oversold`).
  *
  * Family counting can only tighten the rule: type count is always ≥ family count, so a
@@ -79,7 +79,7 @@ export const CONFLUENCE_MIN_BARS = 120;
  * Entry and exit must not share one threshold. Tightening entry is a deliberate act;
  * tightening exit is a defect — a missed entry costs opportunity, a missed exit costs
  * money. When the two shared a knob, raising the entry bar silently raised the exit bar
- * with it and cut liquidation signals by 80% in production.
+ * with it and sharply cut liquidation signals.
  *
  * The default keeps the exit side at roughly the sensitivity it had when the rule counted
  * raw signal types, while still benefiting from the family/phase correction.

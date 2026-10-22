@@ -99,7 +99,7 @@ function formatPriceTargetSummary(
  * non-finite / null / undefined values. Delegates to `fmt` (shared
  * {@link formatNullableNumber}) instead of a raw `toFixed` so a negative P/E
  * (a loss-making peer) that rounds to exactly zero never prints `-0.00`
- * (spec §0/§B6) — a raw `toFixed` does not strip that sign.
+ * — a raw `toFixed` does not strip that sign.
  */
 function formatPeerMetric(
     n: number | null | undefined,
@@ -121,7 +121,7 @@ function formatSectorDirection(
 }
 
 const DERIVED_PERCENT_FACTOR = 100;
-/** Decimal places for every `±x.x%` derived-metric line (spec §2.6). */
+/** Decimal places for every `±x.x%` derived-metric line. */
 const DERIVED_PCT_DP = 1;
 
 function isFiniteNumber(n: number | null | undefined): n is number {
@@ -133,9 +133,8 @@ function isFinitePositive(n: number | null | undefined): n is number {
 }
 
 /**
- * `+x.x%` / `-x.x%`, or `'N/A'` for a non-finite value — one decimal (spec
- * §2.6), not `fmt`'s default two. Delegates to the shared
- * {@link formatSignedNumber} (spec 2026-09-18) instead of a
+ * `+x.x%` / `-x.x%`, or `'N/A'` for a non-finite value — one decimal, not `fmt`'s default two. Delegates to the shared
+ * {@link formatSignedNumber} instead of a
  * hand-rolled sign check, so it never prints `-0.0%` either.
  */
 function fmtSignedPct1(n: number | null): string {
@@ -154,7 +153,7 @@ function percentDelta(
 
 /**
  * Premium/discount of the subject's own metric vs the peer median — N/A when
- * either side is non-positive (spec 2026-09-18). `percentDelta`
+ * either side is non-positive. `percentDelta`
  * alone only guards the BASE (peer median); a subject P/E or P/S that is
  * itself ≤ 0 (a loss-making company) is not a valuation multiple a "premium"
  * or "discount" reads meaningfully against.
@@ -196,7 +195,7 @@ function computeAnalystBuySharePct(g: GradesConsensus | null): number | null {
 
 /**
  * Calendar-date days from `now`'s UTC date to `nextEarningsAt`'s UTC date
- * (today is `0`, not a raw ms/24h round — spec 2026-09-18);
+ * (today is `0`, not a raw ms/24h round);
  * negative when the date has already passed. `null` when the date is
  * missing or unparseable.
  */
@@ -214,9 +213,8 @@ export const DERIVED_METRICS_SECTION_HEADER = '## Derived Metrics (computed)';
 /**
  * Renders the deterministic metrics the model used to compute itself: target
  * upside vs current price, price-target trend, peer valuation premium, the
- * analyst buy share, and days to the next earnings report (spec 2026-09-18
- * §2.6). Every line is `N/A` when its inputs are missing or non-finite (null
- * rule, spec §0).
+ * analyst buy share, and days to the next earnings report. Every line is `N/A` when its inputs are missing or non-finite (null
+ * rule).
  *
  * No EPS-estimate-vs-TTM line: the analyst estimate's fiscal period is not
  * knowable from this snapshot (FMP's estimate is an unspecified fiscal year;
@@ -265,7 +263,7 @@ function formatDerivedMetricsSection(
  * @internal Builds the fundamental-analysis LLM prompt.
  *
  * Build the AI fundamental-analysis prompt, split into a stable/dynamic pair
- * (spec §3.4, {@link AssembledPrompt}) — Design C ("skills-to-system split"):
+ * ({@link AssembledPrompt}) — Design C ("skills-to-system split"):
  *
  * - `stable`: ONLY the Fundamental Analysis Frameworks (Active Skills)
  *   section. Safe to isolate here because this builder's selection context
@@ -300,8 +298,7 @@ function formatDerivedMetricsSection(
  * @param snapshot - Normalised fundamental data for the symbol.
  * @param skills   - All loaded skills; non-fundamental entries are filtered out.
  * @param currency - Listing quote currency from the consumer's market profile. Defaults to `'USD'`.
- * @param now - Reference clock for `## Derived Metrics`'s days-to-earnings line
- *   (spec 2026-09-18 §2.6). Optional without a wall-clock default — the domain
+ * @param now - Reference clock for `## Derived Metrics`'s days-to-earnings line. Optional without a wall-clock default — the domain
  *   never reads the clock itself; production callers pass it, and without it
  *   the days-to-earnings line reads `N/A`.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.

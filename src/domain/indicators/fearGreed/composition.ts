@@ -23,7 +23,7 @@ export const FEAR_GREED_LABEL_CUTOFFS = {
 } as const;
 
 /**
- * @internal §4.5 self-norm warning thresholds.
+ * @internal Self-norm warning thresholds.
  * Used internally by composeSnapshot and walkForward; not part of the public API.
  */
 export const FEAR_GREED_WARNING_THRESHOLDS = {
@@ -63,7 +63,7 @@ export function scoreToLabel(score: number): FearGreedLabel {
 }
 
 /**
- * Spec §4.5 self-norm warning detection. Symmetric chronic weakness/strength.
+ * Self-norm warning detection. Symmetric chronic weakness/strength.
  *
  * @internal Used internally by composeSnapshot and walkForward.
  */

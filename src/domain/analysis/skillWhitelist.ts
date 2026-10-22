@@ -4,7 +4,7 @@ import type { Skill, SkillCategory, SkillType } from '@/domain/types';
  * @internal
  * Which prompt family a skill selection is being made for. Each prompt builder
  * passes its own context so cross-domain skill content can never leak into an
- * unrelated prompt (spec §3.2 invariant: e.g. a fundamental framework must not
+ * unrelated prompt (invariant: e.g. a fundamental framework must not
  * be injected into the TECHNICAL chart prompt).
  *
  * OPTIONS / OVERALL / CONGRESS are intentionally absent: the options and
@@ -51,8 +51,8 @@ type WhitelistRule =
 /**
  * @internal
  * Per-context whitelist rule. The two axes reflect how the catalog is actually
- * tagged (the design doc's original folder-name table has no runtime
- * counterpart — folder location is never stored on {@link Skill}):
+ * tagged (folder location is never stored on {@link Skill}, so the
+ * catalog's folder layout has no runtime counterpart):
  *
  * - `technical` filters on the **`type` axis**: all 75 chart skills declare a
  *   chart `SkillType`, while the 37 indicator skills carry no `category` at
@@ -77,7 +77,7 @@ export const SKILL_CONTEXT_WHITELIST: Readonly<
  *
  * `technical` additionally rejects any skill categorized into a non-chart
  * domain ({@link NON_CHART_CATEGORIES}), regardless of its `type` — this is
- * the spec's cross-domain invariant made defensive: a mis-tagged skill that
+ * the cross-domain invariant (chart prompts carry only chart skills) made defensive: a mis-tagged skill that
  * declares both a chart `type` and `category: fundamental` must still stay
  * out of the chart prompt.
  *

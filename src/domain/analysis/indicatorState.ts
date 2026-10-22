@@ -51,7 +51,7 @@ function isFinitePositive(n: number | null | undefined): n is number {
 /**
  * @internal `above by x.xx%` / `below by x.xx%` of `price` vs a positive
  * `level`, or `null` when either input cannot support a ratio (null rule).
- * `price` must itself be positive too (spec 2026-09-18) — a
+ * `price` must itself be positive too — a
  * non-finite or ≤ 0 price/quote is an unknown reference, not a real "below"
  * reading.
  */
@@ -67,7 +67,7 @@ function distanceFromLevel(
 
 /**
  * @internal Last non-null, finite value of a warm-up-padded series, or
- * `null` (spec 2026-09-18 — a `NaN` in the series must not read as
+ * `null` (a `NaN` in the series must not read as
  * a real "last value").
  */
 function lastValueOf(series: (number | null)[] | undefined): number | null {
@@ -357,7 +357,7 @@ export const VOLUME_AVG_WINDOW = 20;
  * {@link VOLUME_AVG_WINDOW} bars (from whatever history `priorVolumes`
  * carries) are all finite and their average is > 0 (null rule).
  *
- * Slices its own window from `priorVolumes` (spec 2026-09-18) —
+ * Slices its own window from `priorVolumes` —
  * this used to require the CALLER to pass exactly 20 already-sliced
  * elements, coupling `prompt.ts` to this module's window size; now the
  * caller can pass raw history and this module owns the slicing.
@@ -510,7 +510,7 @@ export interface IndicatorStateInput {
     macd: MACDResult | undefined;
     /**
      * MACD histogram trend as already computed by the caller's `detectTrend`
-     * — reused rather than re-derived (spec §2.2), so the two renderings of
+     * — reused rather than re-derived, so the two renderings of
      * "rising/falling" can never disagree.
      */
     macdHistogramTrend: IndicatorTrendState;
@@ -531,7 +531,7 @@ export interface IndicatorStateInput {
     /**
      * Bar volumes immediately before the last bar (oldest first) — any
      * length is fine; `volumeLine` slices its own trailing
-     * {@link VOLUME_AVG_WINDOW}-bar window (spec 2026-09-18).
+     * {@link VOLUME_AVG_WINDOW}-bar window.
      * `N/A` when fewer than {@link VOLUME_AVG_WINDOW} are available.
      */
     priorVolumes: readonly (number | null | undefined)[];
@@ -550,7 +550,7 @@ export interface IndicatorStateInput {
  * Stochastic zone, Ichimoku cloud position, Bollinger position,
  * Supertrend/PSAR distance, ATR % of price). Pure: no I/O, deterministic for
  * the same input. Every line is `N/A` when its inputs are missing or
- * non-finite (spec §0 null rule).
+ * non-finite.
  */
 export function buildIndicatorStateSection(input: IndicatorStateInput): string {
     return [

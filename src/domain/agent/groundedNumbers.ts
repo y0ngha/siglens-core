@@ -297,7 +297,7 @@ const FLOAT_NOISE_ULPS = 8;
  * Not `toFixed` string equality: `toFixed` rounds the binary value, so an exact
  * half like 26333.035 came out as `26333.03` while the model wrote the
  * half-up `26,333.04`, and a correct index level was logged as ungrounded
- * (2026-09-14 production, NASDAQ via `get_market_overview`). Both neighbours
+ * (observed on a real index level from `get_market_overview`). Both neighbours
  * of an exact half are accepted — either rounding convention states the fact.
  */
 function roundsTo(n: number, parsed: ParsedNumber): boolean {

@@ -11,7 +11,7 @@ import {
 } from './generator';
 
 /**
- * Gate harness (spec 2026-10-02 §검증): per structure, recall, false
+ * Gate harness: per structure, recall, false
  * positives on zero-drift random walks, and confusion with other structures.
  */
 

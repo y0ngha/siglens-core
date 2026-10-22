@@ -10,7 +10,7 @@ import {
 const FMT = { timeframe: '1Day' as const, quoting: { dp: 2, krxTick: null } };
 
 /**
- * The release gate (spec 2026-10-02 §검증) at the full sample size of
+ * The release gate at the full sample size of
  * `scripts/elliottGate/run.ts` — 300 synthetic samples per structure per noise
  * level, 1,000 random walks, same seed — so CI checks the very numbers the
  * gate decision was made on. Every shipped structure, impulse included,

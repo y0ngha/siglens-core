@@ -1,6 +1,5 @@
 /**
- * A/B prompt-quality harness — Stage 2 (plan Task 2.5,
- * `docs/superpowers/plans/2026-07-03-prompt-size-quality-redesign.md`).
+ * A/B prompt-quality harness — Stage 2.
  *
  * Sends every prompt case produced by `buildPrompts.ts` to the production
  * default analysis model (Gemini 2.5 Flash Lite — see

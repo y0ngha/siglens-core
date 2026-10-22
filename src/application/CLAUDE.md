@@ -26,11 +26,11 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 ```typescript
 // ❌ domain importing application
 // src/domain/analysis/prompt.ts
-import { submitAnalysis } from '@/application/market/submitAnalysis'; // never
+import { runAnalysis } from '@/application/market/runAnalysis'; // never
 
 // ❌ infrastructure importing application
-// src/infrastructure/jobs/queue.ts
-import { pollAnalysis } from '@/application/market/pollAnalysis'; // never
+// src/infrastructure/cache/redis.ts
+import { peekAnalysisCache } from '@/application/market/peekAnalysisCache'; // never
 ```
 
 ## What Belongs Here
@@ -38,14 +38,25 @@ import { pollAnalysis } from '@/application/market/pollAnalysis'; // never
 A function belongs in `application/` when it must coordinate **two or more** infrastructure
 modules, or when it sequences a domain call followed by an infrastructure call.
 
+Use-cases are plain in-process `run*` functions: the caller awaits one promise, and there
+is no job queue, job id or polling loop (see `src/application/market/runAnalysis.ts`).
+
 ```typescript
-// ✅ application: cache lookup (infra) → domain prompt → infra enqueue → infra cache write
-export async function submitAnalysis(params: SubmitAnalysisParams): Promise<string> {
+// ✅ application: cache lookup (infra) → domain prompt → AI call → domain post-processing
+//    → infra cache write
+export async function runAnalysis(
+    symbol: string,
+    companyName: string,
+    timeframe: Timeframe,
+    force?: boolean,
+    fmpSymbol?: string,
+    options: SubmitAnalysisOptions = {}
+): Promise<RunAnalysisResult> {
     const cache = createCacheProvider();           // adapter factory → CacheProvider | null
-    const cached = await cache?.get<AnalysisResponse>(buildAnalysisCacheKey(params));
-    if (cached) return cached.jobId;
-    const prompt = buildAnalysisPrompt(params.symbol, params.bars, params.indicators);
-    // … enqueue, write cache, etc.
+    const cached = await cache?.get<AnalysisResponse>(cacheKey);
+    if (cached) return { status: 'cached', ...filterAnalysisResult(cached, tier, tierConfig) };
+    const { stable, dynamic } = buildAnalysisPrompt(/* … */);
+    // … call the model, post-process, write cache, etc.
 }
 ```
 
@@ -65,8 +76,8 @@ constructed directly. Treat those as temporary — they should be replaced with 
 `create<Port>Provider()` factory when the module's port migration lands.
 
 Do **not** push every dependency through a `deps: { … }` parameter. Library
-consumers call use-cases with domain inputs only (`submitAnalysis(params)`) and
-should not be burdened with adapter wiring. The library owns wiring; the consumer
+consumers call use-cases with domain inputs only (`runAnalysis(symbol, …, options)`)
+and should not be burdened with adapter wiring. The library owns wiring; the consumer
 owns the call site.
 
 **Intentional exception — externally-owned I/O providers:**
@@ -75,7 +86,7 @@ owns the call site.
 Injecting them is the right boundary: core must not hard-wire a specific FMP or
 Alpaca adapter, just as it must not hard-wire a specific AI provider SDK.
 These parameters are required when a cache miss occurs (the fetch path) and must
-be supplied by the siglens app call site.
+be supplied by the consumer's call site.
 This is an intentional, permanent exception to the "library owns wiring" rule —
 do not revert it to a factory call.
 
@@ -83,19 +94,19 @@ The general test-seam exception still applies: when a factory's return value is 
 singleton or otherwise hard to substitute at runtime, mock the factory module with
 `vi.mock` (see Testing).
 
-## Dispatch contract — prompt assembly (Design C)
+## Dispatch contract — prompt assembly
 
-`submit*.ts` use-cases receive an `AssembledPrompt` (`{ stable, dynamic }`) from the
+`run*.ts` use-cases receive an `AssembledPrompt` (`{ stable, dynamic }`) from the
 domain builder and dispatch it as **two separate fields**, not one combined user prompt:
 
-- `system = AI_SYSTEM_PROMPT + '\n\n' + assembled.stable` (when `stable` is non-empty;
-  otherwise just `AI_SYSTEM_PROMPT`) — the `always_on` skill digests live in the
-  **system** prompt so providers (Gemini/OpenAI/Claude) cache the stable prefix.
+- `system = aiSystemPrompt(locale) + '\n\n' + assembled.stable` (when `stable` is
+  non-empty; otherwise just `aiSystemPrompt(locale)`) — the `always_on` skill digests live
+  in the **system** prompt so providers (Gemini/OpenAI/Claude) cache the stable prefix.
   For technical analysis `stable` leads with the fixed Analysis Intent + Guidelines
-  blocks (p22) — ahead of the per-symbol-sampled free-tier skill digests — so
+  blocks — ahead of the per-symbol-sampled free-tier skill digests — so
   `persona → Intent → Guidelines` is byte-identical across symbols.
 - `prompt = assembled.dynamic` — the per-call half (symbol framing, fetched data,
-  gated skills, request block).
+  gated skills, request block), followed by the output-language reminder for the locale.
 - `seed = analysisSeed(system + '\n\n' + prompt)` — computed over the full assembled
   content so the cache seed still reflects both halves.
 

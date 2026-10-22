@@ -76,7 +76,7 @@ describe('requiresUserApiKey', () => {
 });
 
 describe('isModelAllowedForTier (defense-in-depth)', () => {
-    // 정책 배경(enableTierRestrictions, siglens-worker#21 regression)의 canonical 설명은
+    // 정책 배경(enableTierRestrictions regression)의 canonical 설명은
     // src/domain/keyRouting.ts의 isModelAllowedForTier JSDoc — 여기서는 그 정책 하에서 이
     // 함수가 실제로 무엇을 검증하는지만 assert한다: 어느 tier에도 등록되지 않은 model만
     // 걸러낸다.

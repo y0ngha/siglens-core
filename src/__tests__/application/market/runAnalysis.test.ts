@@ -921,9 +921,9 @@ describe('runAnalysis', () => {
      * `options.priorAnalyses`가 `narrowPriorAnalysesForCacheKey`(캐시 키
      * 단계)와 `buildAnalysisPrompt`의 11번째 인자(프롬프트 단계) 양쪽에
      * 올바르게 배선되는지, 그리고 생략했을 때 기존 캐시 키와 바이트가
-     * 같은지 확인한다 (Task 6b).
+     * 같은지 확인한다.
      */
-    describe('prior-analysis-context (Task 6b)', () => {
+    describe('prior-analysis-context', () => {
         it('priorAnalyses를 생략하면 캐시 키가 예전과 동일하다(:hist= 세그먼트 없음)', async () => {
             await runAnalysis(
                 mockSymbol,
@@ -1649,7 +1649,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
         });
     });
 
-    describe('차트 오버레이 resolve (spec 2026-09-28)', () => {
+    describe('차트 오버레이 resolve', () => {
         const overlayCandidate = {
             id: 'pattern:double_bottom:1705312200',
             kind: 'pattern' as const,

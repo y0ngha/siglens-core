@@ -125,8 +125,8 @@ export async function callGemini(
                     responseJsonSchema: options.responseSchema,
                 }),
                 // thinkingConfig는 **항상** 보낸다. 생략하면 모델의 자연
-                // 기본값이 적용되는데, 그 값은 대체로 추론 ON이다(실측
-                // 2026-09-06: `gemini-3.6-flash` 미지정 시 418 사고 토큰).
+                // 기본값이 적용되는데, 그 값은 대체로 추론 ON이다(실측:
+                // `gemini-3.6-flash`는 미지정 시 사고 토큰을 소비한다).
                 // Free·Member 모델의 기본 OFF를 보장하려면 매 호출 명시해야 한다.
                 //
                 // 숫자 `thinkingBudget`은 쓰지 않는다 — 3세대 모델은 이를

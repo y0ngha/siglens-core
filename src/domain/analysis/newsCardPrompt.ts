@@ -11,7 +11,7 @@ import type { AssembledPrompt, NewsItem } from '@/domain/types';
  * @internal Builds the per-news-card LLM prompt.
  *
  * Build the per-card news analysis prompt for the fixed news-card model. No
- * skills, no other catalog-level knowledge (spec §3.2/Design C).
+ * skills, no other catalog-level knowledge.
  *
  * The two halves are split for provider-side prefix caching (DeepSeek caches
  * a stable prefix automatically):

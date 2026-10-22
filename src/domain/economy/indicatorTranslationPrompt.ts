@@ -7,7 +7,7 @@ import type { AssembledPrompt } from '@/domain/types';
  *
  * Builds the AI prompt for translating an English economic-indicator
  * base name into natural Korean as used in Korean financial media. No
- * skills, no other catalog-level knowledge (spec §3.2/Design C) — `stable`
+ * skills, no other catalog-level knowledge — `stable`
  * is empty and `dynamic` is the full prompt, byte-for-byte the same
  * production order as before the assembly split (v0.31).
  *

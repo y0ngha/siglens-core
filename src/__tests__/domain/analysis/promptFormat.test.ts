@@ -316,7 +316,7 @@ describe('formatLargeAmount', () => {
     });
 });
 
-describe('formatSignedNumber (spec 2026-09-18 §A5/§B6)', () => {
+describe('formatSignedNumber', () => {
     it('prefixes + on non-negative values and keeps the minus sign, at dp precision', () => {
         expect(formatSignedNumber(1.234, 1)).toBe('+1.2');
         expect(formatSignedNumber(-0.456, 1)).toBe('-0.5');

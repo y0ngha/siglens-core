@@ -1,6 +1,5 @@
 /**
- * Shared context and small helpers for the chart-pattern qualifiers (spec
- * 2026-10-07). Each family lives in its own file next to this one; the facade
+ * Shared context and small helpers for the chart-pattern qualifiers. Each family lives in its own file next to this one; the facade
  * is `qualifyPatterns.ts`.
  */
 import type {
@@ -20,7 +19,7 @@ import {
 /**
  * @internal
  * Everything a family qualifier reads. `pivots` are CONFIRMED pivots only
- * (spec 2026-10-07 §2.1): the still-forming extreme moves every day, and a
+ *: the still-forming extreme moves every day, and a
  * line, level or overlay id built on it moved with it.
  */
 export interface QualifyContext {
@@ -31,7 +30,7 @@ export interface QualifyContext {
     minHeightPricePct: number;
 }
 
-/** @internal `max(PATTERN_MIN_HEIGHT_ATR·ATR, pct·price)` — the §2.4 height floor. */
+/** @internal `max(PATTERN_MIN_HEIGHT_ATR·ATR, pct·price)` — the height floor. */
 export function minHeight(ctx: QualifyContext, price: number): number {
     return Math.max(
         PATTERN_MIN_HEIGHT_ATR * ctx.atr,
@@ -112,7 +111,7 @@ export function isRecent(
 
 /**
  * @internal
- * §3.2: the close change over the `PRIOR_TREND_BARS` bars before `start`
+ * Prior trend: the close change over the `PRIOR_TREND_BARS` bars before `start`
  * sets the direction once it reaches `PRIOR_TREND_MIN_ATR`·ATR; otherwise
  * the direction stays undetermined (`null`). Boundary pairs read it for
  * their breakout side, head & shoulders for the advance (decline) into the

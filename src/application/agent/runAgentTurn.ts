@@ -51,7 +51,7 @@ const HISTORY_WINDOW = {
     // and with it the cached prefix — holds still for 4 turns at a stretch.
     stride: 4,
 } as const;
-/** Measured medians (spec §4-2) surfaced to the UI as a progress hint. */
+/** Measured medians surfaced to the UI as a progress hint. */
 const FRESH_ANALYSIS_ESTIMATED_SECONDS: Record<FreshAnalysisKind, number> = {
     technical: 40,
     overall: 120,
@@ -200,7 +200,7 @@ class TurnBudget {
 }
 
 /**
- * One agent turn (spec §4-2): consume quota → build prompt/window → loop
+ * One agent turn: consume quota → build prompt/window → loop
  * provider ⇄ tools up to `maxSteps` → return the final assistant message
  * plus every intermediate message the consumer must persist.
  *
@@ -535,7 +535,7 @@ export async function runAgentTurn(
             let stepText = '';
             const result = await untilStopped(
                 deps.callAgentProvider({
-                    // Key resolution (server vs BYOK) belongs to the consumer's router (spec §5).
+                    // Key resolution (server vs BYOK) belongs to the consumer's router.
                     apiKey: '',
                     model: params.model,
                     system,

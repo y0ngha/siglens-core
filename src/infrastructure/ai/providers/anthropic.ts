@@ -127,7 +127,7 @@ export async function callClaude(
     // 취급하지만(스키마 툴 호출에서도 thinking 블록 없음), 여기서는 활성으로 분류해
     // tool_choice를 `auto`로 둔다.
     //
-    // 실측(2026-10-15):
+    // 실측:
     // - claude-sonnet-5-5는 `between_tools`와 함께든 아니든 forced tool_choice(`tool`/`any`)를
     //   400("not supported for this model")으로 거부하고, `auto`에서는 tool_use로 응답한다.
     // - opus-5-5·fable-5-1도 forced를 거부하지만 thinking을 끌 수 없어(off가 adaptive)
@@ -138,13 +138,12 @@ export async function callClaude(
             ? adaptiveConfig.mode !== 'disabled'
             : budgetThinking;
 
-    // PR5a — tool_choice 강제 여부는 thinking 지원 여부로 갈린다.
-    // Anthropic API 제약(empirically 확인, commit 83d01ba/e3b4d01 참고):
+    // tool_choice 강제 여부는 thinking 지원 여부로 갈린다.
+    // Anthropic API 제약(empirically 확인):
     // forced tool_choice({type:'tool'} 또는 {type:'any'})는 thinking(adaptive/extended)과
-    // 동시에 지정하면 400을 반환한다. 이 저장소가 실제로 그 400을 겪었다 — 83d01ba는
-    // forced tool_choice를 위해 thinking을 꺼야 했고, e3b4d01은 반대로 thinking을 지키기
-    // 위해 tool_choice를 auto로 되돌렸다(sonnet-4-6에서 thinking 블록 + tool_use 조합을
-    // 400 없이 실증).
+    // 동시에 지정하면 400을 반환한다. forced tool_choice를 쓰려면 thinking을 꺼야 하고,
+    // thinking을 지키려면 tool_choice를 auto로 둬야 한다(sonnet-4-6에서 thinking 블록 +
+    // tool_use 조합을 400 없이 실증).
     // 따라서:
     // - thinkingActive === true: tool_choice는 `auto` 유지 — force하면 400.
     // - thinkingActive === false: thinking을 전혀 보내지 않으므로 tool_choice를
@@ -219,7 +218,7 @@ export async function callClaude(
                               // `budget_tokens`)와 함께 보낼 수 없고 effort `high` 이하
                               // 에서만 허용되므로 `output_config`는 보내지 않는다.
                               // SDK 타입(0.128)에 아직 없어 단언한다. 런타임 안전 근거:
-                              // 2026-10-15 실측에서 API가 정확히 이 형태를 받았다(200,
+                              // 실측에서 API가 정확히 이 형태를 받았다(200,
                               // 툴 유무 모두). SDK가 이 값을 타입에 넣으면 단언을 지운다.
                               thinking: {
                                   type: 'between_tools',

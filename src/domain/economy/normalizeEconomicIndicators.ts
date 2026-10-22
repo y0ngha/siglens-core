@@ -19,7 +19,7 @@ import type { EconomicIndicatorPoint, EconomicIndicatorSeries } from './types';
  * @param trendLength - Maximum number of most-recent-to-oldest points to include in `trend`.
  * @param unit - Unit label for the series' values (e.g. `'%'`), when the
  *   caller's own registry knows it. This module has no such registry itself
- *   (spec 2026-09-18 §B3) — omit when unknown; the macro-briefing prompt
+ * — omit when unknown; the macro-briefing prompt
  *   then formats the series as level-type rather than rate-type.
  * @returns Normalized indicator series with `latest`, `previous`, `trend`, and `unit`.
  */

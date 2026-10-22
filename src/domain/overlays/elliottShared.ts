@@ -31,8 +31,7 @@ import {
 import { roundQuotedPrice } from '@/domain/analysis/promptFormat';
 
 /**
- * Building blocks shared by the Elliott structure counters (spec
- * 2026-10-02): pivot runs and rules, the A–B–C type, and drawing helpers.
+ * Building blocks shared by the Elliott structure counters: pivot runs and rules, the A–B–C type, and drawing helpers.
  */
 
 // ─── Shared count helpers ───────────────────────────────────────────────────
@@ -232,7 +231,7 @@ export type AbcType =
 /**
  * @internal
  * Classifies a 4-pivot A–B–C (start, A, B, C ends) by how far B retraces A
- * and where C ends against A's end (spec 2026-10-02 §4). `null` when the
+ * and where C ends against A's end. `null` when the
  * shape is neither a zigzag nor a flat (B between 78.6% and 90% of A, or
  * past 138.2%; a zigzag whose C stays inside A; a flat whose C lands inside
  * the dead band; a zero-size A). While C is still forming (`cInProgress`) the conditions

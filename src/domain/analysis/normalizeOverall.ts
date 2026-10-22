@@ -124,7 +124,7 @@ export function normalizeOverallAnalysisResponse(
         ...(context.optionsOiStale ? { optionsOiStale: true } : {}),
         // Never LLM-authored — echoed straight through when a cached entry
         // already carries it (set once by `runOverallAnalysis` on the
-        // producing call, spec 2026-09-18 §2.5). Omitted rather than `''`
+        // producing call). Omitted rather than `''`
         // for an older cache entry written before this field existed, so
         // "unknown" stays distinguishable from "just now".
         ...(typeof o.analyzedAt === 'string' && o.analyzedAt !== ''

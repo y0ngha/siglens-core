@@ -65,7 +65,7 @@ export function createCacheProvider(): CacheProvider | null { ... }
 ## Indicator Confluence (`signals/confluence.ts`)
 
 `evaluateConfluence(bars, options)` owns the multi-signal entry/exit rule that consumers
-(the trading system, the backtest generator) used to each re-implement. It is pure: the
+used to each re-implement. It is pure: the
 caller fetches every bar series, including the higher-timeframe one, and passes them in.
 Fetching is a consumer concern; the rule is not.
 
@@ -107,7 +107,7 @@ neither gate, **and carries its own threshold** (`CONFLUENCE_EXIT_MIN`, lower th
 `CONFLUENCE_MIN`).
 
 The separate threshold is not cosmetic. When entry and exit shared one, raising the entry
-bar silently raised the exit bar with it and cut liquidation signals by 80% in production —
+bar silently raised the exit bar with it and sharply cut liquidation signals —
 the gates were correctly entry-only while the *constant behind them* was not. Any future
 tightening has to declare which side it lands on; "it's just a threshold" is how the last
 one slipped through.
@@ -129,16 +129,13 @@ Values` — could each be read as independent confirmation. `evaluateConfluence`
 answers that question correctly, so the section renders its output and the instruction
 now says *do not recount*.
 
-**The tally is descriptive, not evidence.** It used to be rendered with backtest authority
-because the trading consumer scored with the same engine. That consumer retired the rule on
-2026-09-24, and a re-measurement of this exact daily configuration (point-in-time S&P 500
-2000–2020 + large caps 2024–26) found entry-rule days *below* the baseline over 10 days in
-all five periods and exit-rule days above it in three of five, level with it (−0.01
-point) in a fourth and below it in 2007–09. Every `Reliability:`
+**The tally is descriptive, not evidence.** It used to be rendered with backtest authority.
+A later out-of-sample re-measurement of this exact daily configuration, against an
+any-day baseline over a 10-day horizon, found entry-rule days did *not* beat the baseline,
+and exit-rule days beat it only in some periods. Every `Reliability:`
 line therefore says "descriptive only — no measured forward edge", and the verdict rules no
 longer treat bullish confluence as a reason for "enter" or bearish confluence as a reason
-for "avoid". Do not reintroduce authority without a forward-return-vs-baseline measurement
-(spec 2026-09-25-pullback-washout-design.md).
+for "avoid". Do not reintroduce authority without a forward-return-vs-baseline measurement.
 
 `CONFLUENCE_PARAMS_BY_TIMEFRAME` is the one place the rule varies by chart. `1Day`
 restores the thresholds the original backtest used (3 families, `expected` at full
@@ -152,10 +149,9 @@ raise the exit bar with it.
 The section also renders **structural risk:reward from the current price**, computed off
 the reference levels rendered immediately above it. That ordering is the point — the model
 sees the inputs, then the conclusion, and can check one against the other. The reason it
-exists at all is measurement from the downstream trader: over 426 production ticks the
-nearest resistance sat *below* the current price 14.6% of the time, and risk:reward was
-inversely related to signal strength (median 1.27 in a middling composite-score band,
-**0.00** in the highest). Strong confluence is therefore not evidence that entering now is
+exists at all is an observed failure mode: the nearest resistance often sat *below* the
+current price, and risk:reward was inversely related to signal strength (collapsing
+toward **0** in the highest-conviction band). Strong confluence is therefore not evidence that entering now is
 attractive, and the model cannot notice that unless the ratio precedes its verdict.
 
 The ratio skips levels closer than **half the mean bar range of the last 14 bars**. Without
@@ -180,10 +176,10 @@ below 1.0 and made the verdict sentence false.
 
 `evaluatePullback(bars)` reads the last daily bar as a washout inside a long-term uptrend
 (close above MA200, Williams %R(14) ≤ −90), a near washout (−90 < %R ≤ −80 above MA200), a
-washout below MA200, or none. It is the reading siglens-trader switched its rule to on
-2026-09-24 (RSI(2) < 10 above MA200), re-measured on independent data: ahead of the
-any-day-above-MA200 baseline in every period 2000–2026, with MA5-exit trades winning
-66–75%. Williams %R is the classifier because it measured as well as or better than RSI(2)
+washout below MA200, or none. It is the classic short-term mean-reversion reading
+(RSI(2) < 10 above MA200); on independent out-of-sample data it stayed ahead of the
+any-day-above-MA200 baseline in every period tested, and most MA5-exit trades were
+profitable. Williams %R is the classifier because it measured as well as or better than RSI(2)
 and is the oscillator the chart prompt already prints; `rsi2` is reported for reference.
 
 - **Daily only.** The measurement is on daily bars and MA200 on an intraday chart is a
@@ -197,11 +193,10 @@ and is the oscillator the chart prompt already prints; `rsi2` is reported for re
   reads bearish about two thirds of the time; without the reading beside it the tally pulls
   the verdict the wrong way on exactly the charts with the measured edge.
 - **The washout verdict is the rule engine's, not the model's.** Asked to judge it, the
-  model never chose "enter" (0 of 6,070 production analyses, p9–p16): it read the reading's
+  model effectively never chose "enter" (across repeated A/B runs): it read the reading's
   normal companions — a bearish tally, a sub-1.0 structural ratio, a red Elder Impulse — as
   missing confirmation. A `washoutInUptrend` block therefore prints `Entry verdict
-  (computed): enter — sell-off path` and Step 1 tells the model to copy it
-  (spec `2026-09-26-washout-entry-verdict-design.md`). Near and below-MA200 readings carry no
+  (computed): enter — sell-off path` and Step 1 tells the model to copy it. Near and below-MA200 readings carry no
   verdict — their edge is too thin or their loss tail too heavy to decide in code.
 - **News-driven drops suspend the verdict.** The measurement does not cover washouts caused
   by earnings, guidance or regulatory news — the setup's largest failures. The verdict tells
@@ -354,8 +349,7 @@ Two decisions worth keeping:
   on evidence that distinguishes three states.
 - **An absent axis abstains — weight 0, out of the denominator — it does not vote
   neutral.** A crypto symbol has no fundamentals by definition, and a neutral vote would
-  pull every crypto composite toward the middle for a reason unrelated to the asset. Same
-  pattern as the confluence axis in the trading consumer.
+  pull every crypto composite toward the middle for a reason unrelated to the asset.
 
 **No verdict threshold is attached, deliberately.** Over three-value enums the composite
 lands on a small discrete set, and no cutoff has been measured on that distribution.
@@ -363,10 +357,9 @@ Naming one would repeat the mistake of picking a boundary from intuition about a
 axis instead of from the distribution it actually produces. The prompt says as much to the
 model, and a test holds the wording.
 
-Congress is **not** an axis here and was not added. The trading consumer zeroed its weight
-after measuring 31/31 identical verdicts, but the reason was that a 30–45 day disclosure
-lag cannot answer a 30-minute question — on a daily chart the data may still carry
-information. Adding it would mean plumbing the congress report into
+Congress is **not** an axis here and was not added. A 30–45 day disclosure lag cannot
+answer a 30-minute question, but on a daily chart the data may still carry information, so
+leaving it out is not a verdict on its value. Adding it would mean plumbing the congress report into
 `buildOverallAnalysisPrompt`, which nothing does today.
 
 ## Plan check (`analysis/planCheck.ts`)

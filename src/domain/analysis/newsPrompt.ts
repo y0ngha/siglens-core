@@ -50,7 +50,7 @@ function selectNewsSkills(skills: readonly Skill[]): Skill[] {
 /**
  * @internal
  * `<N>h ago` (under 24h) or `<N>d ago` relative to `now`, or `''` when the
- * timestamp cannot be parsed — spec 2026-09-18 §2.8. A future-dated item
+ * timestamp cannot be parsed. A future-dated item
  * (clock skew) still renders `0h ago` rather than a negative age. Exported so
  * {@link buildMarketNewsDigestPrompt} (`marketNewsDigestPrompt.ts`) reuses
  * the exact same rendering instead of a second implementation drifting apart.
@@ -114,7 +114,7 @@ function formatNewsItem(
  * {@link formatDayOffset} (earnings calendar, date-only strings — safe to
  * parse directly) and {@link formatMacroDateLabel} (macro calendar, naive
  * `YYYY-MM-DD HH:mm:ss` strings — must be UTC-normalized via
- * {@link parseCalendarDate} before diffing; see spec 2026-09-28) so both
+ * {@link parseCalendarDate} before diffing) so both
  * calendars render the exact same wording from their own day count.
  */
 function dayOffsetLabel(days: number | null): string {
@@ -127,14 +127,13 @@ function dayOffsetLabel(days: number | null): string {
 
 /**
  * `today`, `in N day(s)` (future), or `N day(s) ago` (past) — a calendar-date
- * diff against `now`'s UTC date, not a raw ms/24h round (spec 2026-09-18:
- * the ms form rounded a same-day event to "1 day ago" late in the
- * day). `''` when the date cannot be parsed — spec 2026-09-18 §2.8.
+ * diff against `now`'s UTC date, not a raw ms/24h round (the ms form rounded a same-day event to "1 day ago" late in the
+ * day). `''` when the date cannot be parsed.
  *
  * Safe only for a date-only (`YYYY-MM-DD`) or already-zoned `isoDate` — both
  * parse as UTC per the `Date` spec. The earnings calendar this feeds is
  * date-only; a naive `YYYY-MM-DD HH:mm:ss` timestamp must use
- * {@link formatMacroDateLabel} instead (spec 2026-09-28).
+ * {@link formatMacroDateLabel} instead.
  */
 function formatDayOffset(isoDate: string, now: Date | undefined): string {
     if (now === undefined) return '';
@@ -165,7 +164,7 @@ function formatCalendarItems(
         .join('\n');
 }
 
-/** Prompt rows are capped and sorted date-ascending — spec 2026-09-28 §1. */
+/** Prompt rows are capped and sorted date-ascending. */
 const MACRO_CALENDAR_MAX_ROWS = 12;
 
 /**
@@ -173,7 +172,7 @@ const MACRO_CALENDAR_MAX_ROWS = 12;
  * Renders a macro-calendar numeric field for the prompt: the significant-
  * digit text {@link formatPlainNumber} already produces (no trailing-zero
  * padding, e.g. `0.3` not `0.30`), with its `'N/A'` sentinel replaced by the
- * em dash the spec (2026-09-28 §1) uses for a not-yet-released
+ * em dash the macro-calendar section uses for a not-yet-released
  * `actual`/`estimate`/`previous` field — distinct from the `'N/A'` the
  * earnings-calendar block above already renders for the same null case.
  */
@@ -183,8 +182,7 @@ function formatMacroCalendarValue(n: number | null): string {
 }
 
 /**
- * `date (+' UTC' if naive) (+relative offset)` for one macro-calendar row
- * (spec 2026-09-28 §1, review round 1 finding 1). FMP's economic calendar
+ * `date (+' UTC' if naive) (+relative offset)` for one macro-calendar row. FMP's economic calendar
  * returns naive `YYYY-MM-DD HH:mm:ss` timestamps that are already UTC but
  * carry no zone suffix — unlike the earnings calendar's date-only strings,
  * `new Date(...)` parses this shape as **local** time, silently shifting
@@ -207,8 +205,8 @@ function formatMacroDateLabel(isoDate: string, now: Date | undefined): string {
 
 /**
  * Format a single macro-calendar row: `date | event | impact <level> |
- * actual <a> / estimate <e> / previous <p>[ <unit>]` (spec 2026-09-28 §1).
- * `unit` is appended only when non-empty (review round 1 finding 7) — an
+ * actual <a> / estimate <e> / previous <p>[ <unit>]`.
+ * `unit` is appended only when non-empty — an
  * event with no unit (e.g. a count-based release) would otherwise print a
  * dangling trailing space.
  */
@@ -228,12 +226,12 @@ function formatMacroCalendarRow(
  * @internal
  * Select and order the macro-calendar rows the prompt actually renders:
  * date-ascending, capped to {@link MACRO_CALENDAR_MAX_ROWS}, regardless of
- * input order (spec 2026-09-28 §1). Exported so
+ * input order. Exported so
  * `macroCalendarFingerprintParts` (`infrastructure/hash/analysisInput.ts`)
  * shares this exact selection instead of re-deriving it — otherwise a
  * change to a row beyond the cap (never rendered) could still invalidate
  * the cache, or a differently-derived cap could fingerprint a row the
- * prompt never shows (PR #232 review suggestion 2).
+ * prompt never shows.
  */
 export function selectMacroCalendarRows(
     events: readonly EconomicCalendarEvent[]
@@ -244,7 +242,7 @@ export function selectMacroCalendarRows(
 }
 
 /**
- * Render the `## Macro Calendar` section (spec 2026-09-28 §1). The builder
+ * Render the `## Macro Calendar` section. The builder
  * below only calls this when `macroCalendar` is non-empty
  * (`hasMacroCalendar`) — an empty `events` is not part of this function's
  * contract.
@@ -263,7 +261,7 @@ function formatMacroCalendarSection(
  * @internal
  * `Sentiment tally: N bullish / N bearish / N neutral (high impact: N
  * bullish / N bearish)` — computed from the enriched cards so the model
- * never has to count sentiment itself (spec 2026-09-18 §2.8). Exported for
+ * never has to count sentiment itself. Exported for
  * reuse by {@link buildMarketNewsDigestPrompt}.
  */
 export function formatSentimentTally(
@@ -286,8 +284,7 @@ export function formatSentimentTally(
 /**
  * @internal Builds the news-analysis LLM prompt.
  *
- * Build the AI news-analysis prompt, split into a stable/dynamic pair (spec
- * §3.4, {@link AssembledPrompt}) — Design C ("skills-to-system split"):
+ * Build the AI news-analysis prompt, split into a stable/dynamic pair ({@link AssembledPrompt}) — Design C ("skills-to-system split"):
  *
  * - `stable`: ONLY the News Analysis Frameworks (Active Skills) section.
  *   Safe to isolate here because this builder's selection context is
@@ -330,7 +327,7 @@ export function formatSentimentTally(
  *   Korean; use the 7-argument form for KRX listings.
  * @param macroCalendar - Scheduled macro-economic releases (FOMC, CPI, etc.),
  *   filtered and sorted by the caller — core only re-sorts ascending and caps
- *   at 12 rows for the prompt (spec 2026-09-28). Renders a `## Macro
+ *   at 12 rows for the prompt. Renders a `## Macro
  *   Calendar` section, extends the intro sentence, and adds two Data
  *   Boundary rules only when non-empty; omitted or `[]` keeps every prompt
  *   byte and cache hash identical to before this parameter existed. Available
@@ -338,7 +335,7 @@ export function formatSentimentTally(
  *   covers the "section present" case (mention a date only if it's in the
  *   section) — the "section absent, so never mention a macro date" guard is
  *   NOT this prompt's job; it comes from the consumer's own news skill
- *   (siglens `skills/news/macro-impact.md`, spec 2026-09-28 review round 1).
+ *   (the siglens news skill).
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildNewsAnalysisPrompt(
@@ -377,14 +374,13 @@ export function buildNewsAnalysisPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     currency: CurrencyCode = 'USD',
     /**
-     * Reference clock for the per-item age suffix and calendar day offsets
-     * (spec 2026-09-18 §2.8). Optional without a wall-clock default: the
+     * Reference clock for the per-item age suffix and calendar day offsets. Optional without a wall-clock default: the
      * domain layer never reads the clock itself (every production caller
      * passes it); when omitted, the relative-time annotations are left out.
      */
     now?: Date,
     /**
-     * Scheduled macro-economic releases (spec 2026-09-28). Defaults to `[]`
+     * Scheduled macro-economic releases. Defaults to `[]`
      * so every existing call site — none of which supplies this parameter —
      * produces byte-identical output to before this parameter existed.
      */
@@ -448,10 +444,9 @@ export function buildNewsAnalysisPrompt(
         // The "section absent" case is deliberately NOT covered by this
         // rule — this bullet renders only when the section itself is
         // present (`hasMacroCalendar`), so a clause for the absent case
-        // would be dead text here. The consumer's own news skill
-        // (siglens `skills/news/macro-impact.md`) is what tells the model
-        // not to state a macro date when no section is provided at all
-        // (review round 1 finding 4).
+        // would be dead text here. The consumer's own news skill is what
+        // tells the model not to state a macro date when no section is
+        // provided at all.
         ...(hasMacroCalendar
             ? [
                   '- Macro calendar rows are scheduled releases, not news. Mention a macro event date only if it appears in the Macro Calendar section.',

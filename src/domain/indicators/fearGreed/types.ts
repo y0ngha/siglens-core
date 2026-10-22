@@ -1,6 +1,6 @@
 /**
  * Five-stage label that classifies a Fear & Greed score into a qualitative
- * sentiment bucket. Maps to the spec §4.4 cutoffs (EXTREME_FEAR < 25 ≤ FEAR <
+ * sentiment bucket. Maps to the documented cutoffs (EXTREME_FEAR < 25 ≤ FEAR <
  * 45 ≤ NEUTRAL < 55 ≤ GREED < 75 ≤ EXTREME_GREED).
  */
 export type FearGreedLabel =
@@ -15,7 +15,7 @@ export type FearGreedLabel =
 export type FearGreedConfidence = 'normal' | 'limited' | 'insufficient';
 
 /**
- * Spec §4.5 self-norm warning. `null` when neither chronic regime is detected.
+ * Self-norm warning. `null` when neither chronic regime is detected.
  * `CHRONIC_WEAKNESS` flags a long-term bearish cycle, `CHRONIC_STRENGTH` a
  * long-term bullish cycle. UI surfaces a warning badge so users do not
  * over-interpret the score for chronically weak/strong instruments.
@@ -83,7 +83,7 @@ export interface FearGreedSnapshot {
     confidence: Exclude<FearGreedConfidence, 'insufficient'>;
     /** Number of valid prior factor samples used to compute percentiles. */
     sampleSize: number;
-    /** Spec §4.5 chronic regime flag, or `null` when neither regime applies. */
+    /** Chronic regime flag, or `null` when neither regime applies. */
     warning: FearGreedWarning;
     /**
      * Display-only distance of the latest close from the 200-day SMA, in

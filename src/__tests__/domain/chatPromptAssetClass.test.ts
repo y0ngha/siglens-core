@@ -9,7 +9,7 @@ import type {
     NewsAnalysisResponse,
 } from '@/domain/types';
 
-// Both builders now return `{ stable, dynamic }` (spec §3.4 assembly split);
+// Both builders now return `{ stable, dynamic }`;
 // this file's call sites predate the split and assert against the single
 // legacy combined string (`stable + '\n\n' + dynamic`, exactly the string
 // dispatch still sends as the `prompt` fallback field).
@@ -210,8 +210,7 @@ describe('buildOverallAnalysisPrompt assetClass framing (R2)', () => {
             null,
             'equity'
         );
-        // The role/opener line must use the equity role. Post assembly-split
-        // (spec §3.4), the stable Output Schema block now precedes the
+        // The role/opener line must use the equity role. Post assembly-split, the stable Output Schema block now precedes the
         // dynamic role line in the combined prompt, so this locates the
         // opener line by content rather than assuming index 0 (the inverse
         // of the pre-split order — see promptStability.test.ts).

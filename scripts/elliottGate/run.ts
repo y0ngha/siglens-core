@@ -1,5 +1,5 @@
 /**
- * Full Elliott structure gate run (spec 2026-10-02 §검증): 300 synthetic
+ * Full Elliott structure gate run: 300 synthetic
  * samples per structure per noise level + 1,000 random walks. The vitest
  * `src/__tests__/scripts/elliottGate/elliottGate.test.ts` runs the same
  * harness.

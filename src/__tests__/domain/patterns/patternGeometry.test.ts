@@ -11,9 +11,8 @@ import type {
 } from '@/domain/types';
 
 /**
- * Geometry is pure arithmetic over a qualified pattern's fixed shape (spec
- * 2026-10-07 §3), so these cases hand-build the shapes with round numbers
- * and check each family's levels against the spec's definitions. The
+ * Geometry is pure arithmetic over a qualified pattern's fixed shape, so these cases hand-build the shapes with round numbers
+ * and check each family's levels against the textbook definitions. The
  * qualifier itself (which shapes exist) is covered by qualify.test.ts and
  * the scenario suite.
  */
@@ -92,7 +91,7 @@ describe('computeCandidateGeometry', () => {
         });
     });
 
-    describe('double/triple (§3.8)', () => {
+    describe('double/triple', () => {
         it('double top: neckline breakout, height = peak average − neckline, invalidation = the highest peak at its own bar', () => {
             const g = directed(computeCandidateGeometry(doubleTop, BARS, ATR));
             expect(g.direction).toBe('down');
@@ -139,7 +138,7 @@ describe('computeCandidateGeometry', () => {
         });
     });
 
-    describe('head & shoulders (§3.3): every number reads the SLOPED neckline', () => {
+    describe('head & shoulders: every number reads the SLOPED neckline', () => {
         // Neckline through (2,10) and (4,12) rises 1 per bar; head 20 at bar 3.
         const neckline = line({ index: 2, price: 10 }, { index: 4, price: 12 });
         const hs: QualifiedPattern = {
@@ -201,7 +200,7 @@ describe('computeCandidateGeometry', () => {
         });
     });
 
-    describe('boundary pairs (§3.1, §3.2)', () => {
+    describe('boundary pairs', () => {
         // Resistance flat at 20 (touches 1, 5), support rising 1/bar through
         // (2,10) and (6,14). Last bar is 9.
         const upper = line({ index: 1, price: 20 }, { index: 5, price: 20 });
@@ -331,7 +330,7 @@ describe('computeCandidateGeometry', () => {
         });
     });
 
-    describe('flags (§3.4) and high tight flag (§3.5)', () => {
+    describe('flags and high tight flag', () => {
         it('bull flag: breakout = upper channel at the last bar, height = pole, invalidation = flag low', () => {
             const g = directed(
                 computeCandidateGeometry(
@@ -461,7 +460,7 @@ describe('computeCandidateGeometry', () => {
         });
     });
 
-    describe('cup & handle (§3.6) and rounding (§3.7)', () => {
+    describe('cup & handle and rounding', () => {
         it('cup & handle: breakout = right rim, height = right rim − bottom, invalidation = handle low', () => {
             const g = directed(
                 computeCandidateGeometry(

@@ -71,7 +71,7 @@ In-process `run*` functions (`runAnalysis`, `runOverallAnalysis`, `runNewsAnalys
 
 ### Market sentiment
 
-A fear and greed index scores 0 to 100 in five stages (extreme fear, fear, neutral, greed, extreme greed). It is available per stock, for the US market overall, and for crypto, with percentile and regime statistics. Helpers also summarize how prices moved 5, 20, and 60 sessions after entering an extreme zone, so you can see whether a signal had an edge in the past. KOSPI and KOSDAQ tick-size rounding is included for Korean price levels.
+A fear and greed index scores 0 to 100 in five stages (extreme fear, fear, neutral, greed, extreme greed). It is available per stock, for the US market overall, and for crypto, with percentile and regime statistics. Helpers also record each stay in an extreme zone (when it started and ended, how many sessions it lasted, and its peak score) and compare a stock's score with the market's on the same day. KOSPI and KOSDAQ tick-size rounding is included for Korean price levels.
 
 ### Agent building blocks
 
