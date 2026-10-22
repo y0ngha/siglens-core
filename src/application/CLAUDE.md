@@ -41,7 +41,8 @@ modules, or when it sequences a domain call followed by an infrastructure call.
 ```typescript
 // ✅ application: cache lookup (infra) → domain prompt → AI call (infra) → cache write
 export async function runAnalysis(symbol: string, /* … */ options: SubmitAnalysisOptions = {}) {
-    const cache = resolveCacheProvider(options.cache); // injected, or the env factory → CacheProvider | null
+    // injected cache, or the env factory → CacheProvider | null
+    const cache = resolveCacheProvider(options.cache);
     const cached = await cache?.get<AnalysisResponse>(buildAnalysisCacheKey(symbol /* … */));
     if (cached) return cached;
     const prompt = buildAnalysisPrompt(symbol /* , bars, indicators … */);
@@ -55,8 +56,8 @@ in that infrastructure module instead. Do not promote it to `application/` prema
 ## Adapter Composition
 
 Use-cases call **infrastructure adapter factories** directly. Factories return values typed
-as the corresponding **domain port** (`CacheProvider`, `MarketDataProvider`, …), so the contract between application and infrastructure is
-enforced by the compiler — application code is written against the port, never
+as the corresponding **domain port** (`CacheProvider`, `MarketDataProvider`, …), so the
+contract between application and infrastructure is enforced by the compiler — application code is written against the port, never
 against an adapter's concrete shape.
 
 For modules that have not yet been migrated to a domain port, the adapter is still

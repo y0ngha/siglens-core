@@ -52,15 +52,16 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
 /**
  * Read a cached technical analysis WITHOUT triggering any generation.
  *
- * This is the read-only twin of {@link submitAnalysis}: it reuses the exact
+ * This is the read-only twin of {@link runAnalysis}: it reuses the exact
  * same internal cache key (`buildAnalysisCacheKey`) and the exact same read +
- * validate path (the env-configured {@link createCacheProvider} plus the
- * internal `normalizeCachedAnalysisResponse` normalizer) that `submitAnalysis`
+ * validate path (the cache from `cacheOptions.cache`, or the env-configured
+ * Upstash default when omitted, plus the internal
+ * `normalizeCachedAnalysisResponse` normalizer) that `runAnalysis`
  * runs on a cache hit — but it omits the enqueue/fetch/generate branch entirely.
  *
  * Intended for search-engine bots in Server-Side Rendering: an RSC can surface
  * a cached analysis in the initial HTML at zero LLM cost, and render a fallback
- * (or trigger generation through the normal `submitAnalysis` path on a real
+ * (or trigger generation through the normal `runAnalysis` path on a real
  * user request) when the cache is cold.
  *
  * Zero side effects: no job creation, no LLM call, no market-data fetch, no
@@ -80,13 +81,13 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * @param timeframe - Bar resolution literal.
  * @param _fmpSymbol - Currently unused: the technical analysis cache key is not
  *   scoped by `fmpSymbol`, so this argument does not affect the lookup. Retained
- *   in the signature for API-surface familiarity with `submitAnalysis` (a caller
+ *   in the signature for API-surface familiarity with `runAnalysis` (a caller
  *   that already tracks an `fmpSymbol` can keep passing it). Note the positions
- *   differ — `submitAnalysis(symbol, timeframe, force?, fmpSymbol?, options?)`
- *   carries it at index 3, whereas it sits at index 2 here — so this is not a
+ *   differ — `runAnalysis(symbol, companyName, timeframe, force?, fmpSymbol?, options?)`
+ *   carries it at index 4, whereas it sits at index 2 here — so this is not a
  *   drop-in positional match.
  * @param modelId - LLM model identifier. Defaults to the internal
- *   `DEFAULT_ANALYSIS_MODEL_ID` — the same default `submitAnalysis`
+ *   `DEFAULT_ANALYSIS_MODEL_ID` — the same default `runAnalysis`
  *   applies — so an un-modelled peek reads the same key the writer wrote.
  * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
  *   spec, Part A). Omit to read the reasoning-OFF (pre-toggle) key — the
@@ -100,7 +101,7 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *   controlled rollouts. Defaults to {@link TIER_CONFIG}.
  * @param positionBucket - Member position-bucket hint
  *   (personalized-analysis-by-position-bucket spec, Subsystem C). Must be
- *   passed IDENTICALLY to how the writer (`submitAnalysis`) derived it so
+ *   passed IDENTICALLY to how the writer (`runAnalysis`) derived it so
  *   peek and submit read/write the same cache entry. Pass `undefined` for
  *   the anonymous/SSR no-bucket path, which keeps the cache key byte-identical
  *   to the legacy (pre-position-bucket) key — the default every existing
@@ -117,7 +118,7 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  * if (cached !== null) return cached.result; // serve in SSR at zero cost
  * ```
  *
- * @see submitAnalysis
+ * @see runAnalysis
  *
  * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
  *   cache from env, `null` → no cache. See {@link CacheOptions}.
