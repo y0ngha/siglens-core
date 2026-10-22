@@ -1,11 +1,11 @@
 import type { AgentMessage } from '@/domain/ports/agentProvider';
 
 export interface HistoryWindowOptions {
-    /** User turns to keep verbatim (spec: 8). */
+    /** User turns to keep verbatim (design value: 8). */
     turns: number;
-    /** Most recent turns whose tool results stay verbatim (spec: 2). */
+    /** Most recent turns whose tool results stay verbatim (design value: 2). */
     toolResultTurns: number;
-    /** Input budget in estimated tokens (spec: 32_000). */
+    /** Input budget in estimated tokens (design value: 32_000). */
     budgetTokens: number;
     /**
      * Drop old turns in blocks of this many instead of one per new turn
@@ -79,7 +79,7 @@ function windowStart(count: number, turns: number, stride: number): number {
 }
 
 /**
- * Pick the transcript slice sent to the model (spec §4-4): last `turns`
+ * Pick the transcript slice sent to the model: last `turns`
  * user turns (up to `turns + stride - 1` with a `stride`, see
  * {@link HistoryWindowOptions.stride}) verbatim, tool results outside the
  * last `toolResultTurns` turns replaced by an `omitted` marker (the assistant `toolCalls` stay so every

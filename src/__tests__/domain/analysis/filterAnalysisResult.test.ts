@@ -501,7 +501,7 @@ describe('planCheck tier gating', () => {
         expect(result.actionRecommendation).not.toHaveProperty('planCheck');
     });
 
-    describe('chartOverlays (spec 2026-09-28)', () => {
+    describe('chartOverlays', () => {
         const patternOverlay = {
             id: 'pattern:double_bottom:1',
             kind: 'pattern' as const,

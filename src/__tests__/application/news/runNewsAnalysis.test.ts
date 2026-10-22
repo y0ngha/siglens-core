@@ -4,7 +4,7 @@ import type { Mock } from 'vitest';
 vi.mock('@/application/analysis/callAnalysisAi');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
-// Passthrough spy (review round 1 finding 2): keeps the REAL sampling
+// Passthrough spy: keeps the REAL sampling
 // behavior (so every other test's skill selection is unaffected) while
 // recording the exact `seedParts` array `runNewsAnalysis` builds — the only
 // way to assert on that array's content, since it never appears in any
@@ -564,7 +564,7 @@ describe('runNewsAnalysis', () => {
         });
     });
 
-    describe('macro calendar (spec 2026-09-28)', () => {
+    describe('macro calendar', () => {
         function makeMacroEvent(
             overrides: Partial<EconomicCalendarEvent> = {}
         ): EconomicCalendarEvent {
@@ -595,11 +595,10 @@ describe('runNewsAnalysis', () => {
             expect(call.prompt).toContain('CPI MoM');
         });
 
-        it('macroCalendar 생략 시 캐시 키가 정확히 고정된 값이다 (review round 1 finding 2)', async () => {
+        it('macroCalendar 생략 시 캐시 키가 정확히 고정된 값이다', async () => {
             // sha256('free|news-001|2026-07-25|[]').slice(0,16) — re-derived
-            // independently (see PR review notes) and confirmed against the
-            // current (post-macro-calendar-feature, macro-omitted) code
-            // path, not merely trusted from the reviewer's number.
+            // independently and confirmed against the current
+            // (macro-omitted) code path.
             await runNewsAnalysis(baseArgs());
 
             expect(mockCacheGet).toHaveBeenCalledWith(

@@ -14,7 +14,7 @@ const WARNING_NOTE: Record<NonNullable<FearGreedWarning>, string> = {
  *
  * Format a fearGreed snapshot as an English prompt section.
  *
- * Emits the spec §4.4 / §4.5 sentiment block:
+ * Emits the sentiment block:
  *   ## Fear & Greed Index (Reference)
  *   - Score: {score} / 100 ({label})
  *   - Flow Group: {flow_score} | Trend Group: {trend_score}
@@ -25,7 +25,7 @@ const WARNING_NOTE: Record<NonNullable<FearGreedWarning>, string> = {
  * Used by both the technical analysis prompt (`buildAnalysisPrompt`) and the
  * overall analysis prompt (`buildOverallAnalysisPrompt`) to surface the same
  * sentiment context to the LLM. Centralising the formatting here keeps the
- * two prompts in lock-step whenever the spec text changes.
+ * two prompts in lock-step whenever the sentiment text changes.
  *
  * @throws {Error} When the snapshot is missing the Flow or Trend group.
  *   `composeSnapshot` always emits both Flow and Trend groups; this guard

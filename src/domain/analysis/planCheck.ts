@@ -12,12 +12,11 @@ import type {
  * checkable. It is also computed against the plan's *own* entry, so a plan whose entry zone
  * the market has already left still reads as attractive.
  *
- * That gap was measured downstream. Over 426 production ticks of an auto-trader consuming
- * this analysis, the recommended take-profit sat **below the current price on 11.5%** of
- * ticks and the nearest resistance on 14.6% — the plan was unreachable the moment it was
- * read. Worse, the effect concentrated exactly where conviction was highest: bucketed by the
- * consumer's composite score, median risk:reward was 1.27 in the 45–49 band and **0.00** in
- * the 65–69 band. By the time the indicators agreed, price had already travelled to where
+ * That gap was observed in practice. On live prices, the recommended
+ * take-profit sometimes sat **below the current price** and the nearest resistance below it
+ * more often still — the plan was unreachable the moment it was read. Worse, the effect
+ * concentrated exactly where conviction was highest: bucketed by composite score, median
+ * risk:reward fell toward **0** in the highest band. By the time the indicators agreed, price had already travelled to where
  * the analysis was aiming.
  *
  * Nothing here overrides the AI. It measures, names the gap, and leaves the verdict alone.

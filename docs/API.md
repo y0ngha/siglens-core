@@ -1,197 +1,191 @@
 # External Services
 
-> **Note (Phase 0~7 refactor, 2026-05):** DB(Auth/Email/OAuth/BYOK/Ticker), Gemini SDK
-> 의존성, 그리고 그에 부속된 환경변수(`DATABASE_URL`, `OAUTH_TOKEN_ENCRYPTION_KEY`,
-> `LLM_API_KEY_ENCRYPTION_KEY`, `TRANSLATE_*`, `ANTHROPIC_API_KEY`, `GEMINI_API_KEY` 등)는
-> 모두 consumer(siglens) 측으로 이전되었다. 이 문서는 분석 경로에서 코어가 직접 호출하는
-> 외부 서비스만 다룬다. consumer 측 외부 통합은 siglens 레포의 `docs/API.md` /
-> `docs/AUTH.md`를 참조한다.
-
 `siglens-core`가 직접 호출하는 외부 서비스 목록이다. 모든 호출은 `infrastructure/`
-레이어 내부에서만 발생하며, 각 서비스는 `types.ts`의 인터페이스를 통해 추상화된다.
+레이어 내부에서만 발생한다. 호출이 필요한 외부 시스템의 계약은 `domain/ports/`의 port
+인터페이스로 선언하고, `infrastructure/`의 어댑터가 이를 구현한다.
 
-호출자(consumer)가 직접 사용하는 외부 API(FMP, Alpaca 등 시세 프로바이더)는 consumer가
-구현한 뒤 `domain/ports/`의 `MarketDataProvider` 인터페이스에 주입한다.
+코어가 직접 호출하는 외부 서비스는 다음 세 가지다.
+
+- Upstash Redis (분석 캐시, 사용량 카운터, 채팅 토큰, 재분석 쿨다운, 생성 락)
+- AI Provider SDK (Anthropic, Google Gemini, OpenAI, DeepSeek)
+- 파일시스템 (Skills `.md` 파일)
+
+시세 데이터(FMP, Alpaca 등)는 코어가 HTTP로 호출하지 않는다. 호출자(consumer)가
+`domain/ports/marketDataProvider.ts`의 `MarketDataProvider` 구현체를 만들어 주입한다.
 
 ---
 
 ## 환경변수 전체 목록
 
-```bash
-# Upstash Redis (선택 — 미설정 시 캐시/채팅 토큰 저장 없이 graceful degradation)
-UPSTASH_REDIS_REST_URL=             # Upstash Redis REST URL
-UPSTASH_REDIS_REST_TOKEN=           # master 토큰 (읽기/쓰기)
-UPSTASH_REDIS_REST_READONLY_TOKEN=  # readonly 토큰 (없으면 master 사용)
+`process.env`는 `infrastructure/` 안에서만 읽으며, 읽는 변수는 아래가 전부다. 각 변수는
+해당 기능을 실제로 사용할 때만 읽힌다.
 
-# FMP API (선택 — consumer가 FMP 기반 MarketDataProvider를 사용할 때)
-FMP_API_KEY=                        # readFmpConfig / tryReadFmpConfig 에서 읽음
+| 변수 | 읽는 곳 | 용도 | 필수 여부 |
+|---|---|---|---|
+| `UPSTASH_REDIS_REST_URL` | `infrastructure/upstash/config.ts` | Upstash Redis REST URL | 선택 — URL과 master 토큰 중 하나라도 없으면 `readUpstashConfig()`가 `null`을 반환하고 Redis 기능은 graceful degradation |
+| `UPSTASH_REDIS_REST_TOKEN` | `infrastructure/upstash/config.ts` | master 토큰 (읽기/쓰기) | 선택 (위와 동일) |
+| `UPSTASH_REDIS_REST_READONLY_TOKEN` | `infrastructure/upstash/config.ts` | 캐시 읽기 전용 토큰. 없으면 master 토큰으로 읽는다 | 선택 |
+| `FMP_API_KEY` | `infrastructure/fmp/config.ts` | `readFmpConfig()`(미설정 시 throw) / `tryReadFmpConfig()`(미설정 시 `null`)가 읽는 FMP API 키 | 선택 — 해당 reader를 호출하는 경로에서만 필요 |
+| `ANTHROPIC_API_KEY` | `infrastructure/ai/serverKeys.ts` | 서버 소유 Anthropic 키 | 서버 키로 해당 provider 모델을 호출할 때만 필수 |
+| `GEMINI_API_KEY` | `infrastructure/ai/serverKeys.ts` | 서버 소유 Google Gemini 키 | 서버 키로 해당 provider 모델을 호출할 때만 필수 |
+| `OPENAI_API_KEY` | `infrastructure/ai/serverKeys.ts` | 서버 소유 OpenAI 키 | 서버 키로 해당 provider 모델을 호출할 때만 필수 |
+| `DEEPSEEK_API_KEY` | `infrastructure/ai/serverKeys.ts` | 서버 소유 DeepSeek 키 | 서버 키로 해당 provider 모델을 호출할 때만 필수 |
 
-# Worker (선택 — submitAnalysis 시 외부 worker에 위임할 때만)
-WORKER_URL=                         # worker 엔드포인트 URL
-WORKER_SECRET=                      # worker 인증 시크릿
-```
-
-환경변수는 **infrastructure 레이어 내부에서만 읽는다.** domain/application은 환경에
-의존하지 않는다. consumer 프로젝트는 자신의 `.env`에 위 값을 설정해 주입한다.
-`siglens-core` 레포의 테스트 실행 시에는 더미 값을 사용하며 실제 외부 호출을 하지 않는다.
-
-> AI Provider 호출(Claude/Gemini)은 더 이상 코어가 직접 수행하지 않는다.
-> `requestChatCompletion`은 `RequestChatCompletionDependencies.callAiProvider`로
-> consumer가 주입한 구현체를 호출하며, API key 관리·암호화·provider 라우팅은 consumer 측
-> 책임이다.
+`domain/`과 `application/`은 환경에 의존하지 않는다. consumer 프로젝트는 자신의 환경에
+위 값을 설정해 주입한다. `siglens-core` 레포의 테스트는 더미 값을 사용하며 실제 외부
+호출을 하지 않는다.
 
 ---
 
-## 1. Upstash Redis (분석 결과 캐시)
+## 1. AI Provider
+
+구체 SDK 어댑터는 `infrastructure/ai/providers/`에 있다.
+
+| 파일 | Provider | 진입 함수 |
+|---|---|---|
+| `anthropic.ts` | Anthropic (`@anthropic-ai/sdk`) | `callClaude` |
+| `gemini.ts` | Google Gemini (`@google/genai`) | `callGemini` |
+| `openai.ts` | OpenAI (`openai`) | `callChatGPT` |
+| `deepseek.ts` | DeepSeek (OpenAI 호환 API, `openai` SDK) | `callDeepSeek` |
+
+각 provider는 `infrastructure/ai/retry/`의 `withRetry` 래퍼를 거쳐 호출되고,
+`infrastructure/ai/usage.ts`가 응답의 토큰 사용량을 정규화해 로그로 남긴다.
+`infrastructure/ai/extractJsonWithRepair.ts` / `normalizeJsonResponse.ts`는 LLM 응답
+JSON을 복구·정규화한다.
+
+### API key 처리
+
+- **서버 키**: 서버 키로 호출하는 모델에서는 `resolveServerApiKey(provider)`가 위 표의
+  환경변수를 읽는다. 값이 없으면 `"<ENV_NAME> environment variable is required"`로
+  throw하며, 검증은 import 시점이 아니라 **호출 시점**에 이뤄진다. 따라서 어떤 provider도
+  호출하지 않는 consumer는 해당 키가 없어도 된다.
+- **BYOK(사용자 키)**: 사용자 키는 코어가 저장하지 않는다. 호출자가 요청 옵션으로 전달하며,
+  BYOK 경로에서는 `resolveServerApiKey`가 호출되지 않는다. 키를 서버 키로 쓸지 사용자
+  키로 쓸지는 `domain/keyRouting.ts`의 `shouldUseServerKey(model, tier)` /
+  `isByokOnly`가 결정한다.
+- 사용자 키의 저장·암호화·검증은 consumer 책임이다.
+
+### 채팅 completion의 주입 지점
+
+`application/chat/requestChatCompletion.ts`의 `requestChatCompletion`은 provider를 직접
+호출하지 않고 `RequestChatCompletionDependencies.callAiProvider`(`domain/ports/aiProvider.ts`의
+`CallAiProvider` port)로 호출자가 주입한 구현체를 호출한다. 분석·브리핑 등 `run*` 유스케이스는
+위 provider 어댑터를 `application/analysis/callAnalysisAi.ts`에서 직접 호출한다.
+
+---
+
+## 2. Upstash Redis
 
 공식 문서: https://upstash.com/docs/redis/features/restapi
 
-```
-Base URL: {UPSTASH_REDIS_REST_URL}
-```
+`@upstash/redis` 클라이언트를 사용하며, 연결 설정은 `infrastructure/upstash/config.ts`의
+`readUpstashConfig()`가 위 환경변수에서 만든다. 환경변수가 설정되지 않았거나 Redis 호출이
+실패하면 각 어댑터는 아래 "구현 위치"에 적힌 방식으로 graceful degradation 한다.
 
-### 인증
+### 2.1 분석 결과 캐시
 
-```
-Header: Authorization: Bearer {UPSTASH_REDIS_REST_TOKEN}
-```
+`createCacheProvider()`(`infrastructure/cache/redis.ts`)는 `CacheProvider` port
+(`domain/ports/cache.ts`)를 구현한다. 환경변수가 없으면 `null`을 반환하며, 호출자는 이를
+캐시 미스로 처리한다. 읽기는 readonly 토큰이 있으면 그것으로, 쓰기·삭제는 master 토큰으로
+수행한다. 이 어댑터는 `get` / `set(ttl)` / `delete`와 더불어 `SET NX EX`를 쓰는
+`setIfAbsent`, Lua compare-and-delete를 쓰는 `deleteIfEquals`를 제공한다.
 
-읽기 전용 작업에는 `UPSTASH_REDIS_REST_READONLY_TOKEN`을 사용하고, 미설정 시 master
-토큰으로 fallback한다.
+캐시 키와 TTL은 `infrastructure/cache/config.ts`에서 정의한다. 주요 키 패턴은 다음과 같다
+(전체 목록과 선택적 suffix는 해당 파일의 빌더 함수와 JSDoc이 기준이다).
 
-### 사용 패턴
+| 키 패턴 | 설명 |
+|---|---|
+| `analysis:{symbol}:{timeframe}:{modelId}:{promptVersion}[:…]` | 종목·타임프레임별 기술적 분석 결과. 이유 표시·포지션·언어 등에 따른 suffix가 붙을 수 있다 |
+| `analysis:peek:{symbol}:{timeframe}:{modelId}:{promptVersion}:{tier}[:…]` | 분석 캐시 조회(peek)용 키 |
+| `briefing:market:{dateHour}:{model}:{inputHash}:{promptVersion}` | 시장 브리핑 (시간 단위 버킷) |
+| `briefing:macro:{dateBucket}:{model}:{inputHash}:{promptVersion}` | 거시(macro) 브리핑 |
+| `v1:analysis:{kind}:…` | 펀더멘털·재무제표·의회 거래·수급·시장 뉴스·경제 이벤트 등 기타 분석 (`CACHE_KEY_SCHEMA_VERSION` 접두) |
 
-AI 분석 결과는 심볼·타임프레임별 TTL로 캐싱한다.
+TTL은 용도별로 `config.ts`에 상수로 정의된다. 종목 분석은 `ANALYSIS_CACHE_TTL`이
+타임프레임별 상한(5분봉 5분 … 일봉 1일)을 정하고, `computeBarsEffectiveTtl`이 일일 만료
+경계를 반영해 실제 TTL을 계산한다. 시장 브리핑은 `MARKET_BRIEFING_CACHE_TTL`(1시간)이다.
 
-- 캐시 키 예시: `analysis:{symbol}:{timeframe}:{modelId}` (예: `analysis:AAPL:1Day:gemini-2.5-flash`)
-- 시장 단위(per-market) 브리핑 캐시 키:
-    - `briefing:market:{dateHour}:{model}:{inputHash}` → `CachedBriefingData` (대시보드 시장 브리핑, 시간 단위 버킷)
-    - `briefing:macro:{dateHour}:{model}:{inputHash}` → `CachedMacroBriefingData` (`/economy` 거시 브리핑, 동일 버킷 규약, 별도 네임스페이스로 충돌 방지)
-- TTL은 타임프레임에 따라 결정한다 (`infrastructure/cache/config.ts`에서 정의)
-- 환경변수 미설정 시 캐시 없이 정상 동작(graceful degradation)
+### 2.2 생성 락 (in-flight de-duplication)
+
+동일 캐시 키에 대한 LLM 호출이 동시에 여러 번 일어나지 않도록
+`application/analysis/generationLock.ts`의 `dedupeGeneration`이 프로세스 내 합류
+(`inFlight.ts`)와 Redis 락을 함께 사용한다. 락 승자만 모델을 호출하고, 나머지는 승자가
+게시한 raw 출력을 기다린 뒤 사용한다. 캐시가 `setIfAbsent`를 지원하지 않으면 프로세스 내
+합류만 적용되고, 락 획득 중 Redis 오류가 나면 락 없이 생성을 진행한다(fail-open).
+
+| 키 패턴 | 설명 |
+|---|---|
+| `v1:lock:generation:{cacheKey}` | 생성 락 (TTL 5분, 승자가 게시 후 — 실패해도 — compare-and-delete로 해제) |
+| `v1:generation:raw:{cacheKey}:{token}` | 승자가 대기 중인 peer에게 공유하는 raw LLM 출력 (TTL 2분) |
+
+### 2.3 채팅 토큰 제한
+
+`createChatTokenStore()`(`infrastructure/chat/tokenStore.ts`)는 `ChatTokenStore` port
+(`domain/ports/chatTokenStore.ts`)를 구현한다. 클라이언트 IP를 `hashClientIp`로 SHA-256
+해시한 값을 키에 사용하며, 일일 한도는 `CHAT_TOKEN_LIMIT`(현재 5), 키 TTL은 1일이다
+(`INCR` + `EXPIRE NX`).
+
+| 키 패턴 | 값 타입 | 설명 |
+|---|---|---|
+| `chat:tokens:{hashedClientId}` | number | 클라이언트별 일일 채팅 토큰 사용량 |
+
+Upstash 환경변수가 없거나 Redis 오류가 나면 채팅은 통과 처리된다(fail-open).
+`requestChatCompletion`은 주입된 provider 호출이 서버 책임 오류로 실패하면 이미 소비한
+토큰을 1회 환불한다(`shouldRefundConsumedToken`).
+
+### 2.4 기간 카운터
+
+`createCounterStore({ prefix, period, failurePolicy })`(`infrastructure/usage/counterStore.ts`)는
+`CounterStore` port(`domain/ports/counterStore.ts`)를 구현하는 일/월 단위 카운터다.
+
+- 키: `{prefix}:{subject}:{bucket}` (bucket은 UTC 기준 `YYYY-MM-DD` 또는 `YYYY-MM`)
+- `INCR` + `EXPIRE NX`로 소비하고, 한도 초과 시 즉시 `DECR`하여 음수로 흐르지 않게 한다.
+- `failurePolicy: 'open'`은 장애 시 통과시키고, `'closed'`는
+  `CounterStoreUnavailableError`를 던져 호출자가 쿼터 소진과 구분해 처리할 수 있게 한다.
+
+### 2.5 재분석 쿨다운
+
+`infrastructure/market/reanalyzeCooldown.ts`의 헬퍼(`tryAcquireReanalyzeCooldown`,
+`releaseReanalyzeCooldown`, `getReanalyzeCooldownMs`)는 종목·타임프레임별 5분 쿨다운을
+Redis `SET key NX EX 300`으로 관리한다. 이 헬퍼는 consumer가 필요할 때 호출하는 도구이며,
+`run*` 유스케이스가 자동으로 적용하지는 않는다. Upstash 환경변수가 없거나 Redis 호출이
+실패하면 쿨다운은 통과(`{ ok: true }`)로 처리된다 — UX 보호 장치이지 보안 경계가 아니다.
+
+| 키 패턴 | 설명 |
+|---|---|
+| `analysis:cooldown:{symbol}:{timeframe}` | 재분석 쿨다운 락 |
 
 ### 구현 위치
 
 ```
 domain/ports/
-└── cache.ts     ← CacheProvider 인터페이스 (port)
+├── cache.ts            ← CacheProvider
+├── chatTokenStore.ts   ← ChatTokenStore
+└── counterStore.ts     ← CounterStore, CounterStoreUnavailableError
 
-infrastructure/cache/
-├── types.ts     ← 어댑터 내부 타입 (CachedBriefingData 등)
-├── config.ts    ← 캐시 키 / TTL 상수
-└── redis.ts     ← Upstash 어댑터 (@adapter implements CacheProvider)
+infrastructure/upstash/config.ts     ← readUpstashConfig (env reader)
+infrastructure/cache/                ← types.ts, config.ts (키·TTL), redis.ts (CacheProvider 어댑터)
+infrastructure/chat/tokenStore.ts    ← ChatTokenStore 어댑터 + hashClientIp
+infrastructure/usage/counterStore.ts ← CounterStore 어댑터
+infrastructure/usage/hash.ts         ← hashUsageIp (일 단위 IP 해시)
+infrastructure/market/reanalyzeCooldown.ts ← 재분석 쿨다운 헬퍼
+application/analysis/generationLock.ts     ← dedupeGeneration (생성 락 오케스트레이션)
 ```
 
 `CacheProvider`를 in-memory stub으로 대체하면 단위 테스트에서 외부 호출 없이 검증할 수 있다.
 
 ---
 
-## 2. Upstash Redis (채팅 토큰 제한)
+## 3. FMP Config Reader
 
-동일한 Upstash Redis 인스턴스를 채팅 토큰 제한에도 사용한다. 환경변수는
-`infrastructure/upstash/config.ts`의 `readUpstashConfig()`를 통해 읽는다. 미설정 또는
-Redis 오류 시 채팅은 통과 처리되어 graceful degradation을 유지한다. consumer가 주입한
-AI provider 호출 이후 `server_busy` 또는 `server_error`로 매핑되는 서버 책임 오류가
-발생하면 application layer가 이미 소비된 토큰을 1회 보상한다. 사용자/쿼터 책임으로 보는
-`rate_limited`와 실제 토큰 고갈(`token_exhausted`)은 보상하지 않는다.
-
-### Redis 키 구조
-
-| 키 패턴 | 값 타입 | 설명 |
-|---|---|---|
-| `chat:tokens:{hashedClientId}` | number | 클라이언트별 일일 채팅 토큰 사용량 |
-
-### 구현 위치
-
-```
-domain/ports/
-└── chatTokenStore.ts  ← ChatTokenStore 포트 (@port)
-
-infrastructure/chat/
-└── tokenStore.ts      ← Upstash 기반 구현체 (@adapter implements ChatTokenStore) + IP 해시 helper
-```
-
----
-
-## 3. Upstash Redis (Job 큐)
-
-동일한 Upstash Redis 인스턴스를 Job 큐로 재사용한다. 환경변수는
-`infrastructure/upstash/config.ts`의 `readUpstashConfig()`를 공유한다.
-
-### Redis 키 구조
-
-| 키 패턴 | 값 타입 | 설명 |
-|---|---|---|
-| `job:{jobId}:status` | `JobStatus` | 잡 상태 (`processing` \| `done` \| `error`) |
-| `job:{jobId}:result` | `unknown` | AI 분석 결과 (JSON) |
-| `job:{jobId}:error` | `string` | 실패 원인 메시지 |
-| `job:{jobId}:meta` | `JobMeta` | 잡 메타데이터 (symbol, timeframe 등) |
-| `job:{jobId}:cancelled` | `"1"` | 취소 플래그 (존재 여부로 판단) |
-
-### Job 라이프사이클 함수
-
-`infrastructure/jobs/queue.ts`는 11개의 순수 라이프사이클 함수를 제공한다:
-`setJobMeta`, `getJobStatus`, `getJobResult`, `getJobError`, `getJobMeta`,
-`setJobStatus`, `setJobResult`, `setJobError`, `cancelJob`, `isJobCancelled`, `cleanupJob`
-
-### 구현 위치
-
-`JobStateStore` 포트 인터페이스(및 인자 타입 `JobStateSetOpts`)는 `domain/ports/jobStateStore.ts`에 정의되어 있고 (`@internal`), Upstash 기반 어댑터는 `infrastructure/jobs/redis.ts`에 있다.
-
-```
-domain/ports/
-└── jobStateStore.ts  ← JobStateStore (@internal), JobStateSetOpts (@internal)
-
-infrastructure/jobs/
-├── types.ts     ← JobStatus, JobMeta (DTO)
-├── redis.ts     ← Upstash 기반 JobStateStore 어댑터 (createJobStateStore)
-└── queue.ts     ← job 라이프사이클 함수
-```
-
----
-
-## 4. Worker (분석 위임 HTTP)
-
-`submitAnalysis` 유스케이스는 무거운 LLM 분석을 외부 worker에 HTTP POST로 위임할 수 있다.
-`WORKER_URL`이 설정되어 있을 때만 활성화되며, `WORKER_SECRET`은 인증 헤더로 사용된다.
-환경변수 reader는 `infrastructure/market/config.ts`에 있다.
-
-`WORKER_URL` 미설정 시 worker 위임 경로는 비활성화되고, application layer는 호출자의
-캐시·로컬 처리 경로로 graceful degradation 한다.
-
-### Request Contract (`POST /analyze`)
-
-```
-Headers:
-  Content-Type: application/json
-  X-Worker-Secret: {WORKER_SECRET}
-  X-AI-API-KEY: {userApiKey}   ← 선택적. SubmitAnalysisOptions.userApiKey가 있을 때만 포함.
-                                  user-managed 모델 호출 시 필수.
-
-Body (JSON):
-  { jobId: string, prompt: string, model: TierModel }
-```
-
-- `model`: `SubmitAnalysisOptions.modelId ?? DEFAULT_ANALYSIS_MODEL_ID`로 결정된다. worker가 라우팅 및 provider 선택에 사용한다.
-- `X-AI-API-KEY`: `SubmitAnalysisOptions.userApiKey`가 설정되어 있을 때만 헤더에 포함한다. siglens(consumer) 레포는 caller 측에서 이 값을 주입한다.
-
----
-
-## 5. FMP Config Reader
-
-`infrastructure/fmp/config.ts`는 `FMP_API_KEY`를 읽어 consumer가 주입할 FMP 기반
-`MarketDataProvider` 구현체에 전달할 설정 객체를 만든다.
+`infrastructure/fmp/config.ts`는 `FMP_API_KEY`를 읽어 FMP 기반 `MarketDataProvider`
+구현체에 전달할 설정 객체(`{ apiKey }`)를 만든다.
 
 - `readFmpConfig()` — API 키 미설정 시 throw. 반드시 FMP가 필요한 경로에서 사용.
-- `tryReadFmpConfig()` — API 키 미설정 시 `null` 반환. 선택적 경로(FMP cancel 신호 등)에서 사용.
+- `tryReadFmpConfig()` — API 키 미설정 시 `null` 반환. 선택적 경로에서 사용.
 
-`MARKET_DATA_PROVIDER`, `ALPACA_API_KEY`, `ALPACA_API_SECRET` 환경변수는 PR #104에서
-Alpaca fetch provider 및 provider-type reader(`readAlpacaConfig`, `readMarketProviderType`)가
-코어에서 제거되면서 더 이상 코어가 읽지 않는다. 시세 프로바이더 선택과 Alpaca HTTP 호출은
-consumer(siglens) 측이 직접 담당한다.
-
-코어 라이브러리 자체는 FMP/Alpaca의 HTTP 엔드포인트를 호출하지 않는다. 호출은 consumer가
-주입한 `MarketDataProvider` 구현체에서 이뤄진다.
+코어 라이브러리 자체는 FMP/Alpaca 등의 HTTP 엔드포인트를 호출하지 않는다. 시세 조회는
+consumer가 주입한 `MarketDataProvider` 구현체에서 이뤄진다.
 
 ```typescript
 // domain/ports/marketDataProvider.ts
@@ -203,28 +197,30 @@ export interface MarketDataProvider {
 
 ---
 
-## 6. Filesystem (Skills)
+## 4. Filesystem (Skills)
 
 외부 네트워크 서비스는 아니지만 I/O를 수반하므로 동일 규칙이 적용된다.
 
-- 위치: 프로젝트 루트의 `/skills/**/*.md`
-- 담당: `infrastructure/skills/loader.ts` (`createSkillsProvider`, `FileSkillsLoader`)
+- 위치: 프로세스 working directory 아래의 `skills/**/*.md` (코드 상 `join(process.cwd(), 'skills')`).
+  skill 파일 자체는 consumer가 제공한다.
+- 담당: `infrastructure/skills/loader.ts` (`createSkillsProvider`, `FileSkillsLoader`,
+  `loadSkillsCached`)
 - 파일 포맷과 frontmatter 스펙은 `docs/DOMAIN.md`의 Skills 섹션을 참조한다.
 
-domain은 filesystem을 직접 읽지 않는다. consumer가 `createSkillsProvider()`로 얻은
-`SkillsProvider`의 `loadSkills()`를 호출한 결과(`Skill[]`)를 domain 함수에 주입한다.
-`FileSkillsLoader`는 동일 어댑터의 클래스 형태로 계속 노출되며, 팩토리 호출이 표준 경로다.
+domain은 filesystem을 직접 읽지 않는다. `run*` 유스케이스(예: `runAnalysis`)가
+`loadSkillsCached()`로 skill을 읽어 `Skill[]`을 domain 함수(프롬프트 빌더 등)에 주입한다.
+`createSkillsProvider()` / `FileSkillsLoader`는 `SkillsProvider` port(`domain/ports/skillsProvider.ts`)의
+어댑터이며 패키지 public entry(`src/index.ts`)에서는 export하지 않는다.
 
 ---
 
-## 외부 호출자(Consumer)가 담당하는 부분
+## 코어가 소유하지 않는 부분 (Consumer 책임)
 
-다음은 **`siglens-core` 내부에서 호출하지 않는다.** Consumer(siglens) 레포의 `docs/API.md`
-및 `docs/AUTH.md`를 참조한다.
+다음은 `siglens-core` 내부에서 구현하거나 호출하지 않는다.
 
-- AI Provider HTTP 호출 (Anthropic, Google Gemini, OpenAI 등) — `callAiProvider` 주입
-- DB(Neon/PostgreSQL/Drizzle) — Auth, OAuth, Email, BYOK, Ticker, Asset translations 모두 consumer 소유
-- Email dispatch (verification / password reset)
-- OAuth provider 콜백 (Google/Kakao/Apple)
-- 사용자 LLM API key 저장·암호화 (BYOK)
+- DB (사용자·세션·티어 저장소 등) — `UsageRepository`, `UsageLogRepository`,
+  `UserTierRepository` 같은 port만 정의하며 구현은 consumer 소유
+- 사용자 LLM API key(BYOK) 저장·암호화
+- 인증, OAuth 플로우, 이메일 발송
 - 시세 프로바이더 HTTP 호출 (FMP, Alpaca 등) — `MarketDataProvider` 주입
+- 뉴스·재무·옵션·의회 거래·수급 등 외부 데이터 조회 — `domain/ports/`의 해당 provider port 주입

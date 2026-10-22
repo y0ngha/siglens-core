@@ -169,9 +169,8 @@ export const CURVATURE_VERTEX_MID_HI = 0.75;
 /**
  * @internal
  * Rounding bottom / top: minimum depth between the rim and the extreme of the
- * fitted pivots, as an ATR multiple, per the design doc's literal "2*atr"
- * rule — shallower curves are treated as noise rather than a meaningful
- * rounding formation.
+ * fitted pivots, as an ATR multiple (two ATRs) — shallower curves are
+ * treated as noise rather than a meaningful rounding formation.
  */
 export const ROUNDING_MIN_DEPTH_ATR_MULT = 2;
 
@@ -198,7 +197,7 @@ export const SINGULAR_MATRIX_DET_EPSILON = 1e-9;
  */
 export const PATTERN_SPENT_SLACK_ATR = 0.25;
 
-// ─── Qualification (drawing) — spec 2026-10-07 ─────────────────────────────
+// ─── Qualification (drawing) ─────────────────────────────
 // The pre-screener above stays loose (it only picks skill docs). Everything
 // below gates what may be DRAWN and printed with numbers: `qualify/`.
 
@@ -221,7 +220,7 @@ export const WEDGE_MIN_TOUCHES = 3;
 
 /**
  * @internal
- * Touches each rectangle boundary needs. The spec's two per side is raised to
+ * Touches each rectangle boundary needs. The conventional two per side is raised to
  * three: three flat highs over two flat lows is a triple top (and the mirror
  * a triple bottom), and with only two per side every such range would draw
  * as a rectangle over the reversal pattern it is.
@@ -298,8 +297,8 @@ export const LINE_PATTERN_MIN_BARS = 15;
 /**
  * @internal
  * Head & shoulders: fewest bars from the left to the right shoulder. Fifteen,
- * not the spec's twenty: real daily H&S with clean, level shoulders span
- * 15–19 bars (a 17-bar inverse H&S in the 2026-10-08 recall diagnosis), and
+ * not the conventional twenty: real daily H&S with clean, level shoulders span
+ * 15–19 bars (a 17-bar inverse H&S was seen in recall diagnosis), and
  * the shoulder-match, shoulder-clearance, head-clearance, prior-trend and
  * height rules already keep a short noise cluster out. A triple top/bottom needs no span rule of its
  * own: two gaps of `EXTREME_MIN_GAP_BARS` make it at least 21 bars.
@@ -474,7 +473,7 @@ export const U_EXTREME_BAND = 1 / 3;
 /**
  * @internal
  * U check: share of the closes between the rims that must sit in the band
- * next to the extreme. The spec's 25% does not reject a V: price on a
+ * next to the extreme. The conventional 25% does not reject a V: price on a
  * straight-sided V spends a third of its bars in the bottom third of the
  * depth, and a parabola about 58%. 0.4 sits between the two.
  */
@@ -489,7 +488,7 @@ export const ROUNDING_ARC_SAMPLES = 10;
 /**
  * @internal
  * Arbitration: two qualified hits sharing at least this many confirmed pivots
- * overlap. One, not the spec's three: a swing that plays a role in two
+ * overlap. One, not the conventional three: a swing that plays a role in two
  * patterns is counted twice when both are drawn — a head & shoulders' right
  * shoulder reused as a later double top's first peak touches the H&S span at
  * that one bar only, so neither the span rule nor a three-pivot rule caught it.

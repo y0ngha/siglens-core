@@ -56,27 +56,23 @@ import type {
  * separate confirmation. The rule engine counts **indicator families**, which is the
  * correction.
  *
- * **What the tally is not.** It was rendered with backtest authority because an
- * auto-trader downstream scored with the same engine. That trader retired the rule on
- * 2026-09-24 after its own measurement, and a re-measurement of this exact daily
- * configuration (point-in-time S&P 500 2000–2020 plus large caps 2024–26) found days with
- * the entry rule met followed by *below*-baseline 10-day returns in all five periods, and
- * exit-rule days by returns above the baseline in three of five periods and level with it in a
- * fourth (2000–07, 0.01 point below; 2007–09 was below). The tally is rendered as a
- * description of indicator agreement, not as evidence for or against entering
- * (docs/superpowers/specs/2026-09-25-pullback-washout-design.md).
+ * **What the tally is not.** It was rendered with backtest authority. A later
+ * out-of-sample re-measurement of this exact daily configuration, against an any-day
+ * baseline over a 10-day horizon, found days with the entry rule met did *not* beat the
+ * baseline, and exit-rule days beat it only in some periods. The tally is rendered as a
+ * description of indicator agreement, not as evidence for or against entering.
  *
- * **Why the washout reading is here.** The same re-measurement found the reading
- * siglens-trader switched to — a short-term washout inside a long-term uptrend — ahead of
- * its baseline in every period. On those days the tally reads bearish about two thirds of
+ * **Why the washout reading is here.** The same re-measurement found a different
+ * reading — a short-term washout inside a long-term uptrend — ahead of
+ * its baseline in every period tested. On those days the tally reads bearish about two thirds of
  * the time, so without the reading next to it the tally pulls the verdict the wrong way on
  * exactly the charts where the measured edge is.
  *
- * **Why risk:reward moved out.** Measured over 426 production ticks: the nearest
- * resistance sat *below* the current price 14.6% of the time, and the median upside to the
- * first obstacle was 0.74%. The effect was worst exactly where the indicators agreed most
- * — median risk:reward 1.27 in a middling composite-score band versus **0.00** in the
- * highest. Strong confluence is therefore not evidence that entering now is attractive,
+ * **Why risk:reward moved out.** Downstream measurement on live
+ * ticks showed the nearest resistance sitting *below* the current price a meaningful share of
+ * the time, with only a sliver of upside to the first obstacle. The effect was worst exactly
+ * where the indicators agreed most — median risk:reward collapsed toward **0** in the
+ * highest composite-score band. Strong confluence is therefore not evidence that entering now is attractive,
  * and the model cannot notice that unless the ratio is put in front of it before it writes
  * a verdict.
  */
@@ -108,10 +104,9 @@ export interface TimeframeConfluenceParams {
  * The daily row restores the two **constants** the original backtest used — a threshold of
  * three and `expected` signals counted in full. That backtest ran on daily bars with a
  * ten-day hold and won its comparison at 70% versus 61.5% for an LLM read over the same
- * window. **It did not survive re-measurement against a baseline**: in 2026-09, this daily
- * configuration's met entry rule trailed the any-day baseline over 10 days in all five
- * periods tested, and siglens-trader found the original rule indistinguishable from its
- * baseline over 2015–26. The constants stay (they define the tally the prompt describes);
+ * window. **It did not survive re-measurement against a baseline**: this daily
+ * configuration's met entry rule did not beat the any-day baseline over 10 days, and the
+ * original rule was indistinguishable from its baseline over a long sample. The constants stay (they define the tally the prompt describes);
  * the authority does not — see {@link CONFLUENCE_RELIABILITY}.
  *
  * It is **not** a restoration of the backtested rule. The engine counts indicator families
@@ -125,7 +120,7 @@ export interface TimeframeConfluenceParams {
  * signals. A 30-minute bar is not a small daily bar — the same "three signals" threshold
  * is reached far more often and by weaker evidence — so the intraday side trades the
  * backtest's authority for constants that produce a comparable signal rate. **The intraday
- * variant has not been backtested at all.** (siglens-trader's 1-hour measurement of its own
+ * variant has not been backtested at all.** (A consumer's 1-hour measurement of its own
  * gated variant found no advantage over the baseline after costs.)
  */
 export const CONFLUENCE_PARAMS_BY_TIMEFRAME: Record<
@@ -242,15 +237,15 @@ const PULLBACK_HEADER = '### Short-term sell-off check (computed, 1Day bars)';
 /**
  * The verdict for the washout reading, decided here rather than by the model.
  *
- * Asked to judge it, the model never chose "enter": over 6,070 production analyses
- * (p9–p16) and a 170-case A/B, `entryRecommendation` was "wait" every time. It read the
+ * Asked to judge it, the model never chose "enter": across repeated A/B runs,
+ * `entryRecommendation` was "wait" every time. It read the
  * reading's normal companions — a bearish tally, a sub-1.0 structural ratio, a red Elder
  * Impulse, price under the short averages — as missing confirmation, and asked for a
  * reversal candle or a close back above MA5. That confirmation is exactly what the
  * measurement found costs the edge (waiting for %R to cross back lost it in every
- * period). Rewriting the rule alone moved 8–14 of 25 washout days to "enter"; printing the
- * verdict as a rule-engine value, like the tally and the ratio, moved 25 of 25 and left
- * every near-washout day at "wait" (docs/superpowers/specs/2026-09-26-washout-entry-verdict-design.md).
+ * period). Rewriting the rule alone moved only some washout days to "enter"; printing the
+ * verdict as a rule-engine value, like the tally and the ratio, moved all of them and left
+ * every near-washout day at "wait".
  */
 /**
  * Sessions, counted back from the last bar and including it, in which a company event

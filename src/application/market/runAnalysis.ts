@@ -483,7 +483,7 @@ async function runAnalysisImpl(
         });
     }
     // Which drawings the overlap arbitration removed, and what each lost to
-    // (spec 2026-10-07 §8: one shared pivot now counts as an overlap, and its
+    // (one shared pivot now counts as an overlap, and its
     // losers were never counted). Info, not a warning — dropping is the rule.
     if (patternArbitration.dropped.length > 0) {
         console.info('[ChartPatterns] arbitration dropped', {
@@ -623,7 +623,7 @@ async function runAnalysisImpl(
             }
         );
     }
-    // Referral-rate signal (spec 2026-09-28 §7): candidates were offered but
+    // Referral-rate signal: candidates were offered but
     // the model cited none. Logged only on that anomaly — this layer has no
     // info-level logging convention to hang a per-call ratio on.
     if (

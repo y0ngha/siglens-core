@@ -23,7 +23,7 @@ import { extractPivots } from '@/domain/patterns/pivots';
 import type { ChartPatternId, QualifiedPatternGeometry } from '@/domain/types';
 
 /**
- * Chart-pattern qualification scenario suite (spec 2026-10-07): every
+ * Chart-pattern qualification scenario suite: every
  * ChartPatternId × {textbook, pierce, near-miss, stability, breakout,
  * failure, arbitration, intraday}. The table lives in `catalog.ts`; each row
  * runs the production chain (screener → qualifier → overlays → prompt
@@ -97,7 +97,7 @@ describe('chart-pattern qualification scenarios', () => {
     });
 });
 
-describe('provisional invariance (spec §2.1): extending the current leg moves nothing', () => {
+describe('provisional invariance: extending the current leg moves nothing', () => {
     it.each(STABILITY_CASES.map(c => [c.pattern, c] as const))(
         '%s | d stability',
         (_, c) => {
@@ -139,7 +139,7 @@ describe('provisional invariance (spec §2.1): extending the current leg moves n
     );
 });
 
-describe('a newly confirmed touch keeps the levels fixed (spec §3.1)', () => {
+describe('a newly confirmed touch keeps the levels fixed', () => {
     // Eight pivots (4 + 4 touches); the two appended closes confirm the
     // fifth resistance touch as the ninth pivot.
     const before = runPipeline(MATURING_TRIANGLE_BARS, 1);

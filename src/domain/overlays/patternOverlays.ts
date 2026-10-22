@@ -69,7 +69,7 @@ function seg(
     };
 }
 
-/** A boundary drawn solid from its first to its last confirmed touch (spec 2026-10-07 §2.2). */
+/** A boundary drawn solid from its first to its last confirmed touch. */
 function lineSegment(
     bars: readonly Bar[],
     line: PatternLine,
@@ -350,8 +350,7 @@ function drawingOf(
 
 /**
  * @internal
- * Qualified patterns → drawable pattern candidates (spec 2026-09-28 §3.1,
- * spec 2026-10-07). Levels: invalidation and measured target for every
+ * Qualified patterns → drawable pattern candidates. Levels: invalidation and measured target for every
  * directed pattern, plus a horizontal breakout where no drawn line already
  * marks it. An undirected boundary pair (no prior trend) draws its two
  * boundaries and no level — it has no target. A pattern without geometry is

@@ -16,7 +16,7 @@ const PERCENT_UNIT = '%';
  * available) or when `unit` is empty — rendering "N/A %" would be
  * misleading because N/A has no associated unit. A `%` unit attaches with
  * no leading space (`0.20%`, the conventional way a percent symbol reads);
- * every other unit keeps the space (`150 K`) — spec 2026-09-18 §B7 addendum.
+ * every other unit keeps the space (`150 K`).
  *
  * @param value - Already-formatted numeric string or `'N/A'`.
  * @param unit  - Unit string (e.g. `'%'`). May be empty.
@@ -30,8 +30,7 @@ function withUnit(value: string, unit: string): string {
 /**
  * @internal
  * Absolute-difference threshold below which `actual` counts as "in line" /
- * "unchanged" rather than above/below or higher/lower (spec 2026-09-18
- * §2.11). Matches the rounding precision every figure in this prompt already
+ * "unchanged" rather than above/below or higher/lower. Matches the rounding precision every figure in this prompt already
  * renders at ({@link formatPlainNumber}'s 2-decimal display in practice for
  * typical macro releases), so a difference the reader can't even see on the
  * page never gets called a beat or a miss.
@@ -43,9 +42,9 @@ const ECONOMIC_EVENT_DELTA_DECIMAL_PLACES = 2;
 /**
  * @internal `±x.xxpp (aboveLabel/belowLabel/inLineLabel)` when `unit` is
  * `'%'` (the delta of two percentages is itself a percentage-point figure,
- * not a percent — spec 2026-09-18 §B7 addendum), `±x.xx unit
+ * not a percent), `±x.xx unit
  * (aboveLabel/belowLabel/inLineLabel)` otherwise, or `'N/A'` when either
- * input is missing or non-finite (null rule, spec §0). Delegates the
+ * input is missing or non-finite (null rule). Delegates the
  * sign/`-0` handling to {@link formatSignedNumber}.
  */
 function formatDeltaWithDirection(
@@ -84,7 +83,7 @@ function formatDeltaWithDirection(
  * @internal Builds the per-event economic-calendar AI analysis prompt.
  *
  * Builds the per-event economic-calendar AI analysis prompt. No skills, no
- * other catalog-level knowledge (spec §3.2/Design C) — `stable` is empty and
+ * other catalog-level knowledge — `stable` is empty and
  * `dynamic` is the full prompt, byte-for-byte the same production order as
  * before the assembly split (v0.31).
  *

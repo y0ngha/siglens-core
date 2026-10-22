@@ -106,8 +106,7 @@ export function hashSkillCatalog(skills: readonly Skill[]): string {
 /**
  * @internal
  * Sorted, unambiguously-serialized fingerprint parts for a macro-calendar
- * event set (spec 2026-09-28 §3, review round 1 finding 5, PR #232 review
- * suggestions 1–2). Each part is `JSON.stringify([date, event, impact,
+ * event set. Each part is `JSON.stringify([date, event, impact,
  * actual, estimate, previous, unit])` — every field the news prompt's `##
  * Macro Calendar` section actually renders (`formatMacroCalendarRow`,
  * `newsPrompt.ts`), not just a subset, and JSON-array-encoded rather than

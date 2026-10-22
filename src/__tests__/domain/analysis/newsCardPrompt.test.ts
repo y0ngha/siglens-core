@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { buildNewsCardAnalysisPrompt as buildNewsCardAnalysisPromptRaw } from '@/domain/analysis/newsCardPrompt';
 import type { NewsItem } from '@/domain/types';
 
-// `buildNewsCardAnalysisPrompt` now returns `{ stable, dynamic }` (spec §3.4
-// assembly split) — this file's call sites predate the split and assert
+// `buildNewsCardAnalysisPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildNewsCardAnalysisPrompt = (
@@ -208,7 +208,7 @@ describe('bodyTruncated', () => {
         expect(prompt).toContain(
             'Do not infer or invent figures, guidance, outcomes, or conclusions'
         );
-        // 2026-10-05 UX audit §C2: 옛 문구("say so plainly")는 모델이 "제공된 본문은 ...
+        // UX audit: 옛 문구("say so plainly")는 모델이 "제공된 본문은 ...
         // 잘려" 같은 입력 설명을 summaryKo에 그대로 옮기게 했다. 공백은 알리되
         // 발췌·본문·제공 텍스트라는 말은 쓰지 못하게 한다.
         expect(prompt).toContain(
@@ -264,7 +264,7 @@ describe('buildNewsCardAnalysisPrompt — 출력 로케일', () => {
     /**
      * 이 빌더는 과업 자체가 "번역"이라 **본문 지시가 언어를 못 박는다**.
      * 프롬프트 말미 리마인더는 필드 설명을 덮으려고 만든 것이라 여기까지
-     * 뒤집는다고 볼 수 없다 — 소스에서 직접 갈라야 한다(PR #184 리뷰 4라운드).
+     * 뒤집는다고 볼 수 없다 — 소스에서 직접 갈라야 한다.
      */
     it('로케일을 생략하면 ko와 바이트가 같다', () => {
         expect(buildNewsCardAnalysisPrompt(FULL_NEWS_ITEM)).toBe(

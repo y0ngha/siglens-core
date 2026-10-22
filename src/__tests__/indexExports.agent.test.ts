@@ -21,7 +21,7 @@ describe('index — agent exports', () => {
         expect(typeof findUngroundedNumbers).toBe('function');
     });
 
-    it('후속 질문 마커·파서를 서버·브라우저 진입점 양쪽으로 내보낸다 (UX audit 2026-10-05 §E5-d)', () => {
+    it('후속 질문 마커·파서를 서버·브라우저 진입점 양쪽으로 내보낸다', () => {
         expect(AGENT_FOLLOW_UP_MARKER).toBe('[[followups]]');
         expect(splitAgentFollowUps('본문\n[[followups]] A').followUps).toEqual([
             'A',
@@ -30,7 +30,7 @@ describe('index — agent exports', () => {
         expect(clientApi.splitAgentFollowUps).toBe(splitAgentFollowUps);
     });
 
-    it('peekMacroBriefingCacheEntry를 서버 진입점으로 내보낸다 (UX audit 2026-10-05 §C1)', () => {
+    it('peekMacroBriefingCacheEntry를 서버 진입점으로 내보낸다', () => {
         expect(typeof peekMacroBriefingCacheEntry).toBe('function');
     });
 });

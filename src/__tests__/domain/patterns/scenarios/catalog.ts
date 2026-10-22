@@ -13,9 +13,8 @@ import {
 } from '@/__tests__/domain/patterns/scenarios/builder';
 
 /**
- * Pattern × case scenario table for the qualification suite (spec
- * 2026-10-07). Every scenario is a deterministic bar series and the outcome
- * the spec requires for it. Prices sit near 100 on a `1Day` chart with a
+ * Pattern × case scenario table for the qualification suite. Every scenario is a deterministic bar series and the outcome
+ * the pattern definitions require for it. Prices sit near 100 on a `1Day` chart with a
  * pinned ATR (1 unless a case says otherwise), so every threshold is exact
  * arithmetic: the minimum height is `max(2.5·ATR, 3%·price)` ≈ 3.
  *
@@ -460,7 +459,7 @@ const POLE: Anchor[] = [
     [18, 108],
 ];
 
-/** 10-bar pole 98 → 108, then a 12-bar flat flag 106.5 ↔ 108 (spec §6 test 9). */
+/** 10-bar pole 98 → 108, then a 12-bar flat flag 106.5 ↔ 108. */
 export const BULL_FLAG: Anchor[] = [...POLE, ...flagLegs(18, 6, 106.5, 108)];
 
 /** Pole 98 → 108, then highs falling and lows rising to a point. */
@@ -1353,7 +1352,7 @@ const doubleScenarios: Scenario[] = [
     scenario(
         'double_top',
         'c near-miss',
-        'peaks 4 bars apart (spec §6 test 11)',
+        'peaks 4 bars apart',
         calm([
             [0, 100],
             [20, 110],
@@ -2042,7 +2041,7 @@ export const SCENARIOS: readonly Scenario[] = [
     ),
 ];
 
-/** A series whose final leg is extended for the provisional-invariance check (spec §2.1). */
+/** A series whose final leg is extended for the provisional-invariance check. */
 export interface StabilityCase {
     pattern: ChartPatternId;
     bars: Bar[];
@@ -2065,7 +2064,7 @@ const stability = (pattern: ChartPatternId, bars: Bar[]): StabilityCase[] =>
 
 /**
  * Every family drawn from confirmed pivots. Flags and pennants are left out
- * on purpose: their channel is fitted on the flag's own bars (§3.4), so a
+ * on purpose: their channel is fitted on the flag's own bars, so a
  * longer flag is a different channel by design.
  */
 export const STABILITY_CASES: readonly StabilityCase[] = [

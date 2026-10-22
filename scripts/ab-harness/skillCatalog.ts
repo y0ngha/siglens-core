@@ -1,6 +1,5 @@
 /**
- * Skill-catalog loader for the A/B prompt-quality harness (plan Task 2.5,
- * `docs/superpowers/plans/2026-07-03-prompt-size-quality-redesign.md`).
+ * Skill-catalog loader for the A/B prompt-quality harness.
  *
  * The harness must build TWO prompt variants from the SAME skill catalog
  * metadata (name / category / gating / tokenCost / confidenceWeight):

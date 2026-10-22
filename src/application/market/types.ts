@@ -125,7 +125,7 @@ export interface SubmitAnalysisOptions
      */
     krxTickTable?: KrxTickTable;
     /**
-     * Per-request deep-thinking toggle (member-reasoning-toggle spec, Part A).
+     * Per-request deep-thinking toggle.
      * `true` requests the model's default/spec reasoning depth; `false` or
      * omitted requests the provider-minimized (worker-side) setting — the
      * pre-toggle default. Folded into the cache key so ON and OFF results
@@ -143,8 +143,7 @@ export interface SubmitAnalysisOptions
      */
     locale?: AnalysisLocale;
     /**
-     * Member position-bucket hint
-     * (personalized-analysis-by-position-bucket spec, Subsystem C). A
+     * Member position-bucket hint. A
      * FINISHED bucket enum — never the raw average price or quantity —
      * derived by the caller from a server-read holding. Folded into the
      * cache key (see {@link buildAnalysisCacheKey}'s `positionBucket` param)
@@ -161,7 +160,7 @@ export interface SubmitAnalysisOptions
     positionBucket?: PositionBucket;
     /**
      * Prior-analysis-context history for this symbol + timeframe, supplied
-     * by the consumer (siglens / siglens-trader) from its own database —
+     * by the consumer (siglens or another consumer) from its own database —
      * core has no storage of its own for past analyses. Size the query with
      * {@link analysisHistoryQuery} before fetching (passing the same
      * {@link SubmitAnalysisOptions.session}), **including** its

@@ -78,7 +78,7 @@ interface TypedSwingPoint extends SMCSwingPoint {
  *
  * Returns `null` when the window has fewer than 3 confirmed swing points,
  * the last three do not alternate type (A≠B≠C by type), any price is
- * unusable, or the A→B range is non-positive (spec 2026-09-18 §A3 — the
+ * unusable, or the A→B range is non-positive (the
  * "next opposite swing after B" the fibonacci skill's ABC guidance asks the
  * model to cite).
  *

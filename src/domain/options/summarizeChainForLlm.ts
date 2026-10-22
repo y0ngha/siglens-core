@@ -29,7 +29,7 @@ const AT_PRICE_DISTANCE_PCT = 0.5;
 
 const PERCENT_FACTOR = 100;
 
-/** Decimal places every `*Pct` field in this module rounds to (spec 2026-09-18 §B5). */
+/** Decimal places every `*Pct` field in this module rounds to. */
 const PCT_DECIMAL_PLACES = 2;
 const PCT_ROUND_FACTOR = 10 ** PCT_DECIMAL_PLACES;
 
@@ -39,7 +39,7 @@ function isFinitePositive(n: number | null | undefined): n is number {
 
 /**
  * @internal Round `n` to {@link PCT_DECIMAL_PLACES}, stripping `-0` (a value
- * that rounds to exactly zero loses its sign — never `-0`, per spec §0).
+ * that rounds to exactly zero loses its sign — never `-0`).
  * `null` passes through unchanged.
  */
 function roundPct(n: number | null): number | null {
@@ -51,7 +51,7 @@ function roundPct(n: number | null): number | null {
 /**
  * @internal Signed `% distance` of `value` from a positive `base`, rounded to
  * {@link PCT_DECIMAL_PLACES}, or `null` when either input cannot support a
- * ratio (null rule, spec §0).
+ * ratio (null rule).
  */
 function signedDistancePct(
     value: number | null,
@@ -84,8 +84,7 @@ function spreadPct(mid: number | null, spread: number | null): number | null {
 
 /**
  * @internal `underlyingPrice × (1 ∓ impliedMovePercent / 100)`, rounded to
- * {@link PCT_DECIMAL_PLACES} like every other field in this module (spec
- * 2026-09-18), or `null` when the price or the implied move is
+ * {@link PCT_DECIMAL_PLACES} like every other field in this module, or `null` when the price or the implied move is
  * unavailable — or when `impliedMovePercent >= 100`, which would put `low`
  * at or below zero (an implied move that size is itself an unusable/bad
  * input, not a real "the stock could go to $0 or below" range).

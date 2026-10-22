@@ -74,7 +74,7 @@ function comboSizes(
 
 /**
  * @internal
- * Combinations W–X–Y (8 pivots) and W–X–Y–X–Z (12) (spec 2026-10-02 §2):
+ * Combinations W–X–Y (8 pivots) and W–X–Y–X–Z (12):
  * each simple correction is 4 pivots that `classifyAbc` names, all move the
  * same way; each X retraces less than EW_COMBO_X_MAX_RETRACE of the simple
  * before it; Y and Z run EW_COMBO_Y_TO_W_MIN–MAX × W. A run ending at the

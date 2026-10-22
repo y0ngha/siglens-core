@@ -1,6 +1,5 @@
 /**
- * A/B prompt-quality harness — Stage 1 (plan Task 2.5,
- * `docs/superpowers/plans/2026-07-03-prompt-size-quality-redesign.md`).
+ * A/B prompt-quality harness — Stage 1.
  *
  * Builds the exact prompts the production analysis path would send to the
  * worker for the 8 frozen fixtures (`fixtures/*.json`), in either `full`
@@ -9,11 +8,11 @@
  * `judge.ts` ultimately compares.
  *
  * Usage:
- *   npx tsx scripts/ab-harness/buildPrompts.ts --mode <full|digest> --out <file.json> [--skills <path>] [--fold-stable-into-system]
+ *   npx tsx scripts/ab-harness/buildPrompts.ts --mode <full|digest> --out <file.json> --skills <dir> [--fold-stable-into-system]
  *
- * `--skills` defaults to `../siglens-digests/skills` (sibling of this repo)
- * — see `README.md` for why, and pass e.g. `--skills ../siglens/skills` to
- * point at the real production skill catalog.
+ * `--skills` is required: the path of a skills directory (the skill catalog
+ * the prompts are built from). Point it at the production catalog to measure
+ * what production would send.
  *
  * `--fold-stable-into-system` models Design C's worker-side system
  * composition (skills-to-system split, see `domain/analysis/prompt.ts`'s
@@ -48,10 +47,6 @@ import { parseArgs } from './cliArgs';
 import { loadSkillCatalog, type PromptMode } from './skillCatalog';
 
 const FIXTURES_DIR = join(__dirname, 'fixtures');
-// Resolved relative to THIS FILE (not cwd) so the default works regardless of
-// where `npx tsx` is invoked from — mirrors `scripts/validation/loadEnv.ts`'s
-// `requireFmpApiKey` sibling-repo resolution.
-const DEFAULT_SKILLS_PATH = join(__dirname, '../../../siglens-digests/skills');
 
 const TECHNICAL_FIXTURE_FILES = [
     'tech-trend.json',
@@ -135,7 +130,7 @@ export function buildTechnicalCase(
     foldStableIntoSystem = false
 ): PromptCaseOutput {
     const indicators = calculateIndicators(fixture.bars);
-    // `buildAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4 assembly
+    // `buildAnalysisPrompt` returns `{ stable, dynamic }` (assembly
     // split); the harness sends the model the same combined string
     // production dispatch builds as its `prompt` fallback field ('\n\n' join)
     // — or, under `--fold-stable-into-system`, folds `stable` into `system`
@@ -184,8 +179,8 @@ export function buildNewsCase(
     skills: readonly Skill[],
     foldStableIntoSystem = false
 ): PromptCaseOutput {
-    // `buildNewsAnalysisPrompt` returns `{ stable, dynamic }` (spec §3.4
-    // assembly split); the harness sends the model the same combined string
+    // `buildNewsAnalysisPrompt` returns `{ stable, dynamic }` (assembly
+    // split); the harness sends the model the same combined string
     // production dispatch builds as its `prompt` fallback field ('\n\n' join)
     // — or, under `--fold-stable-into-system`, folds `stable` into `system`
     // instead (see `composeCase`).
@@ -236,14 +231,17 @@ async function main(): Promise<void> {
     const mode = args.mode;
     if (mode !== 'full' && mode !== 'digest') {
         throw new Error(
-            'Usage: buildPrompts.ts --mode <full|digest> --out <file.json> [--skills <path>]'
+            'Usage: buildPrompts.ts --mode <full|digest> --out <file.json> --skills <dir>'
         );
     }
     if (!args.out) {
         throw new Error('--out <file.json> is required');
     }
     const outPath = resolve(args.out);
-    const skillsPath = args.skills ? resolve(args.skills) : DEFAULT_SKILLS_PATH;
+    if (!args.skills) {
+        throw new Error('--skills <dir> is required (a skills directory)');
+    }
+    const skillsPath = resolve(args.skills);
     // Boolean CLI flag: `parseArgs` stores a bare `--fold-stable-into-system`
     // (no following value) as the string `'true'`; any other value is also
     // treated as "set" (only an entirely absent key means unset/false).

@@ -54,7 +54,7 @@ describe('pivotLevels', () => {
     });
 });
 
-describe('computeFibonacciPivot (spec 2026-09-18 §A2)', () => {
+describe('computeFibonacciPivot', () => {
     const pp = (110 + 90 + 105) / 3;
     const range = 110 - 90;
 
@@ -78,7 +78,7 @@ describe('computeFibonacciPivot (spec 2026-09-18 §A2)', () => {
     });
 });
 
-describe('computeWoodiePivot (spec 2026-09-18 §A2)', () => {
+describe('computeWoodiePivot', () => {
     it('weights the close double: pp = (H + L + 2C) / 4', () => {
         const woodie = computeWoodiePivot(bar);
         const pp = (110 + 90 + 2 * 105) / 4;
@@ -98,7 +98,7 @@ describe('computeWoodiePivot (spec 2026-09-18 §A2)', () => {
     });
 });
 
-describe('computeDeMarkPivot (spec 2026-09-18 §A2)', () => {
+describe('computeDeMarkPivot', () => {
     it('close < open -> X = H + 2L + C', () => {
         const b: Bar = {
             time: 1,

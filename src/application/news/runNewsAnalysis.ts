@@ -51,8 +51,7 @@ import {
  * Derive a deterministic hash of the news set, calendar, tier, sampled
  * skills, and (when present) the macro calendar.
  *
- * `macroFingerprintParts` is appended only when non-empty (spec 2026-09-28
- * §3) — an empty macro calendar (every call site before that option existed)
+ * `macroFingerprintParts` is appended only when non-empty — an empty macro calendar (every call site before that option existed)
  * hashes the exact same string as before, so pre-existing cache entries stay
  * valid.
  */
@@ -173,8 +172,7 @@ export async function runNewsAnalysis(
     const newsIds = news.map(n => n.id);
     const earningsDates = upcomingCalendar.map(c => c.earningsDate);
     // Empty when `macroCalendar` is omitted/[] — spreading zero extra parts
-    // keeps the seed identical to every call site before this option existed
-    // (spec 2026-09-28 §3).
+    // keeps the seed identical to every call site before this option existed.
     const macroFingerprintParts = macroCalendarFingerprintParts(macroCalendar);
     const skillSampling = createSkillSamplingPlan(skills, tier, [
         'news',

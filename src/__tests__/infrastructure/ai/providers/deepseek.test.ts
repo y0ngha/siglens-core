@@ -284,8 +284,8 @@ describe('callDeepSeek', () => {
     describe('responseSchema — Responses API로 강제한다', () => {
         // `/chat/completions`는 `response_format: json_schema`를 거부한다
         // (`400 This response_format type is unavailable now`, V4 모델 ID로도 동일).
-        // 강제하지 않던 시절 실측: 30k 토큰 기술 분석 프롬프트에서
-        // `indicatorResults[].signals`가 824건 전부 빈 배열이었다.
+        // 강제하지 않으면: 긴 기술 분석 프롬프트에서
+        // `indicatorResults[].signals`가 전부 빈 배열로 돌아왔다.
         function responsesStream(
             text: string,
             usage?: unknown,
@@ -731,7 +731,7 @@ describe('callDeepSeek — usage telemetry', () => {
 });
 
 /**
- * 2026-09-14 20:30–21:28 UTC DeepSeek sent neither a response nor an error for
+ * DeepSeek has been seen to send neither a response nor an error for
  * an hour; the 1h total timeout never helped. The watchdog aborts on silence
  * only — a call that keeps streaming is never cut, however long it runs.
  */

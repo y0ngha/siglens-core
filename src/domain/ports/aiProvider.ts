@@ -2,8 +2,9 @@
  * Provider-neutral AI chat-completion contract the domain depends on for
  * generating analysis text, briefings, and chat replies.
  *
- * Adapters live in consumer codebases (this library does not ship a concrete
- * AI SDK adapter — see `docs/ARCHITECTURE.md`). Implementations must route by
+ * The chat use case (`requestChatCompletion`) takes an implementation of this
+ * port from its consumer; the analysis use cases call the provider adapters in
+ * `infrastructure/ai/providers` directly. Implementations must route by
  * `options.model` to the appropriate upstream provider (Gemini, OpenAI,
  * Anthropic, …), translate the provider-neutral payload into the upstream
  * SDK's wire shape, and return the generated text. Upstream provider errors

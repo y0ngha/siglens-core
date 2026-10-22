@@ -301,7 +301,7 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_market_overview')?.description).toContain(
             'rank'
         );
-        // `sectorBreadth`, not `breadth` (spec 2026-09-18) — the field is
+        // `sectorBreadth`, not `breadth` — the field is
         // the sector ETFs' own up/down/flat counts, not
         // market-wide advancers/decliners, and the old name read as the latter.
         expect(findToolSpec('get_market_overview')?.description).toContain(
@@ -312,7 +312,7 @@ describe('AGENT_TOOL_SPECS', () => {
         );
     });
 
-    it('리뷰 1라운드: sinceAnalysis 필드 전체·옵션 정밀 필드·시세 asOfIsFetchTime·섹터 name/spread를 담는다', () => {
+    it('sinceAnalysis 필드 전체·옵션 정밀 필드·시세 asOfIsFetchTime·섹터 name/spread를 담는다', () => {
         const cachedAnalysis = findToolSpec('get_cached_analysis')?.description;
         expect(cachedAnalysis).toContain('analysisPrice');
         expect(cachedAnalysis).toContain('priceNow');
@@ -397,7 +397,7 @@ describe('tool description wording', () => {
     });
 });
 
-describe('tool descriptions — benchmark dev defects (2026-10-22)', () => {
+describe('tool descriptions — consumer-provided freshness and history fields', () => {
     const desc = (name: string) =>
         AGENT_TOOL_SPECS.find(t => t.name === name)!.description;
     it('bars: changePct는 봉 개수이지 달력 기간이 아니고, 달력 변화·고저점 날짜·50/200 교차를 설명한다', () => {

@@ -365,7 +365,7 @@ export function isSpentCount(
  * @internal
  * Best candidate of each structure first, then the remaining slots by score
  * (at most ELLIOTT_PER_STRUCTURE_LIMIT per structure, ELLIOTT_CANDIDATE_LIMIT
- * in all), returned best-first (spec 2026-10-02 §후보 제시·선택). Of
+ * in all), returned best-first. Of
  * candidates sharing an id, the higher-scoring one is kept. Ties keep input
  * order, so impulse-only input yields exactly the pre-2026-10-02 top three.
  */
@@ -395,8 +395,7 @@ export function selectElliottCandidates(
 
 /**
  * @internal
- * Elliott counts offered as overlay candidates (spec 2026-09-28 §3.5, spec
- * 2026-10-02): impulses passing the three absolute rules (complete or still
+ * Elliott counts offered as overlay candidates: impulses passing the three absolute rules (complete or still
  * running at the right edge, with an A–B–C attached when one follows a
  * complete impulse), diagonals (rule 3 broken in a wedge), triangles,
  * combinations and standalone A–B–Cs — each only when listed in `enabled`.

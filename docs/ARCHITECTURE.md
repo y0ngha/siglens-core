@@ -12,12 +12,11 @@ UI, 렌더링, 프레임워크 종속 코드는 이 레파지토리에 존재하
 
 ```
 ┌─────────────────────────────────────────┐
-│         application (오케스트레이션)     │  여러 infrastructure를 조합하는
-│           market/, chat/, …            │  use-case 단위 함수
+│         application (오케스트레이션)     │  domain과 infrastructure를 조합하는
+│           market/, chat/, …            │  use-case 단위 함수 (run*)
 ├─────────────────────────────────────────┤
-│          infrastructure (외부)          │  AI Provider, Skills Loader,
-│                                         │  Upstash Redis,
-│                                         │  Market Data Providers
+│          infrastructure (외부)          │  AI Provider SDK 어댑터,
+│                                         │  Skills Loader, Upstash Redis
 ├─────────────────────────────────────────┤
 │             domain (순수)              │  인디케이터, 캔들 패턴,
 │                                         │  차트 패턴, 분석 프롬프트
@@ -28,7 +27,7 @@ UI, 렌더링, 프레임워크 종속 코드는 이 레파지토리에 존재하
          (public entry of the package)
 ```
 
-라이브러리 consumer(Next.js 앱, Node worker, CLI 등)는 `src/index.ts`에서 재노출되는
+라이브러리 consumer(Next.js 앱, 백그라운드 프로세스, CLI 등)는 `src/index.ts`에서 재노출되는
 심볼만 사용한다. Consumer의 프레젠테이션/런타임 코드는 이 레파지토리에 포함되지 않는다.
 
 ---
@@ -42,21 +41,28 @@ domain         ← 외부 import 없음
                  (계산 로직을 직접 구현)
                  Date.now(), fetch, console.*, process.env 전부 금지
                  추상 Repository / 외부 의존성 port 인터페이스 노출 담당 (ports/)
-                 — 실제 어댑터(DB, 캐시 등)는 consumer 또는 infrastructure 소유
+                 — 실제 어댑터는 infrastructure(캐시, AI provider 등) 또는
+                   consumer(DB, 시세·뉴스 데이터 등)가 소유
 
 infrastructure ← domain import 가능
                  application import 금지 (ESLint 강제)
-                 외부 API (AI 프로바이더 등) 호출 담당
+                 외부 API (AI 프로바이더 SDK 등) 호출 담당 (ai/providers/)
                  Skills 파일 I/O 담당
-                 Upstash Redis 캐시 관리 담당 (cache/)
+                 Upstash Redis 캐시·카운터·쿨다운 관리 담당
                  인터페이스(types.ts)를 반드시 먼저 정의
 
 application    ← domain, infrastructure import 가능
                  여러 infrastructure 모듈을 조합해 use-case를 완성
                  domain, infrastructure에서 application import 금지 (ESLint 강제)
-                 현재: market/ (submitAnalysis, pollAnalysis, cancelAnalysisJob,
-                                submitBriefing, pollBriefing),
-                       chat/ (requestChatCompletion)
+                 모델을 프로세스 안에서 직접 호출하는 run* 함수로 구성한다
+                 (job 큐나 외부 worker 없음). in-flight 중복 생성은
+                 Redis 락(application/analysis/generationLock.ts)으로 막는다.
+                 현재: market/ (runAnalysis, runBriefing, peek*Cache),
+                       news/, overall/, congress/, investorFlows/,
+                       fundamental/, financials/, options/, economy/,
+                       analysis/ (공용 AI 호출·락), byok/, usage/, chat/
+                       (requestChatCompletion), agent/ (runAgentTurn),
+                       dashboard/, shared/
 
 src/index.ts   ← domain, infrastructure, application에서 노출할 심볼을 재-export
                  외부 consumer가 유일하게 참조하는 진입점
@@ -105,45 +111,56 @@ const key = process.env.API_KEY; // 금지
 ## 폴더 구조
 
 ```
-# tree -d -L 3 -I "node_modules|dist"
+# 최상위 디렉토리 (node_modules, dist 제외)
 .
 ├── docs
-├── skills
+├── scripts
 └── src
-    ├── __tests__
-    │   ├── application
-    │   │   ├── chat
-    │   │   ├── dashboard
-    │   │   ├── market
-    │   │   └── usage
-    │   ├── domain
-    │   └── infrastructure
+    ├── __tests__          # 테스트 (소스 구조를 미러링) + guards, fixtures, helpers
     ├── application
+    │   ├── agent
+    │   ├── analysis       # 공용 AI 호출, in-flight / 생성 락
+    │   ├── byok
     │   ├── chat
+    │   ├── congress
     │   ├── dashboard
+    │   ├── economy
+    │   ├── financials
+    │   ├── fundamental
+    │   ├── investorFlows
     │   ├── market
+    │   ├── news
+    │   ├── options
+    │   ├── overall
+    │   ├── shared
     │   └── usage
     ├── domain
+    │   ├── agent
     │   ├── analysis
     │   ├── chat
     │   ├── constants
+    │   ├── economy
     │   ├── indicators
-    │   ├── ports          # Port interfaces (CacheProvider, CallAiProvider, repositories, …)
+    │   ├── investorFlows
+    │   ├── llm
+    │   ├── options
+    │   ├── overlays
+    │   ├── patterns
+    │   ├── ports          # Port interfaces (CacheProvider, CallAiProvider, MarketDataProvider, repositories, …)
     │   ├── signals
-    │   └── utils
+    │   └── validation
     ├── infrastructure
-    │   ├── ai            # LLM response JSON salvage helper (no SDK adapter); port lives in domain/ports/aiProvider.ts
-    │   ├── cache
-    │   ├── chat
-    │   ├── email         # EmailDispatcher type contract only
-    │   ├── fmp           # Config reader for FMP env vars
-    │   ├── jobs
-    │   ├── market
-    │   ├── oauth         # OAuth provider type contracts only
-    │   ├── skills
-    │   ├── upstash
-    │   └── usage         # hashUsageIp helper
-    └── index.ts
+    │   ├── ai            # AI provider SDK 어댑터(providers/), retry/, 서버 키 reader, 응답 JSON 복구, 사용량 로깅
+    │   ├── cache         # Upstash 캐시 어댑터, 캐시 키·TTL
+    │   ├── chat          # 채팅 토큰 저장소 (Upstash)
+    │   ├── fmp           # FMP 환경변수 reader
+    │   ├── hash          # 분석 입력 해시 helper
+    │   ├── market        # 재분석 쿨다운 (Upstash)
+    │   ├── skills        # Skills 파일 로더
+    │   ├── upstash       # Upstash 환경변수 reader
+    │   └── usage         # hashUsageIp, 기간 카운터 createCounterStore
+    ├── index.ts           # 서버 entry
+    └── index.client.ts    # 브라우저 entry (순수 서브셋)
 ```
 
 ### src/index.ts
@@ -152,18 +169,19 @@ const key = process.env.API_KEY; // 금지
 외부 consumer에게 노출할 심볼을 Tier 단위로 그룹화하여 재-export한다.
 
 ```typescript
-// src/index.ts (Tier별 그룹화 구조)
+// src/index.ts (Tier별 그룹화 구조, 발췌)
 // === Tier 1: Application Entrypoints ===
-export { submitAnalysis, pollAnalysis /* ... */ } from './application/market/...';
+export { runAnalysis } from './application/market/runAnalysis';
+export { runBriefing } from './application/market/runBriefing';
+export { runAgentTurn } from './application/agent/runAgentTurn';
 
 // === Tier 2: Domain Building Blocks ===
-export { calculateIndicators } from './domain/indicators';
-export { detectSignals, classifyTrend } from './domain/signals';
-export { buildAnalysisPrompt } from './domain/analysis/prompt';
+export { classifyTrend, detectSignals } from './domain/signals';
+export { calculateIndicators /* ... */ } from './domain/indicators';
 
 // === Tier 3: Infrastructure Factories & Config ===
-export { createMarketDataProvider } from './infrastructure/market/factory';
-export { FileSkillsLoader } from './infrastructure/skills/loader';
+export { createCacheProvider } from './infrastructure/cache/redis';
+export { createCounterStore } from './infrastructure/usage/counterStore';
 
 // === Tier 4: Public Types & Constants ===
 export type { Bar, Timeframe, IndicatorResult /* ... */ } from './domain/types';
@@ -181,9 +199,9 @@ Deep import(`@y0ngha/siglens-core/src/domain/...` 또는 `@y0ngha/siglens-core/d
 Layer 의존 규칙(`domain → infrastructure → application`)과 **직교하는** 또 다른 축으로
 Public API 노출 정책이 있다. 한 layer 내에도 public과 internal이 공존한다.
 
-- **Tier 1**: `application/` 진입점 (예: `submitAnalysis`, `getMarketSummary`)
-- **Tier 2**: `domain/` high-level 함수 (예: `calculateIndicators`, `detectSignals`, `buildAnalysisPrompt`)
-- **Tier 3**: `infrastructure/` factory & config (예: `createCacheProvider`, `FileSkillsLoader`)
+- **Tier 1**: `application/` 진입점 (예: `runAnalysis`, `getMarketSummary`)
+- **Tier 2**: `domain/` high-level 함수 (예: `calculateIndicators`, `detectSignals`)
+- **Tier 3**: `infrastructure/` factory & config (예: `createCacheProvider`, `createCounterStore`)
 - **Tier 4**: 모든 public 타입/인터페이스/상수
 - **Internal**: 다른 public 함수의 보조 구현. `src/index.ts`에서 export하지 않으며 정의부에 `/** @internal */` 태그를 단다.
 
@@ -197,14 +215,23 @@ no external imports, pure functions only.
 
 ### domain/ports/
 
-추상 port 인터페이스 모음. 도메인이 의존하는 외부 시스템(캐시, DB 등)의 계약만 선언하며,
-실제 어댑터 구현은 consumer 또는 `infrastructure/`가 소유한다. 의존성 역전(DIP)을 통해
+추상 port 인터페이스 모음. 도메인이 의존하는 외부 시스템(캐시, DB, 시세·뉴스 데이터 등)의
+계약만 선언하며, 실제 어댑터 구현은 `infrastructure/`(캐시, 카운터, 채팅 토큰, skills) 또는
+consumer(DB 저장소, 시세·뉴스·재무 등 데이터 provider)가 소유한다. 의존성 역전(DIP)을 통해
 도메인 계층이 외부 인프라에 결합되지 않도록 보장한다.
 
 - `cache.ts` — `CacheProvider` 인터페이스 (TTL 기반 key-value 캐시 계약).
 - `usageRepository.ts` — `UsageRepository` 인터페이스, `RecordUsageInput`.
 - `usageLogRepository.ts` — `UsageLogRepository` 인터페이스, `CreateUsageLogInput`.
 - `userTierRepository.ts` — `UserTierRepository` 인터페이스, `UserTier` alias.
+- `aiProvider.ts` — `CallAiProvider` (채팅 completion용 provider-neutral 호출 시그니처).
+- `agentProvider.ts` — `CallAgentProvider` (에이전트 툴 콜링 스트리밍).
+- `chatTokenStore.ts` — `ChatTokenStore`.
+- `counterStore.ts` — `CounterStore`, `CounterStoreUnavailableError`.
+- `skillsProvider.ts` — `SkillsProvider`.
+- `marketDataProvider.ts`, `newsProvider.ts`, `fundamentalDataProvider.ts`,
+  `financialStatementsProvider.ts`, `optionsDataProvider.ts`, `congressTradesProvider.ts`,
+  `investorFlowsDataProvider.ts` — consumer가 구현해 주입하는 데이터 provider port.
 
 공유되는 도메인 값 타입(`UsageActionType`, `UsageCounts`, `UsageLogRecord` 등)은 `domain/types.ts`에서
 정의되어 port 파일들 간 순환 import를 방지한다.
@@ -214,16 +241,14 @@ no external imports, pure functions only.
 외부 시스템과의 경계를 담당한다. 각 서브디렉토리는 **하나의 외부 시스템**에만 대응하며,
 `types.ts`에 정의된 인터페이스를 구현한다.
 
-- `ai/` — LLM 응답 JSON salvage 헬퍼(`extractJsonWithRepair`)만 보유. AI 프로바이더 호출 시그니처(`CallAiProvider`)는 `domain/ports/aiProvider.ts`(port)로 이전됨. 구체 SDK 어댑터(Gemini/Claude)는 consumer 소유.
-- `cache/` — Upstash Redis 래퍼 (`CacheProvider` port 구현, TTL 기반 캐시).
-- `chat/` — Upstash Redis 기반 채팅 토큰 저장소
-- `email/` — `EmailDispatcher` 타입 계약만 보유. 발송 어댑터(Resend 등)는 consumer 소유.
-- `fmp/` — FMP 환경변수 reader (값을 채우는 책임은 consumer).
-- `jobs/` — Redis 기반 Job 큐 (enqueue / dequeue / status 관리)
-- `market/` — 시세 프로바이더 인터페이스 (consumer가 주입한 provider 추상화)
-- `oauth/` — OAuth provider 타입 계약. 구체 OAuth 어댑터/플로우는 consumer 소유.
-- `skills/` — Skills 파일 로더 (filesystem → `Skill[]`)
-- `upstash/` — Upstash Redis 클라이언트 팩토리 (env-based)
+- `ai/` — AI provider SDK 어댑터(`providers/`: Anthropic, Gemini, OpenAI, DeepSeek), 재시도 래퍼(`retry/`), 서버 소유 키 reader(`serverKeys.ts`), LLM 응답 JSON 복구·정규화(`extractJsonWithRepair`, `normalizeJsonResponse`), 토큰 사용량 로깅(`usage.ts`). BYOK 사용자 키는 호출자가 전달하며 코어가 저장하지 않는다. 채팅용 호출 시그니처(`CallAiProvider`)는 `domain/ports/aiProvider.ts`에 있고 `requestChatCompletion`은 호출자가 주입한 구현을 사용한다.
+- `cache/` — Upstash Redis 래퍼 (`CacheProvider` port 구현, TTL 기반 캐시 + `setIfAbsent` / `deleteIfEquals`)와 캐시 키·TTL 정의.
+- `chat/` — Upstash Redis 기반 채팅 토큰 저장소 (`ChatTokenStore` 구현)
+- `fmp/` — FMP 환경변수 reader (시세 호출은 consumer가 주입한 `MarketDataProvider`가 수행).
+- `hash/` — 분석 입력·skill 카탈로그·API key scope 해시 helper (캐시 키와 시드 계산용)
+- `market/` — 재분석 쿨다운 헬퍼 (`SET NX EX`, Upstash)
+- `skills/` — Skills 파일 로더·샘플링 (filesystem → `Skill[]`)
+- `upstash/` — Upstash Redis 환경변수 reader (`readUpstashConfig`)
 - `usage/` — `hashUsageIp` 같은 분석 사용량 보조 함수, 기간 카운터 `createCounterStore`(Upstash)
 
 ### agent (ai.siglens.io)
@@ -235,8 +260,6 @@ no external imports, pure functions only.
 - `application/shared/providerError.ts` — 채팅·에이전트 공용 프로바이더 에러 분류 `classifyProviderError`
 - `infrastructure/usage/counterStore.ts` — Upstash 기간 카운터, `failurePolicy`(`open`/`closed`)
 
-설계: siglens `docs/superpowers/specs/2026-09-11-ai-siglens-agent-chat-design.md`
-
 ---
 
 ## 데이터 흐름
@@ -247,35 +270,27 @@ no external imports, pure functions only.
 ### 분석 파이프라인 (typical consumer flow)
 
 ```
-Consumer (web app / worker / CLI)
+Consumer (web app / 백그라운드 프로세스 / CLI)
   │
-  ├─ 1. bars 데이터 수집
-  │     → infrastructure/market/<provider>.ts로 외부 시세 API 호출
-  │     → domain/indicators/* 호출하여 인디케이터 계산
+  ├─ runAnalysis(...) 호출 (MarketDataProvider·cache 등을 주입)
+  │     │
+  │     ├─ 1. Skills 로드 — infrastructure/skills/loader.ts (loadSkillsCached)
+  │     ├─ 2. 캐시 조회 — CacheProvider (infrastructure/cache/redis.ts)
+  │     ├─ 3. (캐시 미스) bars 수집 + 인디케이터 계산
+  │     │     → 주입된 MarketDataProvider.getBars (consumer 구현)
+  │     │     → domain/indicators/* (pure)
+  │     ├─ 4. 프롬프트 구성 — domain/analysis/prompt.ts (pure function)
+  │     ├─ 5. AI 호출 — dedupeGeneration(Redis 락)으로 동일 키 중복 생성을 막고,
+  │     │     application/analysis/callAnalysisAi.ts가
+  │     │     infrastructure/ai/providers/*를 직접 호출
+  │     ├─ 6. 응답 정규화·후처리 — domain/analysis/*
+  │     └─ 7. 결과 캐시 저장 — TTL 기반 (Upstash Redis)
   │
-  ├─ 2. Skills 로드
-  │     → infrastructure/skills/loader.ts (FileSkillsLoader)
-  │     → skills/ 디렉토리의 .md 파일을 파싱하여 Skill[] 반환
-  │
-  ├─ 3. 프롬프트 구성
-  │     → domain/analysis/prompt.ts
-  │     → buildAnalysisPrompt(symbol, bars, indicators, skills)
-  │     → confidence 라벨(Low/Medium/High) 적용; 하한 필터 없음 (pure function)
-  │
-  ├─ 4. AI 호출
-  │     → infrastructure/ai/<provider>.ts
-  │     → 프롬프트를 AI 프로바이더에 전송
-  │
-  ├─ 5. 결과 캐시
-  │     → infrastructure/cache/redis.ts
-  │     → Upstash Redis에 TTL 기반으로 저장
-  │
-  └─ 6. 결과 반환
-        → consumer는 AI 응답을 자신의 프레젠테이션 레이어에서 처리
+  └─ 결과 반환 → consumer는 자신의 프레젠테이션 레이어에서 처리
 ```
 
-`siglens-core`는 6단계 중 **1~5의 pure/infra 로직만** 소유한다.
-consumer는 6단계(렌더링, 사용자 인터랙션)를 자유롭게 구현한다.
+`siglens-core`는 위 흐름의 계산·검증·I/O 로직을 모두 소유하며 job 큐나 외부 worker 없이
+한 번의 `run*` 호출 안에서 완료한다. 렌더링과 사용자 인터랙션은 consumer가 구현한다.
 
 ---
 
@@ -285,18 +300,15 @@ consumer는 6단계(렌더링, 사용자 인터랙션)를 자유롭게 구현한
 
 ### 1. 인터페이스를 먼저 정의한다
 
-모든 infrastructure 모듈은 `types.ts`에 인터페이스를 먼저 정의하고
-구현체가 해당 인터페이스를 만족하도록 한다.
+모든 infrastructure 어댑터는 `domain/ports/`의 port 인터페이스를 구현한다.
+`types.ts`는 어댑터 내부 타입만 담는다.
 
 ```typescript
-// infrastructure/cache/types.ts
-export interface AnalysisCache {
-    get(key: string): Promise<string | null>;
-    set(key: string, value: string, ttlSeconds: number): Promise<void>;
-}
+// domain/ports/cache.ts — port (계약)
+export interface CacheProvider { get; set; delete; setIfAbsent?; deleteIfEquals? }
 
-// infrastructure/cache/redis.ts
-export class UpstashAnalysisCache implements AnalysisCache { ... }
+// infrastructure/cache/redis.ts — adapter
+export function createCacheProvider(): CacheProvider | null { ... }
 ```
 
 ### 2. Graceful Degradation
@@ -312,6 +324,6 @@ domain은 환경에 의존하지 않는다.
 ### 4. 테스트에서는 인터페이스를 mock한다
 
 외부 시스템(Upstash Redis, AI API, consumer 측 시세 API)을 실제로 호출하는
-테스트는 작성하지 않는다. `AnalysisCache` 같은 인터페이스를 stub 구현으로
+테스트는 작성하지 않는다. `CacheProvider` 같은 인터페이스를 stub 구현으로
 교체하여 단위 테스트한다. core는 자체 DB infrastructure를 보유하지 않으므로
 `UsageRepository` 등 추상 repository 인터페이스 또한 stub으로 mock한다.

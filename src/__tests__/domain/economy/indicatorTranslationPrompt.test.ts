@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildIndicatorTranslationPrompt as buildIndicatorTranslationPromptRaw } from '@/domain/economy/indicatorTranslationPrompt';
 
-// `buildIndicatorTranslationPrompt` now returns `{ stable, dynamic }` (spec
-// §3.4 assembly split) — this file's call sites predate the split and assert
+// `buildIndicatorTranslationPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildIndicatorTranslationPrompt = (

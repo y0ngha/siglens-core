@@ -29,9 +29,8 @@ const roundMetric = (_key: string, value: unknown): unknown =>
  * @internal Builds the options-analysis LLM prompt.
  *
  * Build the LLM prompt for options analysis, split into a stable/dynamic pair
- * (spec §3.4, {@link AssembledPrompt}): `stable` is empty — this builder uses
- * no skills (per spec §3.2 "OPTIONS ... 스킬 도입 시 화이트리스트 확장은 후속
- * 과제") and has no other catalog-level knowledge to cache; `dynamic` is the
+ * ({@link AssembledPrompt}): `stable` is empty — this builder uses
+ * no skills and has no other catalog-level knowledge to cache; `dynamic` is the
  * role/intro line, current price, the per-expiration Key Metrics JSON, and —
  * at the tail, after the data — the Output Schema + Interpretation Guide.
  * Keeping the output-format instructions at the tail — after the data they

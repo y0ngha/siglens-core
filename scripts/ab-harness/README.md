@@ -2,9 +2,7 @@
 
 Proves, before the digest-only skill loader ships, that analyses built from
 **digest** prompts are `>=` analyses built from **full-body** prompts on a
-blind AI-judge rubric. Implements plan Task 2.5
-(`docs/superpowers/plans/2026-07-03-prompt-size-quality-redesign.md`, spec
-§3.6 `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`).
+blind AI-judge rubric.
 
 All 3 stages are plain `npx tsx` scripts — nothing here runs in CI or in the
 regular `vitest` gate; it's a manual pre-merge quality check.
@@ -53,10 +51,10 @@ npx tsx scripts/ab-harness/fixtures/generate.ts
 
 ```bash
 # 1. Build prompts for both variants (repeat with --mode digest).
-#    --skills defaults to ../siglens-digests/skills (sibling of this repo);
-#    point it at the real production catalog, e.g.:
-npx tsx scripts/ab-harness/buildPrompts.ts --mode full   --out /tmp/prompts-full.json   --skills ../siglens/skills
-npx tsx scripts/ab-harness/buildPrompts.ts --mode digest --out /tmp/prompts-digest.json --skills ../siglens/skills
+#    --skills is required: the path of a skills directory (point it at the
+#    production skill catalog to measure what production would send).
+npx tsx scripts/ab-harness/buildPrompts.ts --mode full   --out /tmp/prompts-full.json   --skills <skills-dir>
+npx tsx scripts/ab-harness/buildPrompts.ts --mode digest --out /tmp/prompts-digest.json --skills <skills-dir>
 
 # 2. Run both prompt sets through the production default analysis model
 #    (gemini-3.5-flash-lite — resolved from the siglens frontend's
@@ -118,7 +116,7 @@ generate the results.
 | `GEMINI_API_KEY` | `runModels.ts` | Yes — fails fast with a clear message if unset. |
 | `ANTHROPIC_API_KEY` | `judge.ts` | Yes — fails fast with a clear message if unset. |
 
-## Pass criteria (spec §3.6)
+## Pass criteria
 
 `judge.ts` scores every case on 4 axes (1-5): `dataGroundedness`,
 `hallucinationFreedom`, `actionability`, `patternJudgmentAccuracy`, blind

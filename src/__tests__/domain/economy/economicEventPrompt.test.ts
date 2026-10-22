@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { buildEconomicEventAnalysisPrompt as buildEconomicEventAnalysisPromptRaw } from '@/domain/economy/economicEventPrompt';
 import type { EconomicEventAnalysisInput } from '@/domain/economy/types';
 
-// `buildEconomicEventAnalysisPrompt` now returns `{ stable, dynamic }` (spec
-// §3.4 assembly split) — this file's call sites predate the split and assert
+// `buildEconomicEventAnalysisPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildEconomicEventAnalysisPrompt = (
@@ -28,7 +28,7 @@ const BASE_INPUT: EconomicEventAnalysisInput = {
  *
  * few-shot 단언은 **Output 줄에 걸어야 한다.** `Input:` 줄에는 구조상
  * `interpretationKo`가 없어서, 거기에 `not.toContain('한국은행')` 같은 걸 걸면
- * 예시 내용과 무관하게 항상 참이 된다(4라운드 리뷰에서 실제로 그랬다).
+ * 예시 내용과 무관하게 항상 참이 된다.
  */
 function fewShotOutputFor(dynamic: string, inputFragment: string): string {
     const lines = dynamic.split('\n');
@@ -227,7 +227,7 @@ describe('buildEconomicEventAnalysisPrompt — region', () => {
     });
 
     /**
-     * **finding 1의 falsifiable 잠금.**
+     * **지역 중립 규칙의 falsifiable 잠금.**
      *
      * sentiment 정의와 `interpretationKo` 규칙이 예전에는 USD를 박아 놨다 —
      * 7줄 위에서 "USD를 가정하지 말라"고 해놓고 아래에서 USD 기준 분류를 요구하는
@@ -343,7 +343,7 @@ describe('buildEconomicEventAnalysisPrompt numeric rendering', () => {
     });
 });
 
-describe('buildEconomicEventAnalysisPrompt — Actual vs Estimate/Previous (spec 2026-09-18 §2.11)', () => {
+describe('buildEconomicEventAnalysisPrompt — Actual vs Estimate/Previous', () => {
     it('renders "below" and "lower" when actual missed and decelerated', () => {
         // actual 0.2, estimate 0.3, previous 0.4 (BASE_INPUT)
         const p = buildEconomicEventAnalysisPrompt(BASE_INPUT);
@@ -414,7 +414,7 @@ describe('buildEconomicEventAnalysisPrompt — Actual vs Estimate/Previous (spec
         expect(p).toContain('never recompute the deviation yourself');
     });
 
-    it('never renders -0.00pp for a delta that rounds to exactly zero (spec §B6)', () => {
+    it('never renders -0.00pp for a delta that rounds to exactly zero', () => {
         const p = buildEconomicEventAnalysisPrompt({
             ...BASE_INPUT,
             actual: 0.3001,
@@ -425,7 +425,7 @@ describe('buildEconomicEventAnalysisPrompt — Actual vs Estimate/Previous (spec
         expect(p).toContain('+0.00pp');
     });
 
-    it('a non-percent unit renders the delta as "value unit" (with space), never pp (spec §B7 addendum)', () => {
+    it('a non-percent unit renders the delta as "value unit" (with space), never pp', () => {
         const p = buildEconomicEventAnalysisPrompt({
             ...BASE_INPUT,
             event: 'Nonfarm Payrolls',
@@ -439,7 +439,7 @@ describe('buildEconomicEventAnalysisPrompt — Actual vs Estimate/Previous (spec
         expect(p).not.toMatch(/-30\.00pp|-50\.00pp/);
     });
 
-    it('a percent unit attaches to Actual/Estimate/Previous with no leading space (spec §B7 addendum)', () => {
+    it('a percent unit attaches to Actual/Estimate/Previous with no leading space', () => {
         const p = buildEconomicEventAnalysisPrompt(BASE_INPUT);
         expect(p).toContain('- Actual: 0.2%');
         expect(p).not.toContain('- Actual: 0.2 %');

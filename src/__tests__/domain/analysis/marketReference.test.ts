@@ -104,7 +104,7 @@ describe('computeMarketReference', () => {
         expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(true);
     });
 
-    it('never puts Fibonacci/Woodie/DeMark pivots in the capped nearest-level lists (spec 2026-09-18 — Pivot table: line only)', () => {
+    it('never puts Fibonacci/Woodie/DeMark pivots in the capped nearest-level lists (Pivot table: line only)', () => {
         const ref = computeMarketReference(makeBars(5), makeInd(), '1Day');
         const all = [
             ...ref.short.levels.support,
@@ -119,7 +119,7 @@ describe('computeMarketReference', () => {
         expect(all.some(l => l.kind === 'pivot_camarilla')).toBe(true);
     });
 
-    it('emits the complete Standard/Camarilla/Fibonacci/Woodie/DeMark pivot sets on `pivots` (spec 2026-09-18), shared once from the prior bar', () => {
+    it('emits the complete Standard/Camarilla/Fibonacci/Woodie/DeMark pivot sets on `pivots`, shared once from the prior bar', () => {
         const ref = computeMarketReference(makeBars(5), makeInd(), '1Day');
         expect(ref.pivots?.standard).not.toBeNull();
         expect(ref.pivots?.camarilla).not.toBeNull();
@@ -204,7 +204,7 @@ describe('computeMarketReference', () => {
         expect(ref.long.fibProjection).toBeNull();
     });
 
-    it('emits fib_abc_extension levels and an abcExtension triplet once a 3rd (C) swing confirms (spec 2026-09-18 §A3)', () => {
+    it('emits fib_abc_extension levels and an abcExtension triplet once a 3rd (C) swing confirms', () => {
         // low(10,100) -> high(20,120) -> low(30,112): up leg A->B, C confirmed after B.
         const swingHighs = [swing(20, 120)];
         const swingLows = [

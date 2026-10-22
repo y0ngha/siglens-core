@@ -248,7 +248,7 @@ describe('buildBullishRiskRewardText', () => {
         }
     );
 
-    it('SL이 entry 바로 아래(0.01%)라 소수 첫째 자리에서 0으로 반올림돼도 -0.0%를 찍지 않는다 (spec §0/§B6)', () => {
+    it('SL이 entry 바로 아래(0.01%)라 소수 첫째 자리에서 0으로 반올림돼도 -0.0%를 찍지 않는다', () => {
         // slPct = (99.99 - 100) / 100 * 100 = -0.01 -> toFixed(1) would be "-0.0".
         const text = buildBullishRiskRewardText(100, 99.99, [105]);
         expect(text).not.toContain('-0.0%');
@@ -648,7 +648,7 @@ describe('postProcessAnalysisWithReconcile', () => {
             );
         });
 
-        it('보정된 SL/TP로 결정론적 줄을 계산한다 — AI 원본이 아니라 (spec 2026-09-18: reconciledLevels.riskReward에 실린다)', () => {
+        it('보정된 SL/TP로 결정론적 줄을 계산한다 — AI 원본이 아니라 (reconciledLevels.riskReward에 실린다)', () => {
             const response: AnalysisResponse = {
                 ...baseResponse,
                 actionRecommendation: {
@@ -911,7 +911,7 @@ describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels i
     });
 });
 
-describe('postProcessAnalysisWithReconcile — pattern-geometry targets (spec 2026-09-18 §A6)', () => {
+describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => {
     const baseResponse: AnalysisResponse = {
         summary: 'test',
         trend: 'bullish',

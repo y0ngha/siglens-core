@@ -17,7 +17,7 @@ import type {
 } from '@/domain/types';
 
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
-// return with a flattening wrapper (spec §3.4 assembly split).
+// return with a flattening wrapper.
 const buildAnalysisPrompt = (
     ...args: Parameters<typeof buildAnalysisPromptRaw>
 ): string => {

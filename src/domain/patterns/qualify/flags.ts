@@ -42,7 +42,7 @@ import {
     maxAgeBars,
 } from '@/domain/patterns/qualify/context';
 
-// ─── Flags and pennants (§3.4) ──────────────────────────────────────────────
+// ─── Flags and pennants ─────────────────────────────────────────────────────
 
 /** Age window of the longest possible pole-plus-flag span (loop cutoff in `qualifyFlags`). */
 const LONGEST_FLAG_MAX_AGE = maxAgeBars(FLAG_POLE_MAX_BARS + FLAG_MAX_BARS);
@@ -81,8 +81,8 @@ export function qualifyFlags(ctx: QualifyContext): QualifiedPattern[] {
 
 /**
  * The bar highs (lows) that are swing points inside the flag: neither
- * neighbour goes beyond them. Not in the spec, which fits the flag channel on
- * every bar: consecutive bars of one straight leg are collinear, so "most
+ * neighbour goes beyond them. Fitting the channel on these instead of on every
+ * bar is an added guard beyond the textbook definition: consecutive bars of one straight leg are collinear, so "most
  * touches" then picks a line along a single leg instead of the line across
  * the flag's swings. The two end bars have one neighbour and are left out —
  * otherwise a breakout bar at the right edge would anchor a channel drawn
@@ -104,7 +104,7 @@ function localExtremes(
 /**
  * A flag consolidates: each channel line keeps at least
  * `BOUNDARY_MIN_TOUCHES` bars that touch it and not the other line, at
- * least `FLAG_MIN_TOUCH_SPACING_BARS` apart. Not in the spec — a straight
+ * least `FLAG_MIN_TOUCH_SPACING_BARS` apart. An added guard beyond the textbook definition — a straight
  * pullback leg fits two "parallel" lines one bar range apart that every bar
  * touches at once, which read as a flag after any pole-sized swing; and two
  * neighbouring bars on one line are one test of it.
@@ -304,7 +304,7 @@ function staysInside(
  * `CONVERGING_MAX_WIDTH_RATIO`, at most `PARALLEL_MAX_WIDTH_RATIO`) and do
  * not move with the pole by more than the flat bound make a bull or bear
  * flag; converging lines whose upper edge is not rising and lower edge not
- * falling (§2.3 classes) make a pennant. No dead band between the two
+ * falling (the drift classes) make a pennant. No dead band between the two
  * (unlike channel vs. wedge): a dozen bars of flag give a noisy width ratio,
  * and a band would drop the many flags that narrow a little as they drift
  * against the pole.
@@ -335,7 +335,7 @@ function flagPatternId(
     return pennant ? 'pennant' : null;
 }
 
-// ─── High tight flag (§3.5) ─────────────────────────────────────────────────
+// ─── High tight flag ────────────────────────────────────────────────────────
 
 /**
  * @internal

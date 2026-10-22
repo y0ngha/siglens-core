@@ -33,7 +33,7 @@ import {
     priorTrend,
 } from '@/domain/patterns/qualify/context';
 
-// ─── Double / triple tops and bottoms (§3.8) ───────────────────────────────
+// ─── Double / triple tops and bottoms ───────────────────────────────────────
 
 const EXTREME_IDS: Record<
     PivotKind,
@@ -179,7 +179,7 @@ function opposingSwingsTrend(
     return drift === (kind === 'high' ? 'rising' : 'falling');
 }
 
-// ─── Head & shoulders (§3.3) ────────────────────────────────────────────────
+// ─── Head & shoulders ───────────────────────────────────────────────────────
 
 /**
  * @internal
@@ -187,7 +187,7 @@ function opposingSwingsTrend(
  * shoulder] whose right shoulder is one of the last
  * `HS_MAX_PIVOTS_AFTER_RIGHT_SHOULDER + 1` confirmed pivots (the most recent
  * match wins). The neckline is the boundary through the two troughs; the
- * spec's checks are span, level shoulders (each on its own bar —
+ * checks are span, level shoulders (each on its own bar —
  * `extractPivots` never puts two pivots on one bar), both shoulders at least
  * `HS_SHOULDER_MIN_CLEARANCE_ATR`·ATR on the pattern's side of the
  * neckline with no close through it from the second trough to the right

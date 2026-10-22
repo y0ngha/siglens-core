@@ -34,7 +34,7 @@ import {
     priorTrend,
 } from '@/domain/patterns/qualify/context';
 
-// ─── Boundary pairs: triangles, wedges, channels, rectangle (§2.2–§3.2) ───
+// ─── Boundary pairs: triangles, wedges, channels, rectangle ───────────────
 
 const FIXED_TRENDLINE_DIRECTION: Partial<
     Record<ChartPatternId, PatternBreakoutDirection>
@@ -56,8 +56,8 @@ const FIXED_TRENDLINE_DIRECTION: Partial<
  * The chosen window is then grown backwards ({@link extendBackwards}), so a
  * maturing pattern keeps its first touches when newer pivots confirm: with a
  * fixed window the ninth confirmed pivot pushed the first touch out, moving
- * the start, the overlay id, the height and the target (spec 2026-10-07
- * §3.1 — levels are fixed once their touches confirm).
+ * the start, the overlay id, the height and the target.
+ * Levels are fixed once their touches confirm.
  */
 export function qualifyTrendlines(ctx: QualifyContext): QualifiedPattern[] {
     const largest = Math.min(TRENDLINE_PIVOT_WINDOW, ctx.pivots.length);
@@ -254,7 +254,7 @@ function patternFromBoundaries(
 /**
  * Both boundaries are in play at the same time: each keeps at least
  * `BOUNDARY_MIN_TOUCHES` touches from the other boundary's first touch on.
- * Not in the spec's table — without it a double top's rally low, trough and
+ * An added guard beyond the textbook definition — without it a double top's rally low, trough and
  * two peaks (low-high-low-high) read as an ascending triangle and, ranked
  * above doubles in arbitration, displaced it. A boundary that only "touches"
  * before the other one starts is the trend leading into the pattern.
@@ -269,7 +269,7 @@ function boundariesInterleave(upper: PatternLine, lower: PatternLine): boolean {
 }
 
 /**
- * The §2.3 table: each boundary is flat / rising / falling by its total move
+ * The classification table: each boundary is flat / rising / falling by its total move
  * over the span (a dead band in between is "not drawable"), and the width
  * ratio separates converging (triangles, wedges), parallel (channels) and
  * diverging (broadening) pairs. Wedges need `WEDGE_MIN_TOUCHES` per side,

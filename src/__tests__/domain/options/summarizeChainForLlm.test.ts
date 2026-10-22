@@ -403,7 +403,7 @@ describe('summarizeChainForLlm', () => {
             const c = chain([90, 100, 110]);
             const summary = summarizeChainForLlm(c, 100);
             const expected = ((summary.maxPain! - 100) / 100) * 100;
-            // spec 2026-09-18 §B5 — rounded to 2dp at the source.
+            // Rounded to 2dp at the source.
             expect(summary.maxPainDistancePct).toBeCloseTo(expected, 2);
         });
 
@@ -439,7 +439,7 @@ describe('summarizeChainForLlm', () => {
             const summary = summarizeChainForLlm(c, 100);
             const pct = summary.impliedMovePercent!;
             expect(summary.impliedMoveRange).not.toBeNull();
-            // spec 2026-09-18 — rounded to 2dp at the source now.
+            // Rounded to 2dp at the source now.
             expect(summary.impliedMoveRange!.low).toBeCloseTo(
                 100 * (1 - pct / 100),
                 2
@@ -470,7 +470,7 @@ describe('summarizeChainForLlm', () => {
             expect(summarizeChainForLlm(c, 150).impliedMoveRange).toBeNull();
         });
 
-        it('is null when impliedMovePercent >= 100 — low would sit at or below zero (spec 2026-09-18)', () => {
+        it('is null when impliedMovePercent >= 100 — low would sit at or below zero', () => {
             // atmIv 1.5 (150% IV) over a full year -> impliedMovePercent = 150.
             const c: OptionsChain = {
                 expirationDate: '2027-06-20',
@@ -483,7 +483,7 @@ describe('summarizeChainForLlm', () => {
             expect(summary.impliedMoveRange).toBeNull();
         });
 
-        it('rounds bounds to 2 decimal places at the source (spec 2026-09-18)', () => {
+        it('rounds bounds to 2 decimal places at the source', () => {
             const c: OptionsChain = {
                 expirationDate: '2026-06-20',
                 daysToExpiration: 33,
@@ -505,7 +505,7 @@ describe('summarizeChainForLlm', () => {
             const above = summary.topOpenInterestStrikes.find(
                 s => s.strike === 110
             )!;
-            // spec 2026-09-18 §B5 — rounded to 2dp at the source.
+            // Rounded to 2dp at the source.
             expect(above.distancePct).toBeCloseTo(((110 - 90) / 90) * 100, 2);
             expect(above.side).toBe('above');
         });
@@ -544,14 +544,14 @@ describe('summarizeChainForLlm', () => {
             }
         });
 
-        it('rounds distancePct to exactly 2 decimal places (spec 2026-09-18 §B5)', () => {
+        it('rounds distancePct to exactly 2 decimal places', () => {
             // (91 - 90) / 90 * 100 = 1.1111...% -> 1.11.
             const c = chain([91]);
             const summary = summarizeChainForLlm(c, 90);
             expect(summary.topOpenInterestStrikes[0].distancePct).toBe(1.11);
         });
 
-        it('never emits -0 for a distance that rounds to exactly zero (spec §0)', () => {
+        it('never emits -0 for a distance that rounds to exactly zero', () => {
             // (100.001 - 100) / 100 * 100 = 0.001% -> rounds to 0, not -0.
             const c = chain([99.999]);
             const summary = summarizeChainForLlm(c, 100);
@@ -595,12 +595,12 @@ describe('summarizeChainForLlm', () => {
             };
             const summary = summarizeChainForLlm(c, 100);
             const quote = summary.topOiBidAskSummary[0];
-            // spec 2026-09-18 §B5 — rounded to 2dp at the source.
+            // Rounded to 2dp at the source.
             expect(quote.callSpreadPct).toBeCloseTo((0.2 / 1.1) * 100, 2);
             expect(quote.putSpreadPct).toBeCloseTo((0.2 / 0.9) * 100, 2);
         });
 
-        it('rounds callSpreadPct/putSpreadPct to exactly 2 decimal places (spec 2026-09-18 §B5)', () => {
+        it('rounds callSpreadPct/putSpreadPct to exactly 2 decimal places', () => {
             const c: OptionsChain = {
                 expirationDate: '2026-06-20',
                 daysToExpiration: 30,

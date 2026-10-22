@@ -4,7 +4,7 @@ import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 
 const TIMEFRAME_ENUM: readonly string[] = TIMEFRAMES;
 
-/** Analysis kinds `run_fresh_analysis` can produce (spec §7). */
+/** Analysis kinds `run_fresh_analysis` can produce. */
 export const FRESH_ANALYSIS_KINDS = [
     'technical',
     'overall',
@@ -34,7 +34,7 @@ const symbolProp = {
 } as const;
 
 /**
- * Tool catalog (spec §7). Descriptions are the only thing the model reads —
+ * Tool catalog. Descriptions are the only thing the model reads —
  * keep them imperative and say WHEN to call the tool, not just what it does.
  * Executors live in siglens (`app/api/ai/chat/tools/*`).
  */

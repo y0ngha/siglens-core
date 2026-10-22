@@ -1239,7 +1239,7 @@ describe('confidence', () => {
             );
         });
 
-        describe('chartOverlays 정규화 (spec 2026-09-28)', () => {
+        describe('chartOverlays 정규화', () => {
             const validOverlay = {
                 id: 'pattern:double_bottom:1',
                 kind: 'pattern',
@@ -1467,7 +1467,7 @@ describe('confidence', () => {
     });
 });
 
-describe('unlisted chart pattern with geometry survives end-to-end (spec 2026-09-18 addendum — skills are guidance, not a boundary)', () => {
+describe('unlisted chart pattern with geometry survives end-to-end (skills are guidance, not a boundary)', () => {
     it('keeps a pattern whose skillName matches no active skill (UNMATCHED weight, not dropped), and appends its measured/conservative targets after post-processing', () => {
         const raw = makeAnalysisResponse({
             patternSummaries: [

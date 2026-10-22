@@ -58,7 +58,7 @@ export function computeMa200DisplayDistancePct(bars: Bar[]): number | null {
  * - VolumeProfile fails to produce a POC (e.g. all-zero volumes in window)
  *
  * look-ahead avoidance: rolling stats use bars[wStart..t) (current bar excluded).
- * Exception per spec §2.3: 52w high/low includes the current bar by definition,
+ * Exception: 52w high/low includes the current bar by definition,
  * so the result stays within [0, 1] even on new highs/lows.
  *
  * @internal Used by walkForward; not part of the public API.

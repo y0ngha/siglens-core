@@ -54,7 +54,7 @@ function formatNewsItem(
  * @internal
  *
  * Build the category-level market-news digest prompt, split into a
- * stable/dynamic pair (spec §3.4, {@link AssembledPrompt}) — Design C
+ * stable/dynamic pair ({@link AssembledPrompt}) — Design C
  * ("skills-to-system split"): `stable` is ONLY the News Analysis Frameworks
  * (Active Skills) section — deterministic per catalog since this builder's
  * selection context is {@link NO_CHART_SELECTION_CONTEXT} (chartless), see
@@ -83,7 +83,7 @@ export function buildMarketNewsDigestPrompt(
     skills: readonly Skill[],
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     /**
-     * Reference clock for the per-item age suffix (spec 2026-09-18 §2.8).
+     * Reference clock for the per-item age suffix.
      * Optional without a wall-clock default: the domain never reads the clock
      * itself (production callers pass it); omitted → no age suffix.
      */

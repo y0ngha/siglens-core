@@ -345,7 +345,7 @@ describe('normalizePatternSummary', () => {
         expect(result?.geometry).toBeUndefined();
     });
 
-    it('candidateId(spec 2026-09-28)가 비어있지 않은 문자열이면 그대로 전달한다', () => {
+    it('candidateId가 비어있지 않은 문자열이면 그대로 전달한다', () => {
         const result = normalizePatternSummary({
             patternName: 'X',
             skillName: 'Y',
@@ -369,7 +369,7 @@ describe('normalizePatternSummary', () => {
     });
 });
 
-describe('normalizePatternGeometry (spec 2026-09-18 §A6)', () => {
+describe('normalizePatternGeometry', () => {
     it('down 방향: extremeLevel > breakoutLevel이면 통과한다', () => {
         const result = normalizePatternGeometry({
             breakoutLevel: 140,
@@ -526,7 +526,7 @@ describe('normalizeStrategyResult', () => {
         expect(normalizeStrategyResult(null)).toBeNull();
     });
 
-    it('candidateIds(spec 2026-09-28)가 배열이면 비문자열/빈문자열을 걸러 전달한다', () => {
+    it('candidateIds가 배열이면 비문자열/빈문자열을 걸러 전달한다', () => {
         const result = normalizeStrategyResult({
             strategyName: 'Breakout',
             trend: 'bullish',
@@ -765,7 +765,7 @@ describe('normalizeActionRecommendation', () => {
     });
 });
 
-describe('normalizeIdList (spec 2026-09-28)', () => {
+describe('normalizeIdList', () => {
     it('non-array 값이면 []', () => {
         expect(normalizeIdList(null)).toEqual([]);
         expect(normalizeIdList('not-an-array')).toEqual([]);
@@ -776,7 +776,7 @@ describe('normalizeIdList (spec 2026-09-28)', () => {
     });
 });
 
-describe('normalizeChartOverlay (spec 2026-09-28)', () => {
+describe('normalizeChartOverlay', () => {
     const validOverlay = {
         id: 'pattern:double_top:1714521600',
         kind: 'pattern',

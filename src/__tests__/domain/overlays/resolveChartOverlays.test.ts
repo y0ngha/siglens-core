@@ -491,7 +491,7 @@ describe('resolveChartOverlays', () => {
                 };
             };
 
-            // Production (HOOD, 2026-10-01): the Fibonacci card cited [] and
+            // Real chart: the Fibonacci card cited [] and
             // only the Elliott card cited the leg — dropping it lost the ladder.
             it('draws a Fibonacci leg the Elliott card cited under an empty Fibonacci card', () => {
                 expect(

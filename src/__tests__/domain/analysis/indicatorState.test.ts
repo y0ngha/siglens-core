@@ -103,7 +103,7 @@ describe('buildIndicatorStateSection', () => {
             expect(section).toContain('MA(5) N/A');
         });
 
-        it('is N/A when price is zero or negative — an unknown reference, not a real reading (spec 2026-09-18)', () => {
+        it('is N/A when price is zero or negative — an unknown reference, not a real reading', () => {
             const zero = buildIndicatorStateSection({
                 ...baseInput,
                 price: 0,
@@ -118,7 +118,7 @@ describe('buildIndicatorStateSection', () => {
             expect(negative).toContain('MA(5) N/A');
         });
 
-        it('skips a NaN entry in the series and falls back to the last finite value (spec 2026-09-18)', () => {
+        it('skips a NaN entry in the series and falls back to the last finite value', () => {
             const section = buildIndicatorStateSection({
                 ...baseInput,
                 ma: { 5: [104, Number.NaN] },
@@ -546,7 +546,7 @@ describe('buildIndicatorStateSection', () => {
             expect(section).toContain('- Ichimoku: price N/A, tenkan N/A');
         });
 
-        it('cloud position is N/A when price is zero or negative (spec 2026-09-18)', () => {
+        it('cloud position is N/A when price is zero or negative', () => {
             const section = buildIndicatorStateSection({
                 ...baseInput,
                 price: 0,
@@ -609,7 +609,7 @@ describe('buildIndicatorStateSection', () => {
             expect(section).toContain('- Bollinger: N/A');
         });
 
-        it('is N/A when price is zero or negative (spec 2026-09-18)', () => {
+        it('is N/A when price is zero or negative', () => {
             const section = buildIndicatorStateSection({
                 ...baseInput,
                 price: -5,
@@ -709,7 +709,7 @@ describe('buildIndicatorStateSection', () => {
         });
     });
 
-    describe('MACD cycle (spec 2026-09-18 §A4(i), macd-cycle.md)', () => {
+    describe('MACD cycle', () => {
         // (ema9, ema21, ema60) constructed directly from the skill's "EMA
         // Order" column for each stage (Short/Mid/Long = EMA9/21/60):
         // 1 Short>Mid>Long, 2 Mid>Short>Long, 3 Mid>Long>Short,
@@ -765,12 +765,12 @@ describe('buildIndicatorStateSection', () => {
         });
     });
 
-    it('never renders its own "- Bollinger %B:" line — the Pro-Indicator section always prints one, so this would duplicate it (spec 2026-09-18)', () => {
+    it('never renders its own "- Bollinger %B:" line — the Pro-Indicator section always prints one, so this would duplicate it', () => {
         const section = buildIndicatorStateSection(baseInput);
         expect(section).not.toContain('Bollinger %B');
     });
 
-    describe('Volume vs 20-bar average (spec 2026-09-18 §A4(iii))', () => {
+    describe('Volume vs 20-bar average', () => {
         it('computes last bar volume as a multiple of the 20-bar average', () => {
             const section = buildIndicatorStateSection({
                 ...baseInput,
@@ -790,7 +790,7 @@ describe('buildIndicatorStateSection', () => {
             expect(section).toContain('- Volume: N/A');
         });
 
-        it('slices its own trailing 20-bar window from raw history (spec 2026-09-18) — extra older bars, even non-finite ones, are ignored', () => {
+        it('slices its own trailing 20-bar window from raw history — extra older bars, even non-finite ones, are ignored', () => {
             const section = buildIndicatorStateSection({
                 ...baseInput,
                 lastVolume: 1500,

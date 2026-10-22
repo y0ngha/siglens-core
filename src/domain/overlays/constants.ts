@@ -113,7 +113,7 @@ export const FIB_CANDIDATE_LIMIT = 4;
 // ─── Elliott ────────────────────────────────────────────────────────────────
 /**
  * @internal Upper bound on elliott candidates in one prompt. 5 (was 3) leaves
- * room for the best count of each structure kind (spec 2026-10-02).
+ * room for the best count of each structure kind.
  */
 export const ELLIOTT_CANDIDATE_LIMIT = 5;
 /**

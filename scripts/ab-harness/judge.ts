@@ -1,6 +1,5 @@
 /**
- * A/B prompt-quality harness — Stage 3 (plan Task 2.5,
- * `docs/superpowers/plans/2026-07-03-prompt-size-quality-redesign.md`).
+ * A/B prompt-quality harness — Stage 3.
  *
  * Pairs the `full` and `digest` results for every case, blind-labels them
  * (deterministic per caseId — NOT `Math.random()`, so re-runs and tests are
@@ -61,7 +60,7 @@ const JUDGE_MODEL = 'claude-opus-4-8' as const;
 const JUDGE_MAX_TOKENS = 4_096;
 const RETRY_DELAY_MS = 2_000;
 
-/** How often to poll `batches.retrieve` while waiting for a Message Batch to finish (spec: every 30s). */
+/** How often to poll `batches.retrieve` while waiting for a Message Batch to finish (every 30s). */
 const BATCH_POLL_INTERVAL_MS = 30_000;
 
 /**
@@ -716,7 +715,7 @@ export function aggregateVerdicts(
 /**
  * Digest is allowed to fall short of full by up to this much on the AGGREGATE
  * (mean-across-cases) axis score before that axis fails the mean-floor check
- * (spec §3.6 "digest >= full (mean)").
+ * ("digest mean >= full mean per axis", with this much slack).
  */
 const GATE_TOLERANCE = 0.1;
 
@@ -725,7 +724,7 @@ const GATE_TOLERANCE = 0.1;
  * A flat `full - digest <= 0.25` bound (an earlier version of this gate) is
  * meaningless on this scale: the minimum nonzero difference is 1, so *any*
  * single-point regression anywhere fails it — a de facto
- * zero-regressions-anywhere rule, far stricter than the approved spec
+ * zero-regressions-anywhere rule, far stricter than the intended
  * criterion ("digest mean >= full mean per axis, no meaningful
  * degradation"). Instead, per axis:
  * - a single case regressing by >= GATE_OUTLIER_DROP (2) points is a hard
@@ -734,7 +733,7 @@ const GATE_TOLERANCE = 0.1;
  * - a 1-point drop is tolerated in isolation (a single point of judge
  *   variance on an integer scale), but not when it recurs — see
  *   MAX_TOLERATED_ONE_POINT_DROPS below. This is checked independently of
- *   the mean-floor above (spec §3.6 "no axis... significant drop"): a mean
+ *   the mean-floor above: a mean
  *   check alone can't catch one case regressing badly if other cases in the
  *   same axis improved enough to offset it.
  */

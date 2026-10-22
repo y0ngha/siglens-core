@@ -1,5 +1,15 @@
 # Changelog
 
+# [2.25.0](https://github.com/y0ngha/siglens-core/compare/v2.24.0...v2.25.0) (2026-10-22)
+
+### Code Refactoring
+
+* 분석 use-case 캐시 주입 옵션 추가 및 AI SDK를 optional peer로 전환 ([#293](https://github.com/y0ngha/siglens-core/issues/293)) ([6e61481](https://github.com/y0ngha/siglens-core/commit/6e61481778c68121e212787c0d9b73be2df51521))
+
+### BREAKING CHANGES
+
+* AI SDK 3종이 더 이상 dependencies가 아니므로 소비자는 사용하는 모델의 SDK를 직접 설치해야 한다 (Claude → @anthropic-ai/sdk, Gemini → @google/genai, ChatGPT·DeepSeek → openai).
+
 # [2.24.0](https://github.com/y0ngha/siglens-core/compare/v2.23.3...v2.24.0) (2026-10-22)
 
 ### Features

@@ -116,7 +116,7 @@ export function requiresUserApiKey(
  * 구현은 `TIER_CONFIG.models[tier]`의 intrinsic membership을 직접 봐서 core의 정책
  * 플래그를 무시했는데, 그 결과 member가 자기 키로 `claude-opus-5` 같은 pro 전용 모델을
  * 선택하면 상위 게이트(free/premium만 구분)는 통과시키지만 이 함수가 도로 거부해
- * 삼켜진 400이 무한 스피너로 이어졌다(siglens-worker#21 리뷰에서 확인).
+ * 삼켜진 400이 무한 스피너로 이어질 수 있었다.
  * `isModelAllowed`에 위임함으로써 이 정책 불일치를 해소한다.
  *
  * 비용 안전장치는 이 함수의 책임이 아니다 — `shouldUseServerKey`/`requiresUserApiKey`가

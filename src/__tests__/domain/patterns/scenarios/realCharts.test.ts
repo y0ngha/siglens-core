@@ -13,7 +13,7 @@ import risingResistanceFile from '@/__tests__/domain/patterns/fixtures/charts/da
 import gapDownNearLeftRimFile from '@/__tests__/domain/patterns/fixtures/charts/daily-gap-down-near-left-rim.json';
 
 /**
- * Real-chart regressions (2026-10-08 recall diagnosis). The charts are
+ * Real-chart regressions from a recall diagnosis. The charts are
  * anonymized (see `chartFixture`) and keep their full fetched history: the
  * pivots read the per-bar ATR series from its first bar, exactly as the
  * analysis prompt does, so a shorter slice would warm up differently.

@@ -262,7 +262,7 @@ export const DEFAULT_ANALYSIS_MODEL_ID = 'analysis-worker';
 
 /**
  * @internal Cache-key suffix for the per-request reasoning ("deep-thinking")
- * toggle (member-reasoning-toggle spec, Part A). Reasoning ON and OFF produce
+ * toggle. Reasoning ON and OFF produce
  * materially different LLM output for the same inputs, so the two must never
  * share a cache entry — but OFF must stay indistinguishable from the
  * pre-toggle keyless behavior so existing cached entries and SSR peeks that
@@ -290,8 +290,7 @@ function localeKeySuffix(locale?: AnalysisLocale): string {
 }
 
 /**
- * @internal Cache-key suffix for the member position-bucket hint
- * (personalized-analysis-by-position-bucket spec, Subsystem C). A member's
+ * @internal Cache-key suffix for the member position-bucket hint. A member's
  * unrealized-P&L band (see {@link PositionBucket} / `bucketizePosition`)
  * personalizes the prompt, so a bucketed request must never share a cache
  * entry with the base (no-bucket) request or with a different bucket — but
@@ -605,8 +604,8 @@ export function narrowMarketEventsForCacheKey(
     //
     // `narrowPriorAnalysesForCacheKey`는 `generatedAt`만 해시하는데, 그쪽은
     // 한 번 만들어진 분석이 다시 쓰이지 않아 시각이 곧 내용의 식별자다.
-    // 뉴스는 다르다: 같은 기사가 나중에 다시 분류될 수 있고(운영 데이터에서
-    // 14.6만 건이 수집 하루 뒤 이후에 분석됐다), 그때 `publishedAt`은 그대로인
+    // 뉴스는 다르다: 같은 기사가 수집된 지 한참 뒤에 다시 분류될 수 있고, 그때
+    // `publishedAt`은 그대로인
     // 채 `impact`/`sentiment`/`category`만 바뀐다. 시각만 해시하면 그런 갱신이
     // 캐시 키를 바꾸지 못해, 렌더된 `## Market Events` 문구가 TTL이 끝날 때까지
     // 옛 분류를 그대로 보여 준다.
@@ -669,7 +668,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * LLM and therefore must invalidate previously cached results.
  *
  * @remarks
- * **`p3` = selection-engine activation (spec §3.2).** This constant covers the
+ * **`p3` = selection-engine activation.** This constant covers the
  * technical AND fundamental keys, and both templates' bytes change: the
  * technical prompt gains the category/type whitelist, the core/selected split
  * (always_on core first, fired skills relevance-ordered after), and fail-closed
@@ -678,7 +677,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  *
  * @remarks
  * **`p4` = stable/dynamic assembly split, Design C ("skills-to-system
- * split", spec §3.4).** Both `buildAnalysisPrompt` (technical) and
+ * split").** Both `buildAnalysisPrompt` (technical) and
  * `buildFundamentalAnalysisPrompt` now return `AssembledPrompt { stable,
  * dynamic }` instead of a single string; `stable` carries ONLY the
  * `always_on` skill digests (moved out of the user prompt into the system
@@ -687,10 +686,10 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * every other user-prompt section keep their original position. The
  * fingerprint only covers skill metadata (`{name, gating, tokenCost}`), so
  * relocating the skill digests changes prompt bytes without changing that
- * fingerprint, requiring a manual bump per the versioning policy (spec §4).
+ * fingerprint, requiring a manual bump per the versioning policy.
  *
  * @remarks
- * **`p5` = output-rules prose dedup (spec §3.5), TECHNICAL ONLY this round.**
+ * **`p5` = output-rules prose dedup, TECHNICAL ONLY this round.**
  * `buildAnalysisRequest` (in `prompt.ts`, feeding `buildAnalysisPrompt`) drops
  * several field-by-field prose enumerations that only restated what
  * `TECHNICAL_RESPONSE_SCHEMA` already enforces (required-ness, the `"skill"`
@@ -703,12 +702,12 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * `buildAnalysisRequest`) and was NOT touched this round, so its bytes are
  * unchanged — unlike `p3`/`p4`, which changed both templates. Bumping this
  * shared constant still cold-starts the fundamental cache as a side effect of
- * the shared invalidation axis; that is accepted per spec §4's "per-PR
- * warm-cache cold start is acceptable" policy, not a sign that the
+ * the shared invalidation axis; that is accepted under the policy that a warm-cache
+ * cold start on each prompt change is acceptable, not a sign that the
  * fundamental template changed.
  *
  * @remarks
- * **`p6` = free-tier skill sampling (free-analysis-tier-gating spec).** The
+ * **`p6` = free-tier skill sampling.** The
  * loaded skill catalog is now deterministically sampled per tier before
  * assembly (`sampleSkillsForTier` via `createSkillSamplingPlan`): free-tier
  * requests cap each skill-type group to at most 3 skills, changing which
@@ -720,8 +719,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * (unfiltered) content.
  *
  * @remarks
- * **`p6` did NOT bump for the member position-bucket hint's *introduction***
- * (personalized-analysis-by-position-bucket spec, Subsystem C). When the hint
+ * **`p6` did NOT bump for the member position-bucket hint's *introduction***. When the hint
  * was first added it only *appended* a distinct `:pos=<bucket>` segment (see
  * {@link buildAnalysisCacheKey} / `positionKeySuffix`) that was never written
  * before, so it landed on a brand-new key namespace — no previously-cached
@@ -731,8 +729,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * correctness gain.
  *
  * @remarks
- * **`p7` = position-hint reframed to position-management (Subsystem C
- * follow-up).** `formatPositionHintSection` was strengthened from a single
+ * **`p7` = position-hint reframed to position-management (follow-up).** `formatPositionHintSection` was strengthened from a single
  * passive "참고: … 구간에 있습니다." reference line into an instructive holder /
  * position-management framing (보유자 관점 — 보유 지속 / 부분 익절 / 추가매수 / 손절
  * 규율 시나리오). This changes the technical prompt's bytes for EVERY bucketed
@@ -840,7 +837,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * and ratios render `N/A`.
  *
  * @remarks
- * **`p14` = precomputed prompt data (spec 2026-09-18 §2.2/§2.3).** A new
+ * **`p14` = precomputed prompt data.** A new
  * `## Indicator State (computed)` section renders right after `## Indicator
  * Values` — every above/below, cross and zone comparison (MA/EMA distance,
  * MACD vs signal/zero, DMI/ADX regime, Stochastic zone, Ichimoku cloud
@@ -857,7 +854,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * "cite the swing you're anchored on" instruction has something to cite.
  *
  * @remarks
- * **`p15`** — precomputed prompt data, wave 2 (spec 2026-09-18 §A1–A5). A new
+ * **`p15`** — precomputed prompt data, wave 2. A new
  * `## Chart Pattern Candidates (computed)` section renders the pre-screener's
  * hits with deterministic measured-move geometry (key points, breakout
  * level, height, measured/conservative targets, invalidation level, status);
@@ -878,7 +875,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * every request.
  *
  * @remarks
- * Same round, response-shaping only (spec §B6) — not a prompt-byte change,
+ * Same round, response-shaping only — not a prompt-byte change,
  * but bundled here since it touches the same post-processing path `p14`
  * introduced: `buildBullishRiskRewardText`'s stop-loss percent (`slLabel`)
  * now goes through `formatNullableNumber` instead of a raw `toFixed`, so a
@@ -886,12 +883,11 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * `reconciledLevels.riskReward` line with `-0.0%`.
  *
  * @remarks
- * **`p16`** — confluence authority withdrawn, washout reading added (spec
- * 2026-09-25-pullback-washout-design.md). `## Deterministic Metrics` no longer
+ * **`p16`** — confluence authority withdrawn, washout reading added. `## Deterministic Metrics` no longer
  * tells the model to treat a met daily confluence rule as "strong evidence":
  * every `Reliability:` line now says the tally is descriptive and has no
- * measured forward edge (re-measured 2000–2026: daily entry-rule days trailed
- * the baseline in all five periods). On `1Day` charts a new
+ * measured forward edge (re-measured out of sample: daily entry-rule days did
+ * not beat the baseline). On `1Day` charts a new
  * `### Short-Term Washout (rule engine, 1Day bars)` block renders
  * `evaluatePullback` — close vs MA200, Williams %R(14), RSI(2), the MA5 exit
  * reference, the reading and its measured base rate. `entryRecommendation`
@@ -901,9 +897,8 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * (tally is descriptive; state a washout reading next to it). Bytes change for
  * every request.
  *
- * **`p17`** — washout entry verdict decided by the rule engine (spec
- * 2026-09-26-washout-entry-verdict-design.md). `entryRecommendation` was never
- * "enter" in production (0 of 6,070 technical analyses, p9–p16): the model read
+ * **`p17`** — washout entry verdict decided by the rule engine. `entryRecommendation` was effectively never
+ * "enter" under the earlier versions: the model read
  * a washout's normal companions as missing confirmation. A washout-in-uptrend
  * block now prints `Entry verdict (rule engine): enter — washout path`; Step 1
  * puts that path first, says it needs no confirmation and that the confluence
@@ -912,19 +907,17 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * near-washout and below-MA200 base-rate sentences are softened to match the
  * re-measurement. Bytes change on every 1Day request.
  *
- * **`p18`** — the washout verdict stands down on a news-driven drop (same spec,
- * §8). When an earnings, guidance or regulatory event (impact high/medium,
+ * **`p18`** — the washout verdict stands down on a news-driven drop. When an earnings, guidance or regulatory event (impact high/medium,
  * not bullish) landed within the last 3 sessions, the block prints
  * `Entry verdict (rule engine): none — …` instead of `enter`, and Step 1 tells
  * the model to judge that chart itself without citing the base rate. The
  * `enter` verdict told the model not to re-judge, so ungated it forced "enter"
- * onto exactly the drops the measurement does not cover (3 of 23 A/B enters
+ * onto exactly the drops the measurement does not cover (some A/B enters
  * were earnings-window drops). `formatDeterministicMetricsSection` now receives
  * the prompt's `marketEvents`. Step 1 gains one line, so every 1Day request's
  * bytes change.
  *
- * **`p19`** — detector catalogue widened (spec
- * 2026-09-28-pattern-signal-expansion-design.md): six multi-candle labels
+ * **`p19`** — detector catalogue widened: six multi-candle labels
  * (above/below the stomach, rising/falling three methods, bullish/bearish
  * three-line strike), five chart-pattern candidates (rounding top, high tight
  * flag, ascending/descending channel, broadening formation — near-parallel
@@ -933,7 +926,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * (computed)`, and four signals (52-week high/low, gap up/down) now feed skill
  * gating (not the confluence tally), so cached analyses built on the old
  * catalogue are stale.
- * **`p20`** — chart overlay candidate ids (spec 2026-09-28-chart-overlays).
+ * **`p20`** — chart overlay candidate ids.
  * `## Chart Pattern Candidates (computed)` gains a `Candidate id:` line per
  * geometry-bearing candidate, and a new `## Chart Overlay Candidates
  * (computed)` section lists trendline/divergence/fibonacci/elliott
@@ -959,7 +952,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * `always_on` skill digests) so the cross-symbol common prefix covers them for
  * provider automatic prefix caching. Bytes change on every request.
  *
- * **`p23`** — UX audit 2026-10-05 §C6 (and the A/B follow-up). The model echoed
+ * **`p23`** — UX audit (and the A/B follow-up). The model echoed
  * the internal labels it was shown, so they are gone from both instructions
  * and data: the instruction block is now `### Indicator Agreement Assessment`
  * with an internal-labels rule (never write "rule engine", "confluence",
@@ -974,8 +967,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * ("washout" → "sell-off", "bearish confluence tally" → "bearish indicator
  * tally"). Bytes change on every request.
  *
- * **`p24`** — chart-pattern qualification (spec
- * 2026-10-07-chart-pattern-qualification-design.md). `## Chart Pattern
+ * **`p24`** — chart-pattern qualification. `## Chart Pattern
  * Candidates (computed)` now lists only patterns that pass the strict drawing
  * checks (confirmed pivots, boundaries through touches, a slope dead band,
  * minimum size and duration, overlap arbitration) with their numbers and
@@ -1077,8 +1069,8 @@ export const PROMPT_TEMPLATE_VERSION = 'p32' as const;
  *
  * The exact key folds inputs a read-only caller cannot reconstruct without the
  * writer's DB reads — the prior-analysis (`:hist=`) and market-event (`:evt=`)
- * fingerprints — so peeking it essentially always missed (measured on
- * production 2026-09-29: every popular symbol's SSR seed was the fallback).
+ * fingerprints — so peeking it essentially always missed and a server-rendered seed
+ * always fell back.
  * The pointer drops those and the skill fingerprint, keeping only what a
  * reader knows. Same design as {@link buildOverallPeekCacheKey}.
  *
@@ -1118,18 +1110,15 @@ export function buildAnalysisPeekCacheKey(
  *   so existing callers that do not pass a model remain backward-compatible.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix so reasoning
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix so reasoning
  *   ON never collides with the OFF result; `false`/`undefined` produce the
  *   exact same key as omitting the parameter entirely (backward compatible).
- * @param positionBucket - Member position-bucket hint
- *   (personalized-analysis-by-position-bucket spec, Subsystem C). When
+ * @param positionBucket - Member position-bucket hint. When
  *   supplied, appends a distinct `:pos=<bucket>` suffix AFTER the reasoning
  *   suffix so each bucket (and the base/no-bucket request) reads/writes a
  *   distinct cache entry; `undefined` produces the exact same key as omitting
  *   the parameter entirely (backward compatible — this is the v1 scope: only
- *   the technical/chart analysis key composes this axis, see the spec's
- *   cross-repo split).
+ *   the technical/chart analysis key composes this axis).
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the
  *   Korean cache stays valid; other locales append `:lang=<locale>`.
@@ -1205,9 +1194,9 @@ export function buildAnalysisCacheKey(
  * **Why this axis exists.** Sibling keys (`analysis`, `economic-event`,
  * `fundamental`, `financials`) all carry one; market briefing did not, so a
  * prompt change took up to a full TTL (1h) to take effect — within that window
- * a cache HIT returns a response the *old* prompt produced. For the 2026-08-19
- * change that meant English sector tickers and a fabricated VIX number still
- * being served after deploy.
+ * a cache HIT returns a response the *old* prompt produced. One such change
+ * meant English sector tickers and a fabricated VIX number still being served
+ * after deploy.
  *
  * Bump whenever `buildMarketBriefingPrompt`'s output changes in a way that
  * would make a previously cached briefing wrong or stale. `p1` is the first
@@ -1218,7 +1207,7 @@ export function buildAnalysisCacheKey(
  * helper (a missing change printed `NaN%`) and the volatility level is rounded to
  * cents in both places the model is told to copy it verbatim.
  *
- * **`p3`** — precomputed prompt data (spec 2026-09-18 §2.9). Sector rows are
+ * **`p3`** — precomputed prompt data. Sector rows are
  * sorted by change descending and prefixed with rank, and the prompt gains
  * `Breadth: N up / N down / N flat`, `Best − worst sector spread: x.xxpp`,
  * and `Index average change: ±x.xx%` lines, plus a rule that leading/lagging
@@ -1226,7 +1215,7 @@ export function buildAnalysisCacheKey(
  * every request.
  *
  * @remarks
- * **`p4`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B2).
+ * **`p4`** — precomputed prompt data, wave 2.
  * `Index average change` now excludes the volatility-index (`symbol ===
  * 'VIX'`) row — the VIX's own daily swing is several times an equity
  * index's, so folding it in reported a number that tracked VIX noise more
@@ -1298,15 +1287,15 @@ export function buildMacroBriefingDateBucket(now: Date): string {
  * significant digits instead of 10 — the 10-digit rule cut real digits off
  * large published figures (`29723864123.45` rendered `29723864120`).
  *
- * **`p3`** — precomputed prompt data (spec 2026-09-18 §2.10). Indicator rows
+ * **`p3`** — precomputed prompt data. Indicator rows
  * gain a `(Δ ±x.xx)` delta next to the previous value, and calendar rows gain
  * an `(in N days)` suffix. Bytes change for every request.
  *
  * @remarks
- * **`p4`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B3). A
+ * **`p4`** — precomputed prompt data, wave 2. A
  * rate-type indicator (`unit === '%'`) now renders its delta as `±x.xxpp`
  * with no `%` term; a level-type indicator (no `%` unit) renders `±delta[,
- * ±x.xx%]` — the percent term only when `previous > 0` (null rule §0) — and
+ * ±x.xx%]` — the percent term only when `previous > 0` (null rule) — and
  * an integer-valued series (e.g. payroll counts) formats its delta with
  * thousands separators and no forced decimals (`-10,000`, not `-10000.00`).
  * The calendar `(in N days)` suffix now reads `(today, in Nh)` / `(in Nh)`
@@ -1315,7 +1304,7 @@ export function buildMacroBriefingDateBucket(now: Date): string {
  * change for every request.
  *
  * @remarks
- * **`p5`** — UX audit 2026-10-05 §C1 (and the A/B follow-ups). Indicator rows
+ * **`p5`** — UX audit (and the A/B follow-ups). Indicator rows
  * print a human label, the FMP key and an explicit unit
  * (registry: `MACRO_INDICATOR_PROMPT_META`). A level series whose raw unit is a
  * multiplier is pre-converted so the model never rescales: nonfarm payroll
@@ -1379,8 +1368,7 @@ export function buildMacroBriefingCacheKey(
  * @remarks
  * Two earlier changes deliberately did **not** bump this constant, and the
  * reasoning still holds for them: the `PROMPT_DIGEST` activation (this builder
- * interpolates no `skill.content`) and the stable/dynamic assembly split (spec
- * §3.4 — `stable` is `''` and `dynamic` is byte-identical to the previous
+ * interpolates no `skill.content`) and the stable/dynamic assembly split (`stable` is `''` and `dynamic` is byte-identical to the previous
  * plain-string prompt). Both were no-op cache churn; this one is not.
  *
  * @remarks
@@ -1395,14 +1383,14 @@ export function buildMacroBriefingCacheKey(
  * significant digits instead of 10 — the 10-digit rule cut real digits off
  * large published figures (`29723864123.45` rendered `29723864120`).
  *
- * **`p6`** — precomputed prompt data (spec 2026-09-18 §2.11). `## Event
+ * **`p6`** — precomputed prompt data. `## Event
  * Details` gains `Actual vs Estimate: ±x.xx (above/below/in line)` and
  * `Actual vs Previous: ±x.xx (higher/lower/unchanged)` lines, and the "Key
  * signal" sentence points at them instead of asking the model to compare the
  * figures itself. Bytes change for every request.
  *
  * @remarks
- * **`p7`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B7). When
+ * **`p7`** — precomputed prompt data, wave 2. When
  * `unit === '%'`, the Actual-vs-Estimate/Previous deltas now render as
  * `±x.xxpp` (a delta of two percentages is a percentage-point figure, not a
  * percent) instead of `±x.xx %`. `Actual`/`Estimate`/`Previous` themselves
@@ -1535,7 +1523,7 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * the caller instead of inferred from the symbol. Amounts that round up to the
  * next scale render there (`1.0B`, not `1000.0M`).
  *
- * **`f4`** — precomputed prompt data (spec 2026-09-18 §2.6). A new
+ * **`f4`** — precomputed prompt data. A new
  * `## Derived Metrics (computed)` section renders target upside vs current
  * price, price-target trend (1M vs 1Y avg), peer P/E and P/S medians with
  * premium/discount, analyst buy share, EPS estimate vs TTM, and days to next
@@ -1543,14 +1531,14 @@ export const OPTIONS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * every request.
  *
  * @remarks
- * **`f5`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B4). The
+ * **`f5`** — precomputed prompt data, wave 2. The
  * computed `## Derived Metrics (computed)` line is relabelled `Price Target
  * Momentum` — it collided with the raw `## Forward / Analyst Outlook`
  * section's own `Price Target Trend` line (the priceTargetSummary readout),
  * two different numbers under one identical label. Bytes change for every
  * request.
  *
- * Same bump, spec §B6: `formatPeerMetric` (`## Comparable Peers` PER/PSR)
+ * Same bump)
  * now delegates to `formatNullableNumber` instead of a raw `toFixed`, so a
  * loss-making peer's negative P/E no longer renders `-0.0` when it rounds
  * to exactly zero.
@@ -1589,8 +1577,7 @@ export const FUNDAMENTAL_PROMPT_TEMPLATE_VERSION = 'f7' as const;
  * @param modelId - LLM model identifier.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the
@@ -1626,14 +1613,14 @@ export function buildFundamentalCacheKey(
  * condensed `PROMPT_DIGEST` section, changing this template's prompt bytes.
  *
  * @remarks
- * **`p3` = selection-engine activation (spec §3.2)** — the financials builder
+ * **`p3` = selection-engine activation** — the financials builder
  * now routes skills through the shared selector (whitelist + fail-closed
  * gating), so injected fundamental skills are name-sorted instead of catalog
  * order, changing this template's prompt bytes.
  *
  * @remarks
  * **`p4` = stable/dynamic assembly split, Design C ("skills-to-system
- * split", spec §3.4).** `buildFinancialsAnalysisPrompt` now returns
+ * split").** `buildFinancialsAnalysisPrompt` now returns
  * `AssembledPrompt { stable, dynamic }`; ONLY the always_on-only "Financial
  * Analysis Frameworks" (Active Skills) section moved out of the user prompt
  * into `stable` (relocated to the system prompt) — Data Boundary/Output
@@ -1641,7 +1628,7 @@ export function buildFundamentalCacheKey(
  * production order, changing this template's prompt bytes.
  *
  * @remarks
- * **`p5` = free-tier skill sampling (free-analysis-tier-gating spec).** The
+ * **`p5` = free-tier skill sampling.** The
  * financials builder now routes its loaded skills through
  * `createSkillSamplingPlan` before assembly, capping each skill-type group to
  * at most 3 skills for the free tier and changing this template's prompt
@@ -1660,7 +1647,7 @@ export function buildFundamentalCacheKey(
  * currency inferred from the symbol (an ADR's TWD statements printed as
  * `USD`). Amounts that round up to the next scale render there.
  *
- * **`p8`** — precomputed prompt data (spec 2026-09-18 §2.7). Income Statement
+ * **`p8`** — precomputed prompt data. Income Statement
  * and Cash Flow gain a `Margin Trend (latest vs prior same-period row)` line
  * (gross/operating/net/FCF change in `pp`), and Balance Sheet gains a
  * `Liabilities / Equity` line for the latest row. Bytes change for every
@@ -1697,8 +1684,7 @@ export const FINANCIALS_PROMPT_TEMPLATE_VERSION = 'p9' as const;
  *   analyses cover different data and must not share a cache entry.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the
@@ -1739,13 +1725,13 @@ export function buildFinancialsCacheKey(
  * **`p2` = PROMPT_DIGEST activation** (see {@link PROMPT_TEMPLATE_VERSION}'s
  * remark) — `skill.content` switched from the full skill body to the
  * condensed `PROMPT_DIGEST` section, changing this template's prompt bytes.
- * Intentionally NOT bumped for the §3.2 selection engine: the congress builder
+ * Intentionally NOT bumped for the skill selection engine: the congress builder
  * keeps its own private `category === 'congress'` filter and does not call
  * `selectSkills`, so its prompt bytes are unchanged.
  *
  * @remarks
  * **`p3` = stable/dynamic assembly split, Design C ("skills-to-system
- * split", spec §3.4).** `buildCongressTrendPrompt` now returns
+ * split").** `buildCongressTrendPrompt` now returns
  * `AssembledPrompt { stable, dynamic }`; ONLY the catalog-deterministic
  * "Domain Skills (Active)" section (filtered purely by category, never by
  * chart/symbol state) moved out of the user prompt into `stable` (relocated
@@ -1754,7 +1740,7 @@ export function buildFinancialsCacheKey(
  * production order, changing this template's prompt bytes.
  *
  * @remarks
- * **`p4` = free-tier skill sampling (free-analysis-tier-gating spec).** The
+ * **`p4` = free-tier skill sampling.** The
  * congress builder now routes its loaded skills through
  * `createSkillSamplingPlan` before assembly, capping each skill-type group to
  * at most 3 skills for the free tier and changing this template's prompt
@@ -1799,8 +1785,7 @@ export const CONGRESS_CACHE_TTL_SECONDS = SECONDS_PER_DAY;
  * @param modelId - LLM model identifier.
  * @param skillFingerprint - Optional hash of the skill catalog's selection
  *   metadata. When provided, appended as the final key segment.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the
@@ -1852,8 +1837,7 @@ export function buildCongressTrendCacheKey(
  * numbers are comma-grouped and labels / axes render as display names — and so
  * did the rules (FTD caveat, active ATM, no identifiers, no price-impact
  * prediction, Korean terms). A `p2` entry can misdate an FTD peak or read a
- * mega cap's plan sales as bearish. Round-by-round detail lives in
- * `docs/PUBLIC_API.md`.
+ * mega cap's plan sales as bearish.
  *
  * **`p4`** = Korean insider cluster fix (2026-10-17). A cluster counts only
  * reporters with a material change, opposite clusters are netted, and a
@@ -1980,7 +1964,7 @@ export function buildInvestorFlowsCacheKey(
  *
  * @remarks
  * **`p3` = stable/dynamic assembly split, Design C ("skills-to-system
- * split", spec §3.4).** Both `buildNewsAnalysisPrompt` and
+ * split").** Both `buildNewsAnalysisPrompt` and
  * `buildMarketNewsDigestPrompt` now return `AssembledPrompt { stable,
  * dynamic }`; ONLY the always_on-only "News Analysis Frameworks" (Active
  * Skills) section moved out of the user prompt into `stable` (relocated to
@@ -1989,7 +1973,7 @@ export function buildInvestorFlowsCacheKey(
  * changing both templates' prompt bytes.
  *
  * @remarks
- * **`p4` = free-tier skill sampling (free-analysis-tier-gating spec).** Both
+ * **`p4` = free-tier skill sampling.** Both
  * builders now route their loaded skills through `createSkillSamplingPlan`
  * before assembly, capping each skill-type group to at most 3 skills for the
  * free tier and changing both templates' prompt bytes. Since neither
@@ -2008,7 +1992,7 @@ export function buildInvestorFlowsCacheKey(
  * currency follow the caller-supplied listing currency instead of the symbol
  * suffix, and amounts that round up to the next scale render there.
  *
- * **`p7`** — precomputed prompt data (spec 2026-09-18 §2.8). Both builders
+ * **`p7`** — precomputed prompt data. Both builders
  * gain a `Sentiment tally: N bullish / N bearish / N neutral (high impact: …)`
  * header, each item's `Published:` line gains an `(Nh ago | Nd ago)` suffix,
  * and news-analysis calendar rows gain `(in N days | N days ago)`. Bytes
@@ -2022,7 +2006,7 @@ export function buildInvestorFlowsCacheKey(
  * request of both builders.
  *
  * The news-card EXCERPT rule wording and the `stripInputMetaLead` normalizer
- * backstop (UX audit 2026-10-05 §C2) are layered on top of it. The card prompt's
+ * backstop (UX audit) are layered on top of it. The card prompt's
  * bytes DO change (for truncated bodies), but that needs no bump here: core owns
  * no news-card cache key — consumers store per-article results — so a new
  * article simply gets the new wording, and the normalizer only post-processes
@@ -2094,8 +2078,7 @@ export function buildMarketNewsDigestCacheKey(
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param modelId - LLM model identifier.
  * @param inputHash - Short hash of the news items used as prompt input.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the
@@ -2146,7 +2129,7 @@ export function buildNewsCacheKey(
  * placeholder bars were dropped — those inputs are not folded into this key's
  * `inputHash`.
  *
- * **`p3`** — precomputed prompt data (spec 2026-09-18 §2.5): `formatTechnical`
+ * **`p3`** — precomputed prompt data: `formatTechnical`
  * gains a `- Snapshot Price: X` line (when `bars` was supplied) and every
  * support/resistance/target row gains a `(±x.xx% from snapshot)` suffix, so
  * the model no longer has to guess distance from a price it was never given.
@@ -2232,8 +2215,7 @@ export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p10' as const;
  * @param timeframe - Bar resolution used for the technical axis.
  * @param modelId - LLM model identifier.
  * @param inputHash - Short hash of the combined technical/fundamental/news inputs.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the
@@ -2336,7 +2318,7 @@ const MAX_MARKET_CLOSURE_DAYS = 5;
  * first. Once in-window rows fill the limit, each fresh generation pushes the
  * oldest out-of-window row out of the result set, the survivor set changes,
  * and the `:hist=` fingerprint changes — so the very next request misses and
- * generates again, forever. Measured on production (PLTR 1Day, 2026-09-29):
+ * generates again, forever. Observed on a daily chart:
  * every generation after the 21 slots filled produced a new fingerprint.
  * Excluding the bucket in SQL (`generated_at < generatedBeforeMs`) makes the
  * result set depend only on rows older than the bucket start, which new
@@ -2403,8 +2385,7 @@ export function analysisHistoryQuery(
  * no-op cache churn.
  *
  * @remarks
- * **Deliberately NOT bumped for the stable/dynamic assembly split (spec
- * §3.4).** `buildIndicatorTranslationPrompt` now returns `AssembledPrompt {
+ * **Deliberately NOT bumped for the stable/dynamic assembly split.** `buildIndicatorTranslationPrompt` now returns `AssembledPrompt {
  * stable, dynamic }` instead of a plain string, but this builder has no
  * skills to relocate for Design C — `stable` is simply `''` and `dynamic` is
  * byte-for-byte the same prompt text the plain-string version produced (only
@@ -2480,8 +2461,7 @@ export function buildIndicatorTranslationCacheKey(nameHash: string): string {
  * @param symbol - U.S. equity ticker (canonical uppercase).
  * @param timeframe - Bar resolution used for the technical axis.
  * @param modelId - LLM model identifier.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix so a
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix so a
  *   reasoning-ON overall analysis never overwrites the reasoning-OFF "latest"
  *   pointer (or vice versa); `false`/`undefined` produce the exact same key
  *   as omitting the parameter.
@@ -2520,7 +2500,7 @@ export function buildOverallPeekCacheKey(
  * served after the prompt changed; `p1` gives this builder the same
  * invalidation lever its siblings already have.
  *
- * **`p2`** — precomputed prompt data (spec 2026-09-18 §2.4):
+ * **`p2`** — precomputed prompt data:
  * `summarizeChainForLlm` gained `daysToExpiration`, `maxPainDistancePct`,
  * `impliedMoveRange`, per-strike `distancePct`/`side`, and per-quote
  * `callSpreadPct`/`putSpreadPct`, and the Interpretation Guide gained one
@@ -2528,7 +2508,7 @@ export function buildOverallPeekCacheKey(
  * changed, so pre-`p2` cache entries would serve stale metrics.
  *
  * @remarks
- * **`p3`** — precomputed prompt data, wave 2 (spec 2026-09-18 §B5).
+ * **`p3`** — precomputed prompt data, wave 2.
  * `summarizeChainForLlm`'s `distancePct` / `maxPainDistancePct` /
  * `callSpreadPct` / `putSpreadPct` now round to exactly 2 decimal places at
  * the source (previously unrounded floating-point ratios) — the rendered
@@ -2562,8 +2542,7 @@ export const OPTIONS_PROMPT_TEMPLATE_VERSION = 'p5' as const;
  * @param modelId - LLM model identifier scoping the cache.
  * @param snapshotInputHash - Hash of the snapshot inputs — a fresher snapshot
  *   produces a different hash and therefore a new cache entry.
- * @param reasoning - Per-request deep-thinking toggle (member-reasoning-toggle
- *   spec, Part A). `true` appends a distinct `:reason=on` suffix; `false`/
+ * @param reasoning - Per-request deep-thinking toggle. `true` appends a distinct `:reason=on` suffix; `false`/
  *   `undefined` produce the exact same key as omitting the parameter.
  * @param locale - AI output language. Omit (or pass the default `ko`) to get
  *   the exact key this builder produced before the parameter existed, so the

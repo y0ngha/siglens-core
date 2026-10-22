@@ -9,7 +9,7 @@ import type { Skill, SkillGating, SkillSelectionContext } from '@/domain/types';
 /**
  * @internal
  * Result of {@link selectSkills}, split along the stable/dynamic prompt
- * boundary (spec §3.2 / §3.4):
+ * boundary:
  *
  * - `core` — `always_on` skills, name-sorted (locale-pinned). Depends only on
  *   the catalog, never on the chart, so it can serve as a byte-stable prompt
@@ -139,7 +139,7 @@ export function selectSkills(
             throw new Error(
                 `selectSkills: skill "${skill.name}" has no gating metadata — ` +
                     `selection is fail-closed (tag the skill's frontmatter with a ` +
-                    `gating block; see docs/SKILL_GATING.md)`
+                    `gating block that sets its tier)`
             );
         }
 

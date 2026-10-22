@@ -109,8 +109,7 @@ const LINE_ROLES = new Set([
 ]);
 
 /**
- * The invariants every run must hold, whatever was drawn (spec 2026-10-07
- * §2.2, §2.5): no drawn boundary or channel line is crossed by a candle
+ * The invariants every run must hold, whatever was drawn: no drawn boundary or channel line is crossed by a candle
  * beyond ε over its solid touch-to-touch span, a neckline holds between its
  * two troughs,
  * each line family meets its touch count, and no two drawn patterns with

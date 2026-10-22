@@ -29,7 +29,7 @@ const RECALL_FIXTURES: ReadonlyArray<[string, Fixture, ChartPatternId]> = [
 ];
 
 describe('qualifyPatterns', () => {
-    describe('recall fixtures (spec 2026-10-07 §6 tests 10, 12)', () => {
+    describe('recall fixtures', () => {
         it.each(RECALL_FIXTURES)(
             '%s: the pre-screener recalls it, it qualifies (not spent), and it is the only drawable pattern',
             (_, f, id) => {

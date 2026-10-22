@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { buildMarketBriefingPrompt as buildMarketBriefingPromptRaw } from '@/domain/analysis/marketBriefingPrompt';
 import type { MarketIndexData, MarketSectorData } from '@/domain/types';
 
-// `buildMarketBriefingPrompt` now returns `{ stable, dynamic }` (spec §3.4
-// assembly split) — this file's call sites predate the split and assert
+// `buildMarketBriefingPrompt` now returns `{ stable, dynamic }` (assembly
+// split) — this file's call sites predate the split and assert
 // against the single legacy combined string (`stable + '\n\n' + dynamic`,
 // exactly the string dispatch still sends as the `prompt` fallback field).
 const buildMarketBriefingPrompt = (
@@ -348,7 +348,7 @@ describe('buildMarketBriefingPrompt numeric guards', () => {
     });
 });
 
-describe('buildMarketBriefingPrompt — sector rank + breadth + spread (spec 2026-09-18 §2.9)', () => {
+describe('buildMarketBriefingPrompt — sector rank + breadth + spread', () => {
     it('sorts sector rows by change descending and prefixes each with a rank', () => {
         const p = buildMarketBriefingPrompt(indices, sectors, US_CONTEXT);
         const xlkIdx = p.indexOf('#1 기술 (XLK): +1.20%');
@@ -392,12 +392,12 @@ describe('buildMarketBriefingPrompt — sector rank + breadth + spread (spec 202
         expect(p).toContain('Best − worst sector spread: N/A');
     });
 
-    it('spread is N/A with only 1 sector — a single point has no spread (spec 2026-09-18)', () => {
+    it('spread is N/A with only 1 sector — a single point has no spread', () => {
         const p = buildMarketBriefingPrompt(indices, [sectors[0]], US_CONTEXT);
         expect(p).toContain('Best − worst sector spread: N/A');
     });
 
-    it('excludes a non-finite sector change from ranking/breadth/spread, and lists it after the ranked rows with no rank (spec 2026-09-18)', () => {
+    it('excludes a non-finite sector change from ranking/breadth/spread, and lists it after the ranked rows with no rank', () => {
         const withBroken: MarketSectorData[] = [
             ...sectors,
             {
@@ -418,7 +418,7 @@ describe('buildMarketBriefingPrompt — sector rank + breadth + spread (spec 202
         expect(p).not.toContain('NaN');
     });
 
-    it('renders the index average change, excluding the VIX row (spec 2026-09-18 §B2)', () => {
+    it('renders the index average change, excluding the VIX row', () => {
         const p = buildMarketBriefingPrompt(indices, sectors, US_CONTEXT);
         // `indices` fixture is [S&P 500 +0.45%, VIX -2.1%] -> VIX excluded,
         // so the average is just S&P 500's own change, not (0.45 + -2.1) / 2.

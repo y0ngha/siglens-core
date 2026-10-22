@@ -35,8 +35,7 @@ export type AssetClass = 'equity' | 'crypto';
 export type CurrencyCode = 'USD' | 'KRW';
 
 /**
- * Coarse unrealized profit/loss band for a member's holding in a symbol
- * (personalized-analysis-by-position-bucket spec, Subsystem C).
+ * Coarse unrealized profit/loss band for a member's holding in a symbol.
  *
  * Deliberately a 5-level qualitative band — not a raw return percentage or
  * average price — so the value is safe to fold into the shared analysis
@@ -106,8 +105,7 @@ export interface MarketQuote {
     /** Display name returned by the provider. */
     name: string;
     /**
-     * Unix seconds of the provider's quote time, when it reports one (spec
-     * 2026-09-18) — used to compute an `asOf` freshness label for the quote.
+     * Unix seconds of the provider's quote time, when it reports one — used to compute an `asOf` freshness label for the quote.
      * Optional and additive: a provider adapter that does not carry a
      * timestamp through simply omits it.
      */
@@ -1288,13 +1286,13 @@ export interface HorizonReference {
      * `HorizonReference` literals (tests, older snapshots) keep compiling —
      * added so the prompt can print the anchor instead of leaving the Fib
      * skill's "cite the swing it's anchored on" instruction with nothing to
-     * cite (spec 2026-09-18 §2.2 addendum).
+     * cite.
      */
     fibProjection?: FibonacciProjection | null;
     /**
      * The A→B→C swing triplet this horizon's `Fib ABC ext …%` levels are
      * anchored on, or `null`/`undefined` when the window has fewer than 3
-     * alternating confirmed swing points after B (spec 2026-09-18 §A3). Most
+     * alternating confirmed swing points after B. Most
      * charts will not have a confirmed C most of the time — the retracement
      * swing after the latest extreme needs bars to confirm — so `null` here
      * is the common case, not a bug.
@@ -1303,8 +1301,7 @@ export interface HorizonReference {
 }
 
 /**
- * Every pivot family computed from the shared pivot bar (spec 2026-09-18
- * analysis-prompt decision). The per-horizon level lists keep only the levels
+ * Every pivot family computed from the shared pivot bar. The per-horizon level lists keep only the levels
  * nearest price, so a far pivot the model may need for a second target could be
  * missing there; the prompt renders these complete sets as a table instead of
  * letting the model compute one. `null` per family when the pivot bar was
@@ -1377,7 +1374,7 @@ export interface CamarillaPivotLevels {
     s4: number;
 }
 
-/** Fibonacci pivot levels: `pp ± 0.382/0.618/1.000 × range` (spec 2026-09-18 §A2). */
+/** Fibonacci pivot levels: `pp ± 0.382/0.618/1.000 × range`. */
 export interface FibonacciPivotLevels {
     /** Central pivot: (high + low + close) / 3. */
     pp: number;
@@ -1459,7 +1456,7 @@ export interface FibonacciProjection {
 export type SwingLegDirection = 'up' | 'down';
 
 /**
- * ABC extension levels (spec 2026-09-18 §A3) — Fibonacci extension ratios
+ * ABC extension levels — Fibonacci extension ratios
  * projected from point C, using the A→B leg's measured distance, in the
  * A→B leg's own direction (continuation past the B→C retracement).
  */
@@ -1529,15 +1526,14 @@ export interface PatternSummary {
     /** Optional labelled price points (e.g. neckline). */
     keyPrices?: KeyPrice[];
     /**
-     * Id of the `OverlayCandidate` this pattern was confirmed from (spec
-     * 2026-09-28 §2.3). Set by the model from `## Chart Pattern Candidates
+     * Id of the `OverlayCandidate` this pattern was confirmed from. Set by the model from `## Chart Pattern Candidates
      * (computed)`; absent for a pattern the pre-screener did not list.
      */
     candidateId?: string;
     /** Confidence weight inherited from the matching skill. */
     confidenceWeight: number;
     /**
-     * Model-authored geometry for THIS pattern (spec 2026-09-18 §A6) — the
+     * Model-authored geometry for THIS pattern — the
      * app computes `측정 목표가`/`보수 목표가(50%)` from it and appends them
      * to `keyPrices`; the model must never compute a target itself. Copied
      * verbatim from `## Chart Pattern Candidates (computed)` when the
@@ -1552,7 +1548,7 @@ export interface PatternSummary {
 
 /**
  * Model-authored measured-move anchor for one detected chart pattern
- * (`PatternSummary.geometry`, spec 2026-09-18 §A6). `domain/analysis/ai-levels.ts`
+ * (`PatternSummary.geometry`). `domain/analysis/ai-levels.ts`
  * derives `측정 목표가`/`보수 목표가(50%)` from this — never trust a
  * model-computed target string.
  */
@@ -1809,7 +1805,7 @@ export interface AnalysisResponse {
     candlePatterns: CandlePatternSummary[];
     /** Diagonal trendlines visible on the full chart. */
     trendlines: Trendline[];
-    /** Logic-drawn overlays the model referenced (spec 2026-09-28). Absent on pre-p19 cache entries. */
+    /** Logic-drawn overlays the model referenced. Absent on pre-p19 cache entries. */
     chartOverlays?: ChartOverlay[];
     /** Long-position trading recommendation. */
     actionRecommendation?: ActionRecommendation;
@@ -1846,7 +1842,7 @@ export interface FilteredAnalysisResponse {
     candlePatterns: CandlePatternSummary[] | null;
     /** Diagonal trendlines visible on the full chart. */
     trendlines: Trendline[] | null;
-    /** Logic-drawn overlays the model referenced (spec 2026-09-28). Absent on pre-p19 cache entries. */
+    /** Logic-drawn overlays the model referenced. Absent on pre-p19 cache entries. */
     chartOverlays?: ChartOverlay[];
     /** Long-position trading recommendation with gated subfields. */
     actionRecommendation: FilteredActionRecommendation | null;
@@ -1871,7 +1867,7 @@ export interface FilteredAnalysisResult {
 
 /**
  * One past analysis of the same symbol + timeframe, supplied by the consumer
- * (the siglens web app / siglens-trader) from its own database.
+ * (the siglens web app or another consumer) from its own database.
  *
  * Deliberately a FLAT, language-neutral projection rather than a full
  * `AnalysisResponse`: core must not know the consumer's storage shape, and the
@@ -1921,7 +1917,6 @@ export interface PromptConfig {
 
 /**
  * Prompt-assembly output, split along the stable/dynamic caching boundary
- * (spec §3.4, `docs/superpowers/specs/2026-07-03-prompt-size-quality-redesign-design.md`)
  * — Design C ("skills-to-system split"):
  *
  * - `stable` — the `always_on` skill digests for this `(analysisType,
@@ -1985,8 +1980,7 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
     /**
      * The chart-pattern overlap arbitration of this build: the ids drawn and
      * the patterns it dropped (with the id each lost to). For the caller to
-     * log — a drawing that vanishes from a chart can be traced to this rule
-     * (spec 2026-10-07 §8).
+     * log — a drawing that vanishes from a chart can be traced to this rule.
      */
     patternArbitration: {
         kept: readonly ChartPatternId[];
@@ -4269,7 +4263,7 @@ export interface PatternCandidate {
      * which are bar extremes rather than zigzag pivots). A pre-screener hit
      * may include the still-forming (provisional) extreme; computed geometry
      * is no longer derived from these but from a qualified pattern's
-     * confirmed pivots (spec 2026-10-07). Absent for a hand-built candidate
+     * confirmed pivots. Absent for a hand-built candidate
      * (e.g. a test fixture).
      */
     pivots?: readonly PivotPoint[];
@@ -4300,7 +4294,7 @@ export type PatternBreakoutDirection = 'up' | 'down';
  * @internal
  * Deterministic measured-move geometry for one {@link PatternCandidate} —
  * computed by `domain/patterns/patternGeometry.ts` from the exact bars/ATR
- * the candidate was matched on (spec 2026-09-18 §A1). Consumers render this
+ * the candidate was matched on. Consumers render this
  * instead of asking the model to compute a measured move itself.
  */
 export interface PatternGeometry {
@@ -4329,7 +4323,7 @@ export interface PatternGeometry {
  * @internal
  * Geometry of a qualified pattern whose breakout side is not known yet — a
  * rectangle, channel, broadening formation or symmetrical triangle with no
- * prior trend (spec 2026-10-07 §3.2). Both boundaries are reported as they
+ * prior trend. Both boundaries are reported as they
  * stand and no target is derived: picking "the side price is closer to"
  * flipped the direction from one day to the next.
  */
@@ -4356,7 +4350,7 @@ export interface PatternPoint {
 
 /**
  * @internal
- * A straight pattern boundary through its touches (spec 2026-10-07 §2.2) —
+ * A straight pattern boundary through its touches —
  * never a regression line. `start`/`end` are the line's values at its first
  * and last touch — the solid drawn extent; the overlay continues it dashed
  * only to the bar its printed value is read at. The line's value at any
@@ -4390,7 +4384,7 @@ export interface TrendlinePatternShape {
     kind: 'trendline';
     upper: PatternLine;
     lower: PatternLine;
-    /** `null` when the breakout side is undetermined (§3.2 — no prior trend). */
+    /** `null` when the breakout side is undetermined (no prior trend). */
     direction: PatternBreakoutDirection | null;
 }
 
@@ -4405,8 +4399,7 @@ export interface FlagPatternShape {
     /**
      * Lowest low (bull) / highest high (bear) of the flag bars up to the
      * fitted end — the invalidation anchor. The one per-family level that is
-     * not fixed by confirmed pivots: a flag is read from its own bars (spec
-     * §3.4), so this extreme follows the flag down (up) until the channel no
+     * not fixed by confirmed pivots: a flag is read from its own bars, so this extreme follows the flag down (up) until the channel no
      * longer fits, and a close beyond it then reads as a failure only once
      * the flag has stopped extending.
      */
@@ -4455,8 +4448,7 @@ export type PatternShape =
 
 /**
  * @internal
- * A pattern that passed the strict drawing checks of `qualifyPatterns` (spec
- * 2026-10-07): confirmed pivots only, boundaries through touches, a slope dead
+ * A pattern that passed the strict drawing checks of `qualifyPatterns`: confirmed pivots only, boundaries through touches, a slope dead
  * band, minimum size and duration, per-family levels fixed by confirmed
  * pivots (flags excepted — see {@link FlagPatternShape.flagExtreme}) and
  * overlap arbitration. The only input to computed geometry, the prompt's Candidate id
@@ -4483,7 +4475,7 @@ export interface PatternQualification {
      */
     shapeHints: ChartPatternId[];
     /**
-     * Live (not spent) hits the §2.5 overlap arbitration dropped, each with
+     * Live (not spent) hits the overlap arbitration dropped, each with
      * the kept pattern it lost to — for logging only, never drawn or printed.
      */
     arbitrationDropped: PatternArbitrationLoss[];
@@ -4539,7 +4531,7 @@ export interface NormalizedUsage {
 }
 
 // =============================================================================
-// Chart overlays (spec 2026-09-28) — logic-drawn coordinates the model only
+// Chart overlays — logic-drawn coordinates the model only
 // selects by id. Times are bar Unix seconds, never array indices, so a stored
 // overlay stays put when newer bars arrive.
 // =============================================================================
@@ -4607,7 +4599,7 @@ export interface OverlayCandidate {
 
 /**
  * @internal
- * Elliott structure an `elliott` overlay candidate counts (spec 2026-10-02):
+ * Elliott structure an `elliott` overlay candidate counts:
  * `impulse` 1–5 (with an A–B–C attached when one follows), `diagonal` 1–5
  * wedge whose wave 4 overlaps wave 1, `triangle` A–B–C–D–E, `combination`
  * W–X–Y(–X–Z), and a standalone `abc` correction.

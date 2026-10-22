@@ -562,7 +562,7 @@ describe('callClaude', () => {
             });
         });
 
-        it('PR5a: no responseSchema → no tools/tool_choice at all, regardless of model', async () => {
+        it('no responseSchema → no tools/tool_choice at all, regardless of model', async () => {
             mockStream.mockReturnValueOnce(
                 makeStream({
                     stop_reason: 'end_turn',

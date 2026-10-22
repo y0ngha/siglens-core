@@ -310,8 +310,7 @@ export {
 // `normalizeMacroBriefing` — see docs/PUBLIC_API.md's economy-helpers Tier 2
 // entry). Unlike those two, the reason here isn't "no partial-consumption
 // entry point" — it's a trust boundary: `bucketizePosition`'s inputs include
-// the member's average cost basis, which the personalized-analysis-by-
-// position-bucket spec (Subsystem C) requires to be read server-side only
+// the member's average cost basis, which must be read server-side only
 // (see this function's own JSDoc). Exposing the bucketizer on the browser
 // entrypoint would hand consumers exactly the tool to compute a
 // client-supplied/spoofed bucket and poison the shared analysis cache with
@@ -321,7 +320,7 @@ export { bucketizePosition } from './domain/analysis/positionBucket';
 export type { PositionBucket } from './domain/types';
 
 // Prior-analysis-context — the flat, language-neutral shape the consumer
-// (siglens / siglens-trader) reads out of its own database and passes back
+// (the siglens web app or another consumer) reads out of its own database and passes back
 // in via `options.priorAnalyses` on `submitAnalysis`/`runAnalysis` and
 // `submitOverallAnalysis`/`runOverallAnalysis`. Only the TYPE is public: the
 // narrowing/rendering internals (`selectPriorAnalyses`,
@@ -792,14 +791,14 @@ export type {
     RegressionResult,
     CandlePattern,
     CandlePatternEntry,
-    // Chart-pattern pre-screener result types (domain/patterns, spec §3.3).
+    // Chart-pattern pre-screener result types (domain/patterns).
     ChartPatternId,
     PatternCandidate,
     PivotKind,
     PivotPoint,
     CandlePatternSummary,
     ChartDisplayType,
-    // Chart overlays (spec 2026-09-28) — logic-drawn coordinates the model selects by id.
+    // Chart overlays — logic-drawn coordinates the model selects by id.
     ChartOverlay,
     ChatLoadingPhase,
     ChatMessage,

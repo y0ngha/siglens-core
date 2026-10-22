@@ -31,7 +31,7 @@ const contender = (
 const ids = (kept: readonly Contender[]): ChartPatternId[] =>
     kept.map(c => c.pattern.id);
 
-describe('arbitrate (spec 2026-10-07 §2.5)', () => {
+describe('arbitrate', () => {
     // The shorter span is 20 bars in every case below.
     const triangle = contender('ascending_triangle', 0, 20, 'up');
 
