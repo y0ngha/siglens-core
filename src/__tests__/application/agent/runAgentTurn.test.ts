@@ -1,5 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { AGENT_TURN_CAPS, TOOL_TIMEOUT_MS } from '@/application/agent/limits';
+import {
+    AGENT_GLOBAL_LIMITS,
+    AGENT_TURN_CAPS,
+    TOOL_TIMEOUT_MS,
+} from '@/application/agent/limits';
 import {
     runAgentTurn,
     WEB_SEARCH_BUDGET_EXHAUSTED_LOG,
@@ -526,6 +530,91 @@ describe('runAgentTurn', () => {
             );
         }
     );
+
+    it('globalLimits를 주면 공용 검색 예산을 그 값으로 센다(기본값은 AGENT_GLOBAL_LIMITS)', async () => {
+        const script = () =>
+            scriptedProvider([
+                {
+                    text: '',
+                    toolCalls: [
+                        { id: 'w1', name: 'web_search', args: { query: 'x' } },
+                    ],
+                    stopReason: 'tool_use',
+                    usage: USAGE,
+                },
+                { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+            ]);
+        const limitsSeen = async (globalLimits?: {
+            webSearchPerDay: number;
+            webSearchPerMonth: number;
+        }) => {
+            const d = deps(script());
+            if (globalLimits) d.globalLimits = globalLimits;
+            const day = vi.spyOn(d.counters.webSearchGlobalDay, 'consume');
+            const month = vi.spyOn(d.counters.webSearchGlobalMonth, 'consume');
+            await runAgentTurn(params(), d);
+            return [day.mock.calls[0]?.[1], month.mock.calls[0]?.[1]];
+        };
+        expect(await limitsSeen()).toEqual([
+            AGENT_GLOBAL_LIMITS.webSearchPerDay,
+            AGENT_GLOBAL_LIMITS.webSearchPerMonth,
+        ]);
+        expect(
+            await limitsSeen({ webSearchPerDay: 500, webSearchPerMonth: 5000 })
+        ).toEqual([500, 5000]);
+    });
+
+    it.each([
+        ['webSearchGlobalDay', 'global_day', 7],
+        ['webSearchGlobalMonth', 'global_month', 70],
+    ] as const)(
+        '주입한 globalLimits가 소진되면 소진 로그의 limit에 그 값을 남긴다(%s)',
+        async (counter, scope, limit) => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            const p = scriptedProvider([
+                {
+                    text: '',
+                    toolCalls: [
+                        { id: 'w1', name: 'web_search', args: { query: 'x' } },
+                    ],
+                    stopReason: 'tool_use',
+                    usage: USAGE,
+                },
+                { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+            ]);
+            const d = deps(p);
+            d.globalLimits = { webSearchPerDay: 7, webSearchPerMonth: 70 };
+            d.counters[counter] = memoryCounter(0);
+            await runAgentTurn(params(), d);
+            expect(warn).toHaveBeenCalledWith(
+                WEB_SEARCH_BUDGET_EXHAUSTED_LOG,
+                expect.objectContaining({ scope, limit })
+            );
+        }
+    );
+
+    it('globalLimits로 올린 일 한도 안이면 기본 한도를 넘는 호출도 통과한다', async () => {
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [
+                    { id: 'w1', name: 'web_search', args: { query: 'x' } },
+                ],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        d.counters.webSearchGlobalDay.count =
+            AGENT_GLOBAL_LIMITS.webSearchPerDay;
+        d.globalLimits = { webSearchPerDay: 500, webSearchPerMonth: 5000 };
+        await runAgentTurn(params(), d);
+        expect(d.executeTool).toHaveBeenCalledTimes(1);
+        expect(d.counters.webSearchGlobalDay.count).toBe(
+            AGENT_GLOBAL_LIMITS.webSearchPerDay + 1
+        );
+    });
 
     it('web_search는 유저·전역 일·전역 월 카운터를 모두 소비하고 하나라도 막히면 quota', async () => {
         const p = scriptedProvider([

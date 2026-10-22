@@ -439,6 +439,7 @@ export {
     TOOL_TIMEOUT_MS,
     agentLimit,
 } from './application/agent/limits';
+export type { AgentGlobalLimits } from './application/agent/limits';
 export { classifyProviderError } from './application/shared/providerError';
 export {
     AGENT_TOOL_SPECS,
