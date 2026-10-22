@@ -17,6 +17,7 @@ import {
     aggregateBarsToWeekly,
     buildPlanCheck,
     calculateMA,
+    findMaCrosses,
     rsiZone,
     isCompanyEarningsEvent,
     pullbackEventCaveat,
@@ -144,6 +145,15 @@ describe('public API exports', () => {
         expect(
             pullbackEventCaveat({ events: [], earningsDates: [], bars: [] })
         ).toBeNull();
+    });
+
+    it('exports findMaCrosses (server-only) with window coverage', () => {
+        expect(typeof findMaCrosses).toBe('function');
+        expect(findMaCrosses([])).toEqual({
+            crosses: [],
+            evaluatedBars: 0,
+            complete: false,
+        });
     });
 
     it('exports rsiZone so consumers share one RSI zone boundary', () => {

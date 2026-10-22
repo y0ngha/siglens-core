@@ -148,6 +148,11 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | `calculateMA(bars, period)` — 종가 단순 이동평균. 봉이 없거나 `period <= 0`이면 `[]`, 봉이 `period`보다 적으면 전부 `null`인 배열(봉과 같은 길이)을 돌려준다. 소비자가 이동평균을 재구현하지 않도록 노출한다. | `domain/indicators/ma.ts` |
 | `calculateIchimokuFutureCloud(bars, conversionPeriod?, basePeriod?, spanBPeriod?, displacement?)` — 표준 일목균형표 규격대로 `displacement`봉 앞선 미래 구름(senkou A/B)을 `IchimokuFuturePoint[]`로 돌려준다. 봉이 없으면 `[]`. | `domain/indicators/ichimoku.ts` |
 
+**SMA 교차 이력 (1)** — `src/index.ts`에만 export(순수 함수). **`index.client.ts` 의도적 비공개**: 소비자는 서버의 에이전트 도구 실행기(`get_bars_indicators`)뿐이라 클라이언트 번들에 넣을 이유가 없다. 결과 타입 `MaCross`·`MaCrossScan`은 Tier 4.
+| Symbol | Source |
+|---|---|
+| `findMaCrosses(bars, fastPeriod = 50, slowPeriod = 200, lookbackBars = 252)` — 최근 lookback 봉 안의 SMA 골든·데드 교차를 `MaCrossScan { crosses, evaluatedBars, complete }`로 돌려준다(`crosses`는 오래된 순). 엄격한 위·아래가 뒤집힐 때만 교차로 세고 같은 값인 봉은 건너뛴다. `complete`가 false면(`lookbackBars + slowPeriod`봉 미만) 빈 `crosses`를 "교차 없음"으로 읽으면 안 된다. | `domain/indicators/maCrosses.ts` |
+
 **RSI 구간 판정 (1)** — `src/index.ts`·`src/index.client.ts` 양 entrypoint에 export (순수 함수)
 | Symbol | Source |
 |---|---|
@@ -470,6 +475,7 @@ ai.siglens.io 에이전트가 쓰는 도구 계약. 실행기는 소비자가 �
 - 포지션 버킷: `PositionBucket` (`'deep-profit' | 'profit' | 'near-breakeven' | 'loss' | 'deep-loss'` — 회원 보유종목의 미실현 손익 구간을 나타내는 5단계 union, `bucketizePosition`의 반환 타입이자 `peekAnalysisCache`의 `positionBucket` 인자·`SubmitAnalysisOptions.positionBucket`(`runAnalysis`)로 캐시 키에 들어가는 입력). `domain/types.ts`에 정의.
 - Prior-analysis context: `PriorAnalysis` (`{ generatedAt: Date; trend: Trend; riskLevel: RiskLevel; entryPrices?: readonly number[]; stopLoss?: number; takeProfitPrices?: readonly number[] }` — the flat, language-neutral projection of a past analysis the consumer reads out of its own database and passes back in via `options.priorAnalyses`). `domain/types.ts`에 정의 (다른 공유 도메인 타입과 동일). 관련 narrowing/rendering 함수(`selectPriorAnalyses`, `formatPriorAnalysisSection`, `narrowPriorAnalysesForCacheKey`, `barTimeMs`, `findAnchorBarIndex`)는 전부 `@internal` — consumer는 `PriorAnalysis[]`를 만들어 넘기고 `analysisHistoryQuery`로 자기 쿼리 크기만 잡으면 된다.
 - 차트 오버레이: `ChartOverlay`(모델이 참조한 후보를 렌더 가능한 형태로 해석한 결과 — `AnalysisResponse`/`FilteredAnalysisResponse.chartOverlays`의 원소 타입), `OverlayKind`(`'pattern'|'trendline'|'divergence'|'fibonacci'|'elliott'`), `StrategyOverlayKind`(`'divergence'|'fibonacci'|'elliott'` — 전략 카드가 그릴 수 있는 종류, `Skill.overlayKind`의 타입), `OverlayPane`(`'price'|'rsi'`), `OverlayPoint`(`{ time, price }`), `OverlaySegment`, `OverlayLevel`, `OverlayLabel`, `OverlayLineStyle`(`'solid'|'dashed'`), `OverlayLabelPosition`(`'above'|'below'`), `OverlayVariant`(`'primary'|'alternate'`). 전부 `domain/types.ts`, 양 entrypoint. `PatternSummary.candidateId`/`StrategyResult.candidateIds`가 이 후보들을 id로 참조한다.
+- SMA 교차 이력 (`src/index.ts`만 `export type`): `MaCross` (`{ time, kind: 'golden' | 'dead', fast, slow }`), `MaCrossScan` (`{ crosses, evaluatedBars, complete }` — `findMaCrosses`의 반환 타입, `domain/indicators/maCrosses.ts`).
 - RSI 구간 (양 entrypoint `export type`): `RsiZone` (`'overbought' | 'neutral' | 'oversold'` — `rsiZone`의 반환 타입, `domain/indicators/rsiZone.ts`).
 - 오버레이 레벨 라벨 상수: `OVERLAY_LEVEL_LABELS` (`{ breakout: 'breakout', invalidation: 'invalidation', target: 'target', wave5Cap: 'wave5_cap' }` as const — core가 `OverlayLevel.label`에 쓰는 언어 중립 키. 비율이 붙은 목표는 `target 161.8%` 꼴(A–B–C의 C 투영)이고, 피보나치 사다리 라벨(`61.8%`·`ext 127.2%`·`ABC 161.8%`)은 여기 없다. consumer는 이 값으로 화면 문구를 고른다). `domain/overlays/constants.ts`에 정의, 양 entrypoint export.
 - 전략 오버레이 종류 출처 상수: `STRATEGY_KIND_SOURCE_REF` (`Readonly<Record<StrategyOverlayKind, string>>` — `{ divergence: 'kind:divergence', fibonacci: 'kind:fibonacci', elliott: 'kind:elliott' }`. 어느 카드도 소유하지 않는 전략 종류 작도의 `ChartOverlay.sourceRef` — consumer는 종류 이름으로 표시). `domain/overlays/constants.ts`에 정의, 양 entrypoint export.

@@ -330,6 +330,22 @@ may be shared. A fresh `map`/`filter`/`Array.from`/function-result array can tak
 // ✅ clusterLevels(levels).reverse()
 ```
 
+<a id="CP-16"></a>
+#### CP-16 — Quotes inside a string literal are escaped or the delimiter is changed
+
+Prompt copy is full of quoted words. A `'` inside a single-quoted literal, a `"` inside a
+double-quoted one, or a backtick (or `${`) inside a template literal ends or corrupts the
+literal, and the break often surfaces only as a distant parse error or a silently truncated
+rule. Pick the delimiter that does not occur in the text, or escape the character; after
+editing prompt copy, run `yarn typecheck` and the prompt's tests before review.
+
+```typescript
+// ❌ 'Say "not available" unless the tool returned it; don't guess.'   // the apostrophe ends the literal
+// ✅ "Say 'not available' unless the tool returned it; do not guess."
+// ❌ `Quote the field `price` verbatim.`                              // the inner backticks end the template
+// ✅ `Quote the field \`price\` verbatim.`
+```
+
 ---
 
 ## File / Directory Naming
