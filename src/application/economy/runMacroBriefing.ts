@@ -22,8 +22,7 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  * Run a macro (economy) briefing end-to-end: cache lookup → LLM call →
  * normalize → cache write → return.
  *
- * This is the direct (non-queued) replacement for the `submitMacroBriefing` +
- * `pollMacroBriefing` pair. The caller awaits a single promise; no job IDs, no
+ * The caller awaits a single promise; no job IDs, no
  * Redis meta, no polling loop.
  *
  * Mirrors {@link runBriefing} but for the `/economy` page — the cache is keyed
@@ -44,9 +43,6 @@ import { hashMacroBriefingInput } from './macroBriefingInputHash';
  * Pass `options.signal` so a dropped connection aborts the in-flight LLM call.
  *
  * @throws If the AI provider call fails (network, 5xx, AbortError).
- *
- * @see submitMacroBriefing — the queued predecessor; still exported for the
- *   existing production path until siglens switches to runMacroBriefing.
  */
 export async function runMacroBriefing(
     data: EconomySnapshot,

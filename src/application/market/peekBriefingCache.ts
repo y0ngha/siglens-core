@@ -15,18 +15,18 @@ import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { hashBriefingInput } from './briefingInputHash';
 
 /**
- * Read a cached market briefing WITHOUT submitting a job (read-only twin of
- * {@link submitBriefing}'s `cached` branch). Reuses the EXACT same cache key
+ * Read a cached market briefing WITHOUT generating one (read-only twin of
+ * the cache-hit branch of {@link runBriefing}). Reuses the EXACT same cache key
  * (date+hour + model + input hash) and `normalizeMarketBriefing` path, but omits
- * the worker dispatch entirely. Zero side effects.
+ * the LLM call entirely. Zero side effects.
  *
  * For SSR: an RSC surfaces a cached briefing in initial HTML at zero cost; a
  * cold cache (no provider / miss / read error) resolves to `null` so the client
- * can trigger generation through the normal submit path.
+ * can trigger generation through {@link runBriefing}.
  *
  * @param data - Market summary input (indices + sector ETFs).
  * @param modelId - Briefing model id; defaults to BRIEFING_MODEL_ID (the same
- *   default submitBriefing writes under) so an un-modelled peek reads the same key.
+ *   default `runBriefing` writes under) so an un-modelled peek reads the same key.
  * @returns Normalized briefing on a hit, or `null` on miss/cold/error.
  *
  * @example
@@ -35,7 +35,7 @@ import { hashBriefingInput } from './briefingInputHash';
  *     marketLabel: '미국 증시',
  *     volatility: { label: 'VIX', level: 18.3 },
  * });
- * if (cached) return cached; // serve from cache in SSR; else client submitBriefing()
+ * if (cached) return cached; // serve from cache in SSR; else client runBriefing()
  * ```
  *
  * `context` must match what `runBriefing` was called with — it is folded into

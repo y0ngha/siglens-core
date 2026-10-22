@@ -142,11 +142,16 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | `detectSignals` | `domain/signals/index.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
 
-**SMA 교차 이력 (1)** — `src/index.ts`에만 export(순수 함수). **`index.client.ts` 의도적 비공개**: 소비자는 서버의 에이전트 도구 실행기(`get_bars_indicators`)뿐이라 클라이언트 번들에 넣을 이유가 없다.
-
-| Export | 설명 |
+**개별 지표 단독 export (2)** — 통합 계산기와 별개로 소비자가 직접 쓰도록 노출한 순수 함수. `calculateMA`는 서버 entry 전용, `calculateIchimokuFutureCloud`는 양 entrypoint.
+| Symbol | Source |
 |---|---|
-| `findMaCrosses(bars, fastPeriod = 50, slowPeriod = 200, lookbackBars = 252)` → `MaCrossScan` | 최근 lookback 봉 안의 SMA 골든·데드 교차(`MaCross[]`, 오래된 순)와 창 커버리지(`evaluatedBars`, `complete`). 같은 값인 봉은 건너뛰어 닿았다 돌아가는 경우는 교차가 아니다. `complete`가 false면 빈 결과를 "교차 없음"으로 읽으면 안 된다(`lookbackBars + slowPeriod`봉 이상 필요). 타입 `MaCross`, `MaCrossScan`은 Tier 4. |
+| `calculateMA(bars, period)` — 종가 단순 이동평균. 봉이 없거나 `period <= 0`이면 `[]`, 봉이 `period`보다 적으면 전부 `null`인 배열(봉과 같은 길이)을 돌려준다. 소비자가 이동평균을 재구현하지 않도록 노출한다. | `domain/indicators/ma.ts` |
+| `calculateIchimokuFutureCloud(bars, conversionPeriod?, basePeriod?, spanBPeriod?, displacement?)` — 표준 일목균형표 규격대로 `displacement`봉 앞선 미래 구름(senkou A/B)을 `IchimokuFuturePoint[]`로 돌려준다. 봉이 없으면 `[]`. | `domain/indicators/ichimoku.ts` |
+
+**SMA 교차 이력 (1)** — `src/index.ts`에만 export(순수 함수). **`index.client.ts` 의도적 비공개**: 소비자는 서버의 에이전트 도구 실행기(`get_bars_indicators`)뿐이라 클라이언트 번들에 넣을 이유가 없다. 결과 타입 `MaCross`·`MaCrossScan`은 Tier 4.
+| Symbol | Source |
+|---|---|
+| `findMaCrosses(bars, fastPeriod = 50, slowPeriod = 200, lookbackBars = 252)` — 최근 lookback 봉 안의 SMA 골든·데드 교차를 `MaCrossScan { crosses, evaluatedBars, complete }`로 돌려준다(`crosses`는 오래된 순). 엄격한 위·아래가 뒤집힐 때만 교차로 세고 같은 값인 봉은 건너뛴다. `complete`가 false면(`lookbackBars + slowPeriod`봉 미만) 빈 `crosses`를 "교차 없음"으로 읽으면 안 된다. | `domain/indicators/maCrosses.ts` |
 
 **RSI 구간 판정 (1)** — `src/index.ts`·`src/index.client.ts` 양 entrypoint에 export (순수 함수)
 | Symbol | Source |
@@ -321,6 +326,78 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 
 `HistoryWindowOptions.stride?: number`(기본 `1`): `selectHistoryWindow`는 오래된 턴을 `stride` 단위 블록으로 버리며 `turns`…`turns + stride − 1`개 턴을 유지한다. 그래서 히스토리 prefix가 `stride`턴 동안 바이트 단위로 동일하게 유지된다. `runAgentTurn`은 `stride: 4`를 쓴다.
 
+**지표 합류 (confluence) — 서버 entry 전용 (6 functions + 11 constants)**
+
+여러 지표 패밀리가 같은 방향을 가리키는지 점수화하는 순수 함수. 소비자가 봉(고차 타임프레임 봉 포함)을 직접 가져와 넘기며, 이 계층은 I/O를 하지 않는다. 타입은 Tier 4 색인(`ConfluenceSnapshot`, `ConfluenceParams`, `EvaluateConfluenceOptions`, `ConfluenceHtfMode`)을 본다.
+| Symbol | Source |
+|---|---|
+| `evaluateConfluence(bars, options)` — 마지막 봉 기준 종목의 지표 합류 상태. 진입 규칙: 가중 지표 패밀리 수가 `min` 이상 강세이고 그중 하나는 직전 봉 대비 새로 켜졌으며, 종가가 같은 타임프레임 SMA 위, 고차 타임프레임이 `htfMode`가 요구하는 상태, `requireVolume`이면 거래량 패밀리 신호 1개 이상. 청산 규칙은 앞 세 조건의 약세 반전이며 자체 임계값(`exitMin`)을 쓴다. `ConfluenceSnapshot \| null`을 반환하고 `null`은 기권(봉 부족·비유한 종가)이다. | `domain/signals/confluence.ts` |
+| `scoreConfluence(snapshot)` — 스냅샷을 0..100 점수로 변환. 연속 구간은 50 ± `span`(기본 35..65), 진입 트리거는 `CONFLUENCE_TRIGGER_SCORE`(92), 청산 트리거는 `CONFLUENCE_EXIT_SCORE`(8)로 고정된다. `null`은 중립 50. | `domain/signals/confluence.ts` |
+| `isConfluenceExit(snapshot)` — 약세 반전(청산) 트리거가 성립했는지. 트리거만 센다. | `domain/signals/confluence.ts` |
+| `confluenceFamilyWeight(types)` — 신호 타입 목록의 가중 고유 지표 패밀리 수. 패밀리는 가장 큰 멤버 가중치를 한 번만 기여하므로 결과가 소수일 수 있다(확정 패밀리 2 + 예상 패밀리 1 = 2.5). | `domain/signals/confluence.ts` |
+| `signalFamily(type)` — 신호가 속한 지표 패밀리. 매핑이 없으면 타입 이름 자체. | `domain/signals/confluence.ts` |
+| `isExpectedSignal(type)` — 완료된 이벤트가 아니라 예상·위치 조건을 서술하는 신호인지(절반 가중). 소수 패밀리 수에 라벨을 붙일 때 쓴다. | `domain/signals/confluence.ts` |
+| `CONFLUENCE_MIN` / `CONFLUENCE_EXIT_MIN` — 진입·청산 트리거의 가중 패밀리 수 기본 임계값(둘 다 2.5, 의도적으로 분리). | `domain/signals/confluence.ts` |
+| `CONFLUENCE_SPAN` / `CONFLUENCE_SHRINK` — 연속 점수 구간의 반폭(15)과 단독 신호가 구간 끝으로 붙지 않게 분모에 더하는 의사 개수(1). | `domain/signals/confluence.ts` |
+| `CONFLUENCE_TRIGGER_SCORE` / `CONFLUENCE_EXIT_SCORE` — 진입·청산 규칙이 정확히 성립할 때 스냅샷이 받는 점수(92 / 8). | `domain/signals/confluence.ts` |
+| `CONFLUENCE_EXPECTED_WEIGHT` — `expected` 단계 신호의 표 가중치(0.5, `confirmed`는 1). | `domain/signals/confluence.ts` |
+| `CONFLUENCE_MIN_BARS` / `CONFLUENCE_TREND_MA_PERIOD` — 판독에 필요한 최소 봉 수(120)와 같은 타임프레임 추세 필터 SMA 기간(50). | `domain/signals/confluence.ts` |
+| `CONFLUENCE_HTF_MODE` / `VOLUME_FAMILIES` — 고차 타임프레임 게이트 기본 모드(`'uptrend'`, `ConfluenceHtfMode`)와 거래량에서 파생되는 지표 패밀리 집합(`cmf`, `mfi`). | `domain/signals/confluence.ts` |
+
+**미국 시장 달력 — 양 entrypoint (5 functions + 2 constants)**
+
+NYSE 휴장일·조기 마감일을 ET 달력일 기준으로 판정하는 순수 함수. 주말은 휴장일 판정에 포함되지 않는다.
+| Symbol | Source |
+|---|---|
+| `isUsMarketHoliday(now)` — `now`가 속한 ET 달력일이 NYSE 전일 휴장일인지(주말 제외). | `domain/marketCalendar.ts` |
+| `isUsTradingDay(now)` — 평일이면서 휴장일이 아니어서 거래소가 여는 날인지(조기 마감일 포함). | `domain/marketCalendar.ts` |
+| `isUsMarketEarlyClose(now)` — 13:00 ET 조기 마감일인지. 전일 휴장일에는 항상 `false`. | `domain/marketCalendar.ts` |
+| `usMarketCloseMinute(now)` — 그날의 마감 시각(ET 자정 기준 분). 전일 휴장이면 `0`, 조기 마감이면 `EARLY_CLOSE_MINUTE`, 아니면 `REGULAR_CLOSE_MINUTE`. | `domain/marketCalendar.ts` |
+| `minutesUntilUsMarketClose(now, minutesOfDay)` — 마감까지 남은 분. 마감 이후나 전일 휴장이면 `0`. | `domain/marketCalendar.ts` |
+| `REGULAR_CLOSE_MINUTE` / `EARLY_CLOSE_MINUTE` — 정규 마감(16:00 ET)과 조기 마감(13:00 ET)의 ET 자정 기준 분. | `domain/marketCalendar.ts` |
+
+**분석 출력 언어 — 양 entrypoint (2 constants + 1 guard)**
+| Symbol | Source |
+|---|---|
+| `ANALYSIS_LOCALES` / `DEFAULT_ANALYSIS_LOCALE` — 지원하는 출력 언어 목록(`AnalysisLocale`: `'ko' \| 'en' \| 'ja' \| 'zh'`)과, 소비자가 생략했을 때 쓰는 기본값 `'ko'`(생략 시 바이트·캐시 키가 기존과 같다). | `domain/analysis/outputLocale.ts` |
+| `isValidAnalysisLocale(value)` — 신뢰할 수 없는 문자열(URL 세그먼트 등)을 `AnalysisLocale`로 좁히는 가드. | `domain/analysis/outputLocale.ts` |
+
+**모델 정책 가드 — 서버 entry 전용 (1)**
+| Symbol | Source |
+|---|---|
+| `isModelAllowedForTier(model, tier)` — `tier`가 `undefined`면 검사를 생략(`true`), 있으면 `isModelAllowed`가 참조하는 모델 roster에 등록된 모델인지 확인한다. 비용 안전장치가 아니다 — 그건 `shouldUseServerKey`/`requiresUserApiKey`가 맡는다. | `domain/keyRouting.ts` |
+
+**스토캐스틱 지표 상수 — 양 entrypoint (11)**
+| Symbol | Source |
+|---|---|
+| `STOCHASTIC_K_PERIOD` / `STOCHASTIC_D_PERIOD` / `STOCHASTIC_SMOOTHING` — 스토캐스틱 기본 기간(14 / 3 / 3). | `domain/indicators/constants.ts` |
+| `STOCHASTIC_OVERBOUGHT_LEVEL` / `STOCHASTIC_OVERSOLD_LEVEL` — 과매수·과매도 기준선(80 / 20). | `domain/indicators/constants.ts` |
+| `STOCH_RSI_RSI_PERIOD` / `STOCH_RSI_STOCH_PERIOD` / `STOCH_RSI_K_PERIOD` / `STOCH_RSI_D_PERIOD` — Stochastic RSI 기본 기간(14 / 14 / 3 / 3). | `domain/indicators/constants.ts` |
+| `STOCH_RSI_OVERBOUGHT_LEVEL` / `STOCH_RSI_OVERSOLD_LEVEL` — Stochastic RSI 과매수·과매도 기준선(0.8 / 0.2, 0..1 스케일). | `domain/indicators/constants.ts` |
+
+**에이전트 도구 카탈로그·가드 — 서버 entry 전용 (7 functions + 6 constants)**
+
+ai.siglens.io 에이전트가 쓰는 도구 계약. 실행기는 소비자가 구현하고, core는 카탈로그·인자 검증·답변 근거 검사·프롬프트 조립만 맡는다.
+| Symbol | Source |
+|---|---|
+| `AGENT_TOOL_SPECS` / `AGENT_TOOL_NAMES` — 도구 카탈로그(`AgentToolSpec[]`)와 그 이름 목록. 설명은 모델이 읽는 유일한 정보라 "언제 호출하는가"를 말한다. | `domain/agent/tools.ts` |
+| `findToolSpec(name)` — 이름으로 도구 스펙을 찾는다. 없으면 `undefined`. | `domain/agent/tools.ts` |
+| `selectTools(available)` — 소비자가 지금 실행할 수 있는 도구 이름 집합(`ReadonlySet<string>`)으로 카탈로그를 거른다. core는 환경 변수를 읽지 않는다. | `domain/agent/tools.ts` |
+| `FRESH_ANALYSIS_KINDS` — `run_fresh_analysis` 도구가 만들 수 있는 분석 종류(`FreshAnalysisKind`). | `domain/agent/tools.ts` |
+| `validateArgs(schema, args)` — 모델이 준 도구 인자를 도구의 JSON Schema 부분집합으로 검증한다. 위반을 모두 모아 `ValidateArgsResult`(`{ ok: true, value }` \| `{ ok: false, issues }`)로 돌려준다. | `domain/agent/validateArgs.ts` |
+| `findUngroundedNumbers(answer, toolResults)` — 최종 답변의 숫자 토큰 중 같은 턴의 도구 결과 문자열에서 근거를 찾지 못한 것(중복 제거, 등장 순). 잘린 도구 결과는 판별할 수 없으므로 호출자가 JSON 경계에서 자른다. | `domain/agent/groundedNumbers.ts` |
+| `estimateTokens(text)` — 보수적 토큰 추정(ASCII 약 3자/토큰, 비ASCII는 글자당 약 1.2토큰). `selectHistoryWindow` 예산에 쓴다. | `domain/agent/selectHistoryWindow.ts` |
+| `AGENT_PROMPT_VERSION` — 에이전트 시스템 프롬프트 문구가 바뀔 때 올리는 버전 문자열. 턴마다 로그에 남긴다. | `domain/agent/buildAgentSystemPrompt.ts` |
+| `AGENT_FOLLOW_UP_MARKER` — 에이전트가 후속 질문을 제안하는 마지막 줄을 여는 마커(`[[followups]]`). 양 entrypoint. | `domain/agent/agentFollowUps.ts` |
+
+**에이전트 추천 질문 프롬프트 — 서버 entry 전용 (2 functions + 3 constants)**
+| Symbol | Source |
+|---|---|
+| `buildSuggestionsPrompt(input)` — 빈 화면의 "추천 질문"용 시스템·유저 프롬프트 쌍(도구 없는 단발 chat completion). 로케일·현재 시각·ET 세션 상태·최근 헤드라인·보유 종목을 받아 `SuggestionsPrompt`를 돌려준다. provider 중립. | `domain/agent/buildSuggestionsPrompt.ts` |
+| `parseSuggestions(raw, options?)` — 모델 응답에서 JSON 문자열 배열을 꺼낸다. 산문·코드펜스는 허용하고, 배열이 없으면 `[]`. 대소문자 무시 중복 제거, 개수·글자 수 상한 적용. | `domain/agent/buildSuggestionsPrompt.ts` |
+| `SUGGESTIONS_PROMPT_VERSION` — 추천 질문 프롬프트 문구가 바뀔 때 올리는 버전. 소비자가 캐시 키에 접는다. | `domain/agent/buildSuggestionsPrompt.ts` |
+| `SUGGESTION_COUNT` / `SUGGESTION_MAX_CHARS` — 추천 질문 개수(6)와 항목당 글자 상한(60, UTF-16 단위). | `domain/agent/buildSuggestionsPrompt.ts` |
+
 ### Tier 3 — Infrastructure Factories & Config
 
 **캐시 (1 factory + 1 helper)**
@@ -493,6 +570,37 @@ use-case option/result 타입 (모두 `src/index.ts`에서 export. `src/index.cl
 **채팅 모델 상수** — `DEEPSEEK_V4_1_FLASH_MODEL` (= `'deepseek-v4.1-flash'`), `DEEPSEEK_V4_1_PRO_MODEL` (= `'deepseek-v4.1-pro'`) (`application/chat/constants.ts`). `requestChatCompletion`이 `params.model`을 생략한 호출에 적용하는 기본 모델과, market/economy 브리핑이 사용하는 `BRIEFING_MODEL_ID`(`infrastructure/cache/config.ts`, `@internal`)는 모두 `DEEPSEEK_V4_1_FLASH_MODEL`이다. `model`을 명시하지 않는 caller는 이 기본 모델의 provider(DeepSeek)로 응답을 생성한다.
 
 **고급 도메인 헬퍼**: key-level 클러스터링(`clusterKeyLevels`/`validateKeyLevels`)과 action recommendation 검증(`validateActionPrices`/`extractReconciledActionLines`)은 consumer의 세부 검증 흐름을 위해 `src/index.ts`에서 명시적으로 export한다. **`filterAnalysisResult(result, tier, config?)`**(`domain/analysis/filterAnalysisResult.ts`): `AnalysisResponse`를 `tier`의 허용 정보-깊이로 필터링해 `FilteredAnalysisResult`(`{ result, lockedInfoDepth }`)를 반환하는 순수 함수. `runAnalysis`와 `peekAnalysisCache`가 caller tier로 내부 호출하지만, consumer가 캐시된 원본 `AnalysisResponse`를 직접 재필터링(예: tier 변경 후 재렌더링)해야 하는 경우를 위해 public이다. **`buildPlanCheck(rec, currentPrice, entryPrice)`**(`domain/analysis/planCheck.ts`): `ActionRecommendation`을 주어진 가격과 대조해 `PlanCheck | null`(risk:reward, `belowStopLoss`, `exceedsEntryZone`)을 계산하는 순수 함수. `runAnalysis`가 분석 시점 종가로 이미 내부 호출하지만, siglens의 `get_cached_analysis` 에이전트 툴이 **라이브 시세**로 다시 돌려 `sinceAnalysis.planNow`를 만들어야 해서 public이다. 입출력 타입(`ActionRecommendation`/`PlanCheck`)은 이미 Tier 4 public. **`planEntryPrice(rec, fallback)`**(`domain/analysis/ai-levels.ts`): `buildPlanCheck`/`postProcessAnalysisWithReconcile`가 쓰는 것과 **동일한** entry 기준가(엔트리 구간의 유효 양수 평균, 없으면 `fallback`)를 반환하는 순수 함수 — consumer가 `sinceAnalysis.planNow`용으로 같은 계산을 중복 구현하지 않도록 단일 구현을 공개한다. 그 외 정규화 함수(`normalize*`/`asString`/`asArray`/`compact`)·AI 레벨 보정(`postProcessAnalysisWithReconcile` 등)·추세선·candle 라벨/감지 상수·프롬프트 빌더·개별 신호 감지기는 여전히 internal(공개 aggregate·use-case가 내부 호출).
+
+**그 밖의 export 타입 색인** — 위에서 개별로 설명하지 않은 export 타입의 이름 색인이다. 정의 파일별로 묶었고, 괄호는 노출되는 entrypoint를 뜻한다.
+
+- `application/agent/limits.ts` (서버 entry 전용): `AgentPerTierLimit`, `AgentGlobalLimits`.
+- `application/agent/types.ts` (서버 entry 전용): `RunAgentTurnParams`, `RunAgentTurnDependencies`, `RunAgentTurnResult`, `AgentCounters`, `AgentTurnEvent`, `AgentTurnUsage`, `AgentRemaining`, `ExecuteTool`, `ToolExecutionContext`.
+- `application/analysis/types.ts` (서버 entry 전용): `CallAnalysisAiOptions`, `CallBriefingAiOptions`.
+- `application/chat/types.ts` (양 entrypoint): `ChatErrorCode`, `RequestChatCompletionDependencies`, `RequestChatCompletionParams`.
+- `application/congress/types.ts` (서버 entry 전용): `RunCongressTrendDone`.
+- `application/economy/types.ts` (서버 entry 전용): `RunEconomicEventAnalysisOptions`, `RunIndicatorTranslationOptions`, `RunMacroBriefingOptions`.
+- `application/investorFlows/types.ts` (서버 entry 전용): `RunInvestorFlowsAnalysisDone`, `RunInvestorFlowsAnalysisFetchError`, `RunInvestorFlowsAnalysisMissNoTrigger`, `RunInvestorFlowsAnalysisNoData`.
+- `application/market/types.ts` (서버 entry 전용): `RunBriefingOptions`.
+- `application/news/marketNewsDigestTypes.ts` (서버 entry 전용): `RunMarketNewsDigestDone`.
+- `application/news/types.ts` (서버 entry 전용): `RunNewsAnalysisDone`.
+- `application/options/types.ts` (서버 entry 전용): `SubmitOptionsAnalysisSubmitted`.
+- `application/overall/types.ts` (서버 entry 전용): `RunOverallAnalysisDone`, `RunOverallAnalysisOptions`.
+- `application/usage/types.ts` (양 entrypoint): `AnalysisLimitError`, `AnalysisLimitErrorCode`, `ChatbotLimitError`, `ChatbotLimitErrorCode`.
+- `application/usage/types.ts` (서버 entry 전용): `UsageLimitDependencies`, `UsageLimitInput`.
+- `domain/agent/agentFollowUps.ts` (양 entrypoint): `SplitAgentFollowUps`.
+- `domain/agent/buildAgentSystemPrompt.ts` (서버 entry 전용): `AgentTurnContextInput`, `BuildAgentSystemPromptInput`.
+- `domain/agent/buildSuggestionsPrompt.ts` (서버 entry 전용): `SuggestionHeadline`, `BuildSuggestionsPromptInput`, `ParseSuggestionsOptions`.
+- `domain/agent/promptShared.ts` (서버 entry 전용): `AgentLocale`.
+- `domain/agent/selectHistoryWindow.ts` (서버 entry 전용): `HistoryWindowOptions`.
+- `domain/agent/validateArgs.ts` (서버 entry 전용): `ArgIssue`.
+- `domain/analysis/candle-trend.ts` (양 entrypoint): `PatternTrend`.
+- `domain/investorFlows/types.ts` (양 entrypoint): `InstitutionalHolderChangeKind`, `InsiderTransactionType`, `InvestorFlowsAxisId`, `InvestorFlowsSignalDirection`, `InvestorFlowsSignalStrength`, `InvestorFlowsSignalId`, `InvestorFlowsEvidence`, `InvestorFlowsSignal`, `InvestorFlowsLabel`, `InvestorFlowsSufficiency`, `NetShareChangeBasis`, `PartialInstitutionalQuarter`, `InstitutionalMetrics`, `InsiderMetrics`, `LargeHolderMetrics`, `ShortInterestTrend`, `ShortMetrics`.
+- `domain/ports/agentProvider.ts` (서버 entry 전용): `AgentRole`, `AgentToolCall`, `AgentMessage`, `JsonSchemaProperty`, `JsonSchemaObject`, `AgentToolSpec`, `AgentStopReason`, `AgentStreamEvent`, `CallAgentProviderOptions`, `AgentProviderResult`, `CallAgentProvider`.
+- `domain/types.ts` (양 entrypoint): `CurrencyCode`, `AnalysisDataAsOf`, `AnalysisSignal`, `AnalysisSignalType`, `BacktestAiAnalysis`, `BacktestAiEntryRecommendation`, `BacktestAiPriceTarget`, `BacktestAiResult`, `BacktestCase`, `BacktestData`, `BacktestExitReason`, `BacktestMeta`, `BacktestRiskLevel`, `BacktestSignalResult`, `Bar`, `BarsData`, `BollingerResult`, `BuySellVolumeResult`, `BollingerDerivedResult`, `ChandelierResult`, `ChandelierTrend`, `ElderRayResult`, `ImpulseColor`, `RegressionResult`, `CandlePattern`, `CandlePatternEntry`, `CandlePatternSummary`, `ChartDisplayType`, `ChatLoadingPhase`, `ChatMessage`, `ChatPromptPayload`, `ChatSession`, `ClusteredKeyLevel`, `ClusteredKeyLevels`, `ConfirmedSignalType`, `ConflictInfo`, `ConflictResolution`, `DashboardTimeframe`, `DMIResult`, `DonchianChannelResult`, `FundamentalAnalystEstimateInput`, `FundamentalCashFlowInput`, `FundamentalFinancialScoresInput`, `FundamentalGradesConsensusInput`, `FundamentalGrowthInput`, `FundamentalPeerInput`, `FundamentalPriceTargetConsensusInput`, `FundamentalPriceTargetSummaryInput`, `FundamentalRatiosInput`, `FundamentalSectorHistoricalInput`, `FundamentalSectorPerformanceInput`, `FundamentalValuationMetrics`, `PriceTargetAvg`, `EntryRecommendation`, `ExpectedSignalType`, `IchimokuFuturePoint`, `IchimokuResult`, `IndexTicker`, `IndicatorGuideResult`, `IndicatorResult`, `KeltnerChannelResult`, `KeyLevel`, `KeyLevels`, `KeyPrice`, `MACDResult`, `MarketBriefingResponse`, `NewsImpact`, `MarketBriefingSectorAnalysis`, `MarketBriefingVolatilityAnalysis`, `MarketIndexData`, `MarketQuote`, `MarketSectorData`, `MarketSummaryData`, `MultiCandlePattern`, `MultiCandlePatternEntry`, `ParabolicSARResult`, `PatternResult`, `PatternSummary`, `PriceScenario`, `PriceTarget`, `PriceTargets`, `PriceTrend`, `QuadrantKey`, `ReconciledActionLevels`, `ReconciledActionLineData`, `ReconciledTpEntry`, `RiskLevel`, `SectorEtf`, `SectorGroupDef`, `SectorSignalsResult`, `SectorStock`, `Signal`, `SignalDirection`, `SignalPhase`, `SignalStrength`, `SignalType`, `SingleCandlePatternEntry`, `Skill`, `SkillCategory`, `SkillChartDisplay`, `SkillCounts`, `SkillDisplay`, `SkillShowcaseItem`, `SkillType`, `SkillUsageRole`, `SMCBreakType`, `SMCEqualLevel`, `SMCFairValueGap`, `SMCOrderBlock`, `SMCResult`, `SMCStructureBreak`, `SMCStructureDirection`, `SMCSwingPoint`, `SMCSwingPointType`, `SMCZone`, `SMCZoneType`, `SqueezeMomentumResult`, `StochasticResult`, `StochRSIResult`, `StockSignalResult`, `StockWithConflict`, `StrategyResult`, `SupertrendResult`, `Tier`, `MeteredRevealPolicy`, `TierConfig`, `TierFeatureFlags`, `TierFeatureLimits`, `TierInfoDepth`, `TierLimitedFeature`, `Timeframe`, `Trend`, `TrendDirection`, `Trendline`, `TrendlineDirection`, `TrendlinePoint`, `TrendState`, `ValidatedActionPrices`, `VolumeProfileResult`, `VolumeProfileRow`, `WaitUntil`, `BaseModelSpec`, `FilteredActionRecommendation`, `NewsSourceLanguage`, `OverlayCandidate`.
+- `domain/types.ts` (서버 entry 전용): `NormalizedUsage`, `AnalysisType`, `AssembledPrompt`, `MarketEvent`.
+- `infrastructure/cache/types.ts` (서버 entry 전용): `AnalysisHistoryAxis`.
+- `infrastructure/market/types.ts` (양 entrypoint): `AcquireReanalyzeCooldownResult`.
+- `infrastructure/usage/counterStore.ts` (서버 entry 전용): `CounterStoreOptions`, `CounterPeriod`, `CounterFailurePolicy`.
 
 전체 타입 목록은 `src/domain/types.ts`와 `src/index.ts`의 `export type {...}` 블록을 참고한다.
 
@@ -691,6 +799,8 @@ Tier 4 타입·인터페이스 필드·union 멤버·port 메서드의 개명이
 export가 바뀌면 `현재 노출 인벤토리`를 **같은 커밋**에서 고친다. 삭제한 심볼의 행도 같이
 지운다. 인벤토리 행은 현재 계약만 적는다 — 언제·어느 PR에서 바뀌었는지 같은 이력은 적지
 않는다.
+
+`src/__tests__/guards/publicApiInventory.test.ts`가 두 entrypoint의 export 이름이 이 문서에 백틱 식별자로 등장하는지, 그리고 인벤토리 표 행의 첫 셀 머리 식별자가 실제로 export되는지 검사한다. 실패하면 허용 목록을 만들지 말고 문서(또는 export)를 고친다.
 
 변경 이력은 커밋 메시지(git 이력)로 남긴다. 릴리스 때 `CHANGELOG.md`에는 커밋 제목과
 `BREAKING CHANGE:` 꼬리말만 모이므로, 소비자 조치가 필요한 변경은 그 꼬리말에 적는다. 공개

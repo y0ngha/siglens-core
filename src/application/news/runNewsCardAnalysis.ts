@@ -24,8 +24,6 @@ import { analysisSeed } from '@/infrastructure/hash/analysisInput';
  * @internal
  * Fixed model identifier for per-card news translation and sentiment analysis.
  *
- * 구 submitNewsCardAnalysis에서 이전 — job 큐 제거로 그 파일이 사라졌다.
- *
  * 카드당 번역+라벨링은 고빈도 저난도 작업이라 가장 싼 non-reasoning 라인이
  * 맞다. DeepSeek를 고른 이유는 **자동 prefix 캐싱**이다 — 프롬프트의 고정부
  * (`stable`, 로케일별로 고정)가 시스템 프롬프트로 앞에 붙고 기사 본문이 맨
@@ -50,8 +48,7 @@ export const NEWS_CARD_MODEL_ID = DEEPSEEK_V4_1_FLASH_MODEL;
  * Run a per-card news analysis end-to-end: build prompt → LLM call →
  * normalize → return.
  *
- * This is the direct (non-queued) replacement for the
- * `submitNewsCardAnalysis` + `pollNewsCardAnalysis` pair. The caller awaits a
+ * The caller awaits a
  * single promise; no job IDs, no Redis meta, no polling loop.
  *
  * There is **no cache read or write** — the caller is responsible for:
@@ -76,9 +73,6 @@ export const NEWS_CARD_MODEL_ID = DEEPSEEK_V4_1_FLASH_MODEL;
  *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
  *   Thrown before the prompt is built or any provider call (this function has no
  *   cache).
- *
- * @see submitNewsCardAnalysis — the queued predecessor; still exported for
- *   the existing production path until siglens switches to runNewsCardAnalysis.
  */
 export async function runNewsCardAnalysis(
     options: SubmitNewsCardAnalysisOptions
@@ -132,7 +126,7 @@ export async function runNewsCardAnalysis(
         })
     );
 
-    // Inline post-processing (formerly in pollNewsCardAnalysis). No job queue involved.
+    // Inline post-processing. No job queue involved.
     // raw를 미리 JSON.parse하지 않는다 — 이 normalize 함수는 parseLlmPayload로
     // 코드펜스 제거·파싱·garbage 방어를 스스로 수행한다. 앞에서 파싱하면 LLM이
     // 비-JSON을 뱉었을 때 예외가 호출자까지 올라가 그 방어가 무력해진다

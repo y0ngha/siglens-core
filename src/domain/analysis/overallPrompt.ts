@@ -600,9 +600,8 @@ function koTerminologyRule(
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 // 4-axis canonical signature. The legacy 3-axis overload (without
-// companyName) was removed — submitOverallAnalysis and dependencyResolver
-// both call the 4-axis form, and every test (overallPrompt.test.ts +
-// submitOverallAnalysis.test.ts) was already migrated. No remaining
+// companyName) was removed — the overall pipeline and dependencyResolver
+// both call the 4-axis form, and every test was already migrated. No remaining
 // caller depended on the old shape.
 export function buildOverallAnalysisPrompt(
     symbol: string,

@@ -21,7 +21,7 @@ import type { CongressTrendResponse, ModelId, Tier } from '@/domain/types';
  * member who registered their own provider key must be able to route
  * congress analysis through a premium model too, even though congress data
  * itself needs no usage-limit or tier gate. Core does not gate on it (no
- * BYOK-required check the way `submitAnalysis` has one) — tier gating for
+ * BYOK-required check the way `runAnalysis` has one) — tier gating for
  * `modelId` stays the caller's (siglens) responsibility, same as the rest of
  * this options type.
  */
@@ -69,8 +69,8 @@ export interface SubmitCongressTrendOptions
     locale?: AnalysisLocale;
     /**
      * BYOK API key. When provided, forwarded to the worker as the
-     * `X-AI-API-KEY` header — the same mechanism every other submit use-case
-     * uses (`submitAnalysis`, `submitFinancialsAnalysis`, etc.). Core does
+     * `X-AI-API-KEY` header — the same mechanism every other `run*` use-case
+     * uses (`runAnalysis`, `runFinancialsAnalysis`, etc.). Core does
      * not gate on tier/model here (see the type-level doc above); the caller
      * decides when a key is required.
      */
@@ -91,8 +91,6 @@ export interface SubmitCongressTrendOptions
      * Cancellation signal for the in-flight LLM call (used by `runCongressTrend`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
      * can abort the underlying AI provider request.
-     *
-     * Has no effect on `submitCongressTrend` (the worker-based path).
      */
     signal?: AbortSignal;
     /**
@@ -141,7 +139,7 @@ export interface SubmitCongressTrendFetchError {
     error: string;
 }
 
-/** Union of all possible outcomes from `submitCongressTrend`. */
+/** Union of all possible outcomes from the retired queued congress trend submit step. */
 export type SubmitCongressTrendResult =
     | SubmitCongressTrendCached
     | SubmitCongressTrendSubmitted
@@ -170,8 +168,7 @@ export interface RunCongressTrendDone {
 }
 
 /**
- * Result of a `runCongressTrend` call — the direct (non-queued) successor to
- * the `submitCongressTrend` + `pollCongressTrend` pair.
+ * Result of a `runCongressTrend` call.
  *
  * - `cached`: a recent analysis was found in the cache (non-empty summary).
  * - `done`: the LLM completed and the result is ready.

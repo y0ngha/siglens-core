@@ -79,9 +79,8 @@ export interface SubmitFundamentalAnalysisOptions
      */
     skipEnqueueIfMiss?: boolean;
     /**
-     * When true, bypass the cache and enqueue a fresh analysis. Mirrors
-     * submitAnalysis's positional force parameter so all four axes accept
-     * the same re-analyze lever.
+     * When true, bypass the cache and enqueue a fresh analysis. All four
+     * analysis axes accept the same re-analyze lever.
      */
     force?: boolean;
     /**
@@ -128,8 +127,7 @@ export interface SubmitFundamentalAnalysisOptions
     /**
      * Cancellation signal for the in-flight LLM call (used by `runFundamentalAnalysis`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
-     * can abort the underlying AI provider request. Has no effect on
-     * `submitFundamentalAnalysis` (the worker-based path does not accept a signal).
+     * can abort the underlying AI provider request.
      */
     signal?: AbortSignal;
     /**
@@ -190,7 +188,7 @@ export interface SubmitFundamentalAnalysisMissNoTrigger {
     status: 'miss_no_trigger';
 }
 
-/** Union of all possible outcomes from {@link submitFundamentalAnalysis}. */
+/** Union of all possible outcomes from the retired queued fundamental analysis submit step. */
 export type SubmitFundamentalAnalysisResult =
     | SubmitFundamentalAnalysisCached
     | SubmitFundamentalAnalysisSubmitted
@@ -203,7 +201,7 @@ export type SubmitFundamentalAnalysisResult =
 // Poll
 // ─────────────────────────────────────────
 
-/** Outcome of {@link pollFundamentalAnalysis}: still processing, finished, or errored. */
+/** Outcome of the retired queued fundamental analysis poll step: still processing, finished, or errored. */
 export type PollFundamentalAnalysisResult =
     | { status: 'processing' }
     | { status: 'done'; result: FundamentalAnalysisResponse }
@@ -214,8 +212,7 @@ export type PollFundamentalAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
- * Result of a `runFundamentalAnalysis` call — the direct (non-queued) successor
- * to the `submitFundamentalAnalysis` + `pollFundamentalAnalysis` pair.
+ * Result of a `runFundamentalAnalysis` call.
  *
  * - `cached`: a recent analysis was found in the cache and returned as-is.
  * - `done`: the LLM completed and the result is ready.

@@ -94,8 +94,6 @@ export interface SubmitMarketNewsDigestOptions
      * Cancellation signal for the in-flight LLM call (used by `runMarketNewsDigest`).
      * When provided, passed through to `callAnalysisAi` so a dropped connection
      * can abort the underlying AI provider request.
-     *
-     * Has no effect on `submitMarketNewsDigest` (the worker-based path).
      */
     signal?: AbortSignal;
     /**
@@ -129,28 +127,28 @@ export interface SubmitMarketNewsDigestNoNewsError {
     status: 'no_news';
 }
 
-/** Union of all possible outcomes from {@link submitMarketNewsDigest}. */
+/** Union of all possible outcomes from the retired queued market news digest submit step. */
 export type SubmitMarketNewsDigestResult =
     | SubmitMarketNewsDigestCached
     | SubmitMarketNewsDigestSubmitted
     | SubmitMarketNewsDigestMissNoTrigger
     | SubmitMarketNewsDigestNoNewsError;
 
-/** Outcome of {@link pollMarketNewsDigest}: still processing. */
+/** Outcome of the retired queued market news digest poll step: still processing. */
 export interface PollMarketNewsDigestProcessing {
     status: 'processing';
 }
-/** Outcome of {@link pollMarketNewsDigest}: result is ready. */
+/** Outcome of the retired queued market news digest poll step: result is ready. */
 export interface PollMarketNewsDigestDone {
     status: 'done';
     result: NewsAnalysisResponse;
 }
-/** Outcome of {@link pollMarketNewsDigest}: worker reported a failure or normalization error. */
+/** Outcome of the retired queued market news digest poll step: worker reported a failure or normalization error. */
 export interface PollMarketNewsDigestError {
     status: 'error';
     error: string;
 }
-/** Union of all possible outcomes from {@link pollMarketNewsDigest}. */
+/** Union of all possible outcomes from the retired queued market news digest poll step. */
 export type PollMarketNewsDigestResult =
     | PollMarketNewsDigestProcessing
     | PollMarketNewsDigestDone
@@ -167,16 +165,14 @@ export interface RunMarketNewsDigestDone {
 }
 
 /**
- * Result of a `runMarketNewsDigest` call — the direct (non-queued) successor
- * to the `submitMarketNewsDigest` + `pollMarketNewsDigest` pair.
+ * Result of a `runMarketNewsDigest` call.
  *
  * - `cached`: a recent digest was found in the cache and returned as-is.
  * - `done`: the LLM completed and the result is ready.
  * - `miss_no_trigger`: cache missed and `skipEnqueueIfMiss` was set.
  * - `no_news`: the `news` array was empty; LLM was not called.
  *
- * LLM-level failures propagate as thrown exceptions. Unlike `pollMarketNewsDigest`,
- * there is no `error` variant — normalization is applied to a validated JSON
+ * LLM-level failures propagate as thrown exceptions. There is no `error` variant — normalization is applied to a validated JSON
  * object from `callAnalysisAi`, so structural failures surface as thrown exceptions.
  */
 export type RunMarketNewsDigestResult =

@@ -1,5 +1,4 @@
 import { readFileSync, existsSync } from 'node:fs';
-import { join } from 'node:path';
 
 /** Parse `KEY=VALUE` env text into a record. Pure (no I/O). */
 export function parseEnv(text: string): Record<string, string> {
@@ -26,19 +25,26 @@ export function loadEnvFile(path: string): Record<string, string> {
 }
 
 /**
- * Resolve `FMP_API_KEY` from the sibling siglens app's `.env.local`
- * (or `process.env` as a fallback). Throws a clear error when missing.
+ * Resolve `FMP_API_KEY` from `process.env`, falling back to an env file.
+ *
+ * The env file path is explicit: pass `envFile`, or set `SIGLENS_ENV_FILE`
+ * (e.g. `SIGLENS_ENV_FILE=/path/to/.env.local`). No default location is
+ * guessed. Throws a clear error when the key cannot be found.
  */
-export function requireFmpApiKey(): string {
+export function requireFmpApiKey(
+    envFile: string | undefined = process.env.SIGLENS_ENV_FILE
+): string {
     const fromProcess = process.env.FMP_API_KEY;
     if (fromProcess) return fromProcess;
-    // Resolve relative to this file: scripts/validation/ → Project/siglens/.env.local
-    const envPath = join(import.meta.dirname, '../../../siglens/.env.local');
-    const env = loadEnvFile(envPath);
-    const key = env.FMP_API_KEY;
+    if (!envFile) {
+        throw new Error(
+            'FMP_API_KEY not found in process.env and no env file given — set FMP_API_KEY or SIGLENS_ENV_FILE=/path/to/.env.local'
+        );
+    }
+    const key = loadEnvFile(envFile).FMP_API_KEY;
     if (!key) {
         throw new Error(
-            'FMP_API_KEY not found in process.env or ../siglens/.env.local'
+            `FMP_API_KEY not found in process.env or in env file ${envFile}`
         );
     }
     return key;

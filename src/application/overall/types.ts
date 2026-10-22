@@ -62,8 +62,8 @@ export type OverallAxis = 'technical' | 'fundamental' | 'news' | 'options';
 /**
  * Inputs carried by the overall dependency resolver.
  *
- * The `technical` field forwards the minimal options that `submitAnalysis`
- * requires (bars data is fetched internally by the technical submit function;
+ * The `technical` field forwards the minimal options that the technical axis
+ * (`runAnalysis`) requires (bars data is fetched internally by that function;
  * this field carries caller-controlled options only). The Phase-2 siglens
  * consumer is responsible for constructing this object.
  */
@@ -185,7 +185,7 @@ export interface OverallDependencyInputs {
     marketDataProvider?: MarketDataProvider;
     /**
      * Resolved subscription tier. Optional for backward compatibility with
-     * direct test callers; submitOverallAnalysis defaults to DEFAULT_TIER
+     * direct test callers; the overall pipeline defaults to DEFAULT_TIER
      * when omitted.
      */
     tier?: Tier;
@@ -199,9 +199,9 @@ export interface OverallDependencyInputs {
      * When `true`, the resolver forwards `skipEnqueueIfMiss: true` to every
      * axis submit call so cache misses on any axis return `'miss_no_trigger'`
      * instead of triggering a worker job. When all sub-axes resolve from
-     * cache but the overall cache itself misses, `submitOverallAnalysis`
-     * also returns `'miss_no_trigger'` directly instead of enqueueing the
-     * overall worker job — see {@link submitOverallAnalysis}. Intended for
+     * cache but the overall cache itself misses, the overall pipeline
+     * also returns `'miss_no_trigger'` directly instead of generating the
+     * overall analysis. Intended for
      * consumer-side gating of bot/crawler traffic.
      */
     skipEnqueueIfMiss?: boolean;
@@ -230,21 +230,21 @@ export interface OverallDependencyInputs {
      */
     macroCalendar?: readonly EconomicCalendarEvent[];
     /**
-     * Options forwarded verbatim to `submitAnalysis` (the technical axis).
+     * Options forwarded verbatim to `runAnalysis` (the technical axis).
      *
      * The resolver does not interpret these options — the Phase-2 siglens
      * consumer supplies them. This avoids coupling the resolver to
      * bars/indicators data it would otherwise need to fetch itself.
      *
-     * Pass at minimum `{}` when no overrides are needed; `submitAnalysis`
+     * Pass at minimum `{}` when no overrides are needed; `runAnalysis`
      * itself uses sensible defaults. `force` and `fmpSymbol` are forwarded
-     * to `submitAnalysis`'s positional parameters of the same name.
+     * to the `runAnalysis` parameters of the same name.
      *
      * NOTE on `usage`: any `usage` set here is **dropped** by the resolver
-     * when the resolver is called from {@link submitOverallAnalysis} — usage
+     * when the resolver is called from the overall pipeline — usage
      * tracking is owned at the overall layer to prevent triple-counting one
      * overall call as three analyses. The field stays in the type for
-     * standalone resolver callers, but `submitOverallAnalysis` users should
+     * standalone resolver callers, but overall-pipeline users should
      * leave it unset.
      *
      * NOTE on `priorAnalyses`/`marketEvents`: both fold into the technical
@@ -284,13 +284,13 @@ export interface OverallDependencyInputs {
         | 'positionBucket'
         | 'session'
     > & {
-        /** Forwarded to `submitAnalysis(... , force, ...)`. Defaults to `false`. */
+        /** Forwarded to `runAnalysis(... , force, ...)`. Defaults to `false`. */
         force?: boolean;
-        /** Forwarded to `submitAnalysis(... , fmpSymbol, ...)`. */
+        /** Forwarded to `runAnalysis(... , fmpSymbol, ...)`. */
         fmpSymbol?: string;
     };
     /**
-     * Options forwarded verbatim to `submitFundamentalAnalysis`.
+     * Options forwarded verbatim to `runFundamentalAnalysis`.
      * Omit `symbol`, `modelId`, and `dataProvider` — those are derived from the top-level inputs.
      *
      * Same `usage`-drop rule applies as for `technical` — see above.
@@ -306,7 +306,7 @@ export interface OverallDependencyInputs {
         | 'reasoning'
     >;
     /**
-     * Options forwarded verbatim to `submitNewsAnalysis`.
+     * Options forwarded verbatim to `runNewsAnalysis`.
      * Omit `symbol`, `modelId`, `news`, and `upcomingCalendar` — those are derived from the top-level inputs.
      *
      * Renamed from `newsOptions` for naming parity with `fundamental` and `technical`.
@@ -361,7 +361,7 @@ export interface OverallDependencyInputs {
     optionsSnapshot?: OptionsSnapshot;
 
     /**
-     * Per-axis options forwarded verbatim to `submitOptionsAnalysis`.
+     * Per-axis options forwarded verbatim to `runOptionsAnalysis`.
      * Mirrors the technical/fundamental/news per-axis option fields.
      * `expirationDate` is computed by the resolver via pickNearestExpiration —
      * do not set it here.
@@ -480,7 +480,7 @@ export interface OverallDependencyInputs {
  * All four dependency axes resolved — overall analysis can be built immediately.
  *
  * `options` is `null` when the axis was gracefully skipped (the caller omitted
- * `optionsSnapshot` or `submitOptionsAnalysis` returned `no_chains_error`).
+ * `optionsSnapshot` or `runOptionsAnalysis` returned `no_chains_error`).
  * Non-null payloads carry the full options analysis to feed into the prompt.
  *
  * `fundamental` is `null` when the asset class is `'crypto'` — the fundamental
@@ -535,7 +535,7 @@ export interface DependencyStateError {
      * Full submit result object from the failing axis.
      *
      * Carries the original status discriminant (`'error'` or `'key_error'`),
-     * so consumers (notably `submitOverallAnalysis`) can re-surface BYOK
+     * so consumers (notably the overall pipeline) can re-surface BYOK
      * errors with full type narrowing.
      */
     error:
@@ -585,7 +585,7 @@ export type DependencyState =
  * Sentinel returned by the dependency resolver when the fundamental axis is
  * gracefully skipped for a crypto instrument. Mirrors the options-axis
  * `no_chains_error` skip pattern — the resolver produces this value instead
- * of calling `submitFundamentalAnalysis`, so no provider error can propagate.
+ * of calling `runFundamentalAnalysis`, so no provider error can propagate.
  *
  * `status` and `code` share the same literal so consumers can narrow on either
  * field without ambiguity.
@@ -605,10 +605,10 @@ export interface FundamentalCryptoSkip {
  *
  * Extends {@link OverallDependencyInputs} with background-task hooks plus an
  * overall-scoped tier/usage gate. The caller is responsible for constructing
- * all four dependency-axis options before invoking {@link submitOverallAnalysis}.
+ * all four dependency-axis options before invoking the overall pipeline.
  *
  * Usage tracking is intentionally owned at this layer (not per axis): a
- * single `submitOverallAnalysis` call must count as exactly one analysis,
+ * single overall-analysis call must count as exactly one analysis,
  * even though it dispatches four axis submits internally. The dependency
  * resolver therefore drops any `usage` provided in `technical`/`fundamental`/
  * `news` axis options when called from overall — see
@@ -648,7 +648,7 @@ export interface SubmitOverallAnalysisCached {
  * One or more dependency axes are still processing.
  *
  * The caller should poll each pending axis by its `jobId`, then retry
- * `submitOverallAnalysis` once all four are resolved.
+ * the overall analysis once all four are resolved.
  */
 export interface SubmitOverallAnalysisPendingDependencies {
     status: 'pending_dependencies';
@@ -708,7 +708,7 @@ export type SubmitOverallAnalysisApiKeyRequiredError = UserApiKeyRequiredError;
  *    short-circuits to `kind: 'miss_no_trigger'` and the overall cache is
  *    never even checked.
  * 2. All four sub-axes resolved from cache, but the overall cache itself
- *    missed — `submitOverallAnalysis` short-circuits after the overall
+ *    missed — the overall pipeline short-circuits after the overall
  *    cache lookup.
  *
  * The consumer is expected to render a fallback in either case (typically
@@ -719,11 +719,11 @@ export interface SubmitOverallAnalysisMissNoTrigger {
 }
 
 /**
- * Union of all possible outcomes from {@link submitOverallAnalysis}.
+ * Union of all possible outcomes of the queued overall-analysis submit step.
  *
  * - `cached` — a fresh analysis exists in the cache; result is embedded.
  * - `pending_dependencies` — one or more axis jobs are still running; retry after polling each.
- * - `submitted` — overall analysis job submitted; poll via {@link pollOverallAnalysis}.
+ * - `submitted` — overall analysis job submitted; poll the job until it resolves.
  * - `miss_no_trigger` — cache miss but enqueue skipped via `skipEnqueueIfMiss`.
  * - `error` — one of the dependency axes failed; see `axis` and `error` for details.
  * - `key_error` — BYOK API key required for the overall job's own AI call.
@@ -742,8 +742,7 @@ export type SubmitOverallAnalysisResult =
 // ─────────────────────────────────────────
 
 /**
- * Options for a `runOverallAnalysis` call — the direct (non-queued) successor
- * to the `submitOverallAnalysis` + `pollOverallAnalysis` pair.
+ * Options for a `runOverallAnalysis` call.
  *
  * Extends {@link SubmitOverallAnalysisOptions} with a cancellation signal so a
  * dropped connection aborts the entire dependency tree (technical, fundamental,
@@ -839,13 +838,13 @@ export interface PollOverallAnalysisOptions extends BackgroundTaskOptions {
 }
 
 /**
- * Outcome of {@link pollOverallAnalysis}: still processing, finished, or errored.
+ * Outcome of polling an overall-analysis job: still processing, finished, or errored.
  *
  * - `processing` — the worker has not finished yet; caller should retry.
  * - `done` — the overall analysis is ready; result is embedded.
  * - `error`: the worker reported a failure, the payload could not be
  *   normalized, or the caller tier is not allowed to access the job's
- *   timeframe (parity with {@link pollAnalysis}'s caller-tier timeframe gate).
+ *   timeframe (parity with the caller-tier timeframe gate of the technical axis).
  */
 export type PollOverallAnalysisResult =
     | { status: 'processing' }

@@ -35,7 +35,7 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
 /**
  * Read a cached overall (4-axis) analysis WITHOUT triggering any generation.
  *
- * This is the read-only twin of {@link submitOverallAnalysis}: it surfaces the
+ * This is the read-only twin of {@link runOverallAnalysis}: it surfaces the
  * most recently generated overall analysis for a symbol/timeframe/model so an
  * RSC can render it in SSR HTML for search-engine bots at zero LLM cost.
  *
@@ -45,7 +45,7 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  * A content-free caller — which has only `(symbol, companyName, timeframe,
  * modelId)` and no providers/news/snapshot — cannot reconstruct that hash
  * without resolving the axes (cache reads + potential generation), which would
- * violate the zero-side-effect contract. Instead, {@link pollOverallAnalysis}
+ * violate the zero-side-effect contract. Instead, {@link runOverallAnalysis}
  * writes every freshly normalized result under a second, content-free
  * "overwrite-latest" key ({@link buildOverallPeekCacheKey}); this function
  * reads that key. The trade-off is "latest cached" semantics rather than
@@ -91,8 +91,7 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  * if (cached !== null) return cached; // serve in SSR at zero cost
  * ```
  *
- * @see submitOverallAnalysis
- * @see pollOverallAnalysis
+ * @see runOverallAnalysis
  *
  * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
  *   cache from env, `null` → no cache. See {@link CacheOptions}.

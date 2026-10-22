@@ -59,8 +59,7 @@ type ProviderFetchResult =
 
 /**
  * Fetch all six financial-statement sub-calls in parallel and normalise them
- * into a {@link FinancialsSnapshot}. Mirrors the private helper in
- * `submitFinancialsAnalysis.ts` — kept private to this module.
+ * into a {@link FinancialsSnapshot}.
  */
 async function fetchProviderData(
     dataProvider: FinancialStatementsProvider,
@@ -106,9 +105,7 @@ async function fetchProviderData(
  * cache lookup → provider fetch → prompt build → LLM call → normalisation →
  * cache write → return.
  *
- * This is the direct (non-queued) replacement for the
- * `submitFinancialsAnalysis` + `pollFinancialsAnalysis` pair. The caller
- * awaits a single promise; no job IDs, no Redis meta, no polling loop.
+ * The caller * awaits a single promise; no job IDs, no Redis meta, no polling loop.
  *
  * The financials scorecard (`computeFinancialsScorecard`) is computed
  * synchronously as a local variable immediately after the provider fetch —
@@ -128,9 +125,6 @@ async function fetchProviderData(
  * @throws If the provider fetch or normalisation fails. Gate denials (BYOK,
  *   usage limit, fetch error) are returned as discriminated-union variants,
  *   not thrown.
- *
- * @see submitFinancialsAnalysis — the queued predecessor; still exported for
- *   the existing production path until siglens switches to runFinancialsAnalysis.
  */
 export async function runFinancialsAnalysis(
     options: SubmitFinancialsAnalysisOptions
@@ -301,7 +295,7 @@ export async function runFinancialsAnalysis(
         }
     );
 
-    // Inline post-processing (formerly in pollFinancialsAnalysis). No job queue involved.
+    // Inline post-processing. No job queue involved.
     const rawResult = JSON.parse(raw) as unknown;
     const result = normalizeFinancialsAnalysisResponse(rawResult);
 
@@ -312,7 +306,7 @@ export async function runFinancialsAnalysis(
         console.warn('[RunFinancials] Empty financials analysis', { symbol });
     }
 
-    // Cache the normalized result. Matches pollFinancialsAnalysis: write even
+    // Cache the normalized result. Write even
     // when the result is content-empty (no skip). Fire-and-forget so the cache
     // write does not delay the response.
     if (cache !== null) {

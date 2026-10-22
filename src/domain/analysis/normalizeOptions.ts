@@ -82,7 +82,7 @@ function normalizeSignalItem(item: unknown): OptionsSignal | null {
  * source for analysis time, and the LLM has been observed echoing the
  * prompt example string (e.g. `"2023-10-27T10:30:00"`) verbatim,
  * surfacing stale past dates in the UI. Cache-hit paths also flow
- * through this function (see `submitOptionsAnalysis`), so the displayed
+ * through this function (see `runOptionsAnalysis`), so the displayed
  * time effectively means "most recently observed"; with the 1-day cache
  * TTL the drift from the original analysis time is bounded to 24 hours.
  *

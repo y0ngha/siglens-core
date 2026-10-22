@@ -21,8 +21,7 @@ import { hashBriefingInput } from './briefingInputHash';
  * Run a market briefing end-to-end: cache lookup → LLM call → normalize →
  * cache write → return.
  *
- * This is the direct (non-queued) replacement for the `submitBriefing` +
- * `pollBriefing` pair. The caller awaits a single promise; no job IDs, no
+ * The caller awaits a single promise; no job IDs, no
  * Redis meta, no polling loop.
  *
  * The briefing cache is keyed by the current ISO date+hour, the briefing model,

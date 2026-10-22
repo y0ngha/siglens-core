@@ -39,8 +39,7 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_FLASH_LITE_MODEL;
  * Run an indicator-name AI translation end-to-end: cache lookup → LLM call →
  * normalize → cache write → return.
  *
- * This is the direct (non-queued) replacement for `submitIndicatorTranslation`
- * + `pollIndicatorTranslation`. The caller awaits a single promise; no job IDs,
+ * The caller awaits a single promise; no job IDs,
  * no Redis meta, no polling loop.
  *
  * Uses `callAnalysisAi` (not `callBriefingAi`) — the submit path dispatched to
@@ -70,9 +69,6 @@ const INDICATOR_TRANSLATION_MODEL: ActiveModelId = GEMINI_FLASH_LITE_MODEL;
  *   (or any non-`'tier'` value) and `options.userApiKey` is missing or empty.
  *   Thrown after the cache read — a cached result is still returned keyless —
  *   and before any data fetch, Redis lock or provider call.
- *
- * @see submitIndicatorTranslation — the queued predecessor; still exported for
- *   the existing production path until siglens switches to runIndicatorTranslation.
  */
 export async function runIndicatorTranslation(
     normalizedName: string,
@@ -138,13 +134,12 @@ export async function runIndicatorTranslation(
     // raw를 JSON.parse하지 않고 그대로 넘긴다 — normalizeIndicatorTranslation이
     // 코드펜스 제거·파싱·garbage 방어를 모두 수행하며 "never throws"를 계약으로
     // 보장한다. 여기서 미리 파싱하면 LLM이 비-JSON을 뱉었을 때 그 계약을 깨고
-    // 예외가 호출자까지 올라간다(구 pollIndicatorTranslation도 파싱하지 않았다).
+    // 예외가 호출자까지 올라간다(그래서 파싱하지 않는다).
     const nameKo: string = normalizeIndicatorTranslation(raw);
 
     if (cache !== null) {
         // Cache the result as { nameKo } so normalizeIndicatorTranslation can
-        // parse it with the same logic used for raw LLM responses — mirrors the
-        // pollIndicatorTranslation cache write format.
+        // parse it with the same logic used for raw LLM responses.
         // Fire-and-forget: cache write must not delay the response.
         cache
             .set(cacheKey, { nameKo }, INDICATOR_TRANSLATION_CACHE_TTL)
