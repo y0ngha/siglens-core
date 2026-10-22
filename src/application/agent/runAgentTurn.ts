@@ -229,6 +229,7 @@ export async function runAgentTurn(
     const startedAt = Date.now();
     const now = params.now ?? new Date();
     const { counters } = deps;
+    const globalLimits = deps.globalLimits ?? AGENT_GLOBAL_LIMITS;
     const { userId, tier } = params;
 
     // 1. Daily quotas. An uncapped (`Infinity`) quota is not counted at all:
@@ -366,7 +367,8 @@ export async function runAgentTurn(
         // those counters and the `daily` refusals below cannot fire. They stay
         // on purpose: a finite tier limit can come back by changing one number
         // in `limits.ts`, without re-plumbing counters or refusal shapes. The
-        // shared Brave budget (`AGENT_GLOBAL_LIMITS`) is still enforced here.
+        // shared Brave budget (`deps.globalLimits`, default `AGENT_GLOBAL_LIMITS`)
+        // is still enforced here.
         try {
             if (name === 'run_fresh_analysis') {
                 if (
@@ -391,12 +393,12 @@ export async function runAgentTurn(
                     !(await claim(
                         counters.webSearchGlobalDay,
                         GLOBAL_SUBJECT,
-                        AGENT_GLOBAL_LIMITS.webSearchPerDay
+                        globalLimits.webSearchPerDay
                     ))
                 ) {
                     console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
                         scope: 'global_day',
-                        limit: AGENT_GLOBAL_LIMITS.webSearchPerDay,
+                        limit: globalLimits.webSearchPerDay,
                     });
                     return refuse({ error: 'quota', scope: 'global_day' });
                 }
@@ -404,12 +406,12 @@ export async function runAgentTurn(
                     !(await claim(
                         counters.webSearchGlobalMonth,
                         GLOBAL_SUBJECT,
-                        AGENT_GLOBAL_LIMITS.webSearchPerMonth
+                        globalLimits.webSearchPerMonth
                     ))
                 ) {
                     console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
                         scope: 'global_month',
-                        limit: AGENT_GLOBAL_LIMITS.webSearchPerMonth,
+                        limit: globalLimits.webSearchPerMonth,
                     });
                     return refuse({ error: 'quota', scope: 'global_month' });
                 }

@@ -1134,7 +1134,10 @@ export type {
 export type { FreshAnalysisKind } from './domain/agent/tools';
 
 // Agent chat (ai.siglens.io) — application use-case, policy, pure helper types
-export type { AgentPerTierLimit } from './application/agent/limits';
+export type {
+    AgentPerTierLimit,
+    AgentGlobalLimits,
+} from './application/agent/limits';
 export type {
     AgentErrorCode,
     RunAgentTurnParams,

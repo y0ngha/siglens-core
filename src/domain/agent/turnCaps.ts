@@ -3,7 +3,7 @@
  * many lookups a question needs, so simple questions still end in one or two
  * steps. Raised 2026-09-13 so a "news + overall + options + technical +
  * fundamentals" question on a few symbols fits in one turn. `maxWebSearch`
- * stays low because the global Brave budget (`AGENT_GLOBAL_LIMITS`) is shared
+ * stays low because the global Brave budget (`AGENT_GLOBAL_LIMITS` by default) is shared
  * by every user.
  *
  * Lives in `domain/` (re-exported from `application/agent/limits.ts`) because

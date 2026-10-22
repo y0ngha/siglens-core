@@ -9,7 +9,8 @@ type PerTier = Readonly<Record<Tier, number>>;
  * not invent one either: fresh analyses and web search are uncapped for every
  * tier, guests included, and so are signed-in turns. What still bounds cost
  * is structural — the per-turn caps (`AGENT_TURN_CAPS`), the shared Brave
- * budget (`AGENT_GLOBAL_LIMITS`) and the consumer's concurrency limits.
+ * budget (`AGENT_GLOBAL_LIMITS`, overridable via `RunAgentTurnDependencies.globalLimits`)
+ * and the consumer's concurrency limits.
  * `free` = anonymous visitor: a small daily turn allowance (counted per guest
  * by the consumer). `runAgentTurn` skips the counter for an `Infinity` quota
  * and still answers `{"error":"login_required"}` for a guest quota set to 0.
@@ -51,11 +52,27 @@ export function agentLimit(tier: Tier, feature: AgentPerTierLimit): number {
     return AGENT_LIMITS[feature][tier];
 }
 
-/** Service-wide caps independent of user (Brave free credits = 1,000/month). */
-export const AGENT_GLOBAL_LIMITS = {
+/**
+ * Shape of the service-wide caps; a consumer may pass its own through
+ * `RunAgentTurnDependencies.globalLimits`. Each value is a non-negative integer
+ * (`0` refuses every `web_search`) or `Infinity` (uncapped: the counter is not
+ * touched at all). The consumer validates what it reads from config; core does
+ * not clamp NaN or negative numbers.
+ */
+export interface AgentGlobalLimits {
+    webSearchPerDay: number;
+    webSearchPerMonth: number;
+}
+
+/**
+ * Service-wide caps independent of user (Brave free credits = 1,000/month). These are the
+ * defaults; a consumer that buys more search capacity (e.g. for a measurement window) passes
+ * `globalLimits` instead of patching this constant, so the change is visible at the call site.
+ */
+export const AGENT_GLOBAL_LIMITS: Readonly<AgentGlobalLimits> = {
     webSearchPerDay: 33,
     webSearchPerMonth: 1000,
-} as const;
+};
 
 export { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 

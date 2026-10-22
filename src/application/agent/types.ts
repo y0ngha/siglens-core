@@ -8,6 +8,7 @@ import type { CounterStore } from '@/domain/ports/counterStore';
 import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
 import type { ModelId, NormalizedUsage, Tier } from '@/domain/types';
 import type { ProviderErrorCode } from '@/application/shared/providerError';
+import type { AgentGlobalLimits } from '@/application/agent/limits';
 
 /**
  * Turn-level failure codes. `server_busy` also covers a fail-closed counter
@@ -96,6 +97,8 @@ export interface RunAgentTurnDependencies {
     usageLogs?: UsageLogRepository;
     /** Max output tokens per provider call (spec §5: 4,096 with reasoning off). */
     maxOutputTokens?: number;
+    /** Service-wide web-search caps; defaults to `AGENT_GLOBAL_LIMITS`. */
+    globalLimits?: AgentGlobalLimits;
 }
 
 export type AgentTurnEvent =
