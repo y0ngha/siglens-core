@@ -1,5 +1,5 @@
 import type { KeyPolicy } from '@/domain/keyRouting';
-import type { BackgroundTaskOptions } from '@/application/types';
+import type { BackgroundTaskOptions, CacheOptions } from '@/application/types';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import type {
     EnrichedNewsItem,
@@ -18,7 +18,8 @@ import type {
  * digest is a public analysis of the market-wide news flow for a single feed
  * category with optional tier-aware skill sampling.
  */
-export interface SubmitMarketNewsDigestOptions extends BackgroundTaskOptions {
+export interface SubmitMarketNewsDigestOptions
+    extends BackgroundTaskOptions, CacheOptions {
     /** Feed-category bucket (e.g. `'crypto'`, `'general'`). */
     category: NewsFeedCategory;
     /** Human-readable Korean category label shown to the model (e.g. `'미국 암호화폐'`). */

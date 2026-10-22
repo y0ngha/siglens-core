@@ -1,3 +1,4 @@
+import type { CacheOptions } from '@/application/types';
 import { normalizeOverallAnalysisResponse } from '@/domain/analysis/normalizeOverall';
 import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
@@ -9,7 +10,7 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import { buildOverallPeekCacheKey } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 
 /**
  * `true` when a normalized overall analysis carries no narrative content —
@@ -93,6 +94,9 @@ function isEmptyOverall(result: OverallAnalysisResponse): boolean {
  *
  * @see submitOverallAnalysis
  * @see pollOverallAnalysis
+ *
+ * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
+ *   cache from env, `null` → no cache. See {@link CacheOptions}.
  */
 export async function peekOverallAnalysisCache(
     symbol: string,
@@ -102,12 +106,13 @@ export async function peekOverallAnalysisCache(
     reasoning?: boolean,
     tier: Tier = DEFAULT_TIER,
     tierConfig: TierConfig = TIER_CONFIG,
-    locale?: AnalysisLocale
+    locale?: AnalysisLocale,
+    cacheOptions?: CacheOptions
 ): Promise<OverallAnalysisResponse | null> {
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
     if (modelId === undefined) return null;
 
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(cacheOptions?.cache);
     if (cache === null) return null;
 
     // `locale` must match the writer's (`runOverallAnalysis` folds

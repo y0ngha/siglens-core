@@ -1,3 +1,4 @@
+import type { CacheOptions } from '@/application/types';
 import type { KeyPolicy } from '@/domain/keyRouting';
 import type { MacroBriefingResponse } from '@/domain/types';
 import type { EconomicEventAnalysis } from '@/domain/economy/types';
@@ -182,7 +183,7 @@ export type PollIndicatorTranslationResult =
  * Options for a `runMacroBriefing` call — the direct (non-queued) successor to
  * the `submitMacroBriefing` + `pollMacroBriefing` pair.
  */
-export interface RunMacroBriefingOptions {
+export interface RunMacroBriefingOptions extends CacheOptions {
     /**
      * Cancellation signal. When provided, forwarded to `callBriefingAi` so a
      * dropped connection aborts the underlying AI provider request.
@@ -206,7 +207,7 @@ export type RunMacroBriefingResult =
  * Options for a `runEconomicEventAnalysis` call — the direct (non-queued)
  * successor to the `submitEconomicEventAnalysis` + `pollEconomicEventAnalysis` pair.
  */
-export interface RunEconomicEventAnalysisOptions {
+export interface RunEconomicEventAnalysisOptions extends CacheOptions {
     /**
      * Cancellation signal. When provided, forwarded to `callAnalysisAi` so a
      * dropped connection aborts the underlying AI provider request.
@@ -245,7 +246,7 @@ export type RunEconomicEventAnalysisResult =
  * Options for a `runIndicatorTranslation` call — the direct (non-queued)
  * successor to the `submitIndicatorTranslation` + `pollIndicatorTranslation` pair.
  */
-export interface RunIndicatorTranslationOptions {
+export interface RunIndicatorTranslationOptions extends CacheOptions {
     /**
      * Cancellation signal. When provided, forwarded to `callAnalysisAi` so a
      * dropped connection aborts the underlying AI provider request.

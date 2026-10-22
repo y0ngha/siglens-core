@@ -77,6 +77,51 @@ describe('runMarketNewsDigest', () => {
         });
     });
 
+    describe('options.cache 주입', () => {
+        const injectedGet = vi.fn();
+        const injectedSet = vi.fn();
+        const injectedCache = {
+            get: injectedGet,
+            set: injectedSet,
+            delete: vi.fn(),
+        };
+
+        beforeEach(() => {
+            injectedGet.mockReset();
+            injectedSet.mockReset();
+            injectedGet.mockResolvedValue(null);
+            injectedSet.mockResolvedValue(undefined);
+        });
+
+        it('주입한 캐시에서 읽고, env 캐시는 만들지도 읽지도 않는다', async () => {
+            injectedGet.mockResolvedValueOnce(mockRawResult);
+
+            const result = await runMarketNewsDigest({
+                ...baseArgs(),
+                cache: injectedCache,
+            });
+
+            expect(result.status).toBe('cached');
+            expect(injectedGet).toHaveBeenCalledTimes(1);
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it('cache: null 이면 env 캐시로 폴백하지 않고 캐시 없이 실행한다', async () => {
+            const result = await runMarketNewsDigest({
+                ...baseArgs(),
+                cache: null,
+            });
+
+            expect(result.status).toBe('done');
+            expect(mockCreateCacheProvider).not.toHaveBeenCalled();
+            expect(mockCacheGet).not.toHaveBeenCalled();
+            expect(mockCacheSet).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('cache hit', () => {
         it('cache hit → callAnalysisAi NOT called, returns {status:"cached"}', async () => {
             mockCacheGet.mockResolvedValueOnce(mockRawResult);

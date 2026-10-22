@@ -14,7 +14,7 @@ import {
     buildMacroBriefingDateBucket,
     MACRO_BRIEFING_CACHE_TTL,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import type { CachedMacroBriefingData } from '@/infrastructure/cache/types';
 import { hashMacroBriefingInput } from './macroBriefingInputHash';
 
@@ -61,7 +61,7 @@ export async function runMacroBriefing(
         inputHash
     );
 
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options?.cache);
     if (cache !== null) {
         try {
             const cached = await cache.get<CachedMacroBriefingData>(cacheKey);

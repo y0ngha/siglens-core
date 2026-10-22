@@ -6,7 +6,8 @@ import type {
     DeepSeekReasoningConfig,
 } from '@/domain/types';
 import { resolveReasoningConfig } from '@/domain/types';
-import OpenAI from 'openai';
+import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import type OpenAI from 'openai';
 import type { DeepSeekModelId } from '@/domain/analysis/modelSpecs';
 import { extractDeepSeekUsage, logUsage } from '@/infrastructure/ai/usage';
 import type { DeepSeekUsageLike } from '@/infrastructure/ai/usage';
@@ -64,11 +65,22 @@ type DeepSeekChatCompletionCreateParams =
         thinking: DeepSeekThinkingConfig;
     };
 
-const clientCache = createClientCache<OpenAI>(
-    apiKey => new OpenAI({ apiKey, baseURL: DEEPSEEK_BASE_URL })
+// DeepSeek speaks the OpenAI wire protocol, so it shares the `openai` peer SDK.
+const loadOpenAI = loadOptionalSdk(
+    'openai',
+    'DeepSeek models (OpenAI-compatible client)',
+    () => import('openai')
 );
 
-function getClient(apiKey: string): OpenAI {
+let clientCache: ReturnType<typeof createClientCache<OpenAI>> | undefined;
+
+async function getClient(apiKey: string): Promise<OpenAI> {
+    if (clientCache === undefined) {
+        const { default: OpenAIClient } = await loadOpenAI();
+        clientCache ??= createClientCache<OpenAI>(
+            key => new OpenAIClient({ apiKey: key, baseURL: DEEPSEEK_BASE_URL })
+        );
+    }
     return clientCache.get(apiKey);
 }
 
@@ -142,7 +154,7 @@ async function callDeepSeekResponses(
     signal: AbortSignal,
     onActivity: () => void
 ): Promise<DeepSeekResponsesResult> {
-    const client = getClient(options.apiKey);
+    const client = await getClient(options.apiKey);
     // SDK 타입을 그대로 쓴다. body가 `unknown`이면 `text.format` 키 오타 같은 것이
     // 컴파일에서 안 걸리고, 이벤트를 손으로 타이핑하면 아래 incomplete/failed 분기가
     // 타입에서 보이지 않는다 — 실제로 첫 구현이 그래서 절단 감지를 빠뜨렸다.
@@ -273,7 +285,10 @@ export async function callDeepSeek(
     // 전파되지 않는다 — 어떤 준비 작업보다 먼저 여기서 끊는다(재시도 대상 아님: status·retryable 없음).
     options.signal?.throwIfAborted();
     const { model, apiKey } = options;
-    const client = getClient(apiKey);
+    const client = await getClient(apiKey);
+    // getClient는 이제 SDK 지연 로드로 await 한다 — 그 사이 도착한 abort는 아래에서 다는
+    // 리스너가 보지 못하므로 로드 직후 한 번 더 확인한다.
+    options.signal?.throwIfAborted();
     const spec = MODEL_SPECS[model] as DeepSeekModelSpec | undefined;
     if (!spec) {
         throw new Error(`[DeepSeek] Unknown model: ${model}`);

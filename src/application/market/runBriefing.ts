@@ -13,7 +13,7 @@ import {
     buildBriefingCacheKey,
     MARKET_BRIEFING_CACHE_TTL,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import type { CachedBriefingData } from '@/infrastructure/cache/types';
 import { hashBriefingInput } from './briefingInputHash';
 
@@ -62,7 +62,7 @@ export async function runBriefing(
         inputHash
     );
 
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options?.cache);
     if (cache !== null) {
         try {
             const cached = await cache.get<CachedBriefingData>(cacheKey);

@@ -1,5 +1,6 @@
 import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
-import Anthropic from '@anthropic-ai/sdk';
+import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import type Anthropic from '@anthropic-ai/sdk';
 import type {
     ClaudeAdaptiveReasoningConfig,
     ClaudeBudgetReasoningConfig,
@@ -43,11 +44,21 @@ export const MAX_TOKENS_CODE = 'CLAUDE_MAX_TOKENS';
 
 const CLAUDE_TIMEOUT_MS = 3600_000;
 
-const clientCache = createClientCache<Anthropic>(
-    apiKey => new Anthropic({ apiKey })
+const loadAnthropic = loadOptionalSdk(
+    '@anthropic-ai/sdk',
+    'Claude models',
+    () => import('@anthropic-ai/sdk')
 );
 
-function getClient(apiKey: string): Anthropic {
+let clientCache: ReturnType<typeof createClientCache<Anthropic>> | undefined;
+
+async function getClient(apiKey: string): Promise<Anthropic> {
+    if (clientCache === undefined) {
+        const { default: AnthropicClient } = await loadAnthropic();
+        clientCache ??= createClientCache<Anthropic>(
+            key => new AnthropicClient({ apiKey: key })
+        );
+    }
     return clientCache.get(apiKey);
 }
 
@@ -156,7 +167,10 @@ export async function callClaude(
     // 이유 없이 구조화 출력 강제를 포기하게 된다.
     const forceStructuredTool = structuredOutput && !thinkingActive;
 
-    const client = getClient(apiKey);
+    const client = await getClient(apiKey);
+    // getClient는 이제 SDK 지연 로드로 await 한다 — 그 사이 도착한 abort는 아래에서 다는
+    // 리스너가 보지 못하므로 로드 직후 한 번 더 확인한다.
+    options.signal?.throwIfAborted();
 
     const controller = new AbortController();
     // .unref()로 timer가 event loop를 점유하지 않게 하여 정상 종료를 막지 않도록 한다.

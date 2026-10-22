@@ -35,7 +35,7 @@ import {
     buildOptionsCacheKey,
     OPTIONS_CACHE_TTL_SECONDS,
 } from '@/infrastructure/cache/config';
-import { createCacheProvider } from '@/infrastructure/cache/redis';
+import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { sanitizeOptionsChain } from '@/domain/options/sanitizeOptionsChain';
 import type {
     ActiveModelId,
@@ -169,7 +169,7 @@ export async function runOptionsAnalysis(
         options.reasoning,
         options.locale
     );
-    const cache = createCacheProvider();
+    const cache = resolveCacheProvider(options.cache);
 
     if (!options.force && cache !== null) {
         try {

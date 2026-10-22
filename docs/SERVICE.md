@@ -55,7 +55,6 @@ infrastructure/ I/O wrappers + abstract interfaces
 ❌ Email delivery / verification token storage
 ❌ Drizzle ORM schema, Neon/Postgres client, migrations
 ❌ Concrete database adapters — only repository interfaces are exposed
-❌ Concrete AI provider SDK adapters (Gemini, Claude) — only types are exposed
 ❌ Korean ticker translation / asset translation
 ❌ BYOK (user-supplied LLM API key) storage and validation
 ❌ User tier CRUD operations (read-only policy interface only)
