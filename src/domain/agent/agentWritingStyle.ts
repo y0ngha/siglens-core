@@ -20,7 +20,7 @@ import { AGENT_FOLLOW_UP_MARKER } from './agentFollowUps';
  * The politeness, formatting, placeholder-noun, connector, closing-line and
  * answer-language rules each fixed a pattern measured in real answers; reword
  * them only with a fresh real-LLM A/B, since small wording changes moved the
- * measured rates (see the PUBLIC_API changelog).
+ * measured rates (see the commit history of this file).
  *
  * Wording only: it must never override a Depth or Output rule (the Plain
  * closing lines, the one-line caveat, the source line). The first bullet says

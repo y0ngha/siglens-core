@@ -70,9 +70,8 @@ should not be burdened with adapter wiring. The library owns wiring; the consume
 owns the call site.
 
 **Intentional exception — externally-owned I/O providers:**
-`MarketDataProvider` (and `callAiProvider` before it, see Phase 4.5 in
-`docs/PUBLIC_API.md`) are injected as explicit parameters because the *consumer*
-owns the real external I/O implementation; core only owns the port contract.
+`MarketDataProvider` and `callAiProvider` are injected as explicit parameters because the
+*consumer* owns the real external I/O implementation; core only owns the port contract.
 Injecting them is the right boundary: core must not hard-wire a specific FMP or
 Alpaca adapter, just as it must not hard-wire a specific AI provider SDK.
 These parameters are required when a cache miss occurs (the fetch path) and must

@@ -1852,8 +1852,7 @@ export function buildCongressTrendCacheKey(
  * numbers are comma-grouped and labels / axes render as display names — and so
  * did the rules (FTD caveat, active ATM, no identifiers, no price-impact
  * prediction, Korean terms). A `p2` entry can misdate an FTD peak or read a
- * mega cap's plan sales as bearish. Round-by-round detail lives in
- * `docs/PUBLIC_API.md`.
+ * mega cap's plan sales as bearish.
  *
  * **`p4`** = Korean insider cluster fix (2026-10-17). A cluster counts only
  * reporters with a material change, opposite clusters are netted, and a

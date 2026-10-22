@@ -78,7 +78,7 @@ For each recurring group:
 
 1. **Pick the destination** with the Rule Homes table in `CLAUDE.md`:
    - layer-specific rule → that layer's `src/<layer>/CLAUDE.md` (`DOM`, `APP`, `INF`)
-   - public export, entrypoint or `PUBLIC_API.md` changelog rule → `docs/PUBLIC_API.md` (`API`, Korean prose)
+   - public export, entrypoint or `PUBLIC_API.md` inventory rule → `docs/PUBLIC_API.md` (`API`, Korean prose)
    - PR scope or release rule → `docs/GIT_CONVENTIONS.md` (`G`, Korean prose)
    - everything else → `docs/CONVENTIONS.md` under `CP`, `TS`, `N`, `JD`, `DS` or `TE`
 2. **Check for an existing rule.** Read the destination doc. If a rule ID already covers the pattern, mark the group **already-documented** — do not add a duplicate under any circumstances — but **still remove its entries from fix-log in Step 5**. You may add one ❌/✅ line to that rule when it sharpens it; never add recurrence or PR narration.

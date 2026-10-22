@@ -683,8 +683,7 @@ export function buildOverallAnalysisPrompt(
     // 크립토는 fundamental·options·financials 축이 구조적으로 없다. 뉴스 축까지
     // 비면(창 안에 기사 0건인 알트코인) 남는 건 technical 하나뿐인데, 그때도
     // "technical + news로 종합하라"고 지시하면 비어 있는 축에서 근거를 만들어내라는
-    // 말이 된다 — crypto fundamental 축이 예전에 같은 모순으로 수정된 적이 있다
-    // (docs/PUBLIC_API.md 2026-06-22 "Gemini-1 bugfix").
+    // 말이 된다 — crypto fundamental 축이 예전에 같은 모순으로 수정된 적이 있다.
     const cryptoAvailableAxes =
         news !== null ? 'technical + news axes' : 'the technical axis';
     const assetContext = isCrypto

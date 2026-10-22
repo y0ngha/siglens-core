@@ -26,15 +26,9 @@ const ANCHOR_PATTERN = /<a id="([A-Z]+-\d+)"><\/a>/g;
 const TEXT_EXTENSION = /\.(?:ts|md|ya?ml|json|mjs|cjs|js)$/;
 
 const RETIRED_LOG_NAME = ['MIS', 'TAKES'].join('');
-const HISTORY_HEADING = '\n## 개정 이력\n';
-
 /** Files that may keep citing the retired log because they are dated history. */
 function isHistoryFile(path: string): boolean {
-    return (
-        path === 'CHANGELOG.md' ||
-        path.startsWith('docs/superpowers/') ||
-        path.endsWith('ruleReferences.test.ts')
-    );
+    return path === 'CHANGELOG.md' || path.endsWith('ruleReferences.test.ts');
 }
 
 function listRepoFiles(): string[] {
@@ -176,16 +170,7 @@ describe('rule references', () => {
         it('is not mentioned outside changelog and dated history', () => {
             const mentions = REPO_FILES.filter(
                 path => !isHistoryFile(path)
-            ).flatMap(path => {
-                const text = readRepoFile(path);
-                const historyStart =
-                    path === 'docs/PUBLIC_API.md'
-                        ? text.indexOf(HISTORY_HEADING)
-                        : -1;
-                const live =
-                    historyStart === -1 ? text : text.slice(0, historyStart);
-                return live.includes(RETIRED_LOG_NAME) ? [path] : [];
-            });
+            ).filter(path => readRepoFile(path).includes(RETIRED_LOG_NAME));
 
             expect(mentions).toEqual([]);
         });

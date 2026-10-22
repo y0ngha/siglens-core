@@ -2,7 +2,7 @@
 
 <div align="center">
 
-**The pure TypeScript analysis engine behind SIGLENS: indicators, patterns, signals, and AI analysis building blocks.**
+**TypeScript technical analysis library for stocks and crypto: indicators, candlestick and chart patterns, trading signals, and validated AI/LLM analysis.**
 
 [![License](https://img.shields.io/badge/license-MIT-blue)](./LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D22-339933)](./package.json)
@@ -15,43 +15,63 @@
 
 ---
 
+`@y0ngha/siglens-core` is the open-source analysis engine behind [SIGLENS](https://siglens.io), an AI analysis service for US stocks, Korean stocks, and crypto. From a plain array of price bars it computes technical indicators (RSI, MACD, Bollinger Bands, and more), detects candlestick and chart patterns, flags trading signals, and builds a fear and greed index. It also assembles the prompts for AI analysis and checks the model's answer before anyone sees it.
+
+> **Not investment advice. This library places no orders and has no trading features.** It produces analysis and nothing more.
+
 ## What it is
 
-`@y0ngha/siglens-core` is the analysis domain of [SIGLENS](https://siglens.io), an AI analysis service for US stocks, Korean stocks, and crypto. It holds everything that decides what a chart means: how indicators are calculated, which patterns and signals are present, how an AI prompt is assembled, and how the model's answer is checked before anyone sees it.
+The package holds everything that decides what a chart means: how indicators are calculated, which patterns and signals are present, how an AI prompt is assembled, and how the model's answer is checked. It is a plain TypeScript library with no UI, no React, and no Next.js. The [SIGLENS web app](https://github.com/y0ngha/siglens), background workers (separate processes that run jobs outside the web server), and the AI agent at [ai.siglens.io](https://ai.siglens.io) all depend on it, so the numbers and rules stay identical wherever they are used.
 
-It is a plain TypeScript library with no UI, no React, and no Next.js. The [SIGLENS web app](https://github.com/y0ngha/siglens), background workers, and the AI agent at [ai.siglens.io](https://ai.siglens.io) all depend on the same package, so the numbers and rules stay identical wherever they are used.
+## Quick start
 
-This package never places an order and never makes a recommendation. It produces analysis inputs and validated analysis results; what to do with them is up to the consumer.
+```ts
+import { calculateIndicators, detectSignals, type Bar } from '@y0ngha/siglens-core';
+
+// Oldest bar first. `time` is a Unix timestamp in seconds.
+const bars: Bar[] = [{ time: 1_735_689_600, open: 189.2, high: 191.0, low: 188.1, close: 190.4, volume: 48_200_000 } /* , ... */];
+
+const indicators = calculateIndicators(bars); // RSI, MACD, Bollinger Bands, ... per bar
+const signals = detectSignals(bars, indicators); // e.g. { type: 'golden_cross', direction, phase, detectedAt }
+```
+
+Warm-up periods are filled with `null`, so "not yet computed" is never confused with a real `0`.
+
+## How much to trust the output
+
+- **Numbers come from code, not from AI.** Indicators, signals, patterns, and scorecards are computed deterministically by pure functions. The AI only interprets numbers that were already calculated.
+- **The AI's answer is checked.** Responses go through JSON repair, normalization, and sanity checks; an inconsistent answer is corrected or rejected rather than displayed. Examples enforced in code: support and resistance levels with a non-positive price or no stated reason are dropped, and the AI's stop-loss and take-profit prices are validated with an ATR-based fallback. A helper also flags numbers in an AI answer that appear in none of the tool results it was given.
+- **It can still be wrong.** AI can misread a chart, and past signals do not guarantee future results.
 
 ## What it can do
 
 ### Technical indicators
 
-A wide set of indicators is computed from a single array of price bars and returned as one structured result. It covers trend, momentum, volatility, and volume: moving averages, RSI, MACD, Bollinger Bands, Ichimoku, Supertrend, Smart Money Concepts, squeeze momentum, and many more. All of the math is implemented in the package itself, without a third-party indicator library.
+A wide set of indicators is computed from one array of bars and returned as one structured result: moving averages, RSI, MACD, Bollinger Bands, Ichimoku, Supertrend, Smart Money Concepts, squeeze momentum, and many more across trend, momentum, volatility, and volume. The math is implemented in the package itself, without a third-party indicator library.
 
-### Candle and chart patterns
+### Candlestick and chart patterns
 
-Single- and multi-candle patterns are detected directly from the bars. Larger chart patterns are first screened by geometry, then qualified and arbitrated so that only plausible shapes reach the chart or the AI prompt. Chart overlays such as trendlines, Fibonacci levels, divergences, and Elliott wave candidates can be derived from the same data.
+Single- and multi-candle patterns (hammer, doji, engulfing, harami, and others) are detected from the bars. Larger chart patterns (head and shoulders, double and triple tops and bottoms, triangles, wedges, flags, cup and handle, and others) are first screened by geometry, then qualified and arbitrated so only plausible shapes reach the chart or the AI prompt. Trendlines, support and resistance levels, Fibonacci levels, divergences, and Elliott wave candidates can be derived from the same data.
 
 ### Signal detection
 
-Pure detectors turn indicator state into named signals: confirmed crossovers and breakouts, anticipation signals that appear before a move completes, pullbacks, and trend classification. A confluence step shows where several signals agree.
+Pure detectors turn indicator state into named signals: confirmed events such as golden and death crosses, RSI overbought and oversold, MACD crosses, and Bollinger breakouts; anticipation signals that appear before a move completes, such as RSI divergence, Bollinger squeeze, and nearing support or resistance; pullbacks; and trend classification. A confluence step checks whether several signals point the same way.
 
-### Skills system
+### Skills
 
-Analysis techniques are written as Markdown files with frontmatter, not as code. The package loads these files, samples and gates them by market state, and feeds the selected techniques into the prompt. A new technique can be added by adding a file, with no change to calculation code. The skill files themselves are supplied by the consumer.
+Skills are analysis techniques written as Markdown files with frontmatter instead of code. The package loads them, samples and gates them by market state, and feeds the selected ones into the prompt. A new technique is a new file, with no change to calculation code. The skill files themselves are supplied by the consumer.
 
 ### AI analysis prompts and validation
 
-Prompts are built as pure functions for technical, fundamental, financial, news, options, congressional trading, investor flows, and overall analysis, as well as for market and macro briefings. Model responses go through JSON repair, normalization, and sanity checks, so a malformed or inconsistent answer is corrected or rejected rather than displayed. A model registry describes each supported model, covering Anthropic, Google, OpenAI, and DeepSeek.
+Prompts are built as pure functions for technical, fundamental, financial, news, options (derivatives), US congressional trading, investor flows, and overall analysis, plus market and macro briefings. A model registry covers Anthropic, Google, OpenAI, and DeepSeek.
 
-### Analysis orchestration
+### Analysis use cases
 
-Ready-made use cases tie the pieces together: submit an analysis, poll its job, cancel it, and read a cached result. They handle caching, in-flight de-duplication, a job queue, re-analysis cooldowns, usage limits by tier, and user-supplied API keys (BYOK). Heavy work can be delegated to an external worker over HTTP.
+In-process `run*` functions (`runAnalysis`, `runOverallAnalysis`, `runNewsAnalysis`, `runBriefing`, and others) call the model directly and return the finished result. They handle caching, in-flight de-duplication of identical requests, tier gating and usage limits, and BYOK. A *tier* is the product plan (free, member, or pro); *BYOK* (bring your own key) means the user supplies their own AI API key. A re-analysis cooldown (5 minutes per symbol and timeframe) is available as a helper for the consumer to apply. There is no job queue and no external worker.
 
 ### Market sentiment
 
-Fear and greed indices are built from weighted factors for the equity market and for crypto, with percentile and regime statistics. Forward-looking validation helpers measure whether a signal has had an edge in the past.
+A fear and greed index scores 0 to 100 in five stages (extreme fear, fear, neutral, greed, extreme greed). It is available per stock, for the US market overall, and for crypto, with percentile and regime statistics. Helpers also summarize how prices moved 5, 20, and 60 sessions after entering an extreme zone, so you can see whether a signal had an edge in the past. KOSPI and KOSDAQ tick-size rounding is included for Korean price levels.
 
 ### Agent building blocks
 
@@ -61,9 +81,9 @@ For the conversational agent, the package supplies the tool catalog, argument va
 
 ```mermaid
 flowchart TB
-    APP[application<br/>use cases that compose the layers below] --> INFRA
+    APP[application<br/>run* use cases that compose the layers below] --> INFRA
     APP --> DOMAIN
-    INFRA[infrastructure<br/>Redis cache and queue, AI SDK adapters, skills loader] --> DOMAIN
+    INFRA[infrastructure<br/>Redis cache and counters, AI SDK adapters, skills loader] --> DOMAIN
     DOMAIN[domain<br/>pure calculations, prompts, validation, ports]
 
     classDef app fill:#dbeafe,stroke:#2563eb,color:#1e3a8a
@@ -74,15 +94,15 @@ flowchart TB
     class DOMAIN domain
 ```
 
-- **domain** is pure TypeScript with no I/O, no clock, and no environment access. It also declares the ports (cache, market data, news, repositories, and so on) that the outside world must satisfy.
+- **domain** is pure TypeScript with no I/O, no clock, and no environment access. It declares the ports (cache, market data, news, repositories, and so on) that the outside world must satisfy.
 - **infrastructure** talks to the outside: Upstash Redis, AI provider SDKs, and the filesystem for skills. It may import only from domain.
 - **application** composes the two into end-to-end use cases. Nothing below it imports it.
 
-Consumers own presentation and runtime concerns, as well as the database adapters and market data fetchers that implement the ports. Everything public is exported from a single entry point; deep imports are not supported.
+There are two entry points. The server entry (`dist/index.js`) exports the full API. Bundlers pick the browser entry (`dist/index.client.js`) through the `browser` export condition; it is a pure, browser-safe subset with no application or infrastructure runtime code. Deep imports are not supported. Consumers own presentation, database adapters, and market data fetchers that implement the ports.
 
 ## Installation
 
-The package is published to GitHub Packages. Map the `@y0ngha` scope to that registry and authenticate with a GitHub token that has the `read:packages` scope.
+The package is published to GitHub Packages. Map the `@y0ngha` scope to that registry and authenticate with a GitHub token that has the `read:packages` scope. Every install needs the token, including CI.
 
 ```yaml
 # .yarnrc.yml
@@ -92,11 +112,32 @@ npmScopes:
         npmAuthToken: '${GITHUB_TOKEN}'
 ```
 
+```ini
+# .npmrc
+@y0ngha:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=${GITHUB_TOKEN}
+```
+
 ```bash
 yarn add @y0ngha/siglens-core
 ```
 
-Node.js 22 or later is required. `@upstash/redis` is an optional peer dependency: install it only if you use the Redis-backed cache, job queue, or counters.
+Node.js 22 or later is required. `@upstash/redis` is an optional peer dependency: install it only if you use the Redis-backed cache or counters.
+
+## Runtime configuration
+
+**Market data is not included.** Implement the `MarketDataProvider` port (`getBars`, `getQuote`) with your own data source and pass it as `marketDataProvider` to the use cases that fetch bars (such as `runAnalysis`).
+
+The infrastructure layer reads these environment variables, only when the matching feature is used:
+
+| Variable | Used for | Required |
+|---|---|---|
+| `ANTHROPIC_API_KEY`, `GEMINI_API_KEY`, `OPENAI_API_KEY`, `DEEPSEEK_API_KEY` | Server-owned AI keys, read when a model of that provider is called without a user key (BYOK) | Only for providers you call with a server key |
+| `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN` | Redis cache, usage counters, and the re-analysis cooldown; `createCacheProvider()` returns `null` when unset | Optional |
+| `UPSTASH_REDIS_REST_READONLY_TOKEN` | Read-only token for cache reads, if you split credentials | Optional |
+| `FMP_API_KEY` | Read by `readFmpConfig()` / `tryReadFmpConfig()` | Optional |
+
+Skill files are Markdown with frontmatter, loaded from a `skills/` directory under the process working directory. The required fields and format are in [DOMAIN.md](./docs/DOMAIN.md).
 
 ## Development
 
@@ -112,18 +153,19 @@ The project uses Yarn only. `npm` and `pnpm` are not used.
 
 ## Documentation
 
-Project documentation is written in Korean.
+Project documentation is mostly written in Korean, with some parts in English.
 
 | Document | Contents |
 |---|---|
 | [SERVICE.md](./docs/SERVICE.md) | What the library provides and what it leaves to consumers |
-| [DOMAIN.md](./docs/DOMAIN.md) | Indicators, patterns, prompts, and business rules |
+| [DOMAIN.md](./docs/DOMAIN.md) | The actual indicator formulas, thresholds, patterns, prompts, and business rules |
 | [ARCHITECTURE.md](./docs/ARCHITECTURE.md) | Layers, dependency direction, and folder layout |
-| [PUBLIC_API.md](./docs/PUBLIC_API.md) | Public API tiers and versioning policy |
+| [PUBLIC_API.md](./docs/PUBLIC_API.md) | Developer reference: public API tiers, export inventory, versioning policy |
 | [API.md](./docs/API.md) | External services used by the infrastructure layer |
 | [CONVENTIONS.md](./docs/CONVENTIONS.md) | Coding and testing conventions |
 | [FF.md](./docs/FF.md) | Design principles: readability, predictability, cohesion, coupling |
 | [GIT_CONVENTIONS.md](./docs/GIT_CONVENTIONS.md) | Branch, commit, and pull request rules |
+| [CHANGELOG.md](./CHANGELOG.md) | Release history |
 
 ## Security
 
