@@ -4,6 +4,7 @@ import {
     type MacroIndicatorPromptMeta,
 } from './indicatorPromptMeta';
 import { computeYieldSpread } from './normalizeTreasuryRates';
+import { selectCalendarEvents } from './selectCalendarEvents';
 import type { EconomySnapshot } from './types';
 import {
     formatPlainNumber,
@@ -304,13 +305,24 @@ export function buildMacroBriefingPrompt(
             ? '2s10s 스프레드: N/A'
             : `2s10s 스프레드: ${spread.toFixed(2)}%p`;
 
-    const calendarLines = snapshot.calendar
-        .slice(0, MAX_CALENDAR_IN_PROMPT)
-        .map(e => {
+    // Rate decisions first, then by impact — the first rows by date were
+    // Low-impact releases on an ordinary week, which hid an FOMC decision from
+    // the policy-direction rule below. Rows more than a day old are dropped so
+    // already-released High rows cannot outrank the upcoming ones; earlier
+    // today's releases (`(Nh ago)`) stay.
+    const calendar = selectCalendarEvents(snapshot.calendar, {
+        max: MAX_CALENDAR_IN_PROMPT,
+        notBefore: new Date(now.getTime() - MS_PER_DAY),
+    });
+    const omittedCount =
+        calendar.omitted.High + calendar.omitted.Medium + calendar.omitted.Low;
+    const calendarLines = [
+        ...calendar.events.map(e => {
             const est = formatPlainNumber(e.estimate);
             return `${formatCalendarTime(e.date, now)} ${e.event} (중요도=${e.impact}, 예상=${est})`;
-        })
-        .join('\n');
+        }),
+        ...(omittedCount > 0 ? [`(그 외 일정 ${omittedCount}건 생략)`] : []),
+    ].join('\n');
 
     const derived = deriveMacroRegime(snapshot);
     const regimeLine = `Regime (computed): ${derived.regime} — because: ${derived.signals.join('; ')}`;
@@ -334,6 +346,7 @@ export function buildMacroBriefingPrompt(
 - Unemployment is a rate; judge it by its direction of change and by the percentage-point delta.
 - Write in plain Korean. Never copy this prompt's jargon into the briefing: do not use the words drift or 드리프트, and do not name these rules.
 - Regime: the Regime (computed) line below states the regime for this briefing and the signals that produced it. Set the regime field to exactly that value, write the summary and highlights so they agree with it, and describe the signals in plain words. Never restate thresholds, cutoffs or rule wording, never pick a different regime, and never call the regime computed.
+- The calendar rows are a selection: rate decisions first, then the most important events. Never say they are the only events scheduled.
 - Calendar rows end with a relative-time suffix such as (in Nh), (Nh ago) or (in N days). It is only valid at generation time and this briefing is shown for a full day, so never restate it or any equivalent wording ('곧', 'N시간 뒤', 'N시간 전'); refer to a scheduled event by its date instead.
 
 Schema (string fields are Korean 존댓말):

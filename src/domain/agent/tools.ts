@@ -220,11 +220,22 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
         name: 'get_economy',
         description:
-            'US macro indicators (policy rate, CPI, employment, GDP) with the latest-vs-previous change already computed, Treasury yields with their own as-of date (`treasury.date`; cite that date, it can differ from the macro snapshot) including `spread2s10s` (2s10s spread, precomputed — quote it as given, do not recompute it), upcoming high-impact economic calendar events, and the latest SIGLENS macro briefing if available. Use for rates, inflation, macro calendar or "what\'s coming up this week" questions.',
+            'US macro indicators (policy rate, CPI, employment, GDP) with the latest-vs-previous change already computed, Treasury yields with their own as-of date (`treasury.date`; cite that date, it can differ from the macro snapshot) including `spread2s10s` (2s10s spread, precomputed — quote it as given, do not recompute it), the US economic calendar, and the latest SIGLENS macro briefing if available. `calendar` carries `coverage` ({from, to}: the dates it spans), `events` and `omitted` (per-impact count of events left out): Fed rate decisions take the first slots, then High, Medium and Low events fill the rest, nearest first — so a date inside `coverage` with no listed row may still have omitted lower-impact releases; say so rather than that nothing is scheduled. Without arguments it covers the upcoming weeks. For a date outside `coverage` (a later FOMC meeting, last month\'s CPI release), call again with `from` and `to`; that call returns only the calendar. Events more than about five months out are only the major ones, and an empty far range means not scheduled yet. Use for rates, inflation, macro calendar or "what\'s coming up this week" questions.',
         costClass: 'cached',
         inputSchema: {
             type: 'object',
-            properties: {},
+            properties: {
+                from: {
+                    type: 'string',
+                    description:
+                        'Start date YYYY-MM-DD (inclusive). Give with `to` to look up a specific period.',
+                },
+                to: {
+                    type: 'string',
+                    description:
+                        'End date YYYY-MM-DD (inclusive), at most 88 days after `from`; split a longer period into several calls.',
+                },
+            },
             additionalProperties: false,
         },
     },

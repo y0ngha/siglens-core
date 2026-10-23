@@ -227,6 +227,10 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain('call the union of all matching rows');
         expect(prompt).toContain('→ search_ticker first');
         expect(prompt).toContain('→ get_my_portfolio.');
+        // 기본 창 밖의 날짜(다음다음 FOMC)를 "데이터에 없다"로 답하지 않게 한다.
+        expect(prompt).toContain(
+            'call get_economy again with `from`/`to` before saying SIGLENS has no such date'
+        );
         const noSearch = buildAgentSystemPrompt({
             locale: 'ko',
             tools: AGENT_TOOL_SPECS.filter(
@@ -537,7 +541,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-23.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-23.3');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at

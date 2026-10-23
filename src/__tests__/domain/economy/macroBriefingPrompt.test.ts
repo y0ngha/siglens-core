@@ -50,6 +50,44 @@ const SNAP: EconomySnapshot = {
 };
 
 describe('buildMacroBriefingPrompt', () => {
+    it('앞선 Low 행이 많아도 금리 결정 행이 캘린더 행에 남는다', () => {
+        // 날짜순 앞 6행만 넣던 시절엔 시추기 수·CFTC 행이 칸을 다 채워
+        // "금리 결정 행이 있을 때만 정책 방향" 규칙이 FOMC 앞에서 침묵했다.
+        const lows = Array.from({ length: 8 }, (_, i) => ({
+            ...SNAP.calendar[0],
+            date: `2026-06-15 0${i + 1}:00:00`,
+            event: `CFTC position ${i}`,
+            impact: 'Low' as const,
+        }));
+        const p = buildMacroBriefingPromptRaw(
+            {
+                ...SNAP,
+                calendar: [
+                    ...lows,
+                    {
+                        ...SNAP.calendar[0],
+                        date: '2026-06-20 18:00:00',
+                        event: 'Fed Interest Rate Decision',
+                    },
+                ],
+            },
+            DEFAULT_NOW
+        ).dynamic;
+        expect(p).toContain('Fed Interest Rate Decision');
+        expect(p).toContain('CFTC position 4');
+        expect(p).not.toContain('CFTC position 5');
+        // 고른 행만 보면 "이번 주 일정은 이것뿐"으로 읽힌다 — 생략 건수와 규칙을 함께 준다.
+        expect(p).toContain('(그 외 일정 3건 생략)');
+        expect(p).toContain(
+            'The calendar rows are a selection: rate decisions first, then the most important events. Never say they are the only events scheduled.'
+        );
+    });
+
+    it('prints no omitted line when every row fits', () => {
+        const p = buildMacroBriefingPromptRaw(SNAP, DEFAULT_NOW).dynamic;
+        expect(p).not.toContain('건 생략');
+    });
+
     it('지표·2s10s·임박 캘린더를 프롬프트에 포함', () => {
         const p = buildMacroBriefingPrompt(SNAP, DEFAULT_NOW);
         expect(p).toContain('federalFunds');
@@ -348,15 +386,24 @@ describe('buildMacroBriefingPrompt — indicator delta + calendar days-until', (
         expect(p).not.toMatch(/in -?0 days/);
     });
 
-    it('renders an event more than a day in the past as "(N days ago)"', () => {
+    it('drops an event more than a day in the past so released rows cannot outrank upcoming ones', () => {
         const p = buildMacroBriefingPromptRaw(
             {
                 ...SNAP,
-                calendar: [{ ...SNAP.calendar[0], date: '2026-06-12' }],
+                calendar: [
+                    { ...SNAP.calendar[0], date: '2026-06-12', impact: 'High' },
+                    {
+                        ...SNAP.calendar[0],
+                        date: '2026-06-18',
+                        event: 'Retail Sales',
+                        impact: 'Low',
+                    },
+                ],
             },
             NOW
         ).dynamic;
-        expect(p).toContain('2026-06-12 (3 days ago) Fed Rate Decision');
+        expect(p).not.toContain('2026-06-12');
+        expect(p).toContain('2026-06-18 (in 3 days) Retail Sales');
     });
 
     it('labels a naive FMP datetime with UTC but leaves a date-only row unlabelled', () => {

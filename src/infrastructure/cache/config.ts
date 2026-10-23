@@ -1322,9 +1322,16 @@ export function buildMacroBriefingDateBucket(now: Date): string {
  * from `dateHour` to a UTC date (`buildMacroBriefingDateBucket`) with a 1-day
  * TTL. Bytes change for every request.
  *
+ * **`p6`** — calendar rows go through `selectCalendarEvents`: rate decisions
+ * first, then by impact, rows more than a day old dropped, and an omitted-count
+ * line plus a rule that the rows are a selection. Date order let Low rows
+ * crowd out an FOMC decision, so the policy-direction rule went silent before
+ * one. The input hash is unchanged (it hashes the snapshot, not the prompt),
+ * so without this bump deploy day would keep serving the pre-fix briefing.
+ *
  * @internal
  */
-export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p5' as const;
+export const MACRO_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p6' as const;
 
 /**
  * @internal Build the Redis key for a cached macro (economy) briefing.
