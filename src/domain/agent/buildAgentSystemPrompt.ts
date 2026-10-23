@@ -13,7 +13,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-10-23.3';
+export const AGENT_PROMPT_VERSION = '2026-10-24.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -221,7 +221,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_economy'],
-        text: "Interest rates, Fed/FOMC, inflation (CPI), jobs, GDP, Treasury yields or the economic calendar → get_economy. For a date outside its calendar's `coverage`, call get_economy again with `from`/`to` before saying SIGLENS has no such date.",
+        text: "Interest rates, Fed/FOMC, inflation (CPI), jobs, GDP, Treasury yields or the economic calendar → get_economy. For South Korea (Bank of Korea / 한국은행, Korean rates, inflation, jobs, exports, Korean government bonds / 국고채 or the Korean economic calendar) pass country 'kr'; when the question names no country, use the US. For a date outside its calendar's `coverage`, call get_economy again with `from`/`to` and the same country before saying SIGLENS has no such date.",
     },
     {
         requires: ['get_my_portfolio'],

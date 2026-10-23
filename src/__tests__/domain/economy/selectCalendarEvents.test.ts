@@ -40,6 +40,10 @@ describe('isRateDecisionEvent', () => {
         expect(
             isRateDecisionEvent(row(at(5), 'Press Conference', 'High'))
         ).toBe(false);
+        // FMP가 한국은행 결정을 국가 접두사 없이 이렇게 내보낸다(siglens KR_INDICATOR_EVENT.baseRate).
+        expect(
+            isRateDecisionEvent(row(at(5), 'Interest Rate Decision', 'High'))
+        ).toBe(true);
     });
 });
 
