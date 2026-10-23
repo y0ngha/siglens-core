@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.26.0](https://github.com/y0ngha/siglens-core/compare/v2.25.3...v2.26.0) (2026-10-23)
+
+### Features
+
+* get_economy country 인자로 한국 경제 조회 ([#302](https://github.com/y0ngha/siglens-core/issues/302)) ([2eaf38a](https://github.com/y0ngha/siglens-core/commit/2eaf38a9dad22ac4234641f43c05b4f1afb172fa))
+
 ## [2.25.3](https://github.com/y0ngha/siglens-core/compare/v2.25.2...v2.25.3) (2026-10-23)
 
 ### Bug Fixes
