@@ -4131,6 +4131,8 @@ export type {
     EconomySnapshot,
     MacroRegime,
     MacroBriefingResponse,
+    SelectCalendarEventsOptions,
+    CalendarSelection,
 } from './economy/types';
 
 // =============================================================================

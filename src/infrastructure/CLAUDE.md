@@ -177,6 +177,11 @@ validates before comparing).
 - Every LLM-output cache key embeds a `*_PROMPT_TEMPLATE_VERSION` (or a fingerprint that
   embeds one). Bump it whenever the rendered prompt bytes change, including through shared
   formatters; without a bump, stale entries are served until the TTL expires.
+- An input hash covers the data snapshot, not the prompt. Changing which rows a prompt
+  builder selects, caps or orders (calendar selection, top-N, filters) changes the bytes
+  even though the snapshot and the template text are untouched, so it needs the same bump.
+  Make the version bump part of the same change as the byte change, and check it before
+  review, not after.
 - After any bump, audit every `build*Key` in `cache/config.ts`, not just the one you
   touched. Deterministic non-LLM keys (identifier-only concatenation) are exempt.
 - A shared prompt fragment (a common system base, language contract, formatter) changes the

@@ -125,6 +125,14 @@ export {
     computeYieldSpread,
 } from './domain/economy/normalizeTreasuryRates';
 export { normalizeEconomicCalendar } from './domain/economy/normalizeEconomicCalendar';
+export {
+    isRateDecisionEvent,
+    selectCalendarEvents,
+} from './domain/economy/selectCalendarEvents';
+export type {
+    CalendarSelection,
+    SelectCalendarEventsOptions,
+} from './domain/economy/types';
 // Economy — per-event AI analysis domain helpers (browser-safe: pure functions only).
 export { normalizeEconomicEventAnalysis } from './domain/economy/normalizeEconomicEventAnalysis';
 // Economy — indicator-name translation domain helpers (browser-safe: pure functions only).

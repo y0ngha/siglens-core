@@ -298,6 +298,15 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(findToolSpec('get_economy')?.description).toContain(
             'spread2s10s'
         );
+        // A date outside the default window used to read as "no such date in
+        // SIGLENS data" — the description must send the model to a ranged call.
+        expect(findToolSpec('get_economy')?.description).toContain('coverage');
+        expect(findToolSpec('get_economy')?.description).toContain('omitted');
+        expect(
+            Object.keys(
+                findToolSpec('get_economy')?.inputSchema.properties ?? {}
+            )
+        ).toEqual(['from', 'to']);
         expect(findToolSpec('get_market_overview')?.description).toContain(
             'rank'
         );

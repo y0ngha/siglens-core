@@ -65,6 +65,26 @@ export interface EconomicCalendarEvent {
     unit: string;
 }
 
+/** Options for `selectCalendarEvents`. */
+export interface SelectCalendarEventsOptions {
+    /** Upper bound on returned events, rate decisions included; a non-positive or non-finite value returns none. */
+    max: number;
+    /**
+     * Drops events before this instant (an event at exactly `notBefore` is
+     * kept), and events whose date cannot be parsed. Omit to keep every row
+     * (the caller's fetch window already bounds it).
+     */
+    notBefore?: Date;
+}
+
+/** Result of `selectCalendarEvents`. */
+export interface CalendarSelection {
+    /** Picked events, date-ascending, as given (dates are not rewritten). */
+    events: EconomicCalendarEvent[];
+    /** Eligible events left out by `max`, per impact. */
+    omitted: Record<CalendarImpact, number>;
+}
+
 /** Macro snapshot bundle that drives the `/economy` page and the briefing prompt. */
 export interface EconomySnapshot {
     /** Normalized series per indicator in registry order. */
