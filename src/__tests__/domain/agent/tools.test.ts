@@ -306,7 +306,22 @@ describe('AGENT_TOOL_SPECS', () => {
             Object.keys(
                 findToolSpec('get_economy')?.inputSchema.properties ?? {}
             )
-        ).toEqual(['from', 'to']);
+        ).toEqual(['country', 'from', 'to']);
+        expect(
+            findToolSpec('get_economy')?.inputSchema.properties.country
+        ).toMatchObject({ type: 'string', enum: ['us', 'kr'] });
+        // kr 결과에는 국채·스프레드·브리핑이 없다 — 미국 값으로 채우지 말라고 설명이 말해야 한다.
+        expect(findToolSpec('get_economy')?.description).toContain(
+            'never fill those in from US data'
+        );
+        // 국가가 설명 첫머리에 있어야 한국 질문을 범위 밖으로 보지 않는다.
+        expect(findToolSpec('get_economy')?.description).toMatch(
+            /^Macro data for one economy: the United States \(default\) or South Korea/
+        );
+        // 기간 재조회가 미국 캘린더로 새지 않게 국가를 유지하라고 말한다.
+        expect(findToolSpec('get_economy')?.description).toContain(
+            'and the same `country`'
+        );
         expect(findToolSpec('get_market_overview')?.description).toContain(
             'rank'
         );

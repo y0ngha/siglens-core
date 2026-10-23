@@ -16,8 +16,9 @@ const IMPACT_PRIORITY: Record<CalendarImpact, number> = {
 const RATE_DECISION_PATTERN = /interest rate decision/i;
 
 /**
- * A central-bank policy-rate decision row (FMP names the US one
- * `'Fed Interest Rate Decision'`).
+ * A central-bank policy-rate decision row. FMP names the US one
+ * `'Fed Interest Rate Decision'` and the Bank of Korea one plain
+ * `'Interest Rate Decision'`; both match.
  */
 export function isRateDecisionEvent(event: EconomicCalendarEvent): boolean {
     return RATE_DECISION_PATTERN.test(event.event);

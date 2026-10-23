@@ -382,7 +382,7 @@ NYSE 휴장일·조기 마감일을 ET 달력일 기준으로 판정하는 순�
 ai.siglens.io 에이전트가 쓰는 도구 계약. 실행기는 소비자가 구현하고, core는 카탈로그·인자 검증·답변 근거 검사·프롬프트 조립만 맡는다.
 | Symbol | Source |
 |---|---|
-| `AGENT_TOOL_SPECS` / `AGENT_TOOL_NAMES` — 도구 카탈로그(`AgentToolSpec[]`)와 그 이름 목록. 설명은 모델이 읽는 유일한 정보라 "언제 호출하는가"를 말한다. **소비자 조치**: `get_economy` 실행기는 선택 인자 `from`/`to`(YYYY-MM-DD, 최대 88일)를 받아 그 기간의 캘린더만 돌려주고, 결과의 `calendar`를 `{ coverage: { from, to }, events, omitted }`(`selectCalendarEvents`로 선별)로 낸다 — 설명과 라우팅 규칙이 이 필드를 가리킨다. | `domain/agent/tools.ts` |
+| `AGENT_TOOL_SPECS` / `AGENT_TOOL_NAMES` — 도구 카탈로그(`AgentToolSpec[]`)와 그 이름 목록. 설명은 모델이 읽는 유일한 정보라 "언제 호출하는가"를 말한다. **소비자 조치**: `get_economy` 실행기는 선택 인자 `from`/`to`(YYYY-MM-DD, 최대 88일)를 받아 그 기간의 캘린더만 돌려주고, 결과의 `calendar`를 `{ coverage: { from, to }, events, omitted }`(`selectCalendarEvents`로 선별)로 낸다. 선택 인자 `country`(`'us'` 기본, `'kr'`)가 `'kr'`이면 `indicators[]`를 `{ name, label, unit, latest: { date, value }, change }`(발표 이력 기반, `date`는 그 발표일)로, 한국 캘린더를 같은 `calendar` 모양으로 내고 `treasury`·`briefing`은 내지 않는다. `country: 'kr'`과 `from`/`to`를 함께 주면 그 기간의 한국 캘린더만 낸다. 설명과 라우팅 규칙이 이 필드를 가리키므로 **core를 이 버전으로 올리는 변경에 실행기 구현을 함께 넣는다** — 실행기가 `country`를 무시하면 모델이 미국 값을 한국 값으로 읽는다. | `domain/agent/tools.ts` |
 | `findToolSpec(name)` — 이름으로 도구 스펙을 찾는다. 없으면 `undefined`. | `domain/agent/tools.ts` |
 | `selectTools(available)` — 소비자가 지금 실행할 수 있는 도구 이름 집합(`ReadonlySet<string>`)으로 카탈로그를 거른다. core는 환경 변수를 읽지 않는다. | `domain/agent/tools.ts` |
 | `FRESH_ANALYSIS_KINDS` — `run_fresh_analysis` 도구가 만들 수 있는 분석 종류(`FreshAnalysisKind`). | `domain/agent/tools.ts` |

@@ -272,6 +272,12 @@ computing derived values, so a recomputation from the rendered text matches.
 - A rule that enumerates markers or values the renderer emits is built from the renderer's
   single exported list, never retyped; otherwise it silently covers only the first marker
   once the renderer grows another.
+- Adding a branch to a tool (a new argument, market, timeframe or variant) rewrites the
+  description's opening and defaults, it does not append a clause to an opening that still
+  describes only the old scope: the model picks tools from the opening. Cover every branch the
+  consumer emits, state the default for an unqualified question, and tell the retry
+  instruction to keep the new discriminating argument. A description edit changes rendered
+  bytes (bump per the bullet below).
 - Any change to rendered bytes also bumps the cache version
   (`src/infrastructure/CLAUDE.md#INF-4`).
 
