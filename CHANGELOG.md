@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.25.2](https://github.com/y0ngha/siglens-core/compare/v2.25.1...v2.25.2) (2026-10-23)
+
+### Bug Fixes
+
+* 에이전트 봉 도구 — 진행 중인 마지막 봉은 현재가로, 최근 종가는 lastCompletedClose (프롬프트 2026-10-23.2) ([#297](https://github.com/y0ngha/siglens-core/issues/297)) ([653777c](https://github.com/y0ngha/siglens-core/commit/653777c27687a7dc1606eb9a194b25f270b94d0d))
+
 ## [2.25.1](https://github.com/y0ngha/siglens-core/compare/v2.25.0...v2.25.1) (2026-10-22)
 
 ### Bug Fixes
