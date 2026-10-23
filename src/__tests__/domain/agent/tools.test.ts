@@ -409,6 +409,14 @@ describe('tool descriptions — consumer-provided freshness and history fields',
         expect(d).toContain('maCross50_200');
         expect(d).toContain('never that no cross happened');
     });
+    it('bars: 진행 중인 마지막 봉의 값은 현재가이고, 최근 종가는 lastCompletedClose로 답하게 한다', () => {
+        const d = desc('get_bars_indicators');
+        expect(d).toContain('`lastBarInProgress: true`');
+        expect(d).toContain('are the live price, not a closing price');
+        expect(d).toContain('`lastCompletedClose`');
+        expect(d).toContain('are intraday readings');
+        expect(d).toContain('on intraday timeframes call timeframe 1Day');
+    });
     it('fundamentals: 확정 여부·분기 행·실적 반응·신뢰할 수 없는 P/E를 설명한다', () => {
         const d = desc('get_fundamentals');
         expect(d).toContain('earningsDateConfirmed');

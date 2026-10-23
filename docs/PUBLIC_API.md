@@ -387,7 +387,7 @@ ai.siglens.io 에이전트가 쓰는 도구 계약. 실행기는 소비자가 �
 | `validateArgs(schema, args)` — 모델이 준 도구 인자를 도구의 JSON Schema 부분집합으로 검증한다. 위반을 모두 모아 `ValidateArgsResult`(`{ ok: true, value }` \| `{ ok: false, issues }`)로 돌려준다. | `domain/agent/validateArgs.ts` |
 | `findUngroundedNumbers(answer, toolResults)` — 최종 답변의 숫자 토큰 중 같은 턴의 도구 결과 문자열에서 근거를 찾지 못한 것(중복 제거, 등장 순). 잘린 도구 결과는 판별할 수 없으므로 호출자가 JSON 경계에서 자른다. | `domain/agent/groundedNumbers.ts` |
 | `estimateTokens(text)` — 보수적 토큰 추정(ASCII 약 3자/토큰, 비ASCII는 글자당 약 1.2토큰). `selectHistoryWindow` 예산에 쓴다. | `domain/agent/selectHistoryWindow.ts` |
-| `AGENT_PROMPT_VERSION` — 에이전트 시스템 프롬프트 문구가 바뀔 때 올리는 버전 문자열. 턴마다 로그에 남긴다. | `domain/agent/buildAgentSystemPrompt.ts` |
+| `AGENT_PROMPT_VERSION` — 에이전트 시스템 프롬프트나 도구 설명 문구가 바뀔 때 올리는 버전 문자열. 턴마다 로그에 남긴다. | `domain/agent/buildAgentSystemPrompt.ts` |
 | `AGENT_FOLLOW_UP_MARKER` — 에이전트가 후속 질문을 제안하는 마지막 줄을 여는 마커(`[[followups]]`). 양 entrypoint. | `domain/agent/agentFollowUps.ts` |
 
 **에이전트 추천 질문 프롬프트 — 서버 entry 전용 (2 functions + 3 constants)**
