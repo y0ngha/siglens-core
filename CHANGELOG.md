@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.25.3](https://github.com/y0ngha/siglens-core/compare/v2.25.2...v2.25.3) (2026-10-23)
+
+### Bug Fixes
+
+* 경제 캘린더 선별 공통화와 get_economy 기간 조회 ([#300](https://github.com/y0ngha/siglens-core/issues/300)) ([fe5f3b2](https://github.com/y0ngha/siglens-core/commit/fe5f3b2cf65b4ef3dcb4972bcaf129dc3417ac4f))
+
 ## [2.25.2](https://github.com/y0ngha/siglens-core/compare/v2.25.1...v2.25.2) (2026-10-23)
 
 ### Bug Fixes
