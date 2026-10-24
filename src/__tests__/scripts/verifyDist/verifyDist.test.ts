@@ -1,7 +1,12 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import {
     entryFiles,
     findUnresolvedAliases,
+    loadErrorWithoutPeers,
+    optionalPeers,
 } from '../../../../scripts/verifyDist/verifyDist';
 
 describe('findUnresolvedAliases', () => {
@@ -94,5 +99,66 @@ describe('entryFiles', () => {
 
     it('main·exports가 없으면 빈 목록이다', () => {
         expect(entryFiles({})).toEqual([]);
+    });
+});
+
+describe('optionalPeers', () => {
+    it('optional: true인 peer만 이름순으로 고른다', () => {
+        expect(
+            optionalPeers({
+                peerDependenciesMeta: {
+                    zeta: { optional: true },
+                    alpha: { optional: true },
+                    required: { optional: false },
+                    bare: {},
+                },
+            })
+        ).toEqual(['alpha', 'zeta']);
+    });
+
+    it('peerDependenciesMeta가 없으면 빈 목록이다', () => {
+        expect(optionalPeers({})).toEqual([]);
+    });
+});
+
+describe('loadErrorWithoutPeers', () => {
+    // 임시 디렉터리에 가짜 패키지를 실제로 설치해 둔다. 그래야 실패가 "막아서" 난 것인지
+    // "원래 없어서" 난 것인지 구분된다(막지 않으면 로드가 성공해야 한다).
+    const entryRequiring = (specifier: string): string => {
+        const dir = mkdtempSync(join(tmpdir(), 'verify-dist-'));
+        for (const name of ['fake-peer', '@scope/pkg']) {
+            const pkgDir = join(dir, 'node_modules', name);
+            mkdirSync(join(pkgDir, 'sub'), { recursive: true });
+            writeFileSync(join(pkgDir, 'index.js'), 'module.exports = 1;\n');
+            writeFileSync(
+                join(pkgDir, 'sub', 'index.js'),
+                'module.exports = 2;\n'
+            );
+        }
+        const entry = join(dir, 'index.js');
+        writeFileSync(entry, `require(${JSON.stringify(specifier)});\n`);
+        return entry;
+    };
+
+    it('막은 peer를 최상위에서 require하는 진입점은 실패를 돌려준다', () => {
+        expect(
+            loadErrorWithoutPeers(entryRequiring('fake-peer'), ['fake-peer'])
+        ).toMatch(/Cannot find module 'fake-peer'/);
+    });
+
+    it('막은 peer의 하위 경로도 막는다', () => {
+        expect(
+            loadErrorWithoutPeers(entryRequiring('@scope/pkg/sub'), [
+                '@scope/pkg',
+            ])
+        ).toMatch(/Cannot find module '@scope\/pkg\/sub'/);
+    });
+
+    it('막지 않은 패키지는 그대로 로드된다', () => {
+        expect(
+            loadErrorWithoutPeers(entryRequiring('fake-peer'), [
+                '@upstash/redis',
+            ])
+        ).toBeNull();
     });
 });

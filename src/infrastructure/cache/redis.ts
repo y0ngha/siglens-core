@@ -1,5 +1,5 @@
-import { Redis } from '@upstash/redis';
 import type { CacheProvider } from '@/domain/ports/cache';
+import { lazyRedisClient } from '@/infrastructure/upstash/client';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 /**
@@ -22,6 +22,10 @@ const COMPARE_AND_DELETE_SCRIPT =
  * read-only token while writes go through the writer token — useful when
  * deploying with split credentials.
  *
+ * `@upstash/redis` is loaded on the first operation, not at construction; when
+ * the env is set but the package is not installed, operations reject with
+ * `MissingSdkError`.
+ *
  * @returns A configured cache provider, or `null` when Upstash env is
  *   missing.
  *
@@ -40,20 +44,20 @@ export function createCacheProvider(): CacheProvider | null {
     const config = readUpstashConfig();
     if (!config) return null;
 
-    const writer = new Redis({ url: config.url, token: config.token });
+    const writer = lazyRedisClient(config.url, config.token);
     const reader = config.readonlyToken
-        ? new Redis({ url: config.url, token: config.readonlyToken })
+        ? lazyRedisClient(config.url, config.readonlyToken)
         : writer;
 
     return {
         async get<T>(key: string): Promise<T | null> {
-            return reader.get<T>(key);
+            return (await reader()).get<T>(key);
         },
         async set<T>(key: string, value: T, ttlSeconds: number): Promise<void> {
-            await writer.set(key, value, { ex: ttlSeconds });
+            await (await writer()).set(key, value, { ex: ttlSeconds });
         },
         async delete(key: string): Promise<void> {
-            await writer.del(key);
+            await (await writer()).del(key);
         },
         async setIfAbsent<T>(
             key: string,
@@ -63,7 +67,9 @@ export function createCacheProvider(): CacheProvider | null {
             // `SET key value NX EX ttl` replies `"OK"` when it wrote and `null`
             // when the key already existed — atomic on the server, so exactly
             // one concurrent caller across all instances gets `true`.
-            const reply = await writer.set(key, value, {
+            const reply = await (
+                await writer()
+            ).set(key, value, {
                 nx: true,
                 ex: ttlSeconds,
             });
@@ -72,11 +78,9 @@ export function createCacheProvider(): CacheProvider | null {
         async deleteIfEquals(key: string, value: string): Promise<boolean> {
             // GET + DEL in one Lua script so no other client can take the key
             // between the comparison and the delete.
-            const deleted = await writer.eval<[string], number>(
-                COMPARE_AND_DELETE_SCRIPT,
-                [key],
-                [value]
-            );
+            const deleted = await (
+                await writer()
+            ).eval<[string], number>(COMPARE_AND_DELETE_SCRIPT, [key], [value]);
             return deleted === 1;
         },
     };

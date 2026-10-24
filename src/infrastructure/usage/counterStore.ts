@@ -1,9 +1,9 @@
-import { Redis } from '@upstash/redis';
 import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import {
     CounterStoreUnavailableError,
     type CounterStore,
 } from '@/domain/ports/counterStore';
+import { lazyRedisClient } from '@/infrastructure/upstash/client';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 export type CounterPeriod = 'day' | 'month';
@@ -39,7 +39,8 @@ function bucket(period: CounterPeriod, now: Date): string {
  * With `failurePolicy: 'closed'`, an outage (no config or a Redis error)
  * makes `consume` log the `[agent] quota store unavailable` alarm marker
  * once and throw {@link CounterStoreUnavailableError}, so callers answer
- * `server_busy` rather than a quota refusal.
+ * `server_busy` rather than a quota refusal. `@upstash/redis` is loaded on
+ * first use; a missing package is treated as a Redis error.
  *
  * @param options - Key prefix, bucket period, failure policy, and an
  * optional injectable clock (tests only; defaults to `new Date()`).
@@ -48,9 +49,7 @@ function bucket(period: CounterPeriod, now: Date): string {
 export function createCounterStore(options: CounterStoreOptions): CounterStore {
     const config = readUpstashConfig();
     const redis =
-        config === null
-            ? null
-            : new Redis({ url: config.url, token: config.token });
+        config === null ? null : lazyRedisClient(config.url, config.token);
     const clock = options.clock ?? (() => new Date());
     const ttl = options.period === 'day' ? SECONDS_PER_DAY : MONTH_TTL_SECONDS;
     const allowOnFailure = options.failurePolicy === 'open';
@@ -72,10 +71,11 @@ export function createCounterStore(options: CounterStoreOptions): CounterStore {
             }
             const key = keyFor(subject);
             try {
-                const count = await redis.incr(key);
-                await redis.expire(key, ttl, 'NX');
+                const client = await redis();
+                const count = await client.incr(key);
+                await client.expire(key, ttl, 'NX');
                 if (count > limit) {
-                    await redis.decr(key);
+                    await client.decr(key);
                     return false;
                 }
                 return true;
@@ -96,9 +96,10 @@ export function createCounterStore(options: CounterStoreOptions): CounterStore {
         async refund(subject) {
             if (redis === null) return;
             try {
+                const client = await redis();
                 const key = keyFor(subject);
-                const count = await redis.get<number>(key);
-                if (count !== null && count > 0) await redis.decr(key);
+                const count = await client.get<number>(key);
+                if (count !== null && count > 0) await client.decr(key);
                 // ponytail: bucket is recomputed from clock() at refund time,
                 // so a refund crossing UTC midnight misses yesterday's key
                 // (accepted; fix = pass the consume-time bucket key through).
@@ -109,7 +110,8 @@ export function createCounterStore(options: CounterStoreOptions): CounterStore {
         async remaining(subject, limit) {
             if (redis === null) return allowOnFailure ? limit : 0;
             try {
-                const count = await redis.get<number>(keyFor(subject));
+                const client = await redis();
+                const count = await client.get<number>(keyFor(subject));
                 return Math.max(0, limit - (count ?? 0));
             } catch {
                 return allowOnFailure ? limit : 0;
