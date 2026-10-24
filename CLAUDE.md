@@ -157,8 +157,12 @@ workers) are responsible for their own presentation and runtime concerns — `si
 never reaches into them.
 
 Import-direction violations trigger ESLint errors. PRs cannot be merged.
-The purity rules for `domain/` (no I/O, no external libraries) are not lint-enforced —
-they are caught in review.
+The purity rules for `domain/` are lint-enforced too (`eslint.config.mjs`, the
+`src/domain/**` override): only imports inside `domain/` are allowed (no external
+packages, no `node:*`, no relative path into another layer), and `console`, `process`,
+`fetch`, timers, `performance`, `Date.now()`, argument-less `new Date()` and
+`Math.random()` are errors. Purity the linter cannot see (mutating arguments, hidden
+module state) is still caught in review.
 
 ---
 
