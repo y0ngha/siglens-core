@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.28.0](https://github.com/y0ngha/siglens-core/compare/v2.27.0...v2.28.0) (2026-10-24)
+
+### Features
+
+* 에이전트 — 한국 배당수익률은 DART 연간 배당(annualReported)을 대표값으로 ([#304](https://github.com/y0ngha/siglens-core/issues/304)) ([c1a2257](https://github.com/y0ngha/siglens-core/commit/c1a2257b88cf72232262d9df94f9092423aca398))
+
 # [2.27.0](https://github.com/y0ngha/siglens-core/compare/v2.26.0...v2.27.0) (2026-10-24)
 
 ### Features
