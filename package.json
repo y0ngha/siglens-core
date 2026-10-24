@@ -47,6 +47,7 @@
     "packageManager": "yarn@4.18.0",
     "scripts": {
         "build": "tsc -p tsconfig.build.json && tsc-alias -p tsconfig.build.json",
+        "verify:dist": "tsx scripts/verifyDist/verifyDist.ts",
         "typecheck": "tsc --noEmit && tsc -p tsconfig.client.json && tsc -p scripts/tsconfig.json",
         "lint": "eslint .",
         "lint:fix": "eslint . --fix",
