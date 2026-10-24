@@ -172,7 +172,18 @@ describe('AGENT_TOOL_SPECS', () => {
             );
             expect(d).toContain('per-row `form`');
             expect(d).toContain(
-                'when no row has form 10-Q (all forms null or absent)'
+                'when neither row `form` nor `sec.form` exists'
+            );
+            expect(d).toContain('a 10-Q/A counts as the 10-Q for that quarter');
+            expect(d).toContain(
+                '`sec.form` counts as form evidence and wins over the row `form` when both exist and differ'
+            );
+            expect(d).toContain('YoY revenue growth from sec.revenueYoYPct');
+            expect(d).toContain(
+                'Any other null sec field likewise means that figure is not in the filing: do not take it from the row or compute it'
+            );
+            expect(d).toContain(
+                'When sec is null or absent use the row fields'
             );
             expect(d).toContain('answer with the newest Q1–Q3 row');
             expect(d).toContain('say the form is not confirmed');
@@ -184,6 +195,42 @@ describe('AGENT_TOOL_SPECS', () => {
                 'trailing12mAmount and trailingYieldPct may include special dividends'
             );
             expect(d).toContain('not a regular yield');
+            expect(d).toContain('`dividends.annualReported`');
+            expect(d).toContain(
+                'a row `sec` ({form, epsDiluted, revenue, revenueYoYPct, filed, accn}'
+            );
+            expect(d).toContain(
+                'quote EPS from sec.epsDiluted, revenue from sec.revenue'
+            );
+            expect(d).toContain('citing the filing form');
+            expect(d).toContain('and the filed date');
+            expect(d).toContain(
+                'sec.epsDiluted is null for a fiscal Q4 derived from the 10-K'
+            );
+            expect(d).toContain(
+                'the quarterly EPS is not in the filing, never compute it'
+            );
+            expect(d).toContain('headline `yieldOnLastClosePct`');
+            expect(d).toContain(
+                'FY<fiscalYear> annual DPS ÷ current price (source DART)'
+            );
+            expect(d).toContain(
+                'trailing12mAmount/trailingYieldPct only as secondary context'
+            );
+            expect(d).toContain(
+                'When annualReported is absent use the trailing fields as described above, never a single payment'
+            );
+            expect(d).toContain(
+                'If yieldOnLastClosePct is null, quote `dartYieldPct` labeled as the DART-reported yield on the record-date price'
+            );
+            expect(d).toContain('never compute a yield yourself');
+            expect(d).toContain('special payouts are not separated');
+            expect(d).toContain(
+                'dpsCommon 0 means no common-stock cash dividend for that FY'
+            );
+            expect(d).toContain(
+                'null means the DPS for that FY could not be confirmed (use the trailing fields)'
+            );
             expect(d).toContain('report only the latest payment');
             expect(d).toContain(
                 'otherwise say SIGLENS does not carry it and it could not be confirmed'
