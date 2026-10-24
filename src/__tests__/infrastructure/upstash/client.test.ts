@@ -94,23 +94,48 @@ describe('lazyRedisClient', () => {
             });
         });
 
-        it('logs a repeated failure once per process, across clients', async () => {
-            // Consumers build a factory per request; a per-client log would
-            // repeat on every request.
+        it('remembers it for the process instead of looking the package up again', async () => {
             importSdk.mockRejectedValue(missingModule());
             await expect(lazyRedisClient('https://u', 't')()).rejects.toThrow();
             await expect(lazyRedisClient('https://u', 't')()).rejects.toThrow();
-            expect(log).toHaveBeenCalledTimes(1);
+            await expect(lazyRedisClient('https://v', 't')()).rejects.toThrow();
+            expect(importSdk).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('when the client constructor rejects the settings', () => {
+        const rejectingRedis = vi.fn(function () {
+            throw new Error('invalid URL');
+        });
+
+        beforeEach(() => {
+            rejectingRedis.mockClear();
+            importSdk.mockResolvedValue({ Redis: rejectingRedis });
+        });
+
+        it('rejects with the constructor error', async () => {
+            await expect(
+                lazyRedisClient('redis://wrong', 't')()
+            ).rejects.toThrow('invalid URL');
+        });
+
+        it('remembers it for the client instead of constructing again', async () => {
+            const getClient = lazyRedisClient('redis://wrong', 't');
+            await expect(getClient()).rejects.toThrow();
+            await expect(getClient()).rejects.toThrow();
+            expect(rejectingRedis).toHaveBeenCalledTimes(1);
         });
     });
 
     describe('when loading fails transiently', () => {
+        const transient = (): Error => new Error('EIO: transient read error');
+
         it('retries on the next call instead of keeping the failure', async () => {
             // Callers keep the returned function for the life of the process
             // (reanalyzeCooldown holds it module-wide). A remembered failure
             // would leave the feature off until restart.
             importSdk
-                .mockRejectedValueOnce(new Error('EIO: transient read error'))
+                .mockRejectedValueOnce(transient())
                 .mockResolvedValueOnce({ Redis: RedisCtor });
             const getClient = lazyRedisClient('https://u', 't');
             await expect(getClient()).rejects.toThrow('EIO');
@@ -121,7 +146,7 @@ describe('lazyRedisClient', () => {
 
         it('keeps the client once it has been created', async () => {
             importSdk
-                .mockRejectedValueOnce(new Error('EIO: transient read error'))
+                .mockRejectedValueOnce(transient())
                 .mockResolvedValue({ Redis: RedisCtor });
             const getClient = lazyRedisClient('https://u', 't');
             await expect(getClient()).rejects.toThrow();
@@ -129,19 +154,81 @@ describe('lazyRedisClient', () => {
             expect(await getClient()).toBe(first);
             expect(RedisCtor).toHaveBeenCalledTimes(1);
         });
+
+        it('shares one in-flight load between concurrent calls', async () => {
+            importSdk.mockRejectedValueOnce(transient());
+            const getClient = lazyRedisClient('https://u', 't');
+            const results = await Promise.allSettled([
+                getClient(),
+                getClient(),
+            ]);
+            expect(results.map(result => result.status)).toEqual([
+                'rejected',
+                'rejected',
+            ]);
+            expect(importSdk).toHaveBeenCalledTimes(1);
+        });
     });
 
-    describe('when the client constructor rejects the settings', () => {
-        it('rejects with the constructor error on every call and logs it once', async () => {
+    describe('failure log', () => {
+        it('logs the same error for the same client once', async () => {
+            // Consumers build a factory per request; a per-instance log would
+            // repeat on every request.
+            importSdk.mockRejectedValue(new Error('EIO'));
+            await expect(lazyRedisClient('https://u', 't')()).rejects.toThrow();
+            await expect(lazyRedisClient('https://u', 't')()).rejects.toThrow();
+            expect(log).toHaveBeenCalledTimes(1);
+        });
+
+        it('logs different errors separately', async () => {
+            importSdk
+                .mockRejectedValueOnce(new Error('EIO'))
+                .mockRejectedValueOnce(new Error('EACCES'));
+            const getClient = lazyRedisClient('https://u', 't');
+            await expect(getClient()).rejects.toThrow();
+            await expect(getClient()).rejects.toThrow();
+            expect(log).toHaveBeenCalledTimes(2);
+        });
+
+        it('logs the writer and read-only clients separately', async () => {
+            importSdk.mockRejectedValue(new Error('EIO'));
+            await expect(
+                lazyRedisClient('https://u', 'writer')()
+            ).rejects.toThrow();
+            await expect(
+                lazyRedisClient('https://u', 'reader')()
+            ).rejects.toThrow();
+            expect(log).toHaveBeenCalledTimes(2);
+        });
+
+        it('logs a failure again when it recurs after a recovery', async () => {
+            // A loaded module stays loaded, so what can recur is a client whose
+            // settings the constructor rejects.
             importSdk.mockResolvedValue({
-                Redis: vi.fn(function () {
-                    throw new Error('invalid URL');
+                Redis: vi.fn(function (options: { url: string }) {
+                    if (options.url === 'redis://wrong')
+                        throw new Error('invalid URL');
+                    return { options };
                 }),
             });
-            const getClient = lazyRedisClient('redis://wrong', 't');
-            await expect(getClient()).rejects.toThrow('invalid URL');
-            await expect(getClient()).rejects.toThrow('invalid URL');
-            expect(log).toHaveBeenCalledTimes(1);
+            await expect(
+                lazyRedisClient('redis://wrong', 't')()
+            ).rejects.toThrow();
+            await lazyRedisClient('https://u', 't')();
+            await expect(
+                lazyRedisClient('redis://wrong', 't')()
+            ).rejects.toThrow();
+            expect(log).toHaveBeenCalledTimes(2);
+        });
+
+        it('tells non-Error rejections apart by content', async () => {
+            importSdk
+                .mockRejectedValueOnce({ reason: 'a' })
+                .mockRejectedValueOnce({ reason: 'b' });
+            const getClient = lazyRedisClient('https://u', 't');
+            await expect(getClient()).rejects.toEqual({ reason: 'a' });
+            await expect(getClient()).rejects.toEqual({ reason: 'b' });
+            expect(log).toHaveBeenCalledTimes(2);
         });
     });
 });
