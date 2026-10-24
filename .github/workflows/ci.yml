@@ -1,15 +1,29 @@
 name: CI
 
+# 검사 목록은 이 파일 한 곳에만 둔다. 배포(publish.yml)는 이 워크플로를 workflow_call로
+# 불러 같은 검사를 통과해야 publish한다 — 목록을 복사해 두면 한쪽만 고쳐져 갈라진다.
 on:
     pull_request:
         types: [opened, synchronize, reopened]
+    # PR이 각자 초록이어도 합쳐진 main은 검증되지 않는다. 머지 결과도 같은 CI를 탄다.
+    push:
+        branches: [main]
+    workflow_call:
 
+# PR은 같은 PR의 이전 실행을 취소한다. main push·태그(workflow_call) 실행은 실행마다 고유한
+# 그룹을 준다 — ref 단위로 묶으면 GitHub이 그룹당 대기 실행을 하나만 남기고 나머지를 취소해,
+# 연속 머지 중 일부의 결과가 검증되지 않는다.
 concurrency:
-    group: ci-${{ github.event.pull_request.number }}
-    cancel-in-progress: true
+    group: ci-${{ github.event.pull_request.number || github.run_id }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     ci:
+        # release-it의 배포 커밋(`chore: release v…`)은 main push로 한 번, 같은 커밋의 태그로
+        # publish.yml에서 한 번 더 들어온다. 배포 경로(태그)에서 검사하므로 main push 쪽은 건너뛴다.
+        if: >-
+            ${{ !(github.ref == 'refs/heads/main'
+            && startsWith(github.event.head_commit.message, 'chore: release v')) }}
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -48,3 +62,14 @@ jobs:
 
             - name: Verify build output
               run: yarn verify:dist
+
+            # 태그 실행(publish.yml)에서는 검사를 통과한 dist를 그대로 넘겨 publish한다.
+            # 검사한 바이트와 올리는 바이트가 같아야 한다 — publish 잡이 다시 빌드하면 둘이 갈린다.
+            - name: Upload verified dist
+              if: startsWith(github.ref, 'refs/tags/')
+              uses: actions/upload-artifact@v4
+              with:
+                  name: dist
+                  path: dist
+                  retention-days: 1
+                  if-no-files-found: error

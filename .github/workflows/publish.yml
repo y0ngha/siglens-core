@@ -6,7 +6,17 @@ on:
             - 'v*'
 
 jobs:
+    # 태그가 가리키는 커밋으로 PR CI와 같은 검사(typecheck·lint·format·test·build·verify:dist)를
+    # 먼저 돌린다. release-it이 main에 바로 push하는 배포 커밋과, PR 여러 개가 합쳐진 main
+    # 상태는 PR CI를 거치지 않기 때문이다. 이 단계는 태그·GitHub Release가 이미 만들어진 뒤라
+    # 마지막 방어선이고, 첫 방어선은 release-it의 before:init 훅(.release-it.json)이다.
+    ci:
+        uses: ./.github/workflows/ci.yml
+        permissions:
+            contents: read
+
     publish:
+        needs: ci
         runs-on: ubuntu-latest
         permissions:
             contents: read
@@ -27,12 +37,12 @@ jobs:
             - name: Install dependencies
               run: yarn install --immutable
 
-            - name: Build
-              run: yarn build
-
-            # PR CI와 같은 산출물 검증. release-it이 만드는 배포 커밋은 PR CI를 거치지 않는다.
-            - name: Verify build output
-              run: yarn verify:dist
+            # ci 잡이 typecheck·lint·format·test·build·verify:dist를 통과한 dist를 받는다.
+            - name: Download verified dist
+              uses: actions/download-artifact@v4
+              with:
+                  name: dist
+                  path: dist
 
             - name: Publish to GitHub Packages
               run: yarn npm publish
