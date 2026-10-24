@@ -1,7 +1,7 @@
+import type { Redis } from '@upstash/redis';
 import { MS_PER_SECOND, SECONDS_PER_MINUTE } from '@/domain/constants/time';
 import type { Timeframe } from '@/domain/types';
 import type { AcquireReanalyzeCooldownResult } from '@/infrastructure/market/types';
-import type { Redis } from '@upstash/redis';
 import { lazyRedisClient } from '@/infrastructure/upstash/client';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
