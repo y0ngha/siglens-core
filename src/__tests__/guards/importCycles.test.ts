@@ -1,5 +1,6 @@
 import { readdirSync, readFileSync } from 'node:fs';
-import { posix, resolve, sep } from 'node:path';
+import { builtinModules } from 'node:module';
+import { join, relative, resolve, sep } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
@@ -11,17 +12,24 @@ import { describe, expect, it } from 'vitest';
  * other) passes them, and at runtime it can hand a module an `undefined`
  * binding or a TDZ error depending on which file loads first.
  *
- * The graph keeps static `import … from`, `export … from` and `import()` edges
- * and drops edges that disappear at runtime (`import type`, or a declaration
- * whose specifiers are all `type`). Dynamic `import()` is dropped from the
- * cycle check as well: it is evaluated after the importing module finishes,
- * so it cannot create an initialisation cycle.
+ * Specifiers are resolved with `ts.resolveModuleName` and the repository
+ * `tsconfig.json`, so `paths`, `baseUrl` and directory imports resolve exactly
+ * as `tsc` resolves them.
+ *
+ * The graph drops edges that disappear at runtime: `import type`, and a
+ * declaration whose specifiers are all `type`. That matches what `tsc` emits
+ * only because production code must mark type-only imports
+ * (`@typescript-eslint/consistent-type-imports` in `eslint.config.mjs`); a
+ * value-syntax import used only as a type would otherwise be counted here and
+ * erased by `tsc`. Dynamic `import()` is dropped as well: it is evaluated after
+ * the importing module finishes, so it cannot create an initialisation cycle.
  *
  * There is no allow-list. A cycle is fixed where it appears, usually by moving
  * the shared piece into its own file.
  */
 
-const SRC = resolve(__dirname, '../..');
+const REPO_ROOT = resolve(__dirname, '../../..');
+const SRC = join(REPO_ROOT, 'src');
 
 interface ImportEdge {
     from: string;
@@ -30,121 +38,153 @@ interface ImportEdge {
     dynamic: boolean;
 }
 
+interface ImportRecord {
+    specifier: string;
+    typeOnly: boolean;
+    dynamic: boolean;
+}
+
+type Resolution =
+    | { kind: 'graph'; file: string }
+    | { kind: 'external' }
+    | { kind: 'outside-graph' }
+    | { kind: 'unresolved' };
+
 const isProductionSource = (rel: string): boolean =>
     rel.endsWith('.ts') &&
     !rel.endsWith('.d.ts') &&
+    !rel.startsWith('..') &&
     !/(^|\/)__tests__\//.test(rel) &&
     !/\.(test|spec)\.ts$/.test(rel);
 
-const RESOLVE_SUFFIXES = ['', '.ts', '/index.ts'];
+const compilerOptions = ((): ts.CompilerOptions => {
+    const configPath = join(REPO_ROOT, 'tsconfig.json');
+    const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
+    return ts.parseJsonConfigFileContent(config, ts.sys, REPO_ROOT).options;
+})();
 
-/** `undefined` for external packages, `null` for an internal path that does not exist. */
-function resolveSpecifier(
-    specifier: string,
-    fromRel: string,
-    fileSet: ReadonlySet<string>
-): string | null | undefined {
-    let base: string;
-    if (specifier.startsWith('@/')) base = specifier.slice(2);
-    else if (specifier.startsWith('.'))
-        base = posix.normalize(posix.join(posix.dirname(fromRel), specifier));
-    else return undefined;
-    base = base.replace(/\.js$/, '');
-    for (const suffix of RESOLVE_SUFFIXES)
-        if (fileSet.has(base + suffix)) return base + suffix;
-    return null;
+/**
+ * Where a specifier in `fromFile` (absolute) points. JSON, `.d.ts`, test files
+ * and files outside `src/` cannot take part in a runtime cycle of production
+ * modules, so they are `outside-graph` rather than errors.
+ */
+function resolveImport(specifier: string, fromFile: string): Resolution {
+    // `moduleResolution: node` resolves built-ins only through ambient
+    // `@types/node` declarations, never to a file, so classify them up front.
+    if (specifier.startsWith('node:') || builtinModules.includes(specifier))
+        return { kind: 'external' };
+    const resolved = ts.resolveModuleName(
+        specifier,
+        fromFile,
+        compilerOptions,
+        ts.sys
+    ).resolvedModule;
+    if (!resolved) return { kind: 'unresolved' };
+    if (resolved.isExternalLibraryImport) return { kind: 'external' };
+    const rel = relative(SRC, resolved.resolvedFileName).split(sep).join('/');
+    return isProductionSource(rel)
+        ? { kind: 'graph', file: rel }
+        : { kind: 'outside-graph' };
 }
 
+/** A declaration is type-only when it says `type`, or every listed specifier does. */
 const allTypeSpecifiers = (
     elements: ts.NodeArray<ts.ImportSpecifier | ts.ExportSpecifier>
 ): boolean => elements.length > 0 && elements.every(e => e.isTypeOnly);
 
-function extractImports(
-    rel: string,
-    text: string
-): { specifier: string; typeOnly: boolean; dynamic: boolean }[] {
-    const sourceFile = ts.createSourceFile(rel, text, ts.ScriptTarget.Latest);
-    const found: { specifier: string; typeOnly: boolean; dynamic: boolean }[] =
-        [];
+function isTypeOnlyImport(clause: ts.ImportClause | undefined): boolean {
+    if (!clause) return false;
+    if (clause.isTypeOnly) return true;
+    // A default binding is a value even when the named list is all `type`.
+    if (clause.name) return false;
+    const bindings = clause.namedBindings;
+    return (
+        bindings !== undefined &&
+        ts.isNamedImports(bindings) &&
+        allTypeSpecifiers(bindings.elements)
+    );
+}
+
+function isTypeOnlyExport(node: ts.ExportDeclaration): boolean {
+    if (node.isTypeOnly) return true;
+    const clause = node.exportClause;
+    return (
+        clause !== undefined &&
+        ts.isNamedExports(clause) &&
+        allTypeSpecifiers(clause.elements)
+    );
+}
+
+function extractImports(fileName: string, text: string): ImportRecord[] {
+    const sourceFile = ts.createSourceFile(
+        fileName,
+        text,
+        ts.ScriptTarget.Latest
+    );
+    const found: ImportRecord[] = [];
     const visit = (node: ts.Node): void => {
         if (
             ts.isImportDeclaration(node) &&
             ts.isStringLiteral(node.moduleSpecifier)
-        ) {
-            const clause = node.importClause;
-            const named =
-                clause?.namedBindings && ts.isNamedImports(clause.namedBindings)
-                    ? clause.namedBindings
-                    : undefined;
+        )
             found.push({
                 specifier: node.moduleSpecifier.text,
-                typeOnly:
-                    Boolean(clause?.isTypeOnly) ||
-                    (!clause?.name &&
-                        named !== undefined &&
-                        allTypeSpecifiers(named.elements)),
+                typeOnly: isTypeOnlyImport(node.importClause),
                 dynamic: false,
             });
-        } else if (
+        else if (
             ts.isExportDeclaration(node) &&
             node.moduleSpecifier &&
             ts.isStringLiteral(node.moduleSpecifier)
-        ) {
-            const named =
-                node.exportClause && ts.isNamedExports(node.exportClause)
-                    ? node.exportClause
-                    : undefined;
+        )
             found.push({
                 specifier: node.moduleSpecifier.text,
-                typeOnly:
-                    node.isTypeOnly ||
-                    (named !== undefined && allTypeSpecifiers(named.elements)),
+                typeOnly: isTypeOnlyExport(node),
                 dynamic: false,
             });
-        } else if (
+        else if (
             ts.isCallExpression(node) &&
             node.expression.kind === ts.SyntaxKind.ImportKeyword &&
             node.arguments[0] &&
             ts.isStringLiteral(node.arguments[0])
-        ) {
+        )
             found.push({
                 specifier: node.arguments[0].text,
                 typeOnly: false,
                 dynamic: true,
             });
-        }
         ts.forEachChild(node, visit);
     };
     visit(sourceFile);
     return found;
 }
 
-function buildImportGraph(): {
-    files: string[];
-    edges: ImportEdge[];
-    unresolved: string[];
-} {
+function buildImportGraph(): { edges: ImportEdge[]; unresolved: string[] } {
     const files = readdirSync(SRC, { recursive: true, encoding: 'utf8' })
         .map(rel => rel.split(sep).join('/'))
         .filter(isProductionSource)
         .sort();
-    const fileSet = new Set(files);
     const edges: ImportEdge[] = [];
     const unresolved: string[] = [];
     for (const rel of files) {
-        const text = readFileSync(resolve(SRC, rel), 'utf8');
-        for (const { specifier, typeOnly, dynamic } of extractImports(
-            rel,
-            text
+        const absolute = join(SRC, rel);
+        for (const record of extractImports(
+            absolute,
+            readFileSync(absolute, 'utf8')
         )) {
-            const to = resolveSpecifier(specifier, rel, fileSet);
-            if (to === undefined) continue;
-            if (to === null) unresolved.push(`${rel} -> ${specifier}`);
-            else if (to !== rel)
-                edges.push({ from: rel, to, typeOnly, dynamic });
+            const resolution = resolveImport(record.specifier, absolute);
+            if (resolution.kind === 'unresolved')
+                unresolved.push(`${rel} -> ${record.specifier}`);
+            else if (resolution.kind === 'graph')
+                edges.push({
+                    from: rel,
+                    to: resolution.file,
+                    typeOnly: record.typeOnly,
+                    dynamic: record.dynamic,
+                });
         }
     }
-    return { files, edges, unresolved };
+    return { edges, unresolved };
 }
 
 /** Tarjan's algorithm with an explicit stack. Returns components of size 2 or more. */
@@ -222,7 +262,9 @@ function cycleEdges(edges: readonly ImportEdge[]): string[] {
         const key = `${from} -> ${to}`;
         if (seen.has(key)) continue;
         seen.add(key);
-        adjacency.set(from, [...(adjacency.get(from) ?? []), to]);
+        const targets = adjacency.get(from);
+        if (targets) targets.push(to);
+        else adjacency.set(from, [to]);
     }
     const componentOf = new Map<string, number>();
     stronglyConnectedComponents(adjacency).forEach((component, index) =>
@@ -237,17 +279,17 @@ function cycleEdges(edges: readonly ImportEdge[]): string[] {
         .sort();
 }
 
+/** Edges that exist when modules are evaluated. */
 const runtimeStatic = (edge: ImportEdge): boolean =>
     !edge.typeOnly && !edge.dynamic;
 
-describe('import cycles', () => {
+describe('import graph of src/', () => {
     const graph = buildImportGraph();
 
-    it('resolves every internal import to a file', () => {
+    it('resolves every internal import', () => {
         // A broken resolver drops edges, the cycles vanish with them, and the
-        // next test passes for the wrong reason. Pin resolution first.
+        // cycle test passes for the wrong reason.
         expect(graph.unresolved).toEqual([]);
-        expect(graph.edges.length).toBeGreaterThan(graph.files.length);
     });
 
     it('has no runtime import cycle between files', () => {
@@ -255,12 +297,105 @@ describe('import cycles', () => {
     });
 });
 
-describe('cycle detector', () => {
-    const edge = (
-        from: string,
-        to: string,
-        extra: Partial<ImportEdge> = {}
-    ): ImportEdge => ({ from, to, typeOnly: false, dynamic: false, ...extra });
+describe('resolveImport', () => {
+    const from = (rel: string): string => join(SRC, rel);
+
+    it('resolves a `@/` path alias to the source file', () => {
+        expect(resolveImport('@/domain/types', from('index.ts'))).toEqual({
+            kind: 'graph',
+            file: 'domain/types.ts',
+        });
+    });
+
+    it('resolves a `baseUrl` import the way tsc does', () => {
+        expect(resolveImport('src/domain/types', from('index.ts'))).toEqual({
+            kind: 'graph',
+            file: 'domain/types.ts',
+        });
+    });
+
+    it('resolves a directory import to its index file', () => {
+        expect(
+            resolveImport('../indicators', from('domain/signals/index.ts'))
+        ).toEqual({ kind: 'graph', file: 'domain/indicators/index.ts' });
+    });
+
+    it('treats packages and node built-ins as external', () => {
+        expect(resolveImport('typescript', from('index.ts'))).toEqual({
+            kind: 'external',
+        });
+        expect(resolveImport('node:fs', from('index.ts'))).toEqual({
+            kind: 'external',
+        });
+    });
+
+    it('keeps files that cannot join a production cycle out of the graph', () => {
+        expect(resolveImport('../package.json', from('index.ts'))).toEqual({
+            kind: 'outside-graph',
+        });
+    });
+
+    it('reports a path that resolves to nothing', () => {
+        expect(resolveImport('./does-not-exist', from('index.ts'))).toEqual({
+            kind: 'unresolved',
+        });
+    });
+});
+
+describe('extractImports', () => {
+    const typeOnlyOf = (source: string): boolean[] =>
+        extractImports('x.ts', source).map(record => record.typeOnly);
+
+    describe('type-only declarations', () => {
+        it.each([
+            ["import type { A } from './a';", '`import type`'],
+            ["import { type A, type B } from './a';", 'all specifiers `type`'],
+            ["export type { E } from './e';", '`export type`'],
+            [
+                "export { type E } from './e';",
+                'all re-exported specifiers `type`',
+            ],
+        ])('%s is type-only (%s)', source => {
+            expect(typeOnlyOf(source)).toEqual([true]);
+        });
+    });
+
+    describe('runtime declarations', () => {
+        it.each([
+            [
+                "import D, { type A } from './a';",
+                'default binding next to type specifiers',
+            ],
+            ["import { type A, b } from './a';", 'one value specifier'],
+            ["import * as ns from './a';", 'namespace import'],
+            ["import './side-effect';", 'side-effect import'],
+            ["export * from './f';", 'star re-export'],
+            ["export { g } from './g';", 'value re-export'],
+        ])('%s is a runtime edge (%s)', source => {
+            expect(typeOnlyOf(source)).toEqual([false]);
+        });
+    });
+
+    it('marks `import()` as dynamic', () => {
+        expect(
+            extractImports('x.ts', "const g = () => import('./g');")
+        ).toEqual([{ specifier: './g', typeOnly: false, dynamic: true }]);
+    });
+
+    it('ignores an import written in a comment', () => {
+        expect(extractImports('x.ts', "// import { h } from './h';")).toEqual(
+            []
+        );
+    });
+});
+
+describe('cycleEdges', () => {
+    const edge = (from: string, to: string): ImportEdge => ({
+        from,
+        to,
+        typeOnly: false,
+        dynamic: false,
+    });
 
     it('reports every edge of a cycle and none outside it', () => {
         expect(
@@ -273,39 +408,30 @@ describe('cycle detector', () => {
         ).toEqual(['a.ts -> b.ts', 'b.ts -> c.ts', 'c.ts -> a.ts']);
     });
 
-    it('ignores cycles closed only by type-only or dynamic edges', () => {
-        const edges = [
-            edge('a.ts', 'b.ts'),
-            edge('b.ts', 'a.ts', { typeOnly: true }),
-            edge('c.ts', 'd.ts'),
-            edge('d.ts', 'c.ts', { dynamic: true }),
-        ];
-        expect(cycleEdges(edges.filter(runtimeStatic))).toEqual([]);
-        expect(cycleEdges(edges)).toHaveLength(4);
+    it('reports nothing for an acyclic graph', () => {
+        expect(
+            cycleEdges([edge('a.ts', 'b.ts'), edge('b.ts', 'c.ts')])
+        ).toEqual([]);
+    });
+});
+
+describe('runtimeStatic', () => {
+    const base: ImportEdge = {
+        from: 'a.ts',
+        to: 'b.ts',
+        typeOnly: false,
+        dynamic: false,
+    };
+
+    it('keeps a static value edge', () => {
+        expect(runtimeStatic(base)).toBe(true);
     });
 
-    it('classifies type-only imports from the source text', () => {
-        const kinds = extractImports(
-            'x.ts',
-            [
-                "import type { A } from './a';",
-                "import { type B } from './b';",
-                "import { type C, d } from './c';",
-                "export type { E } from './e';",
-                "export * from './f';",
-                "const g = () => import('./g');",
-                "// import { h } from './h';",
-            ].join('\n')
-        ).map(({ specifier, typeOnly, dynamic }) =>
-            [specifier, typeOnly, dynamic].join(':')
-        );
-        expect(kinds).toEqual([
-            './a:true:false',
-            './b:true:false',
-            './c:false:false',
-            './e:true:false',
-            './f:false:false',
-            './g:false:true',
-        ]);
+    it('drops a type-only edge', () => {
+        expect(runtimeStatic({ ...base, typeOnly: true })).toBe(false);
+    });
+
+    it('drops a dynamic edge', () => {
+        expect(runtimeStatic({ ...base, dynamic: true })).toBe(false);
     });
 });

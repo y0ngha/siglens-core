@@ -180,6 +180,17 @@ export default tseslint.config(
             ],
         },
     },
+    // 타입으로만 쓰는 import는 `import type`으로 쓴다. tsc는 값 구문이어도 타입으로만 쓰인
+    // import를 지우는데, 순환 import 가드(src/__tests__/guards/importCycles.test.ts)는 구문만
+    // 보고 런타임 엣지를 가른다. 이 규칙이 있어야 둘의 판정이 같다. 테스트 파일은 가드
+    // 대상이 아니라 제외한다.
+    {
+        files: ['src/**/*.ts'],
+        ignores: ['src/__tests__/**'],
+        rules: {
+            '@typescript-eslint/consistent-type-imports': 'error',
+        },
+    },
     // domain은 순수 계산 레이어다(src/domain/CLAUDE.md "Dependency Rules"). 레이어 방향과
     // 함께 순수성도 여기서 강제한다 — 리뷰로만 지키던 규칙이라 사람이 놓치면 그대로 들어왔다.
     //
