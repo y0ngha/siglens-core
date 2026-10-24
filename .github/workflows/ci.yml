@@ -38,3 +38,26 @@ jobs:
 
             - name: Test
               run: yarn test
+
+            # 배포 산출물은 publish.yml(v* 태그 push)에서야 처음 만들어졌다. 그래서
+            # tsc-alias·tsconfig.build.json 쪽이 깨지면 릴리스 시점에 발견됐다.
+            # PR에서 같은 빌드를 돌리고, 산출물을 소비자가 쓰는 방식으로 확인한다.
+            - name: Build
+              run: yarn build
+
+            # 빌드가 성공해도 `@/` alias가 산출물에 남으면 소비자 쪽에서 런타임에
+            # 모듈을 찾지 못한다(tsc는 이것을 오류로 보지 않는다). package.json
+            # exports의 두 진입점이 실제로 로드되는지도 함께 본다.
+            - name: Verify build output
+              run: |
+                  if grep -rEl "(from |require\()['\"]@/" dist --include='*.js' --include='*.d.ts'; then
+                      echo "::error::빌드 산출물에 해석되지 않은 @/ alias가 남아 있다(위 파일 목록)."
+                      exit 1
+                  fi
+                  node -e "
+                    for (const entry of ['./dist/index.js', './dist/index.client.js']) {
+                      const count = Object.keys(require(entry)).length;
+                      if (count === 0) throw new Error(entry + ' 의 export가 비어 있다');
+                      console.log(entry, 'exports', count);
+                    }
+                  "
