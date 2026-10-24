@@ -424,6 +424,12 @@ domain ← NO external imports (npm packages, AI libraries, technical-indicator 
 - Other files within `domain/` (e.g. `domain/types.ts`, peer files in same sub-folder)
 - Node built-in types that are purely type-level (no runtime I/O)
 
+These rules are enforced by ESLint (`eslint.config.mjs`, the `src/domain/**` override), with
+imports judged by the path they resolve to. A type-only `node:*` import passes; any other
+external or `node:*` import, `console`, `process`, `fetch`, timers, `performance`, `crypto`,
+`globalThis`, `Date.now()`, `Date()` and `Math.random()` fail lint. A bare `new Date()` is left
+to review because of the DOM-3 fallback pattern.
+
 **Prohibited:**
 ```typescript
 // ❌ External library

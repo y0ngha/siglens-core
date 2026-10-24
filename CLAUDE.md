@@ -158,11 +158,13 @@ never reaches into them.
 
 Import-direction violations trigger ESLint errors. PRs cannot be merged.
 The purity rules for `domain/` are lint-enforced too (`eslint.config.mjs`, the
-`src/domain/**` override): only imports inside `domain/` are allowed (no external
-packages, no `node:*`, no relative path into another layer), and `console`, `process`,
-`fetch`, timers, `performance`, `Date.now()`, argument-less `new Date()` and
-`Math.random()` are errors. Purity the linter cannot see (mutating arguments, hidden
-module state) is still caught in review.
+`src/domain/**` override). Imports are judged by the path they resolve to, so a
+relative path, a directory import or the public barrel (`src/index.ts`) cannot reach
+another layer. External packages and `node:*` are errors, except a type-only `node:*`
+import. `console`, `process`, `fetch`, timers, `queueMicrotask`, `performance`, `crypto`,
+`globalThis`, `Date.now()`, `Date()` and `Math.random()` are errors. A bare `new Date()`
+is not linted, because `options.now ?? new Date()` is the DOM-3 pattern; ignoring an
+injected clock, mutating arguments and hidden module state are still caught in review.
 
 ---
 
