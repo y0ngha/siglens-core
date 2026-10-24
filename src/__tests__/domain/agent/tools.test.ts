@@ -93,6 +93,50 @@ describe('AGENT_TOOL_SPECS', () => {
         ).toBeUndefined();
     });
 
+    describe('new tool output contracts', () => {
+        const desc = (name: string): string =>
+            findToolSpec(name)?.description ?? '';
+
+        it('bars: intraday vs close-basis extremes and closeStreak', () => {
+            const d = desc('get_bars_indicators');
+            expect(d).toContain('INTRADAY extremes');
+            expect(d).toContain('highClose');
+            expect(d).toContain('fromHighClosePct');
+            expect(d).toContain('derived.closeStreak');
+            expect(d).toContain('truncated');
+            expect(d).toContain('a single down day is a streak of 1');
+        });
+
+        it('investor flows: Form 144 counts, formType, web_search conditional', () => {
+            const d = desc('get_investor_flows');
+            expect(d).toContain('proposedSalesCounts');
+            expect(d).toContain('formType');
+            expect(d).toContain('excludesAmendments');
+            expect(d).toContain('never count them for a window');
+            expect(d).toContain('when web_search is available');
+        });
+
+        it('fundamentals: form, revenueYoYPct, dividends, sharesBasis; no unshipped fields', () => {
+            const d = desc('get_fundamentals');
+            expect(d).toContain('revenueYoYPct');
+            expect(d).toContain('two decimals');
+            expect(d).toContain('newest row whose form is 10-Q');
+            expect(d).toContain('dividends');
+            expect(d).toContain('trailingYieldPct');
+            expect(d).toContain('sharesBasis');
+            expect(d).not.toContain('sessionTiming');
+            expect(d).not.toContain('indexMemberships');
+            expect(d).toContain('Index membership');
+            expect(d).toContain('not in this tool');
+        });
+
+        it('market overview: lastClose vs live price', () => {
+            const d = desc('get_market_overview');
+            expect(d).toContain('lastClose');
+            expect(d).toContain('lastCloseDate');
+        });
+    });
+
     describe('get_investor_flows', () => {
         const spec = findToolSpec('get_investor_flows');
 
@@ -196,7 +240,7 @@ describe('AGENT_TOOL_SPECS', () => {
                 'A Korean result has no 13F, FINRA short or dilution data, so those axes are insufficient'
             );
             expect(description).toContain(
-                'Korean institutional/foreign net buying (기관·외국인 순매수) is not available'
+                'Korean institutional/foreign net buying (기관·외국인 순매수) is not in this tool — when web_search is available use it'
             );
             expect(description).toContain('never estimate it');
         });

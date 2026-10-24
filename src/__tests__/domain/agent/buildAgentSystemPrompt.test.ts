@@ -545,7 +545,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-24.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-10-25.1');
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at
@@ -721,14 +721,15 @@ describe('buildAgentSystemPrompt', () => {
         it('says Korean institutional/foreign net buying is not available and points at no tool', () => {
             const row = rowOf('Korean institutional or foreign net buying');
             expect(row).toContain('기관·외국인 순매수');
-            expect(row).toContain('→ no tool: SIGLENS does not have this data');
+            expect(row).toContain('→ SIGLENS does not hold this data');
+            expect(row).toContain('use web_search');
+            expect(row).toContain('cite the publisher and the date');
             expect(row).toContain('never estimate it');
             expect(row).toContain(
-                'never suggest that get_investor_flows or any other SIGLENS tool holds it'
+                'Never suggest that get_investor_flows or any other SIGLENS tool holds it'
             );
-            expect(row).toContain('never offer it as a follow-up question');
             expect(row).toContain(
-                'Do not call get_investor_flows for this question'
+                'do not call get_investor_flows for this question'
             );
             // A general 수급 question must not fall into this no-tool row.
             expect(row).not.toContain('외국인 수급');
@@ -1233,6 +1234,35 @@ describe('buildAgentSystemPrompt', () => {
             etSessionStatus: 'open',
         });
         expect(withoutCachedAnalysis).not.toContain('Analysis vs now:');
+    });
+
+    it('웹검색 폴백 행은 web_search가 있을 때만 들어가고, 외국인 순매수 행은 없으면 no tool로 돌아간다', () => {
+        const fallback =
+            prompt
+                .split('\n')
+                .find(l => l.includes('Carve-out to the row above')) ?? '';
+        for (const term of [
+            'dividends (yield, DPS, ex-date)',
+            'earnings before/after-market timing',
+            'index membership',
+            'cite the publisher and date',
+            'never estimate',
+            'never decline',
+        ])
+            expect(fallback).toContain(term);
+        expect(prompt).toContain(
+            'anything a SIGLENS tool returns a value for; the null-value fallback row below is the only carve-out'
+        );
+        const noSearch = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(t => t.name !== 'web_search'),
+            now: NOW,
+            etSessionStatus: 'open',
+        });
+        expect(noSearch).not.toContain('Carve-out to the row above');
+        expect(noSearch).toContain(
+            '→ no tool: SIGLENS does not have this data'
+        );
     });
 
     it('뉴스 공백 안내는 web_search 유무에 따라 한 번만 짧게', () => {
