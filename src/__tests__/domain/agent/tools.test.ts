@@ -131,7 +131,15 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain('when web_search is available use it');
             expect(d).toContain('could not be confirmed');
             expect(d).toContain('not for a general 수급 or outlook question');
-            expect(d).toContain('not in this tool or any SIGLENS tool');
+            expect(d).toContain('`krInvestorTrend`');
+            expect(d).toContain(
+                '(trading plans), plus `krInvestorTrend` when present'
+            );
+            expect(d).toContain('cite 네이버 금융 and asOf');
+            expect(d).toContain('sum5d/sum20d or sum the rows');
+            expect(d).toContain(
+                'When it is null or absent and the user asks specifically'
+            );
         });
 
         it('fundamentals: form, revenueYoYPct, dividends, sharesBasis; no unshipped fields', () => {
@@ -143,8 +151,20 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain('trailingYieldPct');
             expect(d).toContain('sharesBasis');
             expect(d).not.toContain('sessionTiming');
-            expect(d).not.toContain('indexMemberships');
-            expect(d).toContain('Index membership');
+            expect(d).toContain('`indexMemberships`');
+            expect(d).toContain('US only');
+            expect(d).toContain(
+                'cite the Wikipedia constituents list and asOf'
+            );
+            expect(d).toContain(
+                'When null or absent, search and cite when web_search is available'
+            );
+            expect(d).toContain(
+                'never derive an annual or trailing yield from a single payment'
+            );
+            expect(d).toContain(
+                'say the trailing-12-month yield could not be confirmed'
+            );
             expect(d).toContain('not in this tool');
             expect(d).toContain('US domestic filers only');
             expect(d).toContain(
@@ -164,9 +184,7 @@ describe('AGENT_TOOL_SPECS', () => {
                 'trailing12mAmount and trailingYieldPct may include special dividends'
             );
             expect(d).toContain('not a regular yield');
-            expect(d).toContain(
-                'report only what is present and do not invent the rest'
-            );
+            expect(d).toContain('report only the latest payment');
             expect(d).toContain(
                 'otherwise say SIGLENS does not carry it and it could not be confirmed'
             );
@@ -283,7 +301,7 @@ describe('AGENT_TOOL_SPECS', () => {
                 'A Korean result has no 13F, FINRA short or dilution data, so those axes are insufficient'
             );
             expect(description).toContain(
-                'Korean institutional/foreign net buying (기관·외국인 순매수) is not in this tool or any SIGLENS tool'
+                'Korean institutional/foreign net buying (기관·외국인 순매수): for a Korean stock, when present `krInvestorTrend`'
             );
             expect(description).toContain('never estimate it');
         });

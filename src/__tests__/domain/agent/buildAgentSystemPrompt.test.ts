@@ -718,26 +718,32 @@ describe('buildAgentSystemPrompt', () => {
             }
         );
 
-        it('with web_search, routes Korean institutional/foreign net buying to a cited search, only when asked for specifically', () => {
+        it('routes Korean institutional/foreign net buying to krInvestorTrend first, then a cited search only when it is null and the user asked specifically', () => {
             const row = rowOf('Korean institutional or foreign net buying');
             expect(row).toContain('기관·외국인 순매수');
-            expect(row).toContain('→ SIGLENS does not hold this data');
-            expect(row).toContain('use web_search');
+            expect(row).toContain(
+                '→ call get_investor_flows and answer from its `krInvestorTrend` when present (shares; cite 네이버 금융 and its asOf'
+            );
+            expect(row).toContain('sum5d/sum20d or sum the rows');
+            expect(row).toContain(
+                'When `krInvestorTrend` is null or absent, use web_search'
+            );
             expect(row).toContain('cite the publisher and the date');
             expect(row).toContain('never estimate it');
             expect(row).toContain(
                 'web_search is refused (quota), say the figure could not be confirmed'
             );
             expect(row).toContain(
-                'Search only when the user asks for these figures specifically, never for a general 수급 or outlook/buy question'
+                'Search only when krInvestorTrend is null or absent and the user asks for these figures specifically, never for a general 수급 or outlook/buy question'
             );
             expect(row).toContain(
-                'Never suggest that get_investor_flows or any other SIGLENS tool holds it'
+                'Never suggest that any other SIGLENS tool holds it'
             );
-            expect(row).toContain(
+            expect(row).not.toContain(
                 'do not call get_investor_flows for this question'
             );
-            // A general 수급 question must not fall into this no-tool row.
+            // A general 수급 question must not fall into this row.
+            expect(row).toContain('unless `krInvestorTrend` is present');
             expect(row).not.toContain('외국인 수급');
             expect(row).toContain(
                 'A general 수급 question about a Korean stock is not this row'
@@ -760,13 +766,13 @@ describe('buildAgentSystemPrompt', () => {
                     .find(l =>
                         l.includes('Korean institutional or foreign net buying')
                     ) ?? '';
-            expect(row).toContain('→ no tool: SIGLENS does not have this data');
+            expect(row).toContain(
+                'When `krInvestorTrend` is null or absent, say SIGLENS does not carry it'
+            );
+            expect(row).toContain('answer from its `krInvestorTrend`');
             expect(row).toContain('could not be confirmed');
             expect(row).toContain('never estimate it');
             expect(row).toContain('never offer it as a follow-up question');
-            expect(row).toContain(
-                'do not call get_investor_flows for this question'
-            );
             expect(row).not.toContain('use web_search');
         });
 
@@ -1272,9 +1278,8 @@ describe('buildAgentSystemPrompt', () => {
                 .find(l => l.includes('Carve-out to the row above')) ?? '';
         for (const term of [
             'dividends (yield, DPS, ex-date)',
-            'say it pays no dividend); earnings before/after-market timing and index membership (S&P 500, Nasdaq-100, Dow), which no SIGLENS tool provides',
-            'earnings before/after-market timing',
-            'index membership',
+            'never derive a trailing yield from a single payment',
+            'index membership (S&P 500, Nasdaq-100, Dow) that a SIGLENS tool returned as null or absent; earnings before/after-market timing, which no SIGLENS tool provides',
             'cite the publisher and date',
             'never estimate',
             'web_search is refused (quota), say the figure could not be confirmed',
@@ -1283,7 +1288,7 @@ describe('buildAgentSystemPrompt', () => {
             expect(fallback).toContain(term);
         expect(fallback).not.toContain('never decline');
         expect(prompt).toContain(
-            'except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying; the null-value fallback row)'
+            'except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying when krInvestorTrend is null or absent; the null-value fallback row)'
         );
         expect(prompt).not.toContain('the only carve-out');
         const noSearch = buildAgentSystemPrompt({
@@ -1294,7 +1299,7 @@ describe('buildAgentSystemPrompt', () => {
         });
         expect(noSearch).not.toContain('Carve-out to the row above');
         expect(noSearch).toContain(
-            '→ no tool: SIGLENS does not have this data'
+            'When `krInvestorTrend` is null or absent, say SIGLENS does not carry it'
         );
     });
 
