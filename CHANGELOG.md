@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.28.2](https://github.com/y0ngha/siglens-core/compare/v2.28.1...v2.28.2) (2026-10-24)
+
+### Bug Fixes
+
+* Redis 클라이언트 생성 실패를 기억하지 않음 ([#310](https://github.com/y0ngha/siglens-core/issues/310)) ([7b27d30](https://github.com/y0ngha/siglens-core/commit/7b27d301ea01076d8e67d21eef188ee5ec71d632)), closes [#1111](https://github.com/y0ngha/siglens-core/issues/1111)
+
 ## [2.28.1](https://github.com/y0ngha/siglens-core/compare/v2.28.0...v2.28.1) (2026-10-24)
 
 ### Bug Fixes
