@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.28.1](https://github.com/y0ngha/siglens-core/compare/v2.28.0...v2.28.1) (2026-10-24)
+
+### Bug Fixes
+
+* @upstash/redis를 첫 사용 시 지연 로드 ([#308](https://github.com/y0ngha/siglens-core/issues/308)) ([69a1a20](https://github.com/y0ngha/siglens-core/commit/69a1a20d01b3cedf2939b56f2715dad2dfefa374))
+
 # [2.28.0](https://github.com/y0ngha/siglens-core/compare/v2.27.0...v2.28.0) (2026-10-24)
 
 ### Features
