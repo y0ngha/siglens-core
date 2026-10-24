@@ -157,8 +157,14 @@ workers) are responsible for their own presentation and runtime concerns — `si
 never reaches into them.
 
 Import-direction violations trigger ESLint errors. PRs cannot be merged.
-The purity rules for `domain/` (no I/O, no external libraries) are not lint-enforced —
-they are caught in review.
+The purity rules for `domain/` are lint-enforced too (`eslint.config.mjs`, the
+`src/domain/**` override). Imports are judged by the path they resolve to, so a
+relative path, a directory import or the public barrel (`src/index.ts`) cannot reach
+another layer. External packages and `node:*` are errors, except a type-only `node:*`
+import. `console`, `process`, `fetch`, timers, `queueMicrotask`, `performance`, `crypto`,
+`globalThis`, `Date.now()`, `Date()` and `Math.random()` are errors. A bare `new Date()`
+is not linted, because `options.now ?? new Date()` is the DOM-3 pattern; ignoring an
+injected clock, mutating arguments and hidden module state are still caught in review.
 
 ---
 
