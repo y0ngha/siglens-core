@@ -196,12 +196,14 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_investor_flows'],
-        // Without web_search the figure cannot be fetched anywhere, so the
-        // row keeps the original "say so plainly" behaviour.
+        // Without web_search the figure cannot be fetched anywhere, so only
+        // the action sentence switches; the head and tail are shared.
         text: available =>
-            available.has('web_search')
-                ? 'Korean institutional or foreign net buying asked for specifically — 기관·외국인 순매수, 외국인이 사고 있어?, 기관 매매 동향 → SIGLENS does not hold this data, so use web_search (e.g. Naver Finance or KRX pages), cite the publisher and the date of the figure, and never estimate it; if the search finds nothing, say so. Never suggest that get_investor_flows or any other SIGLENS tool holds it, and do not call get_investor_flows for this question: for a Korean stock it holds only DART stake filings, never net buying. A general 수급 question about a Korean stock is not this row: follow the Korean stake-changes row above (call get_investor_flows) and add the institutional/foreign net buying from web_search with citation.'
-                : 'Korean institutional or foreign net buying asked for specifically — 기관·외국인 순매수, 외국인이 사고 있어?, 기관 매매 동향 → no tool: SIGLENS does not have this data. Say so plainly; never estimate it, never offer it as a follow-up question. Never suggest that get_investor_flows or any other SIGLENS tool holds it, and do not call get_investor_flows for this question: for a Korean stock it holds only DART stake filings, never net buying. A general 수급 question about a Korean stock is not this row: follow the Korean stake-changes row above (call get_investor_flows) and add that institutional/foreign net buying is not available.',
+            `Korean institutional or foreign net buying asked for specifically — 기관·외국인 순매수, 외국인이 사고 있어?, 기관 매매 동향 → ${
+                available.has('web_search')
+                    ? 'SIGLENS does not hold this data, so use web_search (e.g. Naver Finance or KRX pages), cite the publisher and the date of the figure, and never estimate it; if the search finds nothing or web_search is refused (quota), say the figure could not be confirmed. Search only when the user asks for these figures specifically, never for a general 수급 or outlook/buy question that merely calls get_investor_flows.'
+                    : 'no tool: SIGLENS does not have this data. Say so plainly and that it could not be confirmed; never estimate it, never offer it as a follow-up question.'
+            } Never suggest that get_investor_flows or any other SIGLENS tool holds it, and do not call get_investor_flows for this question: for a Korean stock it holds only DART stake filings, never net buying. A general 수급 question about a Korean stock is not this row: follow the Korean stake-changes row above (call get_investor_flows) and add that institutional/foreign net buying could not be confirmed, without searching.`,
     },
     {
         requires: ['get_market_overview'],
@@ -234,11 +236,11 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['web_search'],
-        text: 'Market, company or economic facts none of the SIGLENS tools above hold (regulation, corporate events the news tool lacks) → web_search. Never for prices, indicators or anything a SIGLENS tool returns a value for; the null-value fallback row below is the only carve-out.',
+        text: 'Market, company or economic facts none of the SIGLENS tools above hold (regulation, corporate events the news tool lacks) → web_search. Never for prices, indicators or anything a SIGLENS tool returns a value for, except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying; the null-value fallback row).',
     },
     {
         requires: ['web_search'],
-        text: 'Carve-out to the row above: dividends (yield, DPS, ex-date) that a SIGLENS tool returned as null or absent, earnings before/after-market timing, and index membership (S&P 500, Nasdaq-100, Dow), which no SIGLENS tool provides → web_search, cite the publisher and date, never estimate and never decline.',
+        text: 'Carve-out to the row above: dividends (yield, DPS, ex-date) that a SIGLENS tool returned as null or absent (a confirmed non-payer is not null: say it pays no dividend); earnings before/after-market timing and index membership (S&P 500, Nasdaq-100, Dow), which no SIGLENS tool provides → web_search, cite the publisher and date, never estimate; if the search finds nothing or web_search is refused (quota), say the figure could not be confirmed.',
     },
     {
         requires: [],

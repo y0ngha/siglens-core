@@ -105,6 +105,21 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain('derived.closeStreak');
             expect(d).toContain('truncated');
             expect(d).toContain('a single down day is a streak of 1');
+            expect(d).toContain('when present, `derived.closeStreak`');
+            expect(d).toContain('up, down or flat');
+            expect(d).toContain("say 'at least N days'");
+            expect(d).toContain(
+                'When null or absent (older app, non-1Day, fewer than 2 completed bars)'
+            );
+            expect(d).toContain('call get_bars_indicators with timeframe 1Day');
+            expect(d).toContain('intraday bars have no daily closes');
+            expect(d).toContain(
+                'completed daily bars only, excluding an in-progress last bar'
+            );
+            expect(d).toContain(
+                "say 'at least N days' when the count reaches the first loaded bar"
+            );
+            expect(d).toContain('the streak cannot be determined');
         });
 
         it('investor flows: Form 144 counts, formType, web_search conditional', () => {
@@ -113,7 +128,10 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain('formType');
             expect(d).toContain('excludesAmendments');
             expect(d).toContain('never count them for a window');
-            expect(d).toContain('when web_search is available');
+            expect(d).toContain('when web_search is available use it');
+            expect(d).toContain('could not be confirmed');
+            expect(d).toContain('not for a general 수급 or outlook question');
+            expect(d).toContain('not in this tool or any SIGLENS tool');
         });
 
         it('fundamentals: form, revenueYoYPct, dividends, sharesBasis; no unshipped fields', () => {
@@ -128,6 +146,31 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).not.toContain('indexMemberships');
             expect(d).toContain('Index membership');
             expect(d).toContain('not in this tool');
+            expect(d).toContain('US domestic filers only');
+            expect(d).toContain(
+                'null for Korean stocks and foreign/ADR filers'
+            );
+            expect(d).toContain('per-row `form`');
+            expect(d).toContain(
+                'when no row has form 10-Q (all forms null or absent)'
+            );
+            expect(d).toContain('answer with the newest Q1–Q3 row');
+            expect(d).toContain('say the form is not confirmed');
+            expect(d).toContain('the rows do not say which form was filed');
+            expect(d).toContain('a confirmed non-payer');
+            expect(d).toContain('do not web_search');
+            expect(d).toContain('absent or null `dividends` means unknown');
+            expect(d).toContain(
+                'trailing12mAmount and trailingYieldPct may include special dividends'
+            );
+            expect(d).toContain('not a regular yield');
+            expect(d).toContain(
+                'report only what is present and do not invent the rest'
+            );
+            expect(d).toContain(
+                'otherwise say SIGLENS does not carry it and it could not be confirmed'
+            );
+            expect(d).toContain('never answer from memory');
         });
 
         it('market overview: lastClose vs live price', () => {
@@ -240,7 +283,7 @@ describe('AGENT_TOOL_SPECS', () => {
                 'A Korean result has no 13F, FINRA short or dilution data, so those axes are insufficient'
             );
             expect(description).toContain(
-                'Korean institutional/foreign net buying (기관·외국인 순매수) is not in this tool — when web_search is available use it'
+                'Korean institutional/foreign net buying (기관·외국인 순매수) is not in this tool or any SIGLENS tool'
             );
             expect(description).toContain('never estimate it');
         });

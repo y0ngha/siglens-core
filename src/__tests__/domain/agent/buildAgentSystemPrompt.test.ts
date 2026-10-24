@@ -718,13 +718,19 @@ describe('buildAgentSystemPrompt', () => {
             }
         );
 
-        it('says Korean institutional/foreign net buying is not available and points at no tool', () => {
+        it('with web_search, routes Korean institutional/foreign net buying to a cited search, only when asked for specifically', () => {
             const row = rowOf('Korean institutional or foreign net buying');
             expect(row).toContain('기관·외국인 순매수');
             expect(row).toContain('→ SIGLENS does not hold this data');
             expect(row).toContain('use web_search');
             expect(row).toContain('cite the publisher and the date');
             expect(row).toContain('never estimate it');
+            expect(row).toContain(
+                'web_search is refused (quota), say the figure could not be confirmed'
+            );
+            expect(row).toContain(
+                'Search only when the user asks for these figures specifically, never for a general 수급 or outlook/buy question'
+            );
             expect(row).toContain(
                 'Never suggest that get_investor_flows or any other SIGLENS tool holds it'
             );
@@ -739,6 +745,29 @@ describe('buildAgentSystemPrompt', () => {
             expect(
                 rowOf('major-holder or insider stake changes of a Korean stock')
             ).toContain('삼성전자 수급 어때?');
+        });
+
+        it('without web_search, says the net buying is not carried, could not be confirmed, and is never offered as a follow-up', () => {
+            const noSearch = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(t => t.name !== 'web_search'),
+                now: NOW,
+                etSessionStatus: 'open',
+            });
+            const row =
+                noSearch
+                    .split('\n')
+                    .find(l =>
+                        l.includes('Korean institutional or foreign net buying')
+                    ) ?? '';
+            expect(row).toContain('→ no tool: SIGLENS does not have this data');
+            expect(row).toContain('could not be confirmed');
+            expect(row).toContain('never estimate it');
+            expect(row).toContain('never offer it as a follow-up question');
+            expect(row).toContain(
+                'do not call get_investor_flows for this question'
+            );
+            expect(row).not.toContain('use web_search');
         });
 
         it('drops every investor-flows row together with the tool', () => {
@@ -1243,16 +1272,20 @@ describe('buildAgentSystemPrompt', () => {
                 .find(l => l.includes('Carve-out to the row above')) ?? '';
         for (const term of [
             'dividends (yield, DPS, ex-date)',
+            'say it pays no dividend); earnings before/after-market timing and index membership (S&P 500, Nasdaq-100, Dow), which no SIGLENS tool provides',
             'earnings before/after-market timing',
             'index membership',
             'cite the publisher and date',
             'never estimate',
-            'never decline',
+            'web_search is refused (quota), say the figure could not be confirmed',
+            'a confirmed non-payer is not null: say it pays no dividend',
         ])
             expect(fallback).toContain(term);
+        expect(fallback).not.toContain('never decline');
         expect(prompt).toContain(
-            'anything a SIGLENS tool returns a value for; the null-value fallback row below is the only carve-out'
+            'except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying; the null-value fallback row)'
         );
+        expect(prompt).not.toContain('the only carve-out');
         const noSearch = buildAgentSystemPrompt({
             locale: 'ko',
             tools: AGENT_TOOL_SPECS.filter(t => t.name !== 'web_search'),
