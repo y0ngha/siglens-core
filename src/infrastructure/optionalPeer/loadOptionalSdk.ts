@@ -1,9 +1,10 @@
 /** @internal Error code carried by {@link MissingSdkError}. */
-export const MISSING_SDK_CODE = 'AI_SDK_NOT_INSTALLED';
+export const MISSING_SDK_CODE = 'OPTIONAL_PEER_NOT_INSTALLED';
 
 /**
  * @internal
- * Thrown on first use of a provider whose optional peer SDK is not installed.
+ * Thrown on first use of a feature whose optional peer dependency is not
+ * installed (an AI provider SDK or `@upstash/redis`). `sdk` names the package.
  *
  * Carries neither `status` nor `retryable`, so `classifyError` returns `'none'`
  * and the retry wrappers rethrow it immediately instead of looping — installing
@@ -46,11 +47,11 @@ function isMissingModuleError(error: unknown, sdk: string): boolean {
 
 /**
  * @internal
- * Memoized lazy loader for an optional peer SDK.
+ * Memoized lazy loader for an optional peer dependency.
  *
- * The SDKs (`@anthropic-ai/sdk`, `@google/genai`, `openai`) are optional peer
- * dependencies, so they must not be `require`d when the package entry is
- * loaded. `importer` must contain the literal `import('<sdk>')` so the bundler
+ * The AI provider SDKs (`@anthropic-ai/sdk`, `@google/genai`, `openai`) and
+ * `@upstash/redis` are optional peer dependencies, so they must not be
+ * `require`d when the package entry is loaded (INF-11). `importer` must contain the literal `import('<sdk>')` so the bundler
  * and tsc see a static specifier; this helper only adds memoization and the
  * install-hint error.
  *

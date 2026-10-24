@@ -3,7 +3,7 @@ import {
     MISSING_SDK_CODE,
     MissingSdkError,
     loadOptionalSdk,
-} from '@/infrastructure/ai/loadOptionalSdk';
+} from '@/infrastructure/optionalPeer/loadOptionalSdk';
 import { classifyError } from '@/infrastructure/ai/retry/withRetry';
 
 function moduleNotFound(code: string, sdk: string): Error & { code: string } {

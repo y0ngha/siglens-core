@@ -276,7 +276,7 @@ expensive").
 
 `@anthropic-ai/sdk`, `@google/genai`, `openai` and `@upstash/redis` are optional peer dependencies. Never import
 them as runtime values at module top level — use `import type` for their types and load the
-module through `loadOptionalSdk(...)` (`infrastructure/ai/loadOptionalSdk.ts`) on first use, so
+module through `loadOptionalSdk(...)` (`infrastructure/optionalPeer/loadOptionalSdk.ts`) on first use, so
 importing the package entry never requires an SDK the consumer did not install. After awaiting
 the loader, re-check the caller's `AbortSignal` (`signal?.throwIfAborted()`): an abort that
 arrives while the SDK loads would otherwise be lost. Never let an SDK type reach a public

@@ -1,5 +1,5 @@
 import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
-import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import { loadOptionalSdk } from '@/infrastructure/optionalPeer/loadOptionalSdk';
 import type Anthropic from '@anthropic-ai/sdk';
 import type {
     ClaudeAdaptiveReasoningConfig,

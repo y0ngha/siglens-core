@@ -14,20 +14,23 @@ const { importSdk, sdkMethod } = vi.hoisted(() => ({
     sdkMethod: vi.fn(),
 }));
 
-vi.mock('@/infrastructure/ai/loadOptionalSdk', async importOriginal => {
-    const actual =
-        await importOriginal<
-            typeof import('@/infrastructure/ai/loadOptionalSdk')
-        >();
-    return {
-        ...actual,
-        loadOptionalSdk: <M>(
-            sdk: string,
-            purpose: string,
-            _importer: () => Promise<M>
-        ) => actual.loadOptionalSdk<M>(sdk, purpose, () => importSdk()),
-    };
-});
+vi.mock(
+    '@/infrastructure/optionalPeer/loadOptionalSdk',
+    async importOriginal => {
+        const actual =
+            await importOriginal<
+                typeof import('@/infrastructure/optionalPeer/loadOptionalSdk')
+            >();
+        return {
+            ...actual,
+            loadOptionalSdk: <M>(
+                sdk: string,
+                purpose: string,
+                _importer: () => Promise<M>
+            ) => actual.loadOptionalSdk<M>(sdk, purpose, () => importSdk()),
+        };
+    }
+);
 
 const MODEL: ChatGPTModelId = 'gpt-5.6-sol';
 

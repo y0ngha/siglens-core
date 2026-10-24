@@ -99,6 +99,12 @@ Module._resolveFilename = function (request, ...rest) {
 require(entry);
 `;
 
+/** 진입점 로드가 이 시간을 넘기면 끝나지 않는 핸들이 남은 것으로 보고 실패시킨다. */
+const LOAD_TIMEOUT_MS = 30_000;
+
+/** Node가 출력하는 `Error: …`·`TypeError: …` 형태의 메시지 줄. 소스 발췌 줄과 구분한다. */
+const ERROR_MESSAGE_LINE = /^[A-Za-z]*Error(?: \[[A-Z_]+\])?: /;
+
 /** 막힌 상태로 로드에 실패하면 그 오류 메시지, 성공하면 `null`. */
 export function loadErrorWithoutPeers(
     entry: string,
@@ -107,11 +113,17 @@ export function loadErrorWithoutPeers(
     const result = spawnSync(
         process.execPath,
         ['-e', LOAD_WITHOUT_PEERS, entry, JSON.stringify(peers)],
-        { encoding: 'utf8' }
+        { encoding: 'utf8', timeout: LOAD_TIMEOUT_MS }
     );
+    if (result.error) return `자식 프로세스 실행 실패: ${result.error.message}`;
+    if (result.signal)
+        return `자식 프로세스가 ${result.signal}로 끝났다(${LOAD_TIMEOUT_MS}ms 초과 등)`;
     if (result.status === 0) return null;
-    const message = result.stderr.split('\n').find(line => /Error/.test(line));
-    return message?.trim() ?? `exit ${result.status}`;
+    const message = (result.stderr ?? '')
+        .split('\n')
+        .map(line => line.trim())
+        .find(line => ERROR_MESSAGE_LINE.test(line));
+    return message ?? `exit ${result.status}`;
 }
 
 function listFiles(dir: string): string[] {
@@ -140,8 +152,15 @@ function main(): void {
 
     const manifest = JSON.parse(
         readFileSync(join(root, 'package.json'), 'utf8')
-    ) as Parameters<typeof entryFiles>[0] & Parameters<typeof optionalPeers>[0];
+    ) as Parameters<typeof entryFiles>[0] &
+        Parameters<typeof optionalPeers>[0] & { type?: string };
     const peers = optionalPeers(manifest);
+    // 3번 검사는 CommonJS의 `Module._resolveFilename`을 막는다. ESM 산출물은 그 경로를 거치지
+    // 않아 검사가 아무것도 막지 못한 채 통과하므로, 전제가 바뀌면 여기서 멈춘다.
+    if (manifest.type === 'module')
+        throw new Error(
+            'optional peer 로드 검사는 CommonJS 산출물을 전제한다. ESM으로 바꿨다면 ESM 로더 기반으로 고친다.'
+        );
     const require = createRequire(join(root, 'package.json'));
     for (const entry of entryFiles(manifest)) {
         const absolute = join(root, entry);

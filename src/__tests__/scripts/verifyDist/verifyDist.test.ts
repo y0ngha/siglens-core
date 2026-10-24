@@ -1,7 +1,7 @@
-import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import {
     entryFiles,
     findUnresolvedAliases,
@@ -122,10 +122,18 @@ describe('optionalPeers', () => {
 });
 
 describe('loadErrorWithoutPeers', () => {
+    const tempDirs: string[] = [];
+    afterEach(() => {
+        tempDirs
+            .splice(0)
+            .forEach(dir => rmSync(dir, { recursive: true, force: true }));
+    });
+
     // 임시 디렉터리에 가짜 패키지를 실제로 설치해 둔다. 그래야 실패가 "막아서" 난 것인지
     // "원래 없어서" 난 것인지 구분된다(막지 않으면 로드가 성공해야 한다).
     const entryRequiring = (specifier: string): string => {
         const dir = mkdtempSync(join(tmpdir(), 'verify-dist-'));
+        tempDirs.push(dir);
         for (const name of ['fake-peer', '@scope/pkg']) {
             const pkgDir = join(dir, 'node_modules', name);
             mkdirSync(join(pkgDir, 'sub'), { recursive: true });
@@ -152,6 +160,16 @@ describe('loadErrorWithoutPeers', () => {
                 '@scope/pkg',
             ])
         ).toMatch(/Cannot find module '@scope\/pkg\/sub'/);
+    });
+
+    it('소스 발췌 줄이 아니라 오류 메시지 줄을 돌려준다', () => {
+        const dir = mkdtempSync(join(tmpdir(), 'verify-dist-'));
+        tempDirs.push(dir);
+        const entry = join(dir, 'index.js');
+        writeFileSync(entry, "throw new TypeError('broken entry');\n");
+        expect(loadErrorWithoutPeers(entry, [])).toBe(
+            'TypeError: broken entry'
+        );
     });
 
     it('막지 않은 패키지는 그대로 로드된다', () => {

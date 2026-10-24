@@ -6,7 +6,7 @@ import type {
     DeepSeekReasoningConfig,
 } from '@/domain/types';
 import { resolveReasoningConfig } from '@/domain/types';
-import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import { loadOptionalSdk } from '@/infrastructure/optionalPeer/loadOptionalSdk';
 import type OpenAI from 'openai';
 import type { DeepSeekModelId } from '@/domain/analysis/modelSpecs';
 import { extractDeepSeekUsage, logUsage } from '@/infrastructure/ai/usage';

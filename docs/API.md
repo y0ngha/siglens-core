@@ -82,6 +82,13 @@ JSON을 복구·정규화한다.
 `readUpstashConfig()`가 위 환경변수에서 만든다. 환경변수가 설정되지 않았거나 Redis 호출이
 실패하면 각 어댑터는 아래 "구현 위치"에 적힌 방식으로 graceful degradation 한다.
 
+`@upstash/redis`는 optional peer dependency다(INF-11). 어댑터는 클라이언트를
+`infrastructure/upstash/client.ts`의 `lazyRedisClient`로 받고, 패키지는 env가 설정된 상태에서
+첫 작업을 할 때 로드된다. env는 있는데 패키지가 없거나 클라이언트가 URL을 거부하면 그 실패를
+한 번 `[upstash] Redis client unavailable` 오류 로그로 남기고 기억하며, 각 어댑터는 Redis 장애와
+같은 경로로 처리한다(캐시는 `MissingSdkError`를 던지고, 토큰·쿨다운은 통과시키고,
+`failurePolicy: 'closed'` 카운터는 `CounterStoreUnavailableError`를 던진다).
+
 ### 2.1 분석 결과 캐시
 
 `createCacheProvider()`(`infrastructure/cache/redis.ts`)는 `CacheProvider` port
@@ -164,6 +171,8 @@ domain/ports/
 └── counterStore.ts     ← CounterStore, CounterStoreUnavailableError
 
 infrastructure/upstash/config.ts     ← readUpstashConfig (env reader)
+infrastructure/upstash/client.ts     ← lazyRedisClient (@upstash/redis 지연 로드)
+infrastructure/optionalPeer/         ← loadOptionalSdk, MissingSdkError (optional peer 공용 로더)
 infrastructure/cache/                ← types.ts, config.ts (키·TTL), redis.ts (CacheProvider 어댑터)
 infrastructure/chat/tokenStore.ts    ← ChatTokenStore 어댑터 + hashClientIp
 infrastructure/usage/counterStore.ts ← CounterStore 어댑터

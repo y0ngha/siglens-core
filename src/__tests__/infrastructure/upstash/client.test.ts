@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * The real `loadOptionalSdk` (memoization + MODULE_NOT_FOUND mapping) runs;
@@ -7,20 +7,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  */
 const { importSdk } = vi.hoisted(() => ({ importSdk: vi.fn() }));
 
-vi.mock('@/infrastructure/ai/loadOptionalSdk', async importOriginal => {
-    const actual =
-        await importOriginal<
-            typeof import('@/infrastructure/ai/loadOptionalSdk')
-        >();
-    return {
-        ...actual,
-        loadOptionalSdk: <M>(
-            sdk: string,
-            purpose: string,
-            _importer: () => Promise<M>
-        ) => actual.loadOptionalSdk<M>(sdk, purpose, () => importSdk()),
-    };
-});
+vi.mock(
+    '@/infrastructure/optionalPeer/loadOptionalSdk',
+    async importOriginal => {
+        const actual =
+            await importOriginal<
+                typeof import('@/infrastructure/optionalPeer/loadOptionalSdk')
+            >();
+        return {
+            ...actual,
+            loadOptionalSdk: <M>(
+                sdk: string,
+                purpose: string,
+                _importer: () => Promise<M>
+            ) => actual.loadOptionalSdk<M>(sdk, purpose, () => importSdk()),
+        };
+    }
+);
 
 const RedisCtor = vi.fn(function (options: { url: string; token: string }) {
     return { options };
@@ -36,7 +39,15 @@ function missingModule(): Error {
 // gets a fresh module graph; otherwise an earlier "installed" test would leak.
 let lazyRedisClient: typeof import('@/infrastructure/upstash/client').lazyRedisClient;
 
+// The failure path logs once by design; capture it instead of printing.
+let log: ReturnType<typeof vi.spyOn>;
+
+afterEach(() => {
+    log.mockRestore();
+});
+
 beforeEach(async () => {
+    log = vi.spyOn(console, 'error').mockImplementation(() => {});
     importSdk.mockReset();
     RedisCtor.mockClear();
     vi.resetModules();
@@ -83,15 +94,27 @@ describe('lazyRedisClient', () => {
             });
         });
 
-        it('retries the load on the next call instead of caching the failure', async () => {
-            importSdk
-                .mockRejectedValueOnce(missingModule())
-                .mockResolvedValueOnce({ Redis: RedisCtor });
+        it('keeps the failure for later calls and logs it once', async () => {
+            importSdk.mockRejectedValue(missingModule());
             const getClient = lazyRedisClient('https://u', 't');
             await expect(getClient()).rejects.toThrow();
-            await expect(getClient()).resolves.toEqual({
-                options: { url: 'https://u', token: 't' },
+            await expect(getClient()).rejects.toThrow();
+            expect(importSdk).toHaveBeenCalledTimes(1);
+            expect(log).toHaveBeenCalledTimes(1);
+        });
+    });
+
+    describe('when the client constructor rejects the settings', () => {
+        it('rejects with the constructor error and logs it once', async () => {
+            importSdk.mockResolvedValue({
+                Redis: vi.fn(function () {
+                    throw new Error('invalid URL');
+                }),
             });
+            const getClient = lazyRedisClient('redis://wrong', 't');
+            await expect(getClient()).rejects.toThrow('invalid URL');
+            await expect(getClient()).rejects.toThrow('invalid URL');
+            expect(log).toHaveBeenCalledTimes(1);
         });
     });
 });
