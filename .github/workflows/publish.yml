@@ -30,6 +30,10 @@ jobs:
             - name: Build
               run: yarn build
 
+            # PR CI와 같은 산출물 검증. release-it이 만드는 배포 커밋은 PR CI를 거치지 않는다.
+            - name: Verify build output
+              run: yarn verify:dist
+
             - name: Publish to GitHub Packages
               run: yarn npm publish
               env:

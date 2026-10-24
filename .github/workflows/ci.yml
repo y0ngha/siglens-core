@@ -38,3 +38,13 @@ jobs:
 
             - name: Test
               run: yarn test
+
+            # 배포 산출물은 publish.yml(v* 태그 push)에서야 처음 만들어졌다. 그래서
+            # tsc-alias·tsconfig.build.json 쪽이 깨지면 릴리스 시점에 발견됐다.
+            # PR에서 같은 빌드를 돌리고, 산출물을 소비자가 쓰는 방식으로 확인한다
+            # (검사 내용은 scripts/verifyDist/verifyDist.ts. publish.yml도 같은 스크립트를 쓴다).
+            - name: Build
+              run: yarn build
+
+            - name: Verify build output
+              run: yarn verify:dist
