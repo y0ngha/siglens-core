@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.27.0](https://github.com/y0ngha/siglens-core/compare/v2.26.0...v2.27.0) (2026-10-24)
+
+### Features
+
+* 에이전트 웹검색 폴백과 신규 필드 도구 설명 반영 ([#303](https://github.com/y0ngha/siglens-core/issues/303)) ([a3a6730](https://github.com/y0ngha/siglens-core/commit/a3a6730cbabaea769821c34a29bedb2c28e9ef38))
+
 # [2.26.0](https://github.com/y0ngha/siglens-core/compare/v2.25.3...v2.26.0) (2026-10-23)
 
 ### Features
