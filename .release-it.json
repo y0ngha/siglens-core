@@ -1,4 +1,14 @@
 {
+    "hooks": {
+        "before:init": [
+            "yarn typecheck",
+            "yarn lint",
+            "yarn format:check",
+            "yarn test",
+            "yarn build",
+            "yarn verify:dist"
+        ]
+    },
     "git": {
         "requireBranch": "main",
         "commitMessage": "chore: release v${version}",
