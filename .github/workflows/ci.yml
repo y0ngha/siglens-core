@@ -1,12 +1,20 @@
 name: CI
 
+# 검사 목록은 이 파일 한 곳에만 둔다. 배포(publish.yml)는 이 워크플로를 workflow_call로
+# 불러 같은 검사를 통과해야 publish한다 — 목록을 복사해 두면 한쪽만 고쳐져 갈라진다.
 on:
     pull_request:
         types: [opened, synchronize, reopened]
+    # PR이 각자 초록이어도 합쳐진 main은 검증되지 않는다. 머지 결과도 같은 CI를 탄다.
+    push:
+        branches: [main]
+    workflow_call:
 
+# PR은 같은 PR의 이전 실행을 취소한다. push(main)와 workflow_call(태그)은 ref 단위로 묶되
+# 취소하지 않는다 — main에 연속 머지돼도 각 머지 결과의 검증 기록이 남아야 한다.
 concurrency:
-    group: ci-${{ github.event.pull_request.number }}
-    cancel-in-progress: true
+    group: ci-${{ github.event.pull_request.number || github.ref }}
+    cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
     ci:
