@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
-import { Redis } from '@upstash/redis';
 import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import type { ChatTokenStore } from '@/domain/ports/chatTokenStore';
+import { lazyRedisClient } from '@/infrastructure/upstash/client';
 import { readUpstashConfig } from '@/infrastructure/upstash/config';
 
 /** @internal Daily per-client chat token allowance. */
@@ -37,7 +37,8 @@ export function hashClientIp(clientIp: string): string {
  * gracefully: `tryConsumeToken` reports the caller as within-limit,
  * `refundConsumedToken` is a no-op, and `getRemainingTokens` returns the
  * full daily allowance. Runtime Redis errors are caught and degraded the
- * same way so a Redis outage does not block chat traffic.
+ * same way so a Redis outage does not block chat traffic. `@upstash/redis` is
+ * loaded on first use; a missing package degrades the same way.
  *
  * @returns A configured chat token store. Never `null` — graceful degradation
  *   happens per-operation rather than at construction.
@@ -47,18 +48,17 @@ export function hashClientIp(clientIp: string): string {
 export function createChatTokenStore(): ChatTokenStore {
     const config = readUpstashConfig();
     const redis =
-        config === null
-            ? null
-            : new Redis({ url: config.url, token: config.token });
+        config === null ? null : lazyRedisClient(config.url, config.token);
 
     return {
         async tryConsumeToken(hashedClientId: string): Promise<boolean> {
             if (redis === null) return true;
 
             try {
+                const client = await redis();
                 const key = buildChatTokenKey(hashedClientId);
-                const count = await redis.incr(key);
-                await redis.expire(key, CHAT_TOKEN_TTL_SEC, 'NX');
+                const count = await client.incr(key);
+                await client.expire(key, CHAT_TOKEN_TTL_SEC, 'NX');
                 return count <= CHAT_TOKEN_LIMIT;
             } catch {
                 return true;
@@ -69,10 +69,11 @@ export function createChatTokenStore(): ChatTokenStore {
             if (redis === null) return;
 
             try {
+                const client = await redis();
                 const key = buildChatTokenKey(hashedClientId);
-                const count = await redis.get<number>(key);
+                const count = await client.get<number>(key);
                 if (count !== null && count > 0) {
-                    await redis.decr(key);
+                    await client.decr(key);
                 }
             } catch {
                 return;
@@ -83,8 +84,9 @@ export function createChatTokenStore(): ChatTokenStore {
             if (redis === null) return CHAT_TOKEN_LIMIT;
 
             try {
+                const client = await redis();
                 const key = buildChatTokenKey(hashedClientId);
-                const count = await redis.get<number>(key);
+                const count = await client.get<number>(key);
                 return count === null
                     ? CHAT_TOKEN_LIMIT
                     : Math.max(0, CHAT_TOKEN_LIMIT - count);

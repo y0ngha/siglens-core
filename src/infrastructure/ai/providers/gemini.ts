@@ -1,5 +1,5 @@
 import { createClientCache } from '@/infrastructure/ai/providers/clientCache';
-import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import { loadOptionalSdk } from '@/infrastructure/optionalPeer/loadOptionalSdk';
 import type { GoogleGenAI, ThinkingLevel } from '@google/genai';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';

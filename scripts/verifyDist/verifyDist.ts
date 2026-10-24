@@ -9,9 +9,15 @@
  *    export가 비어 있지 않은가. 진입점 목록은 `package.json`에서 읽는다 — 하드코딩하면
  *    exports가 바뀌어도 검사가 예전 파일만 본다.
  *
+ * 3. optional peer(`peerDependenciesMeta`의 `optional: true`)를 설치하지 않은 소비자도
+ *    진입점을 로드할 수 있는가. 레포에는 devDependencies로 다 설치돼 있어 2번만으로는
+ *    "진입점이 optional peer를 최상위에서 require한다"를 잡지 못한다. 그래서 자식
+ *    프로세스에서 그 패키지들의 해석을 막고 진입점을 require한다(INF-11).
+ *
  * PR CI(`ci.yml`)와 배포(`publish.yml`)가 같은 스크립트를 쓴다. 배포 커밋(release-it)은
  * PR CI를 거치지 않으므로 배포 경로에도 같은 검사가 있어야 한다.
  */
+import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { join, relative, resolve, sep } from 'node:path';
@@ -62,6 +68,64 @@ export function entryFiles(manifest: {
     return [...targets].sort();
 }
 
+/** `peerDependenciesMeta`에서 `optional: true`인 패키지 이름. */
+export function optionalPeers(manifest: {
+    peerDependenciesMeta?: Record<string, { optional?: boolean } | undefined>;
+}): string[] {
+    return Object.entries(manifest.peerDependenciesMeta ?? {})
+        .filter(([, meta]) => meta?.optional === true)
+        .map(([name]) => name)
+        .sort();
+}
+
+/**
+ * 자식 프로세스에서 `peers`의 해석을 MODULE_NOT_FOUND로 막은 채 `entry`를 require한다.
+ * 막는 방식은 Node가 패키지가 없을 때 내는 오류와 같은 모양이라, 진입점이 그 오류를
+ * 처리하는 경로까지 실제와 같게 탄다.
+ */
+const LOAD_WITHOUT_PEERS = `
+const Module = require('node:module');
+const [entry, peersJson] = process.argv.slice(1);
+const peers = JSON.parse(peersJson);
+const resolveFilename = Module._resolveFilename;
+Module._resolveFilename = function (request, ...rest) {
+    if (peers.some(peer => request === peer || request.startsWith(peer + '/'))) {
+        const error = new Error("Cannot find module '" + request + "'");
+        error.code = 'MODULE_NOT_FOUND';
+        throw error;
+    }
+    return resolveFilename.call(this, request, ...rest);
+};
+require(entry);
+`;
+
+/** 진입점 로드가 이 시간을 넘기면 끝나지 않는 핸들이 남은 것으로 보고 실패시킨다. */
+const LOAD_TIMEOUT_MS = 30_000;
+
+/** Node가 출력하는 `Error: …`·`TypeError: …` 형태의 메시지 줄. 소스 발췌 줄과 구분한다. */
+const ERROR_MESSAGE_LINE = /^[A-Za-z]*Error(?: \[[A-Z_]+\])?: /;
+
+/** 막힌 상태로 로드에 실패하면 그 오류 메시지, 성공하면 `null`. */
+export function loadErrorWithoutPeers(
+    entry: string,
+    peers: readonly string[]
+): string | null {
+    const result = spawnSync(
+        process.execPath,
+        ['-e', LOAD_WITHOUT_PEERS, entry, JSON.stringify(peers)],
+        { encoding: 'utf8', timeout: LOAD_TIMEOUT_MS }
+    );
+    if (result.error) return `자식 프로세스 실행 실패: ${result.error.message}`;
+    if (result.signal)
+        return `자식 프로세스가 ${result.signal}로 끝났다(${LOAD_TIMEOUT_MS}ms 초과 등)`;
+    if (result.status === 0) return null;
+    const message = (result.stderr ?? '')
+        .split('\n')
+        .map(line => line.trim())
+        .find(line => ERROR_MESSAGE_LINE.test(line));
+    return message ?? `exit ${result.status}`;
+}
+
 function listFiles(dir: string): string[] {
     return readdirSync(dir, { recursive: true, encoding: 'utf8' })
         .map(rel => rel.split(sep).join('/'))
@@ -88,7 +152,15 @@ function main(): void {
 
     const manifest = JSON.parse(
         readFileSync(join(root, 'package.json'), 'utf8')
-    ) as { main?: string; exports?: unknown };
+    ) as Parameters<typeof entryFiles>[0] &
+        Parameters<typeof optionalPeers>[0] & { type?: string };
+    const peers = optionalPeers(manifest);
+    // 3번 검사는 CommonJS의 `Module._resolveFilename`을 막는다. ESM 산출물은 그 경로를 거치지
+    // 않아 검사가 아무것도 막지 못한 채 통과하므로, 전제가 바뀌면 여기서 멈춘다.
+    if (manifest.type === 'module')
+        throw new Error(
+            'optional peer 로드 검사는 CommonJS 산출물을 전제한다. ESM으로 바꿨다면 ESM 로더 기반으로 고친다.'
+        );
     const require = createRequire(join(root, 'package.json'));
     for (const entry of entryFiles(manifest)) {
         const absolute = join(root, entry);
@@ -101,6 +173,11 @@ function main(): void {
         if (exported === 0)
             problems.push(`진입점 export가 비어 있다: ${entry}`);
         else console.log(`${relative(root, absolute)}: export ${exported}개`);
+        const withoutPeers = loadErrorWithoutPeers(absolute, peers);
+        if (withoutPeers)
+            problems.push(
+                `optional peer(${peers.join(', ')}) 없이 진입점을 로드하지 못한다: ${entry}\n  ${withoutPeers}`
+            );
     }
 
     if (problems.length > 0) {

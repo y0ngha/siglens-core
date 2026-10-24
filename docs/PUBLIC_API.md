@@ -647,13 +647,16 @@ use-case option/result 타입 (모두 `src/index.ts`에서 export. `src/index.cl
 
 ---
 
-## AI provider SDK (optional peer dependency)
+## Optional peer dependency (AI provider SDK, `@upstash/redis`)
 
-`@anthropic-ai/sdk`, `@google/genai`, `openai`는 **optional peerDependencies**다. 패키지
+`@anthropic-ai/sdk`, `@google/genai`, `openai`, `@upstash/redis`는 **optional peerDependencies**다. 패키지
 진입점(`index.ts`·`index.client.ts`)을 import하는 것만으로는 어떤 SDK도 로드되지 않으며,
 provider 어댑터가 처음 호출될 때 해당 SDK를 지연 로드한다. 소비자는 실제로 쓰는 모델의
 SDK만 설치한다(Claude → `@anthropic-ai/sdk`, Gemini → `@google/genai`, ChatGPT·DeepSeek →
-`openai`). 설치되지 않은 SDK의 모델을 호출하면 설치 안내 메시지를 담은 에러(`name === 'MissingSdkError'`)로
+`openai`, Redis 캐시·카운터 → `@upstash/redis`). Redis 어댑터는 Upstash env가 설정된 상태에서 첫
+작업을 할 때 `@upstash/redis`를 로드한다. 패키지가 없으면 각 어댑터는 Redis 장애와 같은 경로로
+처리한다(캐시는 `MissingSdkError`를 던지고, 토큰·쿨다운은 통과시키고, `failurePolicy: 'closed'`
+카운터는 `CounterStoreUnavailableError`를 던진다). 설치되지 않은 SDK의 모델을 호출하면 설치 안내 메시지를 담은 에러(`name === 'MissingSdkError'`)로
 실패하며, 재시도 대상이 아니다.
 
 ---

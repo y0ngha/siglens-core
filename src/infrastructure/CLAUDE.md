@@ -272,15 +272,17 @@ it (for example "concurrent winners may duplicate work; switch to a queue if tha
 expensive").
 
 <a id="INF-11"></a>
-#### INF-11 — AI provider SDKs are loaded lazily through `loadOptionalSdk`
+#### INF-11 — Optional peer dependencies are loaded lazily through `loadOptionalSdk`
 
-`@anthropic-ai/sdk`, `@google/genai` and `openai` are optional peer dependencies. Never import
+`@anthropic-ai/sdk`, `@google/genai`, `openai` and `@upstash/redis` are optional peer dependencies. Never import
 them as runtime values at module top level — use `import type` for their types and load the
-module through `loadOptionalSdk(...)` (`infrastructure/ai/loadOptionalSdk.ts`) on first use, so
+module through `loadOptionalSdk(...)` (`infrastructure/optionalPeer/loadOptionalSdk.ts`) on first use, so
 importing the package entry never requires an SDK the consumer did not install. After awaiting
 the loader, re-check the caller's `AbortSignal` (`signal?.throwIfAborted()`): an abort that
 arrives while the SDK loads would otherwise be lost. Never let an SDK type reach a public
-declaration.
+declaration. Redis adapters get their client from `lazyRedisClient` (`infrastructure/upstash/client.ts`)
+and await it inside the same `try` that handles Redis errors. `yarn verify:dist` loads each
+package entry with every optional peer blocked, so a top-level import fails CI.
 
 ## Testing
 

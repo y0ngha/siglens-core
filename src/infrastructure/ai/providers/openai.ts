@@ -3,7 +3,7 @@ import type { ChatGPTModelSpec, ChatGptReasoningConfig } from '@/domain/types';
 import { resolveReasoningConfig } from '@/domain/types';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
-import { loadOptionalSdk } from '@/infrastructure/ai/loadOptionalSdk';
+import { loadOptionalSdk } from '@/infrastructure/optionalPeer/loadOptionalSdk';
 import type OpenAI from 'openai';
 import type { ChatGPTModelId } from '@/domain/analysis/modelSpecs';
 import { extractOpenAIUsage, logUsage } from '@/infrastructure/ai/usage';

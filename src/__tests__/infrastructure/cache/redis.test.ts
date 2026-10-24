@@ -45,23 +45,34 @@ describe('createCacheProvider', () => {
         expect(createCacheProvider()).toBeNull();
     });
 
-    it('returns CacheProvider when required env vars are present (no readonly token)', () => {
-        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
-        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
-        vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', '');
-        const provider = createCacheProvider();
-        expect(provider).not.toBeNull();
-        // only one Redis instance (writer = reader)
-        expect(MockRedis).toHaveBeenCalledTimes(1);
-    });
-
-    it('creates separate reader when readonly token is provided', () => {
+    it('does not construct a Redis client until the first operation', () => {
+        // `@upstash/redis` is an optional peer: building the provider must not
+        // load it, or a consumer without the package fails on import (INF-11).
         vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
         vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
         vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', 'readonly-token');
-        const provider = createCacheProvider();
-        expect(provider).not.toBeNull();
-        // two Redis instances: writer + reader
+        expect(createCacheProvider()).not.toBeNull();
+        expect(MockRedis).not.toHaveBeenCalled();
+    });
+
+    it('shares one client between reads and writes when no readonly token is set', async () => {
+        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
+        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
+        vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', '');
+        const provider = createCacheProvider()!;
+        await provider.get('k');
+        await provider.set('k', 'v', 60);
+        await provider.get('k');
+        expect(MockRedis).toHaveBeenCalledTimes(1);
+    });
+
+    it('creates a separate reader client when a readonly token is set', async () => {
+        vi.stubEnv('UPSTASH_REDIS_REST_URL', 'https://example.upstash.io');
+        vi.stubEnv('UPSTASH_REDIS_REST_TOKEN', 'master-token');
+        vi.stubEnv('UPSTASH_REDIS_REST_READONLY_TOKEN', 'readonly-token');
+        const provider = createCacheProvider()!;
+        await provider.get('k');
+        await provider.set('k', 'v', 60);
         expect(MockRedis).toHaveBeenCalledTimes(2);
     });
 
@@ -180,12 +191,11 @@ describe('createCacheProvider', () => {
 
         const writerGet = vi.fn();
         const readerGet = vi.fn().mockResolvedValue('cached');
-        let callCount = 0;
-        MockRedis.mockImplementation(function () {
-            callCount++;
-            return callCount === 1
-                ? { get: writerGet, set: vi.fn(), del: vi.fn() }
-                : { get: readerGet, set: vi.fn(), del: vi.fn() };
+        // Clients are created lazily, so tell them apart by token, not by order.
+        MockRedis.mockImplementation(function (options: { token: string }) {
+            return options.token === 'readonly-token'
+                ? { get: readerGet, set: vi.fn(), del: vi.fn() }
+                : { get: writerGet, set: vi.fn(), del: vi.fn() };
         });
 
         const provider = createCacheProvider()!;
