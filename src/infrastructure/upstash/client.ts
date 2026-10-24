@@ -1,9 +1,6 @@
 import { inspect } from 'node:util';
 import type { Redis } from '@upstash/redis';
-import {
-    loadOptionalSdk,
-    MissingSdkError,
-} from '@/infrastructure/optionalPeer/loadOptionalSdk';
+import { loadOptionalSdk } from '@/infrastructure/optionalPeer/loadOptionalSdk';
 
 const loadUpstash = loadOptionalSdk(
     '@upstash/redis',
@@ -11,17 +8,14 @@ const loadUpstash = loadOptionalSdk(
     () => import('@upstash/redis')
 );
 
-/**
- * Set once `@upstash/redis` turns out to be missing. Unlike `loadOptionalSdk`
- * (which retries so a runtime install can succeed), a missing Redis package is
- * remembered for the process: Redis adapters run on hot paths, and in the
- * CommonJS build every retry is a synchronous `require` lookup through
- * `node_modules`. Installing the package needs a restart anyway.
- */
-let missingPackage: MissingSdkError | undefined;
+/** The same failure is logged at most once per window. */
+const FAILURE_LOG_WINDOW_MS = 5 * 60 * 1000;
 
-/** Failures already logged, keyed by client and error. Cleared on any success. */
-const loggedFailures = new Set<string>();
+/** Above this many distinct failures, entries older than the window are dropped. */
+const FAILURE_LOG_PRUNE_AT = 100;
+
+/** Last log time per failure key (`url` + error, never the token). */
+const lastLoggedAt = new Map<string, number>();
 
 function errorKey(error: unknown): string {
     if (!(error instanceof Error)) return inspect(error, { depth: 2 });
@@ -31,15 +25,22 @@ function errorKey(error: unknown): string {
 }
 
 /**
- * Log a failure once per client and error. Adapters fail open, so without the
- * log a misconfiguration would silently switch features off; consumers build
- * factories per request, so logging per client instance would repeat on every
- * request. The writer and read-only clients are told apart by token.
+ * Log a client failure, at most once per window for the same URL and error.
+ * Adapters fail open, so without the log a broken setup would silently switch
+ * features off; consumers build factories per request and every failed call
+ * reaches here, so an unthrottled log would grow with traffic. The window also
+ * means a failure that recurs after a recovery is logged again.
  */
-function logFailureOnce(clientKey: string, error: unknown): void {
-    const key = `${clientKey}\u0000${errorKey(error)}`;
-    if (loggedFailures.has(key)) return;
-    loggedFailures.add(key);
+function logFailure(url: string, error: unknown): void {
+    const now = Date.now();
+    const key = `${url}\u0000${errorKey(error)}`;
+    const last = lastLoggedAt.get(key);
+    if (last !== undefined && now - last < FAILURE_LOG_WINDOW_MS) return;
+    if (lastLoggedAt.size >= FAILURE_LOG_PRUNE_AT)
+        for (const [staleKey, at] of lastLoggedAt)
+            if (now - at >= FAILURE_LOG_WINDOW_MS)
+                lastLoggedAt.delete(staleKey);
+    lastLoggedAt.set(key, now);
     console.error(
         '[upstash] Redis client unavailable; Redis-backed features degrade until the setup is fixed',
         error
@@ -53,21 +54,23 @@ function logFailureOnce(clientKey: string, error: unknown): void {
  * `@upstash/redis` is an optional peer dependency (INF-11), so it must not be
  * `require`d when the package entry is loaded — a consumer that never sets the
  * Upstash env would otherwise fail on import. The module is loaded through
- * {@link loadOptionalSdk} the first time the returned function is called.
+ * {@link loadOptionalSdk} on the first call; a missing package rejects with
+ * `MissingSdkError`.
  *
- * Failures are handled by kind:
- * - The constructor rejecting `url`/`token` always recurs for this client, so
- *   it is remembered for the client.
- * - A missing package is remembered for the process ({@link missingPackage}).
- * - Any other load failure may be transient (a flaky fs read during the
- *   import) and is retried on the next call. Callers keep the returned
- *   function for the life of the process (`reanalyzeCooldown` holds it
- *   module-wide) and adapters fail open, so remembering a transient failure
- *   would leave a feature off until restart — the reanalysis cooldown is what
- *   stops cache-bypassing LLM calls.
+ * Only a created client is kept. Any failure — a missing package, a URL the
+ * constructor rejects, a flaky read during the import — is retried on the next
+ * call, the same policy as `loadOptionalSdk`. Some callers hold the returned
+ * function for the whole process (`reanalyzeCooldown` keeps it module-wide) and
+ * the adapters fail open, so a remembered failure would leave a feature off
+ * until restart; the reanalysis cooldown is what stops cache-bypassing LLM
+ * calls.
  *
- * Each failure is logged once per client and error; a later success clears the
- * record so a recurrence is logged again.
+ * Trade-offs (INF-10): while the setup is broken, every Redis operation re-runs
+ * the failing load (a synchronous `require` lookup in the CommonJS build) — that
+ * cost exists only until the setup is fixed. Calls that are waiting on the same
+ * failed attempt all fail together, so a burst at that moment fails open as a
+ * group, the same as a Redis outage. Failures are logged through a time window
+ * ({@link logFailure}).
  *
  * Call it inside the adapter's `try` so the failure takes the same path as a
  * Redis outage.
@@ -80,30 +83,15 @@ export function lazyRedisClient(
     url: string,
     token: string
 ): () => Promise<Redis> {
-    const clientKey = `${url}\u0000${token}`;
     let client: Promise<Redis> | undefined;
-    const fail = (error: unknown, remember: boolean): Promise<never> => {
-        logFailureOnce(clientKey, error);
-        if (!remember) client = undefined;
-        return Promise.reject(error);
-    };
     return () => {
-        if (missingPackage) return Promise.reject(missingPackage);
-        client ??= loadUpstash().then(
-            ({ Redis: RedisClient }) => {
-                try {
-                    const created = new RedisClient({ url, token });
-                    loggedFailures.clear();
-                    return created;
-                } catch (error) {
-                    return fail(error, true);
-                }
-            },
-            (error: unknown) => {
-                if (error instanceof MissingSdkError) missingPackage = error;
-                return fail(error, error instanceof MissingSdkError);
-            }
-        );
+        client ??= loadUpstash()
+            .then(({ Redis: RedisClient }) => new RedisClient({ url, token }))
+            .catch((error: unknown) => {
+                client = undefined;
+                logFailure(url, error);
+                throw error;
+            });
         return client;
     };
 }

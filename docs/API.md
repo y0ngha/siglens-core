@@ -84,11 +84,10 @@ JSON을 복구·정규화한다.
 
 `@upstash/redis`는 optional peer dependency다(INF-11). 어댑터는 클라이언트를
 `infrastructure/upstash/client.ts`의 `lazyRedisClient`로 받고, 패키지는 env가 설정된 상태에서
-첫 작업을 할 때 로드된다. 실패는 종류별로 다룬다. 생성자가 URL·토큰을 거부하면 그 클라이언트에서
-기억하고, 패키지 자체가 없으면 프로세스에서 기억하며, 그 밖의 로드 오류는 일시적일 수 있어 다음
-작업에서 다시 시도한다(일시적 오류가 재시작 전까지 기능을 끄지 않게). 실패는 클라이언트·오류당 한 번
-`[upstash] Redis client unavailable` 오류 로그로 남고, 성공하면 기록을 지워 재발 시 다시 남긴다.
-각 어댑터는 Redis 장애와 같은 경로로 처리한다(캐시는 `MissingSdkError`를 던지고, 토큰·쿨다운은 통과시키고,
+첫 작업을 할 때 로드된다. 만들어진 클라이언트만 기억하고, 실패(패키지 누락, 생성자의 URL 거부, 일시적
+로드 오류)는 `loadOptionalSdk`와 같이 다음 작업에서 다시 시도한다 — 일시적 오류가 재시작 전까지
+기능을 끄지 않게 한다. 실패는 같은 URL·오류당 5분에 한 번 `[upstash] Redis client unavailable` 오류
+로그로 남는다(토큰은 남기지 않는다). 각 어댑터는 Redis 장애와 같은 경로로 처리한다(캐시는 `MissingSdkError`를 던지고, 토큰·쿨다운은 통과시키고,
 `failurePolicy: 'closed'` 카운터는 `CounterStoreUnavailableError`를 던진다).
 
 ### 2.1 분석 결과 캐시
