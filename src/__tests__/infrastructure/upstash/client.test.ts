@@ -1,3 +1,4 @@
+import { inspect } from 'node:util';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
@@ -181,10 +182,19 @@ describe('lazyRedisClient', () => {
         });
 
         it('logs it again once the window has passed', async () => {
-            vi.useFakeTimers();
-            vi.setSystemTime(new Date('2026-10-25T00:00:00Z'));
+            vi.useFakeTimers({ toFake: ['performance'] });
             await failWith(new Error('EIO'));
-            vi.setSystemTime(new Date('2026-10-25T00:05:00Z'));
+            vi.advanceTimersByTime(5 * 60 * 1000);
+            await failWith(new Error('EIO'));
+            expect(log).toHaveBeenCalledTimes(2);
+        });
+
+        it('is not silenced by a wall-clock step back', async () => {
+            vi.useFakeTimers({ toFake: ['performance', 'Date'] });
+            vi.setSystemTime(new Date('2026-10-25T00:10:00Z'));
+            await failWith(new Error('EIO'));
+            vi.setSystemTime(new Date('2026-10-25T00:00:00Z'));
+            vi.advanceTimersByTime(5 * 60 * 1000);
             await failWith(new Error('EIO'));
             expect(log).toHaveBeenCalledTimes(2);
         });
@@ -218,8 +228,34 @@ describe('lazyRedisClient', () => {
         });
 
         it('never puts the token in the log', async () => {
-            await failWith(new Error('EIO'));
-            expect(JSON.stringify(log.mock.calls)).not.toContain('"t"');
+            const token = 'secret-token-3f9a';
+            importSdk.mockRejectedValueOnce(new Error('EIO'));
+            await expect(
+                lazyRedisClient('https://u', token)()
+            ).rejects.toThrow();
+            expect(log).toHaveBeenCalledTimes(1);
+            expect(inspect(log.mock.calls, { depth: 5 })).not.toContain(token);
+        });
+
+        it('tells errors apart by code and by a non-Error cause', async () => {
+            await failWith(
+                Object.assign(new Error('load failed'), { code: 'EIO' })
+            );
+            await failWith(
+                Object.assign(new Error('load failed'), { code: 'EACCES' })
+            );
+            await failWith(new Error('load failed', { cause: 'EIO' }));
+            await failWith(new Error('load failed', { cause: 'EACCES' }));
+            expect(log).toHaveBeenCalledTimes(4);
+        });
+
+        it('keeps tracking bounded when every failure text differs', async () => {
+            vi.useFakeTimers({ toFake: ['performance'] });
+            for (let index = 0; index < 150; index += 1)
+                await failWith(new Error(`request ${index}`));
+            // The oldest keys were dropped, so the first failure is logged again.
+            await failWith(new Error('request 0'));
+            expect(log).toHaveBeenCalledTimes(151);
         });
     });
 });
