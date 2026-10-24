@@ -94,18 +94,45 @@ describe('lazyRedisClient', () => {
             });
         });
 
-        it('keeps the failure for later calls and logs it once', async () => {
+        it('logs a repeated failure once per process, across clients', async () => {
+            // Consumers build a factory per request; a per-client log would
+            // repeat on every request.
             importSdk.mockRejectedValue(missingModule());
-            const getClient = lazyRedisClient('https://u', 't');
-            await expect(getClient()).rejects.toThrow();
-            await expect(getClient()).rejects.toThrow();
-            expect(importSdk).toHaveBeenCalledTimes(1);
+            await expect(lazyRedisClient('https://u', 't')()).rejects.toThrow();
+            await expect(lazyRedisClient('https://u', 't')()).rejects.toThrow();
             expect(log).toHaveBeenCalledTimes(1);
         });
     });
 
+    describe('when loading fails transiently', () => {
+        it('retries on the next call instead of keeping the failure', async () => {
+            // Callers keep the returned function for the life of the process
+            // (reanalyzeCooldown holds it module-wide). A remembered failure
+            // would leave the feature off until restart.
+            importSdk
+                .mockRejectedValueOnce(new Error('EIO: transient read error'))
+                .mockResolvedValueOnce({ Redis: RedisCtor });
+            const getClient = lazyRedisClient('https://u', 't');
+            await expect(getClient()).rejects.toThrow('EIO');
+            await expect(getClient()).resolves.toEqual({
+                options: { url: 'https://u', token: 't' },
+            });
+        });
+
+        it('keeps the client once it has been created', async () => {
+            importSdk
+                .mockRejectedValueOnce(new Error('EIO: transient read error'))
+                .mockResolvedValue({ Redis: RedisCtor });
+            const getClient = lazyRedisClient('https://u', 't');
+            await expect(getClient()).rejects.toThrow();
+            const first = await getClient();
+            expect(await getClient()).toBe(first);
+            expect(RedisCtor).toHaveBeenCalledTimes(1);
+        });
+    });
+
     describe('when the client constructor rejects the settings', () => {
-        it('rejects with the constructor error and logs it once', async () => {
+        it('rejects with the constructor error on every call and logs it once', async () => {
             importSdk.mockResolvedValue({
                 Redis: vi.fn(function () {
                     throw new Error('invalid URL');
