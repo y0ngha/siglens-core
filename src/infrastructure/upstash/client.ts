@@ -24,7 +24,7 @@ const FAILURE_LOG_MAX_KEYS = 100;
  */
 const lastLoggedAt = new Map<string, number>();
 
-function describe(value: unknown): string {
+function describeValue(value: unknown): string {
     return value instanceof Error
         ? `${value.name}: ${value.message}`
         : inspect(value, { depth: 2 });
@@ -32,18 +32,22 @@ function describe(value: unknown): string {
 
 /** Name, message, `code` and `cause` — what tells two failures apart. */
 function errorKey(error: unknown): string {
-    if (!(error instanceof Error)) return describe(error);
+    if (!(error instanceof Error)) return describeValue(error);
     const code =
         'code' in error && error.code !== undefined
             ? ` [${String(error.code)}]`
             : '';
     const cause =
-        error.cause !== undefined ? ` (cause: ${describe(error.cause)})` : '';
-    return `${describe(error)}${code}${cause}`;
+        error.cause !== undefined
+            ? ` (cause: ${describeValue(error.cause)})`
+            : '';
+    return `${describeValue(error)}${code}${cause}`;
 }
 
 function trackLogged(key: string, now: number): void {
     if (lastLoggedAt.size >= FAILURE_LOG_MAX_KEYS) {
+        // Deleting the entry just visited is safe while iterating a Map; one pass
+        // removes everything past the window.
         for (const [staleKey, at] of lastLoggedAt)
             if (now - at >= FAILURE_LOG_WINDOW_MS)
                 lastLoggedAt.delete(staleKey);

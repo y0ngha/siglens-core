@@ -233,7 +233,10 @@ describe('lazyRedisClient', () => {
             await expect(
                 lazyRedisClient('https://u', token)()
             ).rejects.toThrow();
-            expect(log).toHaveBeenCalledTimes(1);
+            expect(log).toHaveBeenCalledWith(
+                expect.stringContaining('[upstash] Redis client unavailable'),
+                expect.objectContaining({ message: 'EIO' })
+            );
             expect(inspect(log.mock.calls, { depth: 5 })).not.toContain(token);
         });
 
