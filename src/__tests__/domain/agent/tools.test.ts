@@ -92,6 +92,11 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(description).toContain('RSI 보는 법');
         // 종목 질문까지 끌어가지 않도록 '종목 없이' 조건은 남아 있어야 한다.
         expect(description).toContain('without needing a symbol');
+        expect(
+            findToolSpec('get_guide')?.inputSchema.properties?.query
+        ).toMatchObject({
+            description: expect.stringContaining('주식 차트 보는 법'),
+        });
     });
 
     it('신규 데이터 툴 4종이 등록되어 있다', () => {
