@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.29.0](https://github.com/y0ngha/siglens-core/compare/v2.28.3...v2.29.0) (2026-10-25)
+
+### Features
+
+* get_guide 도구 설명에 질문형 실전 가이드 반영 ([#312](https://github.com/y0ngha/siglens-core/issues/312)) ([708524a](https://github.com/y0ngha/siglens-core/commit/708524a49edd5d5801c4bc8ca4bc709be37aa759))
+
 ## [2.28.3](https://github.com/y0ngha/siglens-core/compare/v2.28.2...v2.28.3) (2026-10-25)
 
 ### Bug Fixes
