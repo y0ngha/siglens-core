@@ -116,7 +116,7 @@ export async function callClaude(
     const structuredOutput = options.responseSchema !== undefined;
 
     // thinkingApi가 두 갈래를 가른다 — 4.6 세대 이후는 adaptive,
-    // 그 이전(haiku)은 numeric budget_tokens + temperature.
+    // 그 이전(haiku)은 numeric budget_tokens.
     // 스펙이 두 상태를 모두 들고 있으므로, 호출자가 준 설정이 없으면 기본 상태를 해석한다.
     const adaptiveConfig = isClaudeAdaptiveModelSpec(spec)
         ? ((options.reasoning as ClaudeAdaptiveReasoningConfig | undefined) ??
@@ -231,12 +231,9 @@ export async function callClaude(
                               // 메시지가 이 값을 쓰라고 안내한다. 다른 필드(`display`,
                               // `budget_tokens`)와 함께 보낼 수 없고 effort `high` 이하
                               // 에서만 허용되므로 `output_config`는 보내지 않는다.
-                              // SDK 타입(0.128)에 아직 없어 단언한다. 런타임 안전 근거:
-                              // 실측에서 API가 정확히 이 형태를 받았다(200,
-                              // 툴 유무 모두). SDK가 이 값을 타입에 넣으면 단언을 지운다.
-                              thinking: {
-                                  type: 'between_tools',
-                              } as unknown as Anthropic.Messages.ThinkingConfigParam,
+                              // SDK 1.x부터 타입에 있다. 실측에서 API가 정확히 이 형태를
+                              // 받았다(200, 툴 유무 모두).
+                              thinking: { type: 'between_tools' as const },
                           }
                         : adaptiveConfig.mode === 'disabled'
                           ? {
@@ -269,8 +266,8 @@ export async function callClaude(
                                   budget_tokens: budgetConfig.budgetTokens,
                               },
                           }),
-                          // Anthropic API는 temperature/top_p 동시 지정을 허용하지 않는다.
-                          temperature: spec.temperature,
+                          // `spec.temperature`는 보내지 않는다 — API 버전 2026-10-21(SDK 1.x)은
+                          // `temperature`·`top_p`·`top_k`를 기본값이라도 400으로 거부한다.
                       }),
             },
             { signal: controller.signal }

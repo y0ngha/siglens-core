@@ -69,7 +69,7 @@
         "release:major": "dotenv -e .env.local -- release-it major"
     },
     "peerDependencies": {
-        "@anthropic-ai/sdk": ">=0.128.0 <1",
+        "@anthropic-ai/sdk": ">=0.128.0 <2",
         "@google/genai": "^2.24.0",
         "@upstash/redis": "^1.37.0",
         "openai": "^7.23.0"
@@ -89,24 +89,25 @@
         }
     },
     "devDependencies": {
-        "@anthropic-ai/sdk": "^0.128.0",
-        "@google/genai": "^2.24.0",
+        "@anthropic-ai/sdk": "^1.3.0",
+        "@google/genai": "^2.31.0",
         "@release-it/conventional-changelog": "^12.0.2",
-        "@types/node": "^22.20.4",
+        "@types/node": "^22.20.5",
         "@upstash/redis": "^1.39.0",
         "@vitest/coverage-v8": "^5.0.5",
         "dotenv-cli": "^11.0.0",
-        "eslint": "^10.11.0",
+        "eslint": "^10.13.0",
         "husky": "^9.1.7",
-        "lint-staged": "^17.5.1",
-        "openai": "7.23.0",
-        "prettier": "3.9.9",
-        "release-it": "^21.1.0",
-        "tsc-alias": "~1.8.17",
+        "lint-staged": "^17.6.0",
+        "openai": "7.43.0",
+        "prettier": "3.9.10",
+        "release-it": "^21.1.1",
+        "tsc-alias": "~1.9.9",
         "tsx": "^4.23.15",
         "typedoc": "^0.28.20",
-        "typescript": "^5.9.3",
-        "typescript-eslint": "^8.70.1",
+        "typescript": "npm:@typescript/typescript6@^6.0.2",
+        "typescript-eslint": "^8.72.0",
+        "typescript7": "npm:typescript@7.0.2",
         "vite": "^8.3.5",
         "vitest": "^5.0.5"
     },
@@ -122,6 +123,6 @@
     },
     "resolutions": {
         "basic-ftp": "^6.2.1",
-        "undici@npm:7.29.0": "^7.29.1"
+        "undici@npm:7.29.1": "^7.30.1"
     }
 }

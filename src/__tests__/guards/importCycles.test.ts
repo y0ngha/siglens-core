@@ -13,8 +13,8 @@ import { describe, expect, it } from 'vitest';
  * binding or a TDZ error depending on which file loads first.
  *
  * Specifiers are resolved with `ts.resolveModuleName` and the repository
- * `tsconfig.json`, so `paths`, `baseUrl` and directory imports resolve exactly
- * as `tsc` resolves them.
+ * `tsconfig.json`, so `paths` and directory imports resolve exactly as `tsc`
+ * resolves them.
  *
  * The graph drops edges that disappear at runtime: `import type`, and a
  * declaration whose specifiers are all `type`. That matches what `tsc` emits
@@ -69,7 +69,7 @@ const compilerOptions = ((): ts.CompilerOptions => {
  * modules, so they are `outside-graph` rather than errors.
  */
 function resolveImport(specifier: string, fromFile: string): Resolution {
-    // `moduleResolution: node` resolves built-ins only through ambient
+    // `moduleResolution` resolves built-ins only through ambient
     // `@types/node` declarations, never to a file, so classify them up front.
     if (specifier.startsWith('node:') || builtinModules.includes(specifier))
         return { kind: 'external' };
@@ -307,10 +307,9 @@ describe('resolveImport', () => {
         });
     });
 
-    it('resolves a `baseUrl` import the way tsc does', () => {
+    it('leaves a bare repo path unresolved, as tsc does without `baseUrl`', () => {
         expect(resolveImport('src/domain/types', from('index.ts'))).toEqual({
-            kind: 'graph',
-            file: 'domain/types.ts',
+            kind: 'unresolved',
         });
     });
 

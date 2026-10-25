@@ -6,7 +6,11 @@ import type {
 } from '@/domain/types';
 
 /**
- * Default sampling temperature applied to models whose provider APIs accept it.
+ * Default sampling temperature applied to models whose provider APIs accept it —
+ * today only DeepSeek with reasoning off. Claude budget rows would carry it only
+ * for type compatibility with the deprecated `ClaudeBudgetModelSpec.temperature`:
+ * the Claude adapter never sends it (API version 2026-10-21 rejects sampling
+ * parameters).
  *
  * Gemini rows carry no temperature: Google pinned sampling to its own defaults
  * from Gemini 3.6 Flash on (custom values had no effect) and announced that
