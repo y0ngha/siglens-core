@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.28.3](https://github.com/y0ngha/siglens-core/compare/v2.28.2...v2.28.3) (2026-10-25)
+
+### Bug Fixes
+
+* Anthropic SDK 1.x 지원 및 의존성·TypeScript 7 업데이트 ([#311](https://github.com/y0ngha/siglens-core/issues/311)) ([5cadb65](https://github.com/y0ngha/siglens-core/commit/5cadb65218e652377e62f2546acd4dcc774fbe31)), closes [PUBLIC_API.md#API-5](https://github.com/PUBLIC_API.md/issues/API-5)
+
 ## [2.28.2](https://github.com/y0ngha/siglens-core/compare/v2.28.1...v2.28.2) (2026-10-24)
 
 ### Bug Fixes
