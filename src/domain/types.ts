@@ -2500,7 +2500,13 @@ export interface ClaudeBudgetModelSpec extends BaseModelSpec {
     thinkingApi: 'budget';
     /** Per-toggle-state thinking budgets. */
     reasoning: ReasoningModes<ClaudeBudgetReasoningConfig>;
-    /** Sampling temperature. */
+    /**
+     * Sampling temperature.
+     *
+     * @deprecated Not sent: API version 2026-10-21 (`@anthropic-ai/sdk` 1.x)
+     *   rejects `temperature`, `top_p` and `top_k` with a 400 even at their
+     *   defaults. Kept for type compatibility; removed in the next major.
+     */
     temperature: number;
 }
 
@@ -2636,7 +2642,9 @@ export function isClaudeBudgetModelSpec(
  * `temperature` whenever reasoning is enabled, so a caller that reads
  * `spec.temperature` after this guard MUST additionally check the resolved
  * reasoning config (`spec.provider === 'deepseek'` → the active
- * {@link DeepSeekReasoningConfig.thinking}) before sending it.
+ * {@link DeepSeekReasoningConfig.thinking}) before sending it. Claude never
+ * applies one: API version 2026-10-21 rejects sampling parameters, so the
+ * Claude adapter does not send {@link ClaudeBudgetModelSpec.temperature}.
  *
  * @param spec - The model spec to narrow.
  * @returns `true` when `spec` is a `ClaudeBudgetModelSpec` or

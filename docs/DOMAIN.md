@@ -1552,9 +1552,13 @@ display:
 
 ### 1. Determinism (결정성)
 
-- AI provider 호출 시 `temperature`와 `top_p`는 반드시 명시적으로 전달한다.
-  기본값: `temperature: 0`, `top_p: 0.95`
-  환경변수로 override: `GEMINI_TEMPERATURE` / `GEMINI_TOP_P` / `CLAUDE_TEMPERATURE` / `CLAUDE_TOP_P`
+- sampling 파라미터는 그것을 받는 provider에만 보낸다. 값은 `MODEL_SPECS`의 `temperature`
+  (`0`)가 유일한 출처이고 환경변수 override는 없다.
+  - Claude: 보내지 않는다. API 버전 2026-10-21(`@anthropic-ai/sdk` 1.x)은 `temperature`·`top_p`·`top_k`를
+    기본값이라도 400으로 거부한다. budget 스펙의 `temperature`는 타입 호환용으로만 남아 있다(`@deprecated`).
+  - Gemini: 보내지 않는다. 3.6 Flash부터 Google 기본값으로 고정됐다.
+  - ChatGPT: 보내지 않는다(reasoning 모델).
+  - DeepSeek: 추론 OFF일 때만 `temperature`를 보낸다(추론 ON이면 API가 무시한다).
 - 동일 입력 → 동일 프롬프트 문자열을 보장한다.
   `buildAnalysisPrompt`는 입력 `skills` 배열의 순서와 무관하게 byte-identical 결과를 반환해야 한다.
   → active skills를 `skill.name` 기준 `localeCompare` 정렬한 뒤 type별 그룹화.

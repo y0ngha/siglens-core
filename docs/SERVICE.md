@@ -111,10 +111,17 @@ infrastructure runtime code. The library does not depend on DOM or React.
 ## Tech Stack
 
 ```
-TypeScript  ^5.9
+TypeScript  7.0 (native compiler — `tsc` from the `typescript7` devDependency)
 Node.js     >=22 (package.json `engines`)
 yarn        4.x (see `packageManager` in package.json)
 ```
+
+TypeScript 7 ships no JS API (`typescript/lib/typescript.js`), but typescript-eslint, typedoc
+and the guard tests (`importCycles`, `publicApiInventory`) `require('typescript')` for it. So the
+`typescript` devDependency is an alias of `@typescript/typescript6` (the TS 6 API, `tsc6` bin)
+and the TS 7 compiler is installed as `typescript7`, whose `tsc` bin the scripts run. Type
+checking and the build are TS 7; only those tools read code through the TS 6 API. Drop the
+alias once they support TS 7 (typescript-eslint#10940).
 
 ```
 Linting     ESLint + Prettier
