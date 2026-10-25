@@ -128,7 +128,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_guide'],
-        text: 'What a pattern, candlestick, indicator or strategy is, or how to read it, with no symbol in question ("RSI가 뭐야", "what is a double bottom") → get_guide, and link the guide url it returns. When a symbol is also named, add the per-symbol rows for that symbol.',
+        text: 'What a pattern, candlestick, indicator or strategy is, or how to read or check it on a chart, with no symbol in question ("RSI가 뭐야", "RSI 어떻게 봐", "what is a double bottom") → get_guide, and link the guide url it returns. When a symbol is also named, add the per-symbol rows for that symbol.',
     },
     {
         requires: ['get_quote'],

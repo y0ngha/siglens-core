@@ -466,6 +466,8 @@ describe('buildAgentSystemPrompt', () => {
 
     it('개념 설명 질문은 get_guide로 보내고, 툴이 없으면 그 줄을 뺀다', () => {
         expect(prompt).toContain('→ get_guide, and link the guide url');
+        expect(prompt).toContain('"RSI 어떻게 봐"');
+        expect(prompt).toContain('When a symbol is also named');
         const withoutGuide = buildAgentSystemPrompt({
             locale: 'ko',
             tools: AGENT_TOOL_SPECS.filter(s => s.name !== 'get_guide'),

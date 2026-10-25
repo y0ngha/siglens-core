@@ -83,6 +83,22 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(spec?.description).toContain('url');
     });
 
+    it('get_guide 설명은 용어 해설과 질문형 실전 가이드를 모두 다룬다', () => {
+        const description = findToolSpec('get_guide')?.description ?? '';
+        expect(description).toContain(
+            'candlestick pattern, chart pattern, indicator or strategy/theory'
+        );
+        expect(description).toContain('how-to articles');
+        expect(description).toContain('RSI 보는 법');
+        // 종목 질문까지 끌어가지 않도록 '종목 없이' 조건은 남아 있어야 한다.
+        expect(description).toContain('without needing a symbol');
+        expect(
+            findToolSpec('get_guide')?.inputSchema.properties?.query
+        ).toMatchObject({
+            description: expect.stringContaining('주식 차트 보는 법'),
+        });
+    });
+
     it('신규 데이터 툴 4종이 등록되어 있다', () => {
         expect(findToolSpec('get_fundamentals')?.costClass).toBe('cached');
         expect(findToolSpec('get_market_overview')?.costClass).toBe('cached');
