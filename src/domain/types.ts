@@ -2956,6 +2956,111 @@ export interface BacktestRunData {
     trades: readonly BacktestTrade[];
 }
 
+// ─── Backtesting (deprecated v7 format) ───────────────────────────────────────
+
+/**
+ * Risk classification used in backtest reports.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export type BacktestRiskLevel = 'low' | 'moderate' | 'high' | 'extreme';
+
+/**
+ * Internal: backtest signal outcome.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export type BacktestSignalResult = 'win' | 'loss';
+/**
+ * Internal: backtest AI outcome.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export type BacktestAiResult = 'win' | 'loss' | 'neutral';
+/**
+ * Internal: reason a backtest case exited the position.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export type BacktestExitReason = 'take_profit' | 'stop_loss' | 'time';
+
+/**
+ * Internal: AI-suggested price target stored in a backtest case.
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export interface BacktestAiPriceTarget {
+    price: number;
+    basis: string;
+}
+
+/**
+ * Internal: AI entry recommendation stored in a backtest case.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export type BacktestAiEntryRecommendation = 'enter' | 'wait' | 'avoid';
+
+/**
+ * Internal: AI analysis snapshot stored alongside a backtest case.
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export interface BacktestAiAnalysis {
+    summary: string;
+    tags: string[];
+    entryRecommendation: BacktestAiEntryRecommendation;
+    // 방향성 예측: bullish priceTargets[0] 만 저장 (UI는 첫 목표가만 표시)
+    bullishTargets: BacktestAiPriceTarget[];
+    // 실행 레벨: AI가 제시한 SL/TP (무효값은 제거 — 유효한 것만 저장)
+    stopLoss?: number;
+    takeProfit?: number;
+    riskLevel?: BacktestRiskLevel;
+}
+
+/**
+ * Internal: a single backtest case (entry/exit + outcome + AI snapshot).
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export interface BacktestCase {
+    ticker: string;
+    entryDate: string;
+    entryPrice: number;
+    exitDate: string;
+    exitPrice: number;
+    holdingDays: number;
+    returnPct: number;
+    signalType: 'buy';
+    result: BacktestSignalResult;
+    exitReason: BacktestExitReason;
+    aiResult: BacktestAiResult;
+    aiTrendHit: boolean;
+    aiAnalysis: BacktestAiAnalysis;
+}
+
+/**
+ * Internal: aggregate backtest meta (period, totals, rates).
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export interface BacktestMeta {
+    period: string;
+    totalCases: number;
+    winRate: number;
+    aiWinRate: number;
+    aiTrendHitRate: number;
+    tickerCount: number;
+}
+
+/**
+ * Internal: backtest dataset (meta + cases).
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export interface BacktestData {
+    meta: BacktestMeta;
+    cases: BacktestCase[];
+}
+
 /** Internal: 2x2 backtest result quadrant key. */
 export type QuadrantKey =
     | 'bullishConfirmed'
