@@ -1094,9 +1094,6 @@ export type CrossDirection = 'up' | 'down';
 /** Risk classification used in AI analysis output. */
 export type RiskLevel = 'low' | 'medium' | 'high';
 
-/** Risk classification used in backtest reports. */
-export type BacktestRiskLevel = 'low' | 'moderate' | 'high' | 'extreme';
-
 /** A single AI-derived signal entry inside an indicator-guide result. */
 export interface AnalysisSignal {
     /** Signal source — currently always `'skill'`. */
@@ -2840,70 +2837,123 @@ export interface UsageLogRecord {
 
 // ─── Backtesting ──────────────────────────────────────────────────────────────
 
-/** Internal: backtest signal outcome. */
-export type BacktestSignalResult = 'win' | 'loss';
-/** Internal: backtest AI outcome. */
-export type BacktestAiResult = 'win' | 'loss' | 'neutral';
-/** Internal: reason a backtest case exited the position. */
-export type BacktestExitReason = 'take_profit' | 'stop_loss' | 'time';
+/** Internal: how a backtest trade was entered. */
+export type BacktestEntryType = 'enter_close' | 'enter_selloff' | 'wait_limit';
 
-/**
- * Internal: AI-suggested price target stored in a backtest case.
- */
-export interface BacktestAiPriceTarget {
-    price: number;
-    basis: string;
+/** Internal: why one half (leg) of a split-exit backtest trade was closed. */
+export type BacktestLegExitReason =
+    | 'tp1'
+    | 'tp_final'
+    | 'sl1'
+    | 'sl2'
+    | 'breakeven'
+    | 'selloff_ma5'
+    | 'selloff_time'
+    | 'selloff_stop'
+    | 'max_hold'
+    | 'open';
+
+/** Internal: one half of a split-exit backtest trade. */
+export interface BacktestTradeLeg {
+    name: 'A' | 'B';
+    /** Fraction of the position this leg carries (0.5 each). */
+    size: number;
+    exitDate: string;
+    exitPrice: number;
+    reason: BacktestLegExitReason;
+    returnPct: number;
 }
 
-/** Internal: AI entry recommendation stored in a backtest case. */
-export type BacktestAiEntryRecommendation = 'enter' | 'wait' | 'avoid';
-
-/**
- * Internal: AI analysis snapshot stored alongside a backtest case.
- */
-export interface BacktestAiAnalysis {
-    summary: string;
-    tags: string[];
-    entryRecommendation: BacktestAiEntryRecommendation;
-    // 방향성 예측: bullish priceTargets[0] 만 저장 (UI는 첫 목표가만 표시)
-    bullishTargets: BacktestAiPriceTarget[];
-    // 실행 레벨: AI가 제시한 SL/TP (무효값은 제거 — 유효한 것만 저장)
-    stopLoss?: number;
-    takeProfit?: number;
-    riskLevel?: BacktestRiskLevel;
+/** Internal: exit plan taken from the AI response that opened the trade. */
+export interface BacktestTradePlan {
+    tp1: number;
+    tpFinal: number;
+    sl1: number;
+    sl2: number;
+    source: 'ai' | 'fallback';
 }
 
-/** Internal: a single backtest case (entry/exit + outcome + AI snapshot). */
-export interface BacktestCase {
+/**
+ * Internal: a single simulated trade. `returnPct` is the size-weighted mean of
+ * the two legs; `exitDate` is the later leg's exit.
+ */
+export interface BacktestTrade {
     ticker: string;
+    entryType: BacktestEntryType;
+    decisionDate: string;
     entryDate: string;
     entryPrice: number;
     exitDate: string;
-    exitPrice: number;
     holdingDays: number;
     returnPct: number;
-    signalType: 'buy';
-    result: BacktestSignalResult;
-    exitReason: BacktestExitReason;
-    aiResult: BacktestAiResult;
-    aiTrendHit: boolean;
-    aiAnalysis: BacktestAiAnalysis;
+    legs: readonly [BacktestTradeLeg, BacktestTradeLeg];
+    initialPlan: BacktestTradePlan;
+    holdingReviews: number;
+    /** AI summary from the analysis that opened the trade. */
+    summary: string;
+    /** Path of the opening prompt inside the published prompt archive. */
+    promptFile?: string;
+    /** Path of the opening response inside the published prompt archive. */
+    responseFile?: string;
 }
 
-/** Internal: aggregate backtest meta (period, totals, rates). */
-export interface BacktestMeta {
-    period: string;
-    totalCases: number;
-    winRate: number;
-    aiWinRate: number;
-    aiTrendHitRate: number;
-    tickerCount: number;
+/** Internal: buy-and-hold baseline for one ticker over the run period. */
+export interface BacktestTickerBaseline {
+    ticker: string;
+    buyHoldPct: number;
+    buyHoldMaxDrawdownPct: number;
+    /** Trading days in the run period (denominator for time in market). */
+    tradingDays: number;
 }
 
-/** Internal: backtest dataset (meta + cases). */
-export interface BacktestData {
-    meta: BacktestMeta;
-    cases: BacktestCase[];
+/** Internal: provenance of a backtest run. */
+export interface BacktestRunInfo {
+    runId: string;
+    periodStart: string;
+    periodEnd: string;
+    tickers: readonly string[];
+    model: string;
+    coreVersion: string;
+    promptVersion: string;
+    siglensVersion: string;
+    generatedAt: string;
+    resultsUrl: string;
+    releaseUrl: string;
+}
+
+/** Internal: how one trend label lined up with the move that preceded it. */
+export interface BacktestTrendLabelStat {
+    calls: number;
+    /** Mean return over the `windowDays` trading days before the call. */
+    priorMeanPct: number;
+    /** Share of calls whose preceding `windowDays` move was up. */
+    priorUpRatePct: number;
+}
+
+/**
+ * Internal: how well the analysis' `trend` described the move so far. A
+ * bullish/bearish call "matches" when the preceding `windowDays` move had the
+ * same sign. This measures trend recognition, not a forecast.
+ */
+export interface BacktestTrendRecognition {
+    windowDays: number;
+    /** Bullish + bearish calls (neutral states no direction). */
+    directionalCalls: number;
+    matchRatePct: number;
+    byTrend: Readonly<Record<Trend, BacktestTrendLabelStat>>;
+}
+
+/**
+ * Internal: one backtest run — provenance, buy-and-hold baselines and the
+ * trades. Strategy statistics are derived from `trades` by the consumer, so a
+ * hand-written summary can never drift from the data it describes.
+ */
+export interface BacktestRunData {
+    run: BacktestRunInfo;
+    baselines: readonly BacktestTickerBaseline[];
+    spy: BacktestTickerBaseline;
+    trendRecognition: BacktestTrendRecognition;
+    trades: readonly BacktestTrade[];
 }
 
 /** Internal: 2x2 backtest result quadrant key. */
