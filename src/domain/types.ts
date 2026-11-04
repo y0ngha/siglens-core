@@ -1094,9 +1094,6 @@ export type CrossDirection = 'up' | 'down';
 /** Risk classification used in AI analysis output. */
 export type RiskLevel = 'low' | 'medium' | 'high';
 
-/** Risk classification used in backtest reports. */
-export type BacktestRiskLevel = 'low' | 'moderate' | 'high' | 'extreme';
-
 /** A single AI-derived signal entry inside an indicator-guide result. */
 export interface AnalysisSignal {
     /** Signal source — currently always `'skill'`. */
@@ -2840,26 +2837,174 @@ export interface UsageLogRecord {
 
 // ─── Backtesting ──────────────────────────────────────────────────────────────
 
-/** Internal: backtest signal outcome. */
+/** Internal: how a backtest trade was entered. */
+export type BacktestEntryType = 'enter_close' | 'enter_selloff' | 'wait_limit';
+
+/** Internal: why one half (leg) of a split-exit backtest trade was closed. */
+export type BacktestLegExitReason =
+    | 'tp1'
+    | 'tp_final'
+    | 'sl1'
+    | 'sl2'
+    | 'breakeven'
+    | 'selloff_ma5'
+    | 'selloff_time'
+    | 'selloff_stop'
+    | 'max_hold'
+    | 'open';
+
+/** Internal: one half of a split-exit backtest trade. */
+export interface BacktestTradeLeg {
+    name: 'A' | 'B';
+    /** Fraction of the position this leg carries (0.5 each). */
+    size: number;
+    exitDate: string;
+    exitPrice: number;
+    reason: BacktestLegExitReason;
+    returnPct: number;
+}
+
+/** Internal: exit plan taken from the AI response that opened the trade. */
+export interface BacktestTradePlan {
+    tp1: number;
+    tpFinal: number;
+    sl1: number;
+    sl2: number;
+    source: 'ai' | 'fallback';
+}
+
+/**
+ * Internal: a single simulated trade. `returnPct` is the size-weighted mean of
+ * the two legs; `exitDate` is the later leg's exit.
+ */
+export interface BacktestTrade {
+    ticker: string;
+    entryType: BacktestEntryType;
+    decisionDate: string;
+    entryDate: string;
+    entryPrice: number;
+    exitDate: string;
+    holdingDays: number;
+    returnPct: number;
+    legs: readonly [BacktestTradeLeg, BacktestTradeLeg];
+    initialPlan: BacktestTradePlan;
+    holdingReviews: number;
+    /** AI summary from the analysis that opened the trade. */
+    summary: string;
+    /** Path of the opening prompt inside the published prompt archive. */
+    promptFile?: string;
+    /** Path of the opening response inside the published prompt archive. */
+    responseFile?: string;
+}
+
+/** Internal: buy-and-hold baseline for one ticker over the run period. */
+export interface BacktestTickerBaseline {
+    ticker: string;
+    buyHoldPct: number;
+    buyHoldMaxDrawdownPct: number;
+    /** Trading days in the run period (denominator for time in market). */
+    tradingDays: number;
+}
+
+/** Internal: provenance of a backtest run. */
+export interface BacktestRunInfo {
+    runId: string;
+    periodStart: string;
+    periodEnd: string;
+    tickers: readonly string[];
+    model: string;
+    coreVersion: string;
+    promptVersion: string;
+    siglensVersion: string;
+    generatedAt: string;
+    resultsUrl: string;
+    releaseUrl: string;
+}
+
+/** Internal: how one trend label lined up with the move that preceded it. */
+export interface BacktestTrendLabelStat {
+    calls: number;
+    /** Mean return over the `windowDays` trading days before the call. */
+    priorMeanPct: number;
+    /** Share of calls whose preceding `windowDays` move was up. */
+    priorUpRatePct: number;
+}
+
+/**
+ * Internal: how well the analysis' `trend` described the move so far. A
+ * bullish/bearish call "matches" when the preceding `windowDays` move had the
+ * same sign. This measures trend recognition, not a forecast.
+ */
+export interface BacktestTrendRecognition {
+    windowDays: number;
+    /** Bullish + bearish calls (neutral states no direction). */
+    directionalCalls: number;
+    matchRatePct: number;
+    byTrend: Readonly<Record<Trend, BacktestTrendLabelStat>>;
+}
+
+/**
+ * Internal: one backtest run — provenance, buy-and-hold baselines and the
+ * trades. Strategy statistics are derived from `trades` by the consumer, so a
+ * hand-written summary can never drift from the data it describes.
+ */
+export interface BacktestRunData {
+    run: BacktestRunInfo;
+    baselines: readonly BacktestTickerBaseline[];
+    spy: BacktestTickerBaseline;
+    trendRecognition: BacktestTrendRecognition;
+    trades: readonly BacktestTrade[];
+}
+
+// ─── Backtesting (deprecated v7 format) ───────────────────────────────────────
+
+/**
+ * Risk classification used in backtest reports.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
+export type BacktestRiskLevel = 'low' | 'moderate' | 'high' | 'extreme';
+
+/**
+ * Internal: backtest signal outcome.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
 export type BacktestSignalResult = 'win' | 'loss';
-/** Internal: backtest AI outcome. */
+/**
+ * Internal: backtest AI outcome.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
 export type BacktestAiResult = 'win' | 'loss' | 'neutral';
-/** Internal: reason a backtest case exited the position. */
+/**
+ * Internal: reason a backtest case exited the position.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
 export type BacktestExitReason = 'take_profit' | 'stop_loss' | 'time';
 
 /**
  * Internal: AI-suggested price target stored in a backtest case.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
  */
 export interface BacktestAiPriceTarget {
     price: number;
     basis: string;
 }
 
-/** Internal: AI entry recommendation stored in a backtest case. */
+/**
+ * Internal: AI entry recommendation stored in a backtest case.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
 export type BacktestAiEntryRecommendation = 'enter' | 'wait' | 'avoid';
 
 /**
  * Internal: AI analysis snapshot stored alongside a backtest case.
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
  */
 export interface BacktestAiAnalysis {
     summary: string;
@@ -2873,7 +3018,11 @@ export interface BacktestAiAnalysis {
     riskLevel?: BacktestRiskLevel;
 }
 
-/** Internal: a single backtest case (entry/exit + outcome + AI snapshot). */
+/**
+ * Internal: a single backtest case (entry/exit + outcome + AI snapshot).
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
 export interface BacktestCase {
     ticker: string;
     entryDate: string;
@@ -2890,7 +3039,11 @@ export interface BacktestCase {
     aiAnalysis: BacktestAiAnalysis;
 }
 
-/** Internal: aggregate backtest meta (period, totals, rates). */
+/**
+ * Internal: aggregate backtest meta (period, totals, rates).
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
 export interface BacktestMeta {
     period: string;
     totalCases: number;
@@ -2900,7 +3053,11 @@ export interface BacktestMeta {
     tickerCount: number;
 }
 
-/** Internal: backtest dataset (meta + cases). */
+/**
+ * Internal: backtest dataset (meta + cases).
+ *
+ * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
+ */
 export interface BacktestData {
     meta: BacktestMeta;
     cases: BacktestCase[];
