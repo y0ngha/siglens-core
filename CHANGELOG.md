@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.30.0](https://github.com/y0ngha/siglens-core/compare/v2.29.0...v2.30.0) (2026-11-04)
+
+### Features
+
+* 일일 AI 백테스트 run 기반 타입으로 교체 ([#313](https://github.com/y0ngha/siglens-core/issues/313)) ([77dbda3](https://github.com/y0ngha/siglens-core/commit/77dbda30038651004ac2c6d81c06f8e6d7973042)), closes [PUBLIC_API.md#API-5](https://github.com/PUBLIC_API.md/issues/API-5)
+
 # [2.29.0](https://github.com/y0ngha/siglens-core/compare/v2.28.3...v2.29.0) (2026-10-25)
 
 ### Features
