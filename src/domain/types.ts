@@ -2986,6 +2986,7 @@ export type BacktestExitReason = 'take_profit' | 'stop_loss' | 'time';
 
 /**
  * Internal: AI-suggested price target stored in a backtest case.
+ *
  * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
  */
 export interface BacktestAiPriceTarget {
@@ -3002,6 +3003,7 @@ export type BacktestAiEntryRecommendation = 'enter' | 'wait' | 'avoid';
 
 /**
  * Internal: AI analysis snapshot stored alongside a backtest case.
+ *
  * @deprecated v7 백테스트 형식. siglens `/backtesting`이 `BacktestRunData`로 옮긴 뒤 다음 major에서 제거한다.
  */
 export interface BacktestAiAnalysis {
