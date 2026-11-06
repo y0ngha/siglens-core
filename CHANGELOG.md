@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.30.1](https://github.com/y0ngha/siglens-core/compare/v2.30.0...v2.30.1) (2026-11-06)
+
+### Bug Fixes
+
+* **prompt:** 크롤러가 읽는 summary 산문에서 매매 조언을 뺀다 ([#315](https://github.com/y0ngha/siglens-core/issues/315)) ([1f6d2aa](https://github.com/y0ngha/siglens-core/commit/1f6d2aa81c7f41a673e5e8af4d310625ef9ade75))
+
 # [2.30.0](https://github.com/y0ngha/siglens-core/compare/v2.29.0...v2.30.0) (2026-11-04)
 
 ### Features
