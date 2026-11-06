@@ -78,7 +78,7 @@ describe('formatPriorAnalysisSection', () => {
         expect(result).toContain('- 4 bars ago');
     });
 
-    it('renders full entry/TP/SL plan, stop breached, first target reached', () => {
+    it('renders the cited zone / upper / lower refs by role, fell below lower ref, reached first upper ref', () => {
         const bars = makeBars(10);
         // Anchor at index 3, close = 100 (reference price).
         // Subsequent bars (index 4..9) all have high 101 / low 99 by default;
@@ -100,19 +100,19 @@ describe('formatPriorAnalysisSection', () => {
             '1Day'
         );
 
-        expect(result).toContain('entry 100.00-105.00');
-        expect(result).toContain('TP 110.00/120.00');
-        expect(result).toContain('SL 95.00');
+        expect(result).toContain('cited zone 100.00-105.00');
+        expect(result).toContain('upper refs 110.00/120.00');
+        expect(result).toContain('lower ref 95.00');
         expect(result).toContain('-> since:');
-        expect(result).toContain('stop breached');
-        expect(result).toContain('target reached');
-        expect(result).not.toContain('target not reached');
+        expect(result).toContain('fell below lower ref');
+        expect(result).toContain('reached first upper ref');
+        expect(result).not.toContain('stayed below first upper ref');
         expect(result).toContain('high 111.00');
         expect(result).toContain('low 90.00');
         expect(result).toContain('now 105.00');
     });
 
-    it('renders "no entry recommended" when entryPrices/stopLoss/takeProfitPrices are all absent', () => {
+    it('renders "no levels cited" when entryPrices/stopLoss/takeProfitPrices are all absent', () => {
         const bars = makeBars(10);
         const entry = analysis(new Date(bars[3].time * 1000), {
             trend: 'neutral',
@@ -125,15 +125,15 @@ describe('formatPriorAnalysisSection', () => {
             '1Day'
         );
 
-        expect(result).toContain('no entry recommended');
+        expect(result).toContain('no levels cited');
         // No stop/target wording should appear when no plan exists.
-        expect(result).not.toContain('stop breached');
-        expect(result).not.toContain('stop not breached');
-        expect(result).not.toContain('target reached');
-        expect(result).not.toContain('target not reached');
+        expect(result).not.toContain('fell below lower ref');
+        expect(result).not.toContain('held above lower ref');
+        expect(result).not.toContain('reached first upper ref');
+        expect(result).not.toContain('stayed below first upper ref');
     });
 
-    it('stop not breached and target not reached when price never crosses either', () => {
+    it('held above lower ref and stayed below first upper ref when price never crosses either', () => {
         const bars = makeBars(10); // all bars: high 101 / low 99 / close 100
         const entry = analysis(new Date(bars[3].time * 1000), {
             stopLoss: 50, // far below any bar low -> never breached
@@ -147,8 +147,8 @@ describe('formatPriorAnalysisSection', () => {
             '1Day'
         );
 
-        expect(result).toContain('stop not breached');
-        expect(result).toContain('target not reached');
+        expect(result).toContain('held above lower ref');
+        expect(result).toContain('stayed below first upper ref');
     });
 
     it('omits the "-> since:" line when the analysis lands on the final bar', () => {
@@ -233,6 +233,16 @@ describe('formatPriorAnalysisSection', () => {
         expect(newerPos).toBeLessThan(olderPos);
     });
 
+    it('guardrail asks for what changed, not a grade or a replayed plan', () => {
+        expect(PRIOR_ANALYSIS_GUARDRAIL).toContain(
+            'state in one line what changed in the data since then'
+        );
+        expect(PRIOR_ANALYSIS_GUARDRAIL).toContain(
+            'Do not grade a past analysis as right, wrong or valid'
+        );
+        expect(PRIOR_ANALYSIS_GUARDRAIL).not.toContain('say so explicitly');
+    });
+
     it('includes the guardrail text exactly once', () => {
         const bars = makeBars(10);
         const entry = analysis(new Date(bars[3].time * 1000));
@@ -270,9 +280,9 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
     // numeric column must never reach the prompt: `NaN.toFixed(2)` is the
     // literal string 'NaN', and — worse — every comparison against NaN is
     // false, so an unguarded NaN stop renders a confident *wrong* verdict
-    // ('stop not breached') rather than obvious garbage.
+    // ('held above lower ref') rather than obvious garbage.
 
-    it('omits the SL fragment when stopLoss is NaN', () => {
+    it('omits the lower ref fragment when stopLoss is NaN', () => {
         const bars = makeBars(10);
         const entry = analysis(new Date(bars[5].time * 1000), {
             stopLoss: Number.NaN,
@@ -286,10 +296,10 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
         );
 
         expect(result).not.toContain('NaN');
-        expect(result).not.toContain('SL ');
+        expect(result).not.toContain('lower ref ');
     });
 
-    it('never claims "stop not breached" for a NaN stopLoss', () => {
+    it('never claims "held above lower ref" for a NaN stopLoss', () => {
         const bars = makeBars(10);
         const entry = analysis(new Date(bars[5].time * 1000), {
             stopLoss: Number.NaN,
@@ -302,8 +312,8 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
             '1Day'
         );
 
-        expect(result).not.toContain('stop not breached');
-        expect(result).not.toContain('stop breached');
+        expect(result).not.toContain('held above lower ref');
+        expect(result).not.toContain('fell below lower ref');
     });
 
     it('omits the TP fragment when every take-profit target is Infinity', () => {
@@ -320,7 +330,7 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
         );
 
         expect(result).not.toContain('Infinity');
-        expect(result).not.toContain('TP ');
+        expect(result).not.toContain('upper refs ');
         expect(result).not.toContain('target');
     });
 
@@ -339,8 +349,8 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
         );
 
         expect(result).not.toContain('NaN');
-        expect(result).toContain('TP 50.00');
-        expect(result).toContain('target reached');
+        expect(result).toContain('upper refs 50.00');
+        expect(result).toContain('reached first upper ref');
     });
 
     it('drops non-finite entry prices instead of rendering a corrupt range', () => {
@@ -357,10 +367,10 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
         );
 
         expect(result).not.toContain('NaN');
-        expect(result).toContain('entry 180.00');
+        expect(result).toContain('cited zone 180.00');
     });
 
-    it('renders "no entry recommended" when every plan value is non-finite', () => {
+    it('renders "no levels cited" when every plan value is non-finite', () => {
         const bars = makeBars(10);
         const entry = analysis(new Date(bars[5].time * 1000), {
             entryPrices: [Number.NaN],
@@ -376,7 +386,7 @@ describe('formatPriorAnalysisSection — non-finite consumer data', () => {
         );
 
         expect(result).not.toContain('NaN');
-        expect(result).toContain('no entry recommended');
+        expect(result).toContain('no levels cited');
     });
 
     it('reports n/a rather than NaN%/Infinity% when the reference close is 0', () => {
@@ -509,7 +519,9 @@ describe('formatPriorAnalysisSection price precision', () => {
             'DOGEUSD',
             '1Day'
         );
-        expect(out).toContain('entry 0.08310-0.08340, TP 0.08520, SL 0.08250');
+        expect(out).toContain(
+            'cited zone 0.08310-0.08340, upper refs 0.08520, lower ref 0.08250'
+        );
         expect(out).toContain('now 0.08345');
     });
 
@@ -533,7 +545,7 @@ describe('formatPriorAnalysisSection price precision', () => {
             '1Day',
             { dp: 0, krxTick: 'share' }
         );
-        expect(out).toContain('entry 266000-268000, SL 262000');
+        expect(out).toContain('cited zone 266000-268000, lower ref 262000');
         expect(out).toContain('now 269500');
     });
 });

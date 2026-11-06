@@ -1058,9 +1058,23 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * forbids "win rate". Bytes change for every U.S. listing prompt and every
  * non-Korean prompt.
  *
+ * **`p33`** — descriptive crawler-visible prose (2026-11-06). A Plan
+ * Vocabulary Boundary block keeps stop-loss, entry, take-profit and sizing
+ * talk inside `actionRecommendation`; the summary checklist concludes on
+ * "which levels and conditions decide what comes next" instead of "what it
+ * means for the investor"; the extreme-volatility note becomes a volatility
+ * condition instead of sizing advice; the volatility reliability note drops
+ * "position sizing / stop distance"; the prior-analysis guardrail reports a
+ * changed read as the cited level and what price did, without grading the
+ * past call, and the `## Prior Analyses` history labels past levels by role
+ * (`cited zone` / `upper refs` / `lower ref`) instead of `entry`/`TP`/`SL`
+ * with stop/target verdicts. The keyPrices label example and the
+ * support/resistance rules drop their stop-loss, take-profit and "for the
+ * investor" wording. Bytes change for every technical prompt.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p32' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p33' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest
@@ -2203,9 +2217,15 @@ export function buildNewsCacheKey(
  * The U.S. listing sentence gains "Prices are quoted in USD." and non-Korean
  * system prompts gain the currency-writing rule.
  *
+ * **`p11`** — prior-analysis guardrail (see {@link PROMPT_TEMPLATE_VERSION}
+ * `p33`). A changed read is reported as the cited level and what price did
+ * after it, without grading the past call or restating its entry/stop/target,
+ * and the history labels past levels by role instead of `entry`/`TP`/`SL`.
+ * Bytes change for every overall prompt with a `## Prior Analyses` section.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p10' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p11' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

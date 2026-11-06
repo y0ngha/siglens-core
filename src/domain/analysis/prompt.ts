@@ -1210,8 +1210,7 @@ export const PRO_RELIABILITY_NOTE = {
         '{permission gate: green = longs only, red = shorts only, blue = both allowed}',
     chandelier: '{risk context: trailing stop / trend regime — not an entry}',
     regime: '{regime lens: weight directional reads by this — trend-follow if trending, fade if mean-reverting}',
-    volatility:
-        '{risk context: position sizing / stop distance / breakout follow-through}',
+    volatility: '{risk context: normal swing width / breakout follow-through}',
 } as const;
 
 // Regime classification cut-points. Hurst and Variance Ratio pivot on their
@@ -1599,6 +1598,32 @@ const buildSkillBlock = (skill: Skill): string => {
 };
 
 /**
+ * @internal
+ * Keeps the conditional trading plan inside `actionRecommendation`.
+ *
+ * `summary` and the pattern/strategy/candle summaries are the prose a search
+ * crawler reads in the consumer's server-rendered snapshot (the plan fields are
+ * filtered out for the free tier the snapshot is generated with). A stop width,
+ * an entry verdict or a graded past call in that prose reads as investment
+ * advice and as a performance claim on a page that says it gives neither, so
+ * those fields describe levels by what they do to the structure. The rule
+ * names roles instead of quoting example sentences (quoted sentences in a
+ * prompt get copied verbatim into the output), in English so the block reads
+ * the same for every output locale. The holder-position hint is the one
+ * carve-out: it is a personalised prompt (its own cache-key suffix), never the
+ * free-tier snapshot a crawler sees, and it asks for position management by
+ * design. Exported so tests assert the rendered lines (CONVENTIONS.md#TE-3).
+ */
+export const PLAN_VOCABULARY_BOUNDARY = [
+    '### Plan Vocabulary Boundary',
+    '- The conditional trading plan (entry zone, stop-loss, take-profit, position size) lives ONLY in actionRecommendation. summary, strategyResults[].summary, patternSummaries[].summary and candlePatterns[].summary never carry it.',
+    '- In those fields, do not name a stop-loss, take-profit or entry zone, do not judge whether now is a good or bad time to buy or sell, and do not advise how wide a stop should be or how large a position should be.',
+    '- Name a level by its structural role instead (support, resistance, invalidation level, breakdown line, measured pattern target, written in the output language) and state what crossing it does to the structure. State volatility as a condition (how wide normal swings are relative to price), never as sizing or stop advice.',
+    "- When a skill's format asks for a stop level, an entry or trade signal, or profit-taking, write that item as the level's structural role and the condition that confirms or invalidates the setup.",
+    '- The one exception is a holder-position section: when the prompt says the user already holds this symbol, that section governs how the summary frames managing the position.',
+] as const;
+
+/**
  * Per-field content guidance for the few AnalysisResponse fields whose unique
  * semantic instruction lives ONLY here. The response schema enforces the
  * structure of every field (names, types, enums, nesting), so a JSON skeleton
@@ -1617,7 +1642,7 @@ const ANALYSIS_FIELD_GUIDANCE: Record<
     string
 > = {
     summary:
-        'A comprehensive, accessible Korean markdown summary that synthesizes ALL findings (indicators, patterns, volume profile, skills, strategies) into plain language a non-technical user can understand. Instead of stating raw indicator values, explain their practical meaning (e.g., instead of RSI is overbought at 75, say the stock has risen quickly and may be due for a pause). Answer: What is happening with this stock and what does it mean for the investor? Use \\n\\n between paragraphs, and use short bullet lists only when they improve readability.',
+        'A comprehensive, accessible Korean markdown summary that synthesizes ALL findings (indicators, patterns, volume profile, skills, strategies) into plain language a non-technical user can understand. Instead of stating raw indicator values, explain their practical meaning (e.g., instead of RSI is overbought at 75, say the stock has risen quickly and may be due for a pause). Answer: What is happening with this stock, and which price levels and conditions decide what comes next? Use \\n\\n between paragraphs, and use short bullet lists only when they improve readability.',
     strategyResults:
         "Each entry's summary is Korean markdown text with each **label**: value on its own line, grouped into readable paragraphs using \\n\\n where context changes.",
     actionRecommendation:
@@ -1710,8 +1735,8 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- keyPrices must only contain actual price levels (numbers that represent a price, e.g. 150.00). Do NOT include bar indices, counts, or any non-price numeric values.',
         "- keyPrices hold the pattern's structural prices (peaks, troughs, head, shoulders, neckline, boundaries, rims). Never add measured or conservative target entries to keyPrices — the app appends them from geometry, so an entry of your own would duplicate or contradict them.",
         locale === DEFAULT_ANALYSIS_LOCALE
-            ? '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "손절선"). Never use English or snake_case identifiers.'
-            : `- All label values in keyPrices must be written in ${outputLanguageName(locale)} (e.g. an upper trendline, a neckline, a stop-loss level). Never use snake_case identifiers.`,
+            ? '- All label values in keyPrices must be written in Korean (e.g. "상단 추세선", "하단 추세선", "넥라인", "무효화선"). Never use English or snake_case identifiers.'
+            : `- All label values in keyPrices must be written in ${outputLanguageName(locale)} (e.g. an upper trendline, a neckline, an invalidation line). Never use snake_case identifiers.`,
         '',
         '### Support/Resistance Assessment',
         '- For keyLevels, you may reuse exact prices from the ## Market Reference section (to avoid arithmetic error) OR derive your own from patterns, SMC, and volume — neither is mandatory. State a brief reason for each level. Do NOT treat reference levels as carrying more conviction merely because they were precomputed; weigh them like any other evidence.',
@@ -1800,10 +1825,12 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '4. INCLUDE strategy conclusions — for each strategy in strategyResults, state its finding (e.g., MACD/MA cycle stage, divergence detection result, mean reversion signal, breakout setup, Fibonacci level, Elliott wave position). If a strategy contradicts the dominant trend, explicitly state the conflict.',
         '5. DESCRIBE key support/resistance levels and their significance.',
         '6. ASSESS risk — warning signs and what could go wrong.',
-        '7. CONCLUDE: "What is happening with this stock and what does it mean for the investor?"',
+        '7. CONCLUDE: "What is happening with this stock, and which price levels and conditions decide what comes next?"',
         '- Use \\n\\n between topic paragraphs. Never write a single long paragraph.',
-        '- Prefer 3 to 5 short paragraphs. Each paragraph should cover one context: trend, signals, levels, risk, investor takeaway.',
+        '- Prefer 3 to 5 short paragraphs. Each paragraph should cover one context: trend, signals, levels, risk, conclusion.',
         '- If signals conflict, state the mixed picture and which side has more independent indicator groups agreeing.',
+        '',
+        ...PLAN_VOCABULARY_BOUNDARY,
         '',
         '### Action Recommendation Decision Tree',
         '- Framing (see CORE PRINCIPLES → Descriptive, not prescriptive): this section maps price levels into a conditional plan. Describe the plan as structure and conditions, never as an instruction to the reader. Write "이 구간을 회복하기 전까지 구조는 유효하지 않습니다" or "손절 기준으로 삼는 자리는 122,000원입니다", not "사는 편이 낫습니다"/"기다리세요"/"나눠서 매수하세요". The entryRecommendation enum carries the verdict; the prose carries the reasoning.',
@@ -2002,10 +2029,10 @@ const buildAnalysisRequest = (
                   '### keyLevels Writing Rules for Support/Resistance Tools',
                   '- Use the Support/Resistance Tool Guides above to INTERPRET the levels in the ## Market Reference section — use the exact provided numbers; do not recompute the pivot/Fibonacci arithmetic yourself.',
                   '- The reference pivot and Fibonacci levels are advisory context, not a mandate. When relevant, assess which levels the current price is nearest to and which are acting as support or resistance.',
-                  '- For Fibonacci Extension levels, consider them for take-profit assessment when they fit your read of the chart.',
+                  '- For Fibonacci Extension levels, consider them as the next reference levels beyond the swing when they fit your read of the chart.',
                   '- You may add reference pivot/Fibonacci levels to the keyLevels field as support/resistance entries with their basis (e.g. "Standard pivot R1", "Fib 61.8% retracement") as the reason — or derive your own from patterns, SMC, and volume.',
                   '- When a Fibonacci level or pivot point converges with an existing indicator-based support/resistance level, name the converging levels in the reason field as one piece of supporting evidence.',
-                  '- Include relevant support/resistance tool findings in the summary field, explaining their practical meaning for the investor.',
+                  '- Include relevant support/resistance tool findings in the summary field, explaining what each level means for the structure.',
                   '',
                   'Support/Resistance tool list to apply:',
                   ...supportResistanceSkills.map(s => `- ${s.name}`),
@@ -2061,9 +2088,12 @@ const buildAnalysisRequest = (
 // v0.31 production ordering; nothing was moved away from that tail position,
 // so no recap is needed.
 
-// ── ATR-extreme sizing note (Tier-0 conditional promotion) ──────────────────
-// When realized volatility is extreme, position-sizing context must never be
-// dropped — even if the gated sizing guide did not fire. The threshold is
+// ── ATR-extreme volatility note (Tier-0 conditional promotion) ──────────────
+// When realized volatility is extreme, that condition must never be dropped —
+// even if the gated ATR guide did not fire. It is stated as a condition, not
+// as sizing or stop advice: this note sits in the dynamic tail next to the
+// summary checklist, and stop/sizing wording there leaks into the
+// crawler-visible summary (PLAN_VOCABULARY_BOUNDARY). The threshold is
 // timeframe-aware: a 6% daily ATR is extreme, but intraday bars routinely show
 // 2%+ ATR, so the intraday bar is lower.
 /** @internal Exported only so the boundary test reads this exact threshold. */
@@ -2076,9 +2106,9 @@ const atrExtremeThreshold = (timeframe: Timeframe): number =>
         ? ATR_EXTREME_PERCENT_DAILY
         : ATR_EXTREME_PERCENT_INTRADAY;
 
-const ATR_EXTREME_SIZING_NOTE = [
-    '## Extreme Volatility — Position Sizing',
-    '- Realized volatility (ATR) is extreme for this timeframe. Size positions conservatively: widen stops to the ATR range, reduce position size so a single ATR move stays within risk tolerance, and avoid market entries into the volatility spike.',
+const ATR_EXTREME_VOLATILITY_NOTE = [
+    '## Extreme Volatility',
+    '- Realized volatility (ATR) is extreme for this timeframe: normal swings are wide relative to price, so a single bar can cross a nearby level without changing the structure, and a break needs more room to confirm.',
 ].join('\n');
 
 /**
@@ -2305,7 +2335,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   ({@link CORE_SKILL_REFERENCE_POINTER}) where the combined skill-content
  *   block used to sit — replacing only the `core` digests that moved to
  *   `stable` — the gated (`selected`) skill digests ordered by relevance,
- *   the tier/timeframe conditional notes (ATR-extreme sizing), the optional
+ *   the tier/timeframe conditional notes (ATR-extreme volatility), the optional
  *   Fear & Greed section, and finally — at the true tail, exactly as in
  *   production — the FULL "## Analysis Request" section (static output
  *   rules + the per-type writing-rule/active-skill-name instructions, see
@@ -2670,7 +2700,7 @@ export function buildAnalysisPrompt(
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),
         ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)
-            ? [ATR_EXTREME_SIZING_NOTE]
+            ? [ATR_EXTREME_VOLATILITY_NOTE]
             : []),
         ...(fearGreed ? [formatFearGreedSection(fearGreed)] : []),
         // Only push a non-empty section so an empty/unmatched history

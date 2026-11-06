@@ -25,7 +25,7 @@ import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
  *
  * `formatNullableNumber` only guards `null`/`undefined`: `NaN.toFixed(2)` is
  * the literal string `'NaN'` and `Infinity.toFixed(2)` is `'Infinity'`, so an
- * unguarded consumer row with `stopLoss: NaN` would render `SL NaN` straight
+ * unguarded consumer row with `stopLoss: NaN` would render `lower ref NaN` straight
  * into a prompt billed to a paid model. Callers treat `null` as "this value is
  * absent" and omit the corresponding fragment, which is the honest reading of
  * a non-finite input — the same posture {@link percentFrom} takes for a zero
@@ -62,12 +62,12 @@ const percentFrom = (reference: number, value: number): string =>
  *
  * The `null` case is not cosmetic. Every comparison against `NaN` is `false`,
  * so an unguarded `NaN` stop would always render the literal verdict
- * `'stop not breached'` — a confident, wrong statement of fact handed to the
+ * `'held above lower ref'` — a confident, wrong statement of fact handed to the
  * model, which is worse than saying nothing.
  */
 const formatStopWord = (stopLoss: number, low: number): string | null => {
     if (!Number.isFinite(stopLoss) || !Number.isFinite(low)) return null;
-    return low <= stopLoss ? 'stop breached' : 'stop not breached';
+    return low <= stopLoss ? 'fell below lower ref' : 'held above lower ref';
 };
 
 /**
@@ -78,10 +78,12 @@ const formatStopWord = (stopLoss: number, low: number): string | null => {
  */
 const formatTargetWord = (firstTarget: number, high: number): string | null => {
     if (!Number.isFinite(firstTarget) || !Number.isFinite(high)) return null;
-    return high >= firstTarget ? 'target reached' : 'target not reached';
+    return high >= firstTarget
+        ? 'reached first upper ref'
+        : 'stayed below first upper ref';
 };
 
-/** `entry a-b` for a range, `entry a` for a single price; `''` when absent. */
+/** `cited zone a-b` for a range, `cited zone a` for a single price; `''` when absent. */
 const formatEntryPlanPart = (
     entryPrices: readonly number[] | undefined,
     quoting: PriceQuoting
@@ -89,15 +91,15 @@ const formatEntryPlanPart = (
     if (!entryPrices || entryPrices.length === 0) return '';
     // Non-finite entries are dropped before the range is formed, so a partly
     // corrupt array degrades to the usable subset instead of rendering
-    // `entry NaN-180.00`.
+    // `cited zone NaN-180.00`.
     const finite = entryPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
     const px = (n: number): string => formatQuotedPrice(n, quoting);
-    if (finite.length === 1) return `entry ${px(finite[0])}`;
-    return `entry ${px(finite[0])}-${px(finite[finite.length - 1])}`;
+    if (finite.length === 1) return `cited zone ${px(finite[0])}`;
+    return `cited zone ${px(finite[0])}-${px(finite[finite.length - 1])}`;
 };
 
-/** `TP a/b/...` in the given (ascending) order; `''` when absent. */
+/** `upper refs a/b/...` in the given (ascending) order; `''` when absent. */
 const formatTakeProfitPlanPart = (
     takeProfitPrices: readonly number[] | undefined,
     quoting: PriceQuoting
@@ -105,7 +107,7 @@ const formatTakeProfitPlanPart = (
     if (!takeProfitPrices || takeProfitPrices.length === 0) return '';
     const finite = takeProfitPrices.filter(Number.isFinite);
     if (finite.length === 0) return '';
-    return `TP ${finite.map(n => formatQuotedPrice(n, quoting)).join('/')}`;
+    return `upper refs ${finite.map(n => formatQuotedPrice(n, quoting)).join('/')}`;
 };
 
 /** One rendered past call, newest-first order trusted from the caller (`selected` is not re-sorted here). */
@@ -133,10 +135,10 @@ function formatEntry(
     const planParts = [
         formatEntryPlanPart(entry.entryPrices, quoting),
         formatTakeProfitPlanPart(entry.takeProfitPrices, quoting),
-        stopText !== null ? `SL ${stopText}` : '',
+        stopText !== null ? `lower ref ${stopText}` : '',
     ].filter(part => part !== '');
     const plan =
-        planParts.length > 0 ? planParts.join(', ') : 'no entry recommended';
+        planParts.length > 0 ? planParts.join(', ') : 'no levels cited';
 
     const headerLine = `- ${barsAgo} bars ago (${anchorDateTime}): ${entry.trend}, ${entry.riskLevel} risk | ${plan}`;
 
@@ -200,21 +202,37 @@ function formatEntry(
  * model its own past verdicts primes it to anchor on them — to keep calling a
  * symbol bullish because the last three calls were bullish — instead of
  * reading the current chart on its own terms. The three clauses close that
- * off explicitly: current data overrides history on conflict, a wrong past
- * call must be named as wrong (not quietly dropped), and "the history leans
- * this way" is never itself a justification for the new verdict. Do not
- * delete this as boilerplate — it is the reason the feature is safe to ship.
+ * off explicitly: current data overrides history on conflict, a changed read
+ * must say what changed in the data (not quietly drop the old one), and "the
+ * history leans this way" is never itself a justification for the new verdict.
+ * Do not delete this as boilerplate — it is the reason the feature is safe to
+ * ship.
+ *
+ * The change is reported as the cited level and what price did after it, not
+ * as a grade ("that call was right/wrong") or a replay of the old entry/stop/
+ * target. The summary that carries this line is the prose a consumer's
+ * server-rendered snapshot shows to search crawlers, where a graded call reads
+ * as a track-record claim and a restated stop as trading advice (see
+ * `PLAN_VOCABULARY_BOUNDARY` in `prompt.ts`).
  */
 export const PRIOR_ANALYSIS_GUARDRAIL =
-    'Prior-analysis guardrail: the history above is reference only. Where it conflicts with the current data, current data always wins. If a past call was wrong, say so explicitly and state in one line what changed since then. Do not maintain a direction, risk level, or plan because the history leans that way — the justification for your verdict is always the computed data above, never your own prior output.';
+    'Prior-analysis guardrail: the history above is reference only. Where it conflicts with the current data, current data always wins. When the current read differs from a past one, state in one line what changed in the data since then: the level that past analysis cited and what price did after it. Do not grade a past analysis as right, wrong or valid, and do not restate its plan as an entry, a stop or a take-profit; name its levels by their structural role (support, resistance, invalidation level). Do not maintain a direction, risk level, or plan because the history leans that way — the justification for your verdict is always the computed data above, never your own prior output.';
 
 /**
  * @internal
  *
  * Renders selected prior analyses into a `## Prior Analyses` prompt section,
  * each past call scored against what price actually did afterwards (high /
- * low / now relative to the price at the time of that call, plus whether its
- * stop was breached and whether its first target was reached).
+ * low / now relative to the price at the time of that call, plus whether price
+ * fell below its lower reference and whether it reached its first upper
+ * reference).
+ *
+ * The plan levels are labelled by structural role (`cited zone`, `upper
+ * refs`, `lower ref`) rather than as `entry`/`TP`/`SL` with
+ * `stop breached`/`target reached` verdicts: the model copies the shape of the
+ * data it is given, and the summary this feeds is crawler-visible prose where a
+ * restated stop reads as advice and a verdict as a track-record claim (see
+ * {@link PRIOR_ANALYSIS_GUARDRAIL}).
  *
  * Returns `''` when `selected` or `bars` is empty, following the same
  * "empty section is skipped by the caller" contract `buildAnalysisPrompt`

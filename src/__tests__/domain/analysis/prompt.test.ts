@@ -13,6 +13,7 @@ import {
     formatTablePrice,
     INDICATOR_VALUES_SECTION_HEADER,
     PRO_INDICATOR_SECTION_HEADER,
+    PLAN_VOCABULARY_BOUNDARY,
     PRO_RELIABILITY_NOTE,
     PROMPT_CONFIG_BY_TIMEFRAME,
     REGIME_CONTEXT_SECTION_HEADER,
@@ -1990,7 +1991,7 @@ describe('prompt', () => {
                 'A comprehensive, accessible Korean markdown summary'
             );
             expect(result).toContain(
-                'What is happening with this stock and what does it mean for the investor?'
+                'What is happening with this stock, and which price levels and conditions decide what comes next?'
             );
         });
 
@@ -3205,6 +3206,24 @@ describe('prompt', () => {
             expect(result).toContain('Summary Writing Checklist');
         });
 
+        it('Plan Vocabulary Boundary 블록의 모든 줄이 체크리스트 뒤, 결정 트리 앞에 렌더된다', () => {
+            for (const line of PLAN_VOCABULARY_BOUNDARY) {
+                expect(result).toContain(line);
+            }
+            const boundary = result.indexOf('### Plan Vocabulary Boundary');
+            expect(boundary).toBeGreaterThan(
+                result.indexOf('### Summary Writing Checklist')
+            );
+            expect(boundary).toBeLessThan(
+                result.indexOf('### Action Recommendation Decision Tree')
+            );
+        });
+
+        it('결론 단계가 투자자 시사점이 아니라 가격대와 조건을 묻는다', () => {
+            expect(result).not.toContain('what does it mean for the investor');
+            expect(result).not.toContain('investor takeaway');
+        });
+
         it('체크리스트에 추세 방향 단계가 포함된다', () => {
             expect(result).toContain('1. STATE the overall trend');
         });
@@ -3853,6 +3872,29 @@ describe('prompt', () => {
             expect(result).toContain(
                 'keyLevels Writing Rules for Support/Resistance Tools'
             );
+        });
+
+        it('지지·저항·패턴 지시가 투자자 시사점·익절·손절선 예시로 summary를 끌지 않는다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [
+                    makeSkill({
+                        type: 'support_resistance',
+                        name: '피봇 포인트',
+                    }),
+                    makeSkill({ type: 'pattern', name: '헤드앤숄더' }),
+                ]
+            );
+            expect(result).toContain(
+                'keyLevels Writing Rules for Support/Resistance Tools'
+            );
+            // PLAN_VOCABULARY_BOUNDARY와 맞서는 잔여 문구 — summary·keyPrices로 샌다.
+            expect(result).not.toMatch(/for the investor/i);
+            expect(result).not.toContain('take-profit assessment');
+            expect(result).not.toContain('"손절선"');
         });
 
         it('support_resistance skill이 없을 때 keyLevels Writing Rules 섹션이 포함되지 않는다', () => {
