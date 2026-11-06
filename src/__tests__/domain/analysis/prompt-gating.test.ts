@@ -223,7 +223,7 @@ describe('buildAnalysisPrompt gating (chart only)', () => {
     });
 });
 
-describe('ATR-extreme sizing note', () => {
+describe('ATR-extreme volatility note', () => {
     const sizingMatcher = /ATR|sizing|volatil/i;
 
     it('appends the always-on sizing note when ATR% is extreme on 1Day', () => {
@@ -290,6 +290,10 @@ describe('ATR-extreme sizing note', () => {
             '1Day'
         );
         expect(out).toMatch(/Extreme Volatility/i);
+        // The note states a volatility condition; sizing and stop width stay in
+        // actionRecommendation (PLAN_VOCABULARY_BOUNDARY).
+        expect(out).not.toContain('Size positions conservatively');
+        expect(out).not.toContain('Position Sizing');
     });
 });
 

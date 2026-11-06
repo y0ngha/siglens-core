@@ -547,10 +547,12 @@ describe('buildFinancialsCacheKey', () => {
 });
 
 describe('currency wording template versions (p32 bump set)', () => {
+    // p33 (technical) and p11 (overall) bumped again for the descriptive-prose
+    // change; the other six still sit at their currency-rule versions.
     it('pins every version whose non-Korean prompt bytes gained the currency rule', () => {
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p32');
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p33');
         expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).toBe('f7');
-        expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p10');
+        expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p11');
         expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p9');
         expect(FINANCIALS_PROMPT_TEMPLATE_VERSION).toBe('p9');
         expect(CONGRESS_PROMPT_TEMPLATE_VERSION).toBe('p5');
@@ -1129,7 +1131,9 @@ describe('positionBucket이 캐시 키에 반영될 때', () => {
         // p28 (2026-10-18): 넥라인 계열 패턴의 돌파 후 복귀를 `failed breakout`으로 찍는다.
         // p29 (2026-10-18): 끝난 A–B–C의 무효화를 C 끝으로 옮긴다.
         // p30 (2026-10-18): KRX ETF/ETN 호가 표, KRW 보수 목표가를 호가 단위 정수로 찍는다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p32');
+        // p33 (2026-11-06): 손절·진입·사이징 문구를 actionRecommendation 안으로 가두고
+        // 직전 분석 회고에서 적중 평가를 뺀다(크롤러가 읽는 summary 산문).
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p33');
     });
 });
 
