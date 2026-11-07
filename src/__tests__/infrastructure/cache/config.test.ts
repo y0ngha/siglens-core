@@ -23,6 +23,7 @@ import {
     buildFundamentalCacheKey,
     buildMacroBriefingCacheKey,
     buildMarketNewsDigestCacheKey,
+    MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION,
     buildNewsCacheKey,
     buildOptionsCacheKey,
     buildOverallCacheKey,
@@ -553,7 +554,7 @@ describe('currency wording template versions (p32 bump set)', () => {
         expect(PROMPT_TEMPLATE_VERSION).toBe('p33');
         expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).toBe('f7');
         expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p11');
-        expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p9');
+        expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p10');
         expect(FINANCIALS_PROMPT_TEMPLATE_VERSION).toBe('p9');
         expect(CONGRESS_PROMPT_TEMPLATE_VERSION).toBe('p5');
         expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p7');
@@ -750,7 +751,14 @@ describe('buildMarketNewsDigestCacheKey 함수는', () => {
                 'abc123'
             )
         ).toBe(
-            `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-3.6-flash:${NEWS_PROMPT_TEMPLATE_VERSION}:abc123`
+            `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:crypto:gemini-3.6-flash:p9:abc123`
+        );
+    });
+
+    it('종목 뉴스 프롬프트 버전과 분리돼 있다 — 종목 뉴스만 바꾸면 다이제스트 키는 그대로', () => {
+        expect(MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION).toBe('p9');
+        expect(MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION).not.toBe(
+            NEWS_PROMPT_TEMPLATE_VERSION
         );
     });
 

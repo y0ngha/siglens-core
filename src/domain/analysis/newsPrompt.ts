@@ -31,6 +31,7 @@ import {
     parseCalendarDate,
 } from './promptFormat';
 import { MS_PER_HOUR } from '@/domain/constants/time';
+import { citationMarker } from './newsCitations';
 
 /**
  * Select the news-category skills via the shared selection engine (whitelist +
@@ -86,6 +87,30 @@ export function formatAgeSuffix(
  */
 export const DRIVER_READER_FACING_RULE =
     '- currentDriverKo is page copy that end users read, not a note about your input. Open with the subject and what is happening in the news right now. Never refer to the input itself, in any sentence including caveats and limitations: no wording that labels the articles as supplied or given material, no article counts, and no sentences about what data was or was not included (for example the absence of price or volume figures). To respect the no-causation rule, simply do not attribute price moves to the news; no disclaimer sentence is needed.';
+
+/**
+ * Asks for an article-number marker on each key event. The date and outlet
+ * are filled in from the article list afterwards (`newsCitations.ts`) —
+ * the model is told not to write them, because a copied timestamp is
+ * where it slips. The marker text comes from {@link citationMarker}, the
+ * same source the resolver parses.
+ */
+const CITATION_MARKER_RULE = `- End each keyEventsKo bullet with the number of the one article it mainly rests on, written as ${citationMarker('N')} with that article's number from the list above (article [3] → ${citationMarker(3)}). Do not write the article's publish date or outlet name yourself; they are added from the article list automatically. Use no markers in currentDriverKo.`;
+
+/** Shared tail of both upcoming-event rules: one event per bullet, cited, undated said so. */
+const UPCOMING_BULLET_SHAPE = `Each bullet names one expected event; an open question with no expected event belongs in currentDriverKo instead. End a milestone taken from an article with that article's ${citationMarker('N')}. When no date is known, mark the milestone with a short phrase meaning the date is not yet set, and do not explain that the article left the date out.`;
+
+/**
+ * What goes first in upcomingEventsKo. Equities: the next earnings date
+ * (only a row not yet reported — the calendar section also carries past
+ * releases), then company milestones. Crypto has no earnings or company,
+ * so its rule names asset-level milestones instead.
+ */
+function upcomingFirstRule(assetClass: AssetClass): string {
+    return assetClass === 'crypto'
+        ? `- upcomingEventsKo lists events specific to this asset first: milestones the articles say are coming (an exchange listing or relaunch, a network upgrade, a regulatory or court deadline, a token unlock, a fund decision). ${UPCOMING_BULLET_SHAPE}`
+        : `- upcomingEventsKo lists catalysts specific to this company first: the next earnings date from the earnings calendar (a row that already has reported results is past, not upcoming), then milestones the articles say are coming (a product launch, a regulatory decision, a deal closing, a shareholder vote, a conference the company presents at). ${UPCOMING_BULLET_SHAPE}`;
+}
 
 /** Format a single enriched news item into a compact block for the prompt. */
 function formatNewsItem(
@@ -456,6 +481,16 @@ export function buildNewsAnalysisPrompt(
         '- Do not claim that the news caused an actual price move.',
     ].join('\n');
 
+    // Macro rows are the same for every symbol, so letting them fill the
+    // upcoming list makes each news page read like the next. Equities keep
+    // one only when an article ties it to the company; crypto has no
+    // earnings and trades on liquidity, so it keeps up to two.
+    const upcomingMacroRule = !hasMacroCalendar
+        ? ''
+        : assetClass === 'crypto'
+          ? '- upcomingEventsKo may include at most two Macro Calendar releases, since liquidity conditions drive this asset.\n'
+          : '- upcomingEventsKo may include at most one Macro Calendar release, and only when an article above links that release to this company. Otherwise leave macro releases out of upcomingEventsKo.\n';
+
     const assetContext =
         assetClass === 'crypto'
             ? `This is a cryptocurrency with no earnings reports, quarterly fundamentals, or analyst ratings. Focus on regulatory news, macro/liquidity context, protocol updates, and sentiment shifts.`
@@ -502,9 +537,10 @@ Rules:
 ${localizedFieldDirective(locale)}
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
 - keyEventsKo should cover the 3–5 most market-moving events from the articles above when enough articles exist.
-- upcomingEventsKo should highlight scheduled catalysts (earnings, regulatory deadlines, etc.).
-- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because there has been little recent news coverage.
-- If no scheduled catalysts are provided, return upcomingEventsKo: [].
+${CITATION_MARKER_RULE}
+${upcomingFirstRule(assetClass)}
+${upcomingMacroRule}- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because there has been little recent news coverage.
+- If nothing qualifies for upcomingEventsKo under the rules above, return upcomingEventsKo: [].
 - Base currentDriverKo only on the articles and calendar rows above. Do not attribute price moves to the news.
 ${DRIVER_READER_FACING_RULE}
 - overallSentiment reflects the net directional bias of the provided news flow only.`;

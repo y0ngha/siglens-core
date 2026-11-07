@@ -17,6 +17,10 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import { normalizeNewsAnalysisResponse } from '@/domain/analysis/normalizeNews';
+import {
+    applyNewsCitations,
+    type CitationContext,
+} from '@/domain/analysis/newsCitations';
 import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import {
     DEFAULT_ANALYSIS_LOCALE,
@@ -114,6 +118,12 @@ export async function runNewsAnalysis(
     } = options;
     const usage = options.usage;
     const occurredAt = options.now ?? usage?.occurredAt ?? new Date();
+    // The prompt numbers `news` in this order, so `[#n]` resolves to news[n-1].
+    const citations: CitationContext = {
+        articles: news,
+        locale: options.locale ?? DEFAULT_ANALYSIS_LOCALE,
+        currency: options.currency ?? 'USD',
+    };
 
     // ── 1. Empty news guard (before tier/cache/prompt) ──
     if (news.length === 0) {
@@ -205,6 +215,7 @@ export async function runNewsAnalysis(
         try {
             const cached = await cache.get<NewsAnalysisResponse>(cacheKey);
             if (cached !== null) {
+                // Stored results are already resolved (see the generate step).
                 const result = normalizeNewsAnalysisResponse(cached);
                 await recordAnalysisUsageSafely(usage, modelId, occurredAt);
                 return { status: 'cached', result };
@@ -235,7 +246,7 @@ export async function runNewsAnalysis(
     }
 
     // ── 6. Build prompt ──
-    const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
+    const locale = citations.locale;
     const { stable, dynamic } = buildNewsAnalysisPrompt(
         symbol,
         companyName,
@@ -264,8 +275,8 @@ export async function runNewsAnalysis(
     const raw = await dedupeGeneration(
         cache,
         cacheKey,
-        () =>
-            callAnalysisAi({
+        async () => {
+            const generated = await callAnalysisAi({
                 prompt,
                 model: modelId as ActiveModelId,
                 tier,
@@ -278,7 +289,19 @@ export async function runNewsAnalysis(
                 seed: analysisSeed(`${system}\n\n${prompt}`),
                 reasoning: options.reasoning,
                 correlationId: `${symbol}:news`,
-            }),
+            });
+            // Resolve `[#n]` markers HERE, against the article order this
+            // caller's prompt used. dedupeGeneration hands this return value
+            // to in-process and cross-instance joiners of the same cache key,
+            // whose own `news` may be ordered differently (the key hashes
+            // sorted IDs), so they must receive resolved text, not markers.
+            return JSON.stringify(
+                applyNewsCitations(
+                    normalizeNewsAnalysisResponse(generated),
+                    citations
+                )
+            );
+        },
         {
             signal: options.signal,
             inFlightKey: resolveInFlightKey(
@@ -290,8 +313,8 @@ export async function runNewsAnalysis(
     );
 
     // ── 8. Inline post-processing ──
-    // callAnalysisAi returns normalized JSON; JSON.parse gives an object, so
-    // normalizeNewsAnalysisResponse receives a non-string and skips re-parsing.
+    // `raw` is the generate step's normalized, citation-resolved JSON (this
+    // caller's or the winning peer's); normalizing it again is idempotent.
     // raw를 미리 JSON.parse하지 않는다 — 이 normalize 함수는 parseLlmPayload로
     // 코드펜스 제거·파싱·garbage 방어를 스스로 수행한다. 앞에서 파싱하면 LLM이
     // 비-JSON을 뱉었을 때 예외가 호출자까지 올라가 그 방어가 무력해진다

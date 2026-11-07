@@ -2037,16 +2037,34 @@ export function buildInvestorFlowsCacheKey(
  * The U.S. listing sentence gains "Prices are quoted in USD." and non-Korean
  * system prompts gain the currency-writing rule.
  *
+ * **`p10`** — cited events. Key-event bullets end with an article marker
+ * (`[#3]`) that code resolves to the article's publish date and outlet, and
+ * upcoming events list company-specific catalysts first, with macro releases
+ * capped (one per equity, only when an article ties it to the company; two
+ * for crypto). From `p10` the market-news digest keys on its own
+ * {@link MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION}, so a symbol-news prompt
+ * change no longer turns over every category digest.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p9' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p10' as const;
+
+/**
+ * Prompt-template version for the market-news category digest
+ * (`marketNewsDigestPrompt.ts`). Split from {@link NEWS_PROMPT_TEMPLATE_VERSION}
+ * at `p9` — the value both shared until then — so existing digest keys stay
+ * warm. Bump only when the digest prompt or its normalization changes.
+ *
+ * @internal
+ */
+export const MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION = 'p9' as const;
 
 /**
  * Build the Redis key for a cached market-news category digest.
  * Format: `{version}:analysis:market-news:${category}:${modelId}:${promptVersion}:${inputHash}`.
  *
  * Keyed by `category` (the {@link NewsFeedCategory} bucket), `modelId`,
- * {@link NEWS_PROMPT_TEMPLATE_VERSION}, and `inputHash` (a deterministic hash
+ * {@link MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION}, and `inputHash` (a deterministic hash
  * of the article IDs and skill fingerprint) so different feed categories,
  * models, prompt-template generations, and article sets cache independently.
  *
@@ -2082,7 +2100,7 @@ export function buildMarketNewsDigestCacheKey(
     reasoning?: boolean,
     locale?: AnalysisLocale
 ): string {
-    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${NEWS_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
+    return `${CACHE_KEY_SCHEMA_VERSION}:analysis:market-news:${category}:${modelId}:${MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION}:${inputHash}${reasoningKeySuffix(reasoning)}${localeKeySuffix(locale)}`;
 }
 
 /**
