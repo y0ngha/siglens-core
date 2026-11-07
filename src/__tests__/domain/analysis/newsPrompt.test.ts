@@ -655,6 +655,64 @@ describe('buildNewsAnalysisPrompt — macro calendar', () => {
         });
     });
 
+    describe('upcomingEventsKo macro cap', () => {
+        const build = (
+            assetClass: 'equity' | 'crypto',
+            macro: EconomicCalendarEvent[]
+        ) =>
+            buildNewsAnalysisPromptRaw(
+                TEST_SYMBOL,
+                'Apple Inc.',
+                [],
+                [],
+                [],
+                assetClass,
+                'ko',
+                'USD',
+                MACRO_NOW,
+                macro
+            ).dynamic;
+
+        it('equity: at most one macro release, only when an article ties it to the company', () => {
+            expect(build('equity', [MACRO_EVENT_CPI])).toContain(
+                '- upcomingEventsKo may include at most one Macro Calendar release, and only when an article above links that release to this company.'
+            );
+        });
+
+        it('crypto: up to two macro releases', () => {
+            const dynamic = build('crypto', [MACRO_EVENT_CPI]);
+            expect(dynamic).toContain(
+                '- upcomingEventsKo may include at most two Macro Calendar releases'
+            );
+            expect(dynamic).not.toContain('at most one Macro Calendar release');
+        });
+
+        it('crypto: the first rule names asset milestones, never a company earnings date', () => {
+            const dynamic = build('crypto', [MACRO_EVENT_CPI]);
+            expect(dynamic).toContain(
+                '- upcomingEventsKo lists events specific to this asset first'
+            );
+            expect(dynamic).not.toContain('specific to this company first');
+        });
+
+        it('equity: the earnings row must not be a past (reported) release', () => {
+            expect(build('equity', [])).toContain(
+                'a row that already has reported results is past, not upcoming'
+            );
+        });
+
+        it('no macro calendar: no macro cap rule, company-first and citation rules stay', () => {
+            const dynamic = build('equity', []);
+            expect(dynamic).not.toContain('Macro Calendar release');
+            expect(dynamic).toContain(
+                'upcomingEventsKo lists catalysts specific to this company first'
+            );
+            expect(dynamic).toContain(
+                'End each keyEventsKo bullet with the number of the one article'
+            );
+        });
+    });
+
     it('renders the Macro Calendar section header when non-empty', () => {
         const { dynamic } = buildNewsAnalysisPromptRaw(
             TEST_SYMBOL,

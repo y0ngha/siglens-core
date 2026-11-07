@@ -602,7 +602,7 @@ describe('runNewsAnalysis', () => {
             await runNewsAnalysis(baseArgs());
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p9:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p10:719732b6711a0154'
             );
         });
 
@@ -699,6 +699,83 @@ describe('runNewsAnalysis', () => {
             )![0] as string;
 
             expect(afterReleaseKey).not.toBe(beforeReleaseKey);
+        });
+    });
+
+    describe('기사 번호 표식 → 날짜·출처', () => {
+        const marked = {
+            currentDriverKo: '신제품 발표가 뉴스 흐름을 이끈다 [#1].',
+            keyEventsKo: ['애플이 신제품을 발표했다 [#1].'],
+            upcomingEventsKo: ['신제품 출시, 날짜 미정 [#1]'],
+            overallSentiment: 'bullish' as const,
+        };
+        const resolved = {
+            currentDriverKo: '신제품 발표가 뉴스 흐름을 이끈다.',
+            keyEventsKo: ['애플이 신제품을 발표했다 (5월 1일 · Reuters).'],
+            upcomingEventsKo: ['신제품 출시, 날짜 미정 (Reuters 5월 1일 보도)'],
+            overallSentiment: 'bullish' as const,
+        };
+
+        it('새 생성 결과의 표식을 기사 메타데이터로 바꾸고, 바꾼 결과를 캐시에 쓴다', async () => {
+            mockCallAnalysisAi.mockResolvedValueOnce(JSON.stringify(marked));
+
+            const result = await runNewsAnalysis(baseArgs());
+
+            expect(result).toEqual({ status: 'done', result: resolved });
+            expect(mockCacheSet).toHaveBeenCalledWith(
+                expect.stringContaining(':analysis:news:AAPL:'),
+                resolved,
+                NEWS_CACHE_TTL_SECONDS
+            );
+        });
+
+        it('캐시 적중은 저장된(이미 변환된) 결과를 그대로 돌려준다', async () => {
+            mockCacheGet.mockResolvedValueOnce(resolved);
+            expect(await runNewsAnalysis(baseArgs())).toEqual({
+                status: 'cached',
+                result: resolved,
+            });
+        });
+
+        it('같은 키에 합류한 호출은 자기 순서가 아니라 생성자 순서로 변환된 결과를 받는다', async () => {
+            const reuters = makeEnrichedNewsItem('news-r');
+            const bloomberg = {
+                ...makeEnrichedNewsItem('news-b'),
+                source: 'Bloomberg',
+                publishedAt: '2026-05-03T10:00:00Z',
+            };
+            let release: (raw: string) => void = () => {};
+            mockCallAnalysisAi.mockImplementationOnce(
+                () => new Promise<string>(res => (release = res))
+            );
+
+            // 같은 기사 집합, 다른 순서 → 캐시 키(정렬된 ID 해시)가 같다.
+            const first = runNewsAnalysis({
+                ...baseArgs(),
+                news: [reuters, bloomberg],
+            });
+            const joiner = runNewsAnalysis({
+                ...baseArgs(),
+                news: [bloomberg, reuters],
+            });
+            await vi.waitFor(() =>
+                expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1)
+            );
+            release(
+                JSON.stringify({
+                    ...marked,
+                    keyEventsKo: ['애플이 신제품을 발표했다 [#1].'],
+                })
+            );
+
+            const cite = '애플이 신제품을 발표했다 (5월 1일 · Reuters).';
+            for (const r of await Promise.all([first, joiner])) {
+                expect(r).toMatchObject({
+                    status: 'done',
+                    result: { keyEventsKo: [cite] },
+                });
+            }
+            expect(mockCallAnalysisAi).toHaveBeenCalledTimes(1);
         });
     });
 });
