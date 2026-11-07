@@ -82,23 +82,28 @@ const EN_MONTHS = [
     'Dec',
 ] as const;
 
-function timeZoneFor(currency: CurrencyCode): string {
+function timeZoneFor(currency: CurrencyCode): MarketTimeZone {
     return currency === 'KRW' ? 'Asia/Seoul' : 'America/New_York';
 }
 
-/** One formatter per time zone — only two are ever used. */
-const MONTH_DAY_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+/**
+ * The two market calendars a publish date is read in. Built once: a
+ * formatter is costly to construct and holds no per-call state, so sharing
+ * it cannot change any output.
+ */
+const MONTH_DAY_FORMATTERS = {
+    'Asia/Seoul': monthDayFormat('Asia/Seoul'),
+    'America/New_York': monthDayFormat('America/New_York'),
+} as const;
 
-function monthDayFormatter(timeZone: string): Intl.DateTimeFormat {
-    const existing = MONTH_DAY_FORMATTERS.get(timeZone);
-    if (existing !== undefined) return existing;
-    const created = new Intl.DateTimeFormat('en-US', {
+type MarketTimeZone = keyof typeof MONTH_DAY_FORMATTERS;
+
+function monthDayFormat(timeZone: string): Intl.DateTimeFormat {
+    return new Intl.DateTimeFormat('en-US', {
         timeZone,
         month: 'numeric',
         day: 'numeric',
     });
-    MONTH_DAY_FORMATTERS.set(timeZone, created);
-    return created;
 }
 
 /**
@@ -110,11 +115,11 @@ function monthDayFormatter(timeZone: string): Intl.DateTimeFormat {
  */
 function monthDayIn(
     iso: string,
-    timeZone: string
+    timeZone: MarketTimeZone
 ): { month: number; day: number } | null {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return null;
-    const parts = monthDayFormatter(timeZone).formatToParts(date);
+    const parts = MONTH_DAY_FORMATTERS[timeZone].formatToParts(date);
     const month = Number(parts.find(p => p.type === 'month')?.value);
     const day = Number(parts.find(p => p.type === 'day')?.value);
     if (!Number.isInteger(month) || !Number.isInteger(day)) return null;
@@ -182,13 +187,11 @@ function articleOf(
     group: string,
     articles: readonly CitableArticle[]
 ): CitableArticle | null {
-    for (const n of group.match(MARKER_NUMBER) ?? []) {
-        const candidate = articles[Number(n) - 1];
-        if (candidate !== undefined && candidate.source.trim() !== '') {
-            return candidate;
-        }
-    }
-    return null;
+    return (
+        (group.match(MARKER_NUMBER) ?? [])
+            .map(n => articles[Number(n) - 1])
+            .find(a => a !== undefined && a.source.trim() !== '') ?? null
+    );
 }
 
 /** Place `citation` at the end of `body`, before a sentence-final period. */
