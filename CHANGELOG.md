@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.31.0](https://github.com/y0ngha/siglens-core/compare/v2.30.1...v2.31.0) (2026-11-07)
+
+### Features
+
+* **news:** 핵심 이벤트에 기사 날짜·출처를 달고 다가오는 일정을 종목 고유 일정 중심으로 바꾼다 ([#316](https://github.com/y0ngha/siglens-core/issues/316)) ([36d3cdf](https://github.com/y0ngha/siglens-core/commit/36d3cdfbc8df843ccf34149de657c9f0ca994bc5)), closes [#N](https://github.com/y0ngha/siglens-core/issues/N)
+
 ## [2.30.1](https://github.com/y0ngha/siglens-core/compare/v2.30.0...v2.30.1) (2026-11-06)
 
 ### Bug Fixes
