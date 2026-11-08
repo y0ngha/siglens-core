@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.31.1](https://github.com/y0ngha/siglens-core/compare/v2.31.0...v2.31.1) (2026-11-08)
+
+### Bug Fixes
+
+* **news:** `#` 앞에 단어가 붙은 인용 표식도 날짜·출처로 바꾼다 ([#317](https://github.com/y0ngha/siglens-core/issues/317)) ([5b68964](https://github.com/y0ngha/siglens-core/commit/5b6896491187e2ce95c4e97ee047d9e225bca739))
+
 # [2.31.0](https://github.com/y0ngha/siglens-core/compare/v2.30.1...v2.31.0) (2026-11-07)
 
 ### Features
