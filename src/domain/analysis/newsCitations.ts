@@ -50,9 +50,23 @@ export function citationMarker(n: number | 'N'): string {
  * A marker group plus the whitespace before it. Accepts what the model
  * actually writes besides the requested `[#3]`: several numbers in one
  * bracket (`[#2, #5]`, `[#2,5]`), a range (`[#3-5]`, `[#3–#5]`), and
- * full-width brackets in ja/zh output (`［#3］`, `【#3】`).
+ * full-width brackets in ja/zh output (`［#3］`, `【#3】`), and a short label
+ * the model sometimes puts before a `#` (`[페이퍼 #21]`, `[기사#3]`,
+ * `[기사 #1, 기사 #2]`, seen in production 2026-11-08).
+ *
+ * The label ({@link MARKER_LABEL}) is letters, spaces and hyphens only, up to
+ * 20 characters. No digits: the cited number is read with
+ * {@link MARKER_NUMBER}, so a digit in the label would be cited instead of the
+ * article number. No punctuation, so `[No. #1]` stays text. A letters-only
+ * bracket ending in `#number` (`[Top #1]`) is read as a marker on purpose:
+ * in a news bullet that shape is far more often a leaked marker than prose,
+ * and a leaked marker is what a reader must never see.
  */
-const MARKER_GROUP = /\s*[[［【]#\d+(?:\s*[,，、\-–~]\s*#?\d+)*[\]］】]/g;
+const MARKER_LABEL = String.raw`(?:\p{L}[\p{L} \-]{0,19})?`;
+const MARKER_GROUP = new RegExp(
+    String.raw`\s*[[［【]${MARKER_LABEL}#\d+(?:\s*[,，、\-–~]\s*${MARKER_LABEL}#?\d+)*[\]］】]`,
+    'gu'
+);
 
 /**
  * A copy of the article list's own `[3]` numbering at the very end of a

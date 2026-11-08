@@ -124,6 +124,59 @@ describe('resolveCitationMarkers — 모델이 실제로 쓰는 변형', () => {
         ).toBe('売上が増えた（10月15日・Reuters）。');
     });
 
+    // 2026-11-08 운영 PEPEUSD 스냅샷: 모델이 `#` 앞에 단어를 붙여 표식이 화면에 그대로 남았다.
+    it.each([
+        ['단어 + 공백', '매수세가 유입됐다 [페이퍼 #1].'],
+        ['단어 붙여쓰기', '매수세가 유입됐다 [기사#1].'],
+        [
+            '영문 여러 단어(20자 이내)',
+            '매수세가 유입됐다 [Reuters article #1].',
+        ],
+        ['번호마다 단어', '매수세가 유입됐다 [기사 #1, 기사 #2].'],
+        ['글자+#번호 대괄호는 의도적으로 표식', '매수세가 유입됐다 [Top #1].'],
+    ])('#앞에 단어가 붙은 표식(%s)도 인용한다', (_label, text) => {
+        expect(resolveCitationMarkers(text, 'event', ctx())).toBe(
+            '매수세가 유입됐다 (10월 15일 · Reuters).'
+        );
+    });
+
+    it.each([
+        ['전각 대괄호', '売上が増えた［記事 #1］。'],
+        ['겹낫표 괄호', '売上が増えた【報道#1】。'],
+    ])('ja: 단어가 붙은 %s 표식', (_label, text) => {
+        expect(
+            resolveCitationMarkers(text, 'event', ctx({ locale: 'ja' }))
+        ).toBe('売上が増えた（10月15日・Reuters）。');
+    });
+
+    it('단어가 붙은 표식이 여럿이면 마지막 그룹을 인용한다', () => {
+        expect(
+            resolveCitationMarkers(
+                '앞선 보도 [기사 #1]와 달리 가이던스를 올렸다 [기사 #2].',
+                'event',
+                ctx()
+            )
+        ).toBe(
+            '앞선 보도와 달리 가이던스를 올렸다 (10월 20일 · GlobeNewswire).'
+        );
+    });
+
+    it.each([
+        ['단어에 숫자(번호 오인 방지)', '실적 [Q3 #1] 발표'],
+        ['단어에 구두점', '순위 [No. #1] 유지'],
+        ['단어가 20자 초과', '실적 [an unusually long label text #1] 발표'],
+    ])('표식으로 보지 않는다: %s', (_label, text) => {
+        expect(resolveCitationMarkers(text, 'event', ctx())).toBe(text);
+    });
+
+    it('stripCitationMarkers도 단어가 붙은 표식만 지우고 일반 대괄호는 둔다', () => {
+        expect(
+            stripCitationMarkers(
+                '순위 [No. #1] 유지, 수급이 개선됐다 [페이퍼 #23].'
+            )
+        ).toBe('순위 [No. #1] 유지, 수급이 개선됐다.');
+    });
+
     it('목록 번호를 그대로 베낀 끝자리 [3]도 표식으로 본다(문장 중간 [3]은 본문)', () => {
         expect(resolveCitationMarkers('실적 발표 [2].', 'event', ctx())).toBe(
             '실적 발표 (10월 20일 · GlobeNewswire).'
