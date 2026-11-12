@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.32.0](https://github.com/y0ngha/siglens-core/compare/v2.31.1...v2.32.0) (2026-11-12)
+
+### Features
+
+* **news:** 다가오는 일정에 미확정 실적일·펀드 프레이밍을 싣고 매크로로 빈 목록을 채우지 않는다 ([#318](https://github.com/y0ngha/siglens-core/issues/318)) ([d92a6bc](https://github.com/y0ngha/siglens-core/commit/d92a6bcf52dab32ef2ab23d00719f09a8836fdc4))
+
 ## [2.31.1](https://github.com/y0ngha/siglens-core/compare/v2.31.0...v2.31.1) (2026-11-08)
 
 ### Bug Fixes
