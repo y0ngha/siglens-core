@@ -2045,9 +2045,16 @@ export function buildInvestorFlowsCacheKey(
  * {@link MARKET_NEWS_DIGEST_PROMPT_TEMPLATE_VERSION}, so a symbol-news prompt
  * change no longer turns over every category digest.
  *
+ * **`p11`** — upcoming events by instrument. A company's macro cap no longer
+ * lets a generic release fill an otherwise empty list (return `[]` instead);
+ * funds (`instrumentKind: 'fund'`) get fund milestones first and up to two
+ * macro releases; a provider-estimated earnings row is tagged in the calendar
+ * section and must be called an expected date. Bytes change for every
+ * symbol-news request; the digest stays on its own version.
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p10' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p11' as const;
 
 /**
  * Prompt-template version for the market-news category digest

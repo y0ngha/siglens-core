@@ -19,6 +19,7 @@ import type {
     EarningsCalendarItem,
     EconomicCalendarEvent,
     EnrichedNewsItem,
+    NewsInstrumentKind,
     Skill,
 } from '@/domain/types';
 import {
@@ -101,15 +102,87 @@ const CITATION_MARKER_RULE = `- End each keyEventsKo bullet with the number of t
 const UPCOMING_BULLET_SHAPE = `Each bullet names one expected event; an open question with no expected event belongs in currentDriverKo instead. End a milestone taken from an article with that article's ${citationMarker('N')}. When no date is known, mark the milestone with a short phrase meaning the date is not yet set, and do not explain that the article left the date out.`;
 
 /**
- * What goes first in upcomingEventsKo. Equities: the next earnings date
- * (only a row not yet reported — the calendar section also carries past
- * releases), then company milestones. Crypto has no earnings or company,
- * so its rule names asset-level milestones instead.
+ * Whether a tagged (estimated) earnings row is still upcoming — the clause
+ * that tells the model how to word it only renders then. Without a clock
+ * every tagged row counts, since its day offset is unknown too.
  */
-function upcomingFirstRule(assetClass: AssetClass): string {
-    return assetClass === 'crypto'
-        ? `- upcomingEventsKo lists events specific to this asset first: milestones the articles say are coming (an exchange listing or relaunch, a network upgrade, a regulatory or court deadline, a token unlock, a fund decision). ${UPCOMING_BULLET_SHAPE}`
-        : `- upcomingEventsKo lists catalysts specific to this company first: the next earnings date from the earnings calendar (a row that already has reported results is past, not upcoming), then milestones the articles say are coming (a product launch, a regulatory decision, a deal closing, a shareholder vote, a conference the company presents at). ${UPCOMING_BULLET_SHAPE}`;
+function hasUpcomingUnconfirmedEarnings(
+    items: readonly EarningsCalendarItem[],
+    now: Date | undefined
+): boolean {
+    return items.some(item => {
+        if (item.dateConfirmed !== false) return false;
+        if (now === undefined) return true;
+        const days = calendarDayDiff(item.earningsDate, now);
+        return days === null || days >= 0;
+    });
+}
+
+/**
+ * Listing framing for a fund (ETF/ETN/index product). Replaces the company
+ * framing as a whole, so the prompt never calls one symbol both an equity and
+ * a fund, and it carries the same listing facts (currency, KRX session).
+ */
+function fundListingContext(currency: CurrencyCode): string {
+    const notACompany =
+        'It is not an operating company: it has no earnings reports, management, or company milestones. Read the news through what the fund holds, its flows, and the market and macro context.';
+    return currency === 'KRW'
+        ? `This is a fund (ETF, ETN, or index product) listed on the KRX. Prices are quoted in KRW (whole won, no decimal ticks) and the regular session runs 09:00–15:30 KST. Do not describe it as a U.S. product. ${notACompany}`
+        : `This is a U.S.-listed fund (ETF, ETN, or index product). Prices are quoted in USD. ${notACompany}`;
+}
+
+/**
+ * Calendar-row tag for a provider-estimated earnings date (`dateConfirmed: false`).
+ * Plain words, no brackets: brackets read like a citation marker, and a copied
+ * tag must not look like one.
+ */
+const UNCONFIRMED_DATE_TAG = '— date not confirmed, provider estimate';
+
+/**
+ * What goes first in upcomingEventsKo. Companies: the next earnings date
+ * (only a row not yet reported — the calendar section also carries past
+ * releases; an estimated row is called an expected date), then company
+ * milestones. Funds (ETF/ETN/index) and crypto have no earnings or company,
+ * so their rules name product- or asset-level milestones instead.
+ */
+function upcomingFirstRule(
+    assetClass: AssetClass,
+    instrumentKind: NewsInstrumentKind,
+    hasUnconfirmedEarnings: boolean
+): string {
+    if (assetClass === 'crypto') {
+        return `- upcomingEventsKo lists events specific to this asset first: milestones the articles say are coming (an exchange listing or relaunch, a network upgrade, a regulatory or court deadline, a token unlock, a fund decision). ${UPCOMING_BULLET_SHAPE}`;
+    }
+    if (instrumentKind === 'fund') {
+        return `- upcomingEventsKo lists events specific to this fund first: milestones the articles say are coming (an index rebalance, a distribution, a fee or methodology change, an event at a major holding that an article ties to the fund). ${UPCOMING_BULLET_SHAPE}`;
+    }
+    // The tag clause renders only when a row carries the tag, so a prompt with
+    // confirmed rows never describes a tag it does not contain.
+    const unconfirmedClause = hasUnconfirmedEarnings
+        ? `; for an upcoming row tagged "${UNCONFIRMED_DATE_TAG}", say the date is expected and not yet announced, in the output language`
+        : '';
+    return `- upcomingEventsKo lists catalysts specific to this company first: the next earnings date from the earnings calendar (a row that already has reported results or is dated before today is past, not upcoming${unconfirmedClause}), then milestones the articles say are coming (a product launch, a regulatory decision, a deal closing, a shareholder vote, a conference the company presents at). ${UPCOMING_BULLET_SHAPE}`;
+}
+
+/**
+ * Macro rows are the same for every symbol, so letting them fill the
+ * upcoming list makes each news page read like the next. A company keeps
+ * one only when an article ties it to the company, and never as filler when
+ * nothing company-specific qualifies (2026-11 production: KR large caps
+ * with no earnings row listed only a generic CPI release). Crypto trades on
+ * liquidity and a fund on what it holds, so both keep up to two.
+ */
+function upcomingMacroRule(
+    assetClass: AssetClass,
+    instrumentKind: NewsInstrumentKind
+): string {
+    if (assetClass === 'crypto') {
+        return '- upcomingEventsKo may include at most two Macro Calendar releases, since liquidity conditions drive this asset.\n';
+    }
+    if (instrumentKind === 'fund') {
+        return '- upcomingEventsKo may include at most two Macro Calendar releases that bear on what this fund holds.\n';
+    }
+    return '- upcomingEventsKo may include at most one Macro Calendar release, and only when an article above links that release to this company. Without such an article, leave macro releases out of upcomingEventsKo, even when nothing company-specific qualifies.\n';
 }
 
 /** Format a single enriched news item into a compact block for the prompt. */
@@ -181,9 +254,13 @@ function formatCalendarItems(
                     ? `Actual EPS: ${fmt(item.epsActual)}`
                     : '';
             const offset = formatDayOffset(item.earningsDate, now);
-            const dateLabel = offset
+            const dated = offset
                 ? `${item.earningsDate} (${offset})`
                 : item.earningsDate;
+            const dateLabel =
+                item.dateConfirmed === false
+                    ? `${dated} ${UNCONFIRMED_DATE_TAG}`
+                    : dated;
             return `  - ${dateLabel}: EPS est. ${eps}${actEps ? ` | ${actEps}` : ''} | Rev est. ${rev}`;
         })
         .join('\n');
@@ -361,6 +438,10 @@ export function formatSentimentTally(
  *   section) — the "section absent, so never mention a macro date" guard is
  *   NOT this prompt's job; it comes from the consumer's own news skill
  *   (the siglens news skill).
+ * @param instrumentKind - `'fund'` frames an equity-class ETF/ETN/index
+ *   product (fund milestones first, up to two macro releases); `'company'`
+ *   (default) keeps company framing. Ignored for crypto. Available on the
+ *   10-argument overload only.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildNewsAnalysisPrompt(
@@ -386,7 +467,8 @@ export function buildNewsAnalysisPrompt(
     locale?: AnalysisLocale,
     currency?: CurrencyCode,
     now?: Date,
-    macroCalendar?: readonly EconomicCalendarEvent[]
+    macroCalendar?: readonly EconomicCalendarEvent[],
+    instrumentKind?: NewsInstrumentKind
 ): AssembledPrompt;
 export function buildNewsAnalysisPrompt(
     symbol: string,
@@ -409,7 +491,9 @@ export function buildNewsAnalysisPrompt(
      * so every existing call site — none of which supplies this parameter —
      * produces byte-identical output to before this parameter existed.
      */
-    macroCalendar: readonly EconomicCalendarEvent[] = []
+    macroCalendar: readonly EconomicCalendarEvent[] = [],
+    /** Company or fund framing for equity symbols; ignored for crypto. */
+    instrumentKind: NewsInstrumentKind = 'company'
 ): AssembledPrompt {
     const companyName =
         typeof companyNameOrNews === 'string' ? companyNameOrNews : symbol;
@@ -481,20 +565,19 @@ export function buildNewsAnalysisPrompt(
         '- Do not claim that the news caused an actual price move.',
     ].join('\n');
 
-    // Macro rows are the same for every symbol, so letting them fill the
-    // upcoming list makes each news page read like the next. Equities keep
-    // one only when an article ties it to the company; crypto has no
-    // earnings and trades on liquidity, so it keeps up to two.
-    const upcomingMacroRule = !hasMacroCalendar
-        ? ''
-        : assetClass === 'crypto'
-          ? '- upcomingEventsKo may include at most two Macro Calendar releases, since liquidity conditions drive this asset.\n'
-          : '- upcomingEventsKo may include at most one Macro Calendar release, and only when an article above links that release to this company. Otherwise leave macro releases out of upcomingEventsKo.\n';
+    // The section also carries releases from the last few days. A row is past
+    // once its date has gone by, even before the provider fills in `actual`
+    // (A/B: a fund listed a released CPI).
+    const macroRule = hasMacroCalendar
+        ? `${upcomingMacroRule(assetClass, instrumentKind)}- A Macro Calendar row dated before today, or one that already has an actual value, is a past release, not an upcoming event.\n`
+        : '';
 
     const assetContext =
         assetClass === 'crypto'
             ? `This is a cryptocurrency with no earnings reports, quarterly fundamentals, or analyst ratings. Focus on regulatory news, macro/liquidity context, protocol updates, and sentiment shifts.`
-            : equityListingContext(currency);
+            : instrumentKind === 'fund'
+              ? fundListingContext(currency)
+              : equityListingContext(currency);
 
     const schemaLang = schemaLanguageLabel(locale);
     const stable = `## News Analysis Frameworks (Active Skills)
@@ -538,8 +621,12 @@ ${localizedFieldDirective(locale)}
 - overallSentiment must be exactly one of: "bullish", "neutral", "bearish".
 - keyEventsKo should cover the 3–5 most market-moving events from the articles above when enough articles exist.
 ${CITATION_MARKER_RULE}
-${upcomingFirstRule(assetClass)}
-${upcomingMacroRule}- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because there has been little recent news coverage.
+${upcomingFirstRule(
+    assetClass,
+    instrumentKind,
+    hasUpcomingUnconfirmedEarnings(upcomingCalendar, now)
+)}
+${macroRule}- If no recent news articles are provided, return keyEventsKo: [], set overallSentiment to "neutral", and state in currentDriverKo that news-based judgment is limited because there has been little recent news coverage.
 - If nothing qualifies for upcomingEventsKo under the rules above, return upcomingEventsKo: [].
 - Base currentDriverKo only on the articles and calendar rows above. Do not attribute price moves to the news.
 ${DRIVER_READER_FACING_RULE}

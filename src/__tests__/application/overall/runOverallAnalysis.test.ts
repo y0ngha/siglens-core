@@ -1341,6 +1341,17 @@ describe('runOverallAnalysis', () => {
             );
         });
 
+        it('최상위 instrumentKind를 news 축에 전달한다(standalone 뉴스와 같은 값이어야 같은 캐시 키)', async () => {
+            await runOverallAnalysis({
+                ...equityOptions(),
+                instrumentKind: 'fund',
+            });
+
+            expect(mockRunNewsAnalysis).toHaveBeenCalledWith(
+                expect.objectContaining({ instrumentKind: 'fund' })
+            );
+        });
+
         it('equity 최상위 assetClass도 news 축에 그대로 전달한다', async () => {
             await runOverallAnalysis(equityOptions());
 

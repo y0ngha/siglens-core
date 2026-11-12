@@ -655,6 +655,72 @@ describe('buildNewsAnalysisPrompt — macro calendar', () => {
         });
     });
 
+    describe('earnings calendar: provider-estimated date', () => {
+        const calendarLine = (item: EarningsCalendarItem) =>
+            buildNewsAnalysisPromptRaw(
+                TEST_SYMBOL,
+                'Apple Inc.',
+                [],
+                [item],
+                [],
+                'equity',
+                'ko',
+                'USD',
+                MACRO_NOW
+            )
+                .dynamic.split('\n')
+                .find(l => l.startsWith(`  - ${item.earningsDate}`));
+
+        const fullPrompt = (item: EarningsCalendarItem) =>
+            buildNewsAnalysisPromptRaw(
+                TEST_SYMBOL,
+                'Apple Inc.',
+                [],
+                [item],
+                [],
+                'equity',
+                'ko',
+                'USD',
+                MACRO_NOW
+            ).dynamic;
+
+        it('tags a dateConfirmed:false row (no brackets) and the company rule says to call it expected', () => {
+            const item = { ...UPCOMING_EARNINGS, dateConfirmed: false };
+            expect(calendarLine(item)).toContain(
+                '— date not confirmed, provider estimate'
+            );
+            expect(calendarLine(item)).not.toMatch(/\[date/);
+            expect(fullPrompt(item)).toContain(
+                'say the date is expected and not yet announced'
+            );
+        });
+
+        it('a past-dated tagged row does not render the wording clause', () => {
+            expect(
+                fullPrompt({
+                    ...UPCOMING_EARNINGS,
+                    earningsDate: '2025-04-20',
+                    dateConfirmed: false,
+                })
+            ).not.toContain('not yet announced');
+        });
+
+        it('the tag clause is absent when no row is tagged', () => {
+            expect(fullPrompt(UPCOMING_EARNINGS)).not.toContain(
+                'not yet announced'
+            );
+        });
+
+        it.each([
+            ['confirmed', true],
+            ['unknown', undefined],
+        ])('%s row has no tag', (_label, dateConfirmed) => {
+            expect(
+                calendarLine({ ...UPCOMING_EARNINGS, dateConfirmed })
+            ).not.toContain('date not confirmed');
+        });
+    });
+
     describe('upcomingEventsKo macro cap', () => {
         const build = (
             assetClass: 'equity' | 'crypto',
@@ -697,8 +763,108 @@ describe('buildNewsAnalysisPrompt — macro calendar', () => {
 
         it('equity: the earnings row must not be a past (reported) release', () => {
             expect(build('equity', [])).toContain(
-                'a row that already has reported results is past, not upcoming'
+                'a row that already has reported results or is dated before today is past, not upcoming'
             );
+        });
+
+        it('company: without a linking article, a macro release never fills an otherwise empty list', () => {
+            expect(build('equity', [MACRO_EVENT_CPI])).toContain(
+                'Without such an article, leave macro releases out of upcomingEventsKo, even when nothing company-specific qualifies.'
+            );
+        });
+
+        const buildFund = (macro: EconomicCalendarEvent[]) =>
+            buildNewsAnalysisPromptRaw(
+                'SPY',
+                'SPDR S&P 500 ETF Trust',
+                [],
+                [],
+                [],
+                'equity',
+                'ko',
+                'USD',
+                MACRO_NOW,
+                macro,
+                'fund'
+            ).dynamic;
+
+        it('fund: fund milestones first and up to two macro releases, no company or earnings rule', () => {
+            const dynamic = buildFund([MACRO_EVENT_CPI]);
+            expect(dynamic).toContain(
+                '- upcomingEventsKo lists events specific to this fund first'
+            );
+            expect(dynamic).toContain(
+                'This is a U.S.-listed fund (ETF, ETN, or index product).'
+            );
+            expect(dynamic).not.toContain('publicly traded U.S. equity');
+            expect(dynamic).toContain(
+                '- upcomingEventsKo may include at most two Macro Calendar releases that bear on what this fund holds.'
+            );
+            expect(dynamic).not.toContain('specific to this company first');
+            expect(dynamic).not.toContain('at most one Macro Calendar release');
+        });
+
+        it('a released macro row (actual filled) is never an upcoming event', () => {
+            for (const dynamic of [
+                build('equity', [MACRO_EVENT_CPI]),
+                build('crypto', [MACRO_EVENT_CPI]),
+                buildFund([MACRO_EVENT_CPI]),
+            ]) {
+                expect(dynamic).toContain(
+                    '- A Macro Calendar row dated before today, or one that already has an actual value, is a past release, not an upcoming event.'
+                );
+            }
+            expect(build('equity', [])).not.toContain(
+                'already has an actual value'
+            );
+        });
+
+        it('fund without a macro calendar: fund rule and fund framing stay, no macro cap', () => {
+            const dynamic = buildFund([]);
+            expect(dynamic).toContain(
+                '- upcomingEventsKo lists events specific to this fund first'
+            );
+            expect(dynamic).toContain('It is not an operating company');
+            expect(dynamic).not.toContain('Macro Calendar release');
+        });
+
+        it('KRW fund keeps the KRX listing facts', () => {
+            const dynamic = buildNewsAnalysisPromptRaw(
+                '069500.KS',
+                'KODEX 200',
+                [],
+                [],
+                [],
+                'equity',
+                'ko',
+                'KRW',
+                MACRO_NOW,
+                [],
+                'fund'
+            ).dynamic;
+            expect(dynamic).toContain(
+                'This is a fund (ETF, ETN, or index product) listed on the KRX.'
+            );
+            expect(dynamic).toContain('09:00–15:30 KST');
+            expect(dynamic).not.toContain('Korean equity');
+        });
+
+        it('crypto ignores instrumentKind', () => {
+            const crypto = (kind: 'company' | 'fund') =>
+                buildNewsAnalysisPromptRaw(
+                    'BTCUSD',
+                    'Bitcoin',
+                    [],
+                    [],
+                    [],
+                    'crypto',
+                    'ko',
+                    'USD',
+                    MACRO_NOW,
+                    [MACRO_EVENT_CPI],
+                    kind
+                ).dynamic;
+            expect(crypto('fund')).toBe(crypto('company'));
         });
 
         it('no macro calendar: no macro cap rule, company-first and citation rules stay', () => {
