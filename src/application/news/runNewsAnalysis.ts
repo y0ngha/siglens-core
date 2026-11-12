@@ -32,6 +32,7 @@ import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import type {
     ActiveModelId,
     NewsAnalysisResponse,
+    NewsInstrumentKind,
     Skill,
 } from '@/domain/types';
 import {
@@ -64,16 +65,21 @@ function hashNewsInput(
     earningsDates: readonly string[],
     tier: string,
     skills: readonly Skill[],
-    macroFingerprintParts: readonly string[]
+    macroFingerprintParts: readonly string[],
+    instrumentKind: NewsInstrumentKind
 ): string {
     const sortedIds = newsIds.toSorted().join(',');
     const sortedDates = earningsDates.toSorted().join(',');
     const skillFingerprint = JSON.stringify(normalizeSkillsForHash(skills));
     const base = `${tier}|${sortedIds}|${sortedDates}|${skillFingerprint}`;
-    return hashAnalysisInput(
+    const withMacro =
         macroFingerprintParts.length > 0
             ? `${base}|${macroFingerprintParts.join(',')}`
-            : base
+            : base;
+    // Fund framing changes the prompt, so it gets its own entry; company (the
+    // default) adds nothing and keeps every existing key.
+    return hashAnalysisInput(
+        instrumentKind === 'fund' ? `${withMacro}|fund` : withMacro
     );
 }
 
@@ -176,10 +182,20 @@ export async function runNewsAnalysis(
     // would keep returning the previous result for the full 24h TTL.
     const { skills } = await loadSkillsCached();
     const newsIds = news.map(n => n.id);
-    const earningsDates = upcomingCalendar.map(c => c.earningsDate);
+    // An estimated date carries a `~` so the cached result turns over when the
+    // company confirms it (the prompt labels the two differently). Confirmed
+    // and unknown rows keep the bare date, so their keys are unchanged.
+    const earningsDates = upcomingCalendar.map(c =>
+        c.dateConfirmed === false ? `${c.earningsDate}~` : c.earningsDate
+    );
     // Empty when `macroCalendar` is omitted/[] — spreading zero extra parts
     // keeps the seed identical to every call site before this option existed.
     const macroFingerprintParts = macroCalendarFingerprintParts(macroCalendar);
+    // Crypto ignores the framing, so it never splits crypto keys.
+    const instrumentKind: NewsInstrumentKind =
+        options.assetClass === 'crypto'
+            ? 'company'
+            : (options.instrumentKind ?? 'company');
     const skillSampling = createSkillSamplingPlan(skills, tier, [
         'news',
         symbol,
@@ -193,13 +209,15 @@ export async function runNewsAnalysis(
         ...(macroFingerprintParts.length > 0
             ? ['macro-calendar', ...macroFingerprintParts]
             : []),
+        ...(instrumentKind === 'fund' ? ['fund'] : []),
     ]);
     const inputHash = hashNewsInput(
         newsIds,
         earningsDates,
         tier,
         skillSampling.skills,
-        macroFingerprintParts
+        macroFingerprintParts,
+        instrumentKind
     );
     const cacheKey = buildNewsCacheKey(
         symbol,
@@ -257,7 +275,8 @@ export async function runNewsAnalysis(
         locale,
         options.currency,
         occurredAt,
-        macroCalendar
+        macroCalendar,
+        instrumentKind
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

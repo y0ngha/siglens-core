@@ -397,6 +397,7 @@ export type {
     AssetClass,
     CurrencyCode,
     MarketSessionSpec,
+    NewsInstrumentKind,
 } from './domain/types';
 
 // Economy (macro) domain types — /economy page snapshot + briefing

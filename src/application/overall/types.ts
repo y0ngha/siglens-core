@@ -36,6 +36,7 @@ import type {
     InvestorFlowsScorecard,
     ModelId,
     NewsAnalysisResponse,
+    NewsInstrumentKind,
     OptionsAnalysisResponse,
     OptionsSnapshot,
     OverallAnalysisResponse,
@@ -449,6 +450,15 @@ export interface OverallDependencyInputs {
      * Optional for backward compatibility — omit to keep equity behavior.
      */
     assetClass?: AssetClass;
+
+    /**
+     * Company or fund framing, forwarded to the news axis after the per-axis
+     * `news` options, so this top-level value always wins. It is part of the
+     * news cache key (`'fund'` only), so an overall run and a standalone
+     * `runNewsAnalysis` call share an entry only when both pass the same value.
+     * Defaults to `'company'`.
+     */
+    instrumentKind?: NewsInstrumentKind;
 
     /**
      * Listing quote currency, supplied from the caller's market profile (core

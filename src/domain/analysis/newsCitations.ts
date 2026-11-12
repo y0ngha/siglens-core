@@ -52,7 +52,8 @@ export function citationMarker(n: number | 'N'): string {
  * bracket (`[#2, #5]`, `[#2,5]`), a range (`[#3-5]`, `[#3–#5]`), and
  * full-width brackets in ja/zh output (`［#3］`, `【#3】`), and a short label
  * the model sometimes puts before a `#` (`[페이퍼 #21]`, `[기사#3]`,
- * `[기사 #1, 기사 #2]`, seen in production 2026-11-08).
+ * `[기사 #1, 기사 #2]`, seen in production 2026-11-08), plus padding or
+ * quotes around any member (`[ #5 ]`, `["#6"]`, `["#5", "#6"]`, 2026-11-12).
  *
  * The label ({@link MARKER_LABEL}) is letters, spaces and hyphens only, up to
  * 20 characters. No digits: the cited number is read with
@@ -63,8 +64,10 @@ export function citationMarker(n: number | 'N'): string {
  * and a leaked marker is what a reader must never see.
  */
 const MARKER_LABEL = String.raw`(?:\p{L}[\p{L} \-]{0,19})?`;
+/** Spaces or quote marks the model puts just inside a marker's brackets. */
+const MARKER_PAD = String.raw`[\s"'“”‘’]*`;
 const MARKER_GROUP = new RegExp(
-    String.raw`\s*[[［【]${MARKER_LABEL}#\d+(?:\s*[,，、\-–~]\s*${MARKER_LABEL}#?\d+)*[\]］】]`,
+    String.raw`\s*[[［【]${MARKER_PAD}${MARKER_LABEL}#\d+${MARKER_PAD}(?:\s*[,，、\-–~]\s*${MARKER_PAD}${MARKER_LABEL}#?\d+${MARKER_PAD})*[\]］】]`,
     'gu'
 );
 

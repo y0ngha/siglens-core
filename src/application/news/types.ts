@@ -15,6 +15,7 @@ import type {
     ModelId,
     NewsAnalysisResponse,
     NewsCardAnalysis,
+    NewsInstrumentKind,
     NewsItem,
     Tier,
     TierConfig,
@@ -112,6 +113,14 @@ export interface SubmitNewsAnalysisOptions
      * Defaults to `'equity'` for backward compatibility.
      */
     assetClass?: AssetClass;
+    /**
+     * Company or fund framing for an equity-class symbol (see
+     * {@link NewsInstrumentKind}). Defaults to `'company'`; ignored for
+     * crypto. `'fund'` is folded into the input hash and skill-sampling seed,
+     * so company and fund framings never share a cache entry; `'company'`
+     * adds nothing and keeps existing keys.
+     */
+    instrumentKind?: NewsInstrumentKind;
     /**
      * Listing quote currency, supplied from the caller's market profile (core
      * never derives it from the symbol — see {@link CurrencyCode}). `KRW`

@@ -391,6 +391,9 @@ export async function runOverallAnalysis(
                 ...(newsFieldIsArray
                     ? undefined
                     : (newsField as object | undefined)),
+                // After the per-axis spread: the top-level value is the one
+                // source, so a stray per-axis field cannot override it.
+                instrumentKind: options.instrumentKind,
                 skipEnqueueIfMiss: topLevelSkipEnqueueIfMiss,
                 force: effectiveAxisForce,
                 signal,

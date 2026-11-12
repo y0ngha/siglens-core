@@ -602,8 +602,62 @@ describe('runNewsAnalysis', () => {
             await runNewsAnalysis(baseArgs());
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p10:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
             );
+        });
+
+        it('추정 실적일(dateConfirmed:false)은 캐시 키를 바꾸고, 확정되면 원래 키로 돌아간다', async () => {
+            const keyFor = async (dateConfirmed?: boolean) => {
+                mockCacheGet.mockClear();
+                await runNewsAnalysis({
+                    ...baseArgs(),
+                    upcomingCalendar: [
+                        { ...singleCalendarItem, dateConfirmed },
+                    ],
+                });
+                return mockCacheGet.mock.calls.at(-1)![0] as string;
+            };
+            const estimated = await keyFor(false);
+            expect(estimated).not.toBe(
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
+            );
+            expect(await keyFor(true)).toBe(
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
+            );
+            expect(await keyFor(undefined)).toBe(
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
+            );
+        });
+
+        it('instrumentKind를 프롬프트까지 넘긴다(fund 프레이밍)', async () => {
+            await runNewsAnalysis({
+                ...baseArgs(),
+                macroCalendar: [makeMacroEvent()],
+                instrumentKind: 'fund',
+            });
+            const call = mockCallAnalysisAi.mock.calls.at(-1)![0] as {
+                prompt: string;
+            };
+            expect(call.prompt).toContain(
+                'This is a U.S.-listed fund (ETF, ETN, or index product).'
+            );
+        });
+
+        it('fund는 별도 캐시 엔트리, company는 기존 키 그대로, crypto는 instrumentKind를 무시한다', async () => {
+            const keyFor = async (
+                over: Partial<Parameters<typeof runNewsAnalysis>[0]>
+            ) => {
+                mockCacheGet.mockClear();
+                await runNewsAnalysis({ ...baseArgs(), ...over });
+                return mockCacheGet.mock.calls.at(-1)![0] as string;
+            };
+            const base =
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154';
+            expect(await keyFor({ instrumentKind: 'company' })).toBe(base);
+            expect(await keyFor({ instrumentKind: 'fund' })).not.toBe(base);
+            expect(
+                await keyFor({ assetClass: 'crypto', instrumentKind: 'fund' })
+            ).toBe(await keyFor({ assetClass: 'crypto' }));
         });
 
         it('macroCalendar 생략 시 seedParts가 이 옵션이 생기기 전 목록과 정확히 같다', async () => {
@@ -620,6 +674,15 @@ describe('runNewsAnalysis', () => {
                 'earnings-dates',
                 '2026-07-25',
             ]);
+        });
+
+        it('fund면 seedParts 끝에 fund가 붙고, company는 붙지 않는다', async () => {
+            await runNewsAnalysis({ ...baseArgs(), instrumentKind: 'fund' });
+            expect(findSeedParts('AAPL').at(-1)).toBe('fund');
+
+            mockCreateSkillSamplingPlan.mockClear();
+            await runNewsAnalysis({ ...baseArgs(), instrumentKind: 'company' });
+            expect(findSeedParts('AAPL')).not.toContain('fund');
         });
 
         it('macroCalendar가 있으면 seedParts에 macro-calendar 지문이 추가된다', async () => {

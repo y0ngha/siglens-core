@@ -24,6 +24,17 @@ export type MarketSessionStatus = EtSessionStatus;
 export type AssetClass = 'equity' | 'crypto';
 
 /**
+ * What an equity-class symbol is, for news framing. `'company'` (default) is an
+ * operating company with earnings and company milestones. `'fund'` is an ETF,
+ * ETN, or index product: it has no earnings or company events, and macro
+ * releases are among its main scheduled catalysts. Supplied by the consumer
+ * (core does not classify tickers). `'fund'` is folded into the news input
+ * hash and skill-sampling seed; `'company'` adds nothing. Ignored for
+ * `assetClass: 'crypto'`.
+ */
+export type NewsInstrumentKind = 'company' | 'fund';
+
+/**
  * Currency used to render prices in generated prose.
  *
  * Core never infers this from the symbol. That `005930.KS` is quoted in won is
@@ -3602,6 +3613,13 @@ export interface EarningsCalendarItem {
     revenueActual: number | null;
     revenueEstimated: number | null;
     lastUpdated: string; // ISO date
+    /**
+     * `false` when the provider marks `earningsDate` as its own estimate (not
+     * yet announced by the company, e.g. yahoo `isEarningsDateEstimate`).
+     * Omitted when unknown or confirmed. The news prompt labels a `false` row
+     * so the model calls it an expected date instead of stating it as fact.
+     */
+    dateConfirmed?: boolean;
 }
 
 /** Raw earnings report payload as returned by the data provider. */
