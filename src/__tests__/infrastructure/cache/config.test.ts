@@ -554,7 +554,7 @@ describe('currency wording template versions (p32 bump set)', () => {
         expect(PROMPT_TEMPLATE_VERSION).toBe('p33');
         expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).toBe('f7');
         expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p11');
-        expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p11');
+        expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p12');
         expect(FINANCIALS_PROMPT_TEMPLATE_VERSION).toBe('p9');
         expect(CONGRESS_PROMPT_TEMPLATE_VERSION).toBe('p5');
         expect(INVESTOR_FLOWS_PROMPT_TEMPLATE_VERSION).toBe('p7');

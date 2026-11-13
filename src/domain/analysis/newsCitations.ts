@@ -79,6 +79,24 @@ const MARKER_GROUP = new RegExp(
  */
 const TRAILING_BARE_MARKER = /\s*[[［【]\d+[\]］】](?=[.。!?！？]?$)/;
 
+/**
+ * A bullet that is nothing but `#number` or a list of them (`#16`, `[#16]`,
+ * `#16, #17`); the leading `#` is required. The first number is captured.
+ */
+const LONE_MARKER_BULLET =
+    /^[[［【]?\s*#\s*(\d+)(?:\s*[,，、]\s*#?\s*\d+)*\s*[\]］】]?[.。]?$/;
+
+/**
+ * A bracketed phrase with no digit or `#` at the very end of a bullet (before
+ * optional end punctuation, the same set as {@link TRAILING_BARE_MARKER}),
+ * which the model wrote where the marker belongs (`… [보도에 따르면]`).
+ */
+const TRAILING_PLACEHOLDER =
+    /\s*[[［【][^\d#[\]［］【】\n]{1,20}[\]］】](?=[.。!?！？]?$)/u;
+
+/** Two sentence ends left side by side once a placeholder between them is removed. */
+const DOUBLED_END_PUNCTUATION = /([.。!?！？])[.。]$/;
+
 const MARKER_NUMBER = /\d+/g;
 
 /** Final periods that belong to an abbreviation, not to the sentence. */
@@ -295,11 +313,68 @@ export function applyNewsCitations(
     return {
         ...result,
         currentDriverKo: stripCitationMarkers(result.currentDriverKo),
-        keyEventsKo: result.keyEventsKo
+        keyEventsKo: rejoinSplitMarkers(result.keyEventsKo, true)
             .map(e => resolveCitationMarkers(e, 'event', ctx))
             .filter(e => e.length > 0),
-        upcomingEventsKo: result.upcomingEventsKo
+        // Upcoming bullets keep a trailing bracketed phrase: it may be the
+        // required "date not yet set" note, which has the placeholder's shape.
+        upcomingEventsKo: rejoinSplitMarkers(result.upcomingEventsKo, false)
             .map(e => resolveCitationMarkers(e, 'upcoming', ctx))
             .filter(e => e.length > 0),
     };
+}
+
+/**
+ * Undo one production failure (NET, 2026-11-13): the model ended each bullet
+ * with a bracketed phrase instead of the marker and emitted the article number
+ * as the next bullet (`["… [보도에 따르면]", "#16", …]`).
+ *
+ * A `#number` bullet is folded into the bullet before it as that bullet's
+ * marker. In key events the placeholder phrase it replaced is dropped, and
+ * only in that case, so an ordinary bullet ending in brackets keeps them;
+ * upcoming bullets always keep the phrase (`dropPlaceholder: false`).
+ *
+ * A `#number` bullet that cannot be folded (first in the list, after another
+ * lone number, or after a bullet that already has a marker) is dropped: it is
+ * never reader-facing content, and folding it into a cited bullet would
+ * replace that bullet's own citation.
+ */
+function rejoinSplitMarkers(
+    bullets: readonly string[],
+    dropPlaceholder: boolean
+): string[] {
+    const out: string[] = [];
+    let lastAcceptsMarker = false;
+    for (const bullet of bullets) {
+        const lone = bullet.trim().match(LONE_MARKER_BULLET);
+        if (lone === null) {
+            out.push(bullet);
+            lastAcceptsMarker = !hasMarker(bullet);
+            continue;
+        }
+        if (lastAcceptsMarker) {
+            const prev = out[out.length - 1]!.trim();
+            const body = dropPlaceholder ? dropTrailingPlaceholder(prev) : prev;
+            out[out.length - 1] = `${body} ${citationMarker(Number(lone[1]))}`;
+        }
+        lastAcceptsMarker = false;
+    }
+    return out;
+}
+
+/**
+ * Remove the trailing placeholder phrase. Only when one was removed, collapse
+ * the two sentence ends it sat between (`늘었다. [문구].` → `늘었다.`), so a
+ * bullet with no placeholder keeps its own punctuation (`…`, `?.`).
+ */
+function dropTrailingPlaceholder(text: string): string {
+    const without = text.replace(TRAILING_PLACEHOLDER, '');
+    return without === text
+        ? text
+        : without.replace(DOUBLED_END_PUNCTUATION, '$1');
+}
+
+/** Whether `text` already carries a marker the resolver would read. */
+function hasMarker(text: string): boolean {
+    return text.search(MARKER_GROUP) !== -1 || TRAILING_BARE_MARKER.test(text);
 }

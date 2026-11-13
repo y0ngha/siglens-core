@@ -2052,9 +2052,14 @@ export function buildInvestorFlowsCacheKey(
  * section and must be called an expected date. Bytes change for every
  * symbol-news request; the digest stays on its own version.
  *
+ * **`p12`** — the citation rule adds that the marker stays inside its bullet:
+ * never a phrase in place of the number, never the number as its own bullet
+ * (2026-11 production: one result wrote `[보도에 따르면]` and split `#16`
+ * into the next bullet).
+ *
  * @internal
  */
-export const NEWS_PROMPT_TEMPLATE_VERSION = 'p11' as const;
+export const NEWS_PROMPT_TEMPLATE_VERSION = 'p12' as const;
 
 /**
  * Prompt-template version for the market-news category digest

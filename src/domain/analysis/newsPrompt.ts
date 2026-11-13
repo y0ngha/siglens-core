@@ -96,7 +96,7 @@ export const DRIVER_READER_FACING_RULE =
  * where it slips. The marker text comes from {@link citationMarker}, the
  * same source the resolver parses.
  */
-const CITATION_MARKER_RULE = `- End each keyEventsKo bullet with the number of the one article it mainly rests on, written as ${citationMarker('N')} with that article's number from the list above (article [3] → ${citationMarker(3)}). Do not write the article's publish date or outlet name yourself; they are added from the article list automatically. Use no markers in currentDriverKo.`;
+const CITATION_MARKER_RULE = `- End each keyEventsKo bullet with the number of the one article it mainly rests on, written as ${citationMarker('N')} with that article's number from the list above (article [3] → ${citationMarker(3)}), inside the same bullet. Never write a phrase in place of the number, and never put the number in a bullet of its own. Do not write the article's publish date or outlet name yourself; they are added from the article list automatically. Use no markers in currentDriverKo.`;
 
 /** Shared tail of both upcoming-event rules: one event per bullet, cited, undated said so. */
 const UPCOMING_BULLET_SHAPE = `Each bullet names one expected event; an open question with no expected event belongs in currentDriverKo instead. End a milestone taken from an article with that article's ${citationMarker('N')}. When no date is known, mark the milestone with a short phrase meaning the date is not yet set, and do not explain that the article left the date out.`;
