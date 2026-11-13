@@ -602,7 +602,7 @@ describe('runNewsAnalysis', () => {
             await runNewsAnalysis(baseArgs());
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
             );
         });
 
@@ -619,13 +619,13 @@ describe('runNewsAnalysis', () => {
             };
             const estimated = await keyFor(false);
             expect(estimated).not.toBe(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
             );
             expect(await keyFor(true)).toBe(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
             );
             expect(await keyFor(undefined)).toBe(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
             );
         });
 
@@ -652,7 +652,7 @@ describe('runNewsAnalysis', () => {
                 return mockCacheGet.mock.calls.at(-1)![0] as string;
             };
             const base =
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p11:719732b6711a0154';
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154';
             expect(await keyFor({ instrumentKind: 'company' })).toBe(base);
             expect(await keyFor({ instrumentKind: 'fund' })).not.toBe(base);
             expect(

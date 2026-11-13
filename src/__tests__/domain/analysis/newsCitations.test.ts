@@ -239,4 +239,124 @@ describe('applyNewsCitations', () => {
             overallSentiment: 'neutral',
         });
     });
+
+    // 2026-11-13 운영 NET 스냅샷: 표식 자리에 문구를 쓰고 번호를 다음 불릿으로 뗐다.
+    it('번호만 있는 불릿은 앞 불릿의 표식으로 합치고, 그 자리의 대괄호 문구를 지운다', () => {
+        expect(
+            applyNewsCitations(
+                {
+                    currentDriverKo: '동인',
+                    keyEventsKo: [
+                        '매출이 39% 늘었습니다. [보도에 따르면]',
+                        '#1',
+                        '가이던스를 올렸습니다. [보도에 따르면]',
+                        '[#2]',
+                    ],
+                    upcomingEventsKo: ['주주총회 [일정 미정]', '#2'],
+                    overallSentiment: 'bullish',
+                },
+                ctx()
+            )
+        ).toEqual({
+            currentDriverKo: '동인',
+            keyEventsKo: [
+                '매출이 39% 늘었습니다 (10월 15일 · Reuters).',
+                '가이던스를 올렸습니다 (10월 20일 · GlobeNewswire).',
+            ],
+            // 다가오는 일정은 '[일정 미정]' 같은 필수 문구일 수 있어 지우지 않는다.
+            upcomingEventsKo: [
+                '주주총회 [일정 미정] (GlobeNewswire 10월 20일 보도)',
+            ],
+            overallSentiment: 'bullish',
+        });
+    });
+
+    const keyEvents = (keyEventsKo: string[]) =>
+        applyNewsCitations(
+            {
+                currentDriverKo: '동인',
+                keyEventsKo,
+                upcomingEventsKo: [],
+                overallSentiment: 'neutral',
+            },
+            ctx()
+        ).keyEventsKo;
+
+    it('합칠 앞 불릿이 없는 번호 불릿(맨 앞·연속)은 버린다', () => {
+        expect(keyEvents(['#1', '#2', '사건 [보도에 따르면]', '#1'])).toEqual([
+            '사건 (10월 15일 · Reuters)',
+        ]);
+    });
+
+    it('이미 표식이 있는 불릿 뒤의 번호 불릿은 합치지 않고 버린다(원래 인용 유지)', () => {
+        expect(keyEvents(['사건 A [#1]', '#2', '사건 B [#2]'])).toEqual([
+            '사건 A (10월 15일 · Reuters)',
+            '사건 B (10월 20일 · GlobeNewswire)',
+        ]);
+    });
+
+    it.each([
+        [
+            '마침표 뒤 문구',
+            '매출이 늘었다. [보도에 따르면].',
+            '#1',
+            '매출이 늘었다 (10월 15일 · Reuters).',
+        ],
+        [
+            '전각 괄호 번호',
+            '매출이 늘었다 [보도에 따르면]',
+            '［#1］',
+            '매출이 늘었다 (10월 15일 · Reuters)',
+        ],
+        [
+            '번호 목록',
+            '매출이 늘었다 [보도에 따르면]',
+            '#1, #2',
+            '매출이 늘었다 (10월 15일 · Reuters)',
+        ],
+        // 범위 밖 번호: 문구는 지워지고 인용은 붙지 않는다(문구가 노출되는 것보다 낫다).
+        [
+            '범위 밖 번호',
+            '매출이 늘었다 [보도에 따르면]',
+            '#99',
+            '매출이 늘었다',
+        ],
+    ])('합치기 변형: %s', (_label, prev, lone, expected) => {
+        expect(keyEvents([prev, lone])).toEqual([expected]);
+    });
+
+    it('문구가 없으면 끝 문장부호를 건드리지 않는다(말줄임표)', () => {
+        expect(keyEvents(['논의가 이어졌다..', '#1'])).toEqual([
+            '논의가 이어졌다. (10월 15일 · Reuters).',
+        ]);
+    });
+
+    it('#가 없는 숫자 불릿은 표식으로 보지 않는다', () => {
+        expect(keyEvents(['주주총회 [일정 미정]', '2026'])).toEqual([
+            '주주총회 [일정 미정]',
+            '2026',
+        ]);
+    });
+
+    it('앞 불릿 끝 공백·느낌표 뒤의 대괄호 문구도 지운다', () => {
+        expect(keyEvents(['매출이 늘었다 [보도에 따르면] ', '#1'])).toEqual([
+            '매출이 늘었다 (10월 15일 · Reuters)',
+        ]);
+        expect(keyEvents(['사상 최대 매출 [보도에 따르면]!', '#1'])).toEqual([
+            '사상 최대 매출! (10월 15일 · Reuters)',
+        ]);
+    });
+
+    it('뒤에 번호 불릿이 없으면 끝의 대괄호 문구는 본문으로 남긴다', () => {
+        const result = applyNewsCitations(
+            {
+                currentDriverKo: '동인',
+                keyEventsKo: ['신제품을 공개했습니다 [속보]', '사건 [#1]'],
+                upcomingEventsKo: [],
+                overallSentiment: 'neutral',
+            },
+            ctx()
+        );
+        expect(result.keyEventsKo[0]).toBe('신제품을 공개했습니다 [속보]');
+    });
 });
