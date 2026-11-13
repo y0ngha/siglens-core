@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.32.1](https://github.com/y0ngha/siglens-core/compare/v2.32.0...v2.32.1) (2026-11-13)
+
+### Bug Fixes
+
+* **news:** 번호가 다음 불릿으로 떨어진 인용 표식을 앞 불릿에 다시 붙인다 ([#319](https://github.com/y0ngha/siglens-core/issues/319)) ([9e19e70](https://github.com/y0ngha/siglens-core/commit/9e19e706d3db5c2c6013145bb4d535b5be20896b))
+
 # [2.32.0](https://github.com/y0ngha/siglens-core/compare/v2.31.1...v2.32.0) (2026-11-12)
 
 ### Features
