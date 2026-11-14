@@ -279,6 +279,9 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | Symbol | Source |
 |---|---|
 | `aggregateBarsToWeekly(bars)` — ISO 주(월요일 시작, UTC) 집계. open=첫 open, close=마지막 close, high/low=주간 최댓값/최솟값, volume=합. OHLC가 비정상(비유한·0·음수)인 봉은 건너뛴다. 마지막 미완성 주도 포함. | `domain/analysis/aggregateBarsToWeekly.ts` |
+| `barPeriodStartSeconds(period, unixSeconds)` — `'week'`(ISO 월요일, UTC)·`'month'`(UTC 달력 월) 기간 시작 시각(초). 주봉·월봉 집계가 그 기간 봉에 찍는 `time`과 같다. 소비자가 "이 날짜가 마지막 주봉·월봉과 같은 기간인가"를 경계 재구현 없이 판정할 때 쓴다(타입 `BarPeriod`). | `domain/analysis/barPeriods.ts` |
+| `hasUsablePrices(bar)` — 봉의 OHLC가 모두 유한한 양수인지. 주봉·월봉 집계가 건너뛰는 봉과 같은 판정이다. | `domain/analysis/analysisUtils.ts` |
+| `aggregateBarsToMonthly(bars)` — 달력 월(UTC) 집계. 각 봉의 `time`은 그달 1일 00:00 UTC. 나머지 규칙은 `aggregateBarsToWeekly`와 같다(비정상 OHLC 건너뜀, 마지막 미완성 월 포함). | `domain/analysis/aggregateBarsToMonthly.ts` |
 
 **플랜 점검 (2)** — siglens `get_cached_analysis` 에이전트 툴이 분석 당시 플랜을 **지금 가격** 기준으로 다시 재는 데(`sinceAnalysis.planNow`) 쓴다 — 분석 파이프라인과 같은 진입 기준가·같은 계산.
 | Symbol | Source |
@@ -386,6 +389,7 @@ ai.siglens.io 에이전트가 쓰는 도구 계약. 실행기는 소비자가 �
 | `findToolSpec(name)` — 이름으로 도구 스펙을 찾는다. 없으면 `undefined`. | `domain/agent/tools.ts` |
 | `selectTools(available)` — 소비자가 지금 실행할 수 있는 도구 이름 집합(`ReadonlySet<string>`)으로 카탈로그를 거른다. core는 환경 변수를 읽지 않는다. | `domain/agent/tools.ts` |
 | `FRESH_ANALYSIS_KINDS` — `run_fresh_analysis` 도구가 만들 수 있는 분석 종류(`FreshAnalysisKind`). | `domain/agent/tools.ts` |
+| `AGENT_BARS_TIMEFRAMES` — `get_bars_indicators`가 받는 타임프레임(`AgentBarsTimeframe`): 제공자 타임프레임 전부 + `'1Week'`·`'1Month'`. 다른 도구(`get_cached_analysis`·`run_fresh_analysis`)는 그대로 `TIMEFRAMES`다. **소비자 조치**: `get_bars_indicators` 실행기가 `1Week`/`1Month`를 받으면 일봉(가능하면 5년치 `fearGreedBars`)을 `aggregateBarsToWeekly`/`aggregateBarsToMonthly`로 묶어 지표를 계산하고, 도구 설명이 약속한 대로 `t`=기간 첫날, `asOf`=마지막 일봉 날짜, `higherTimeframe`=1Week에서 월봉·1Month에서 null, `pullback`·`fearGreed`·`calendarChange`·`maCross50_200`·`closeStreak`·`lastCompletedClose`=null로 낸다. **core를 이 버전으로 올리는 변경에 실행기 구현을 함께 넣는다** — 실행기가 모르면 `1Week` 요청이 실패한다. | `domain/agent/tools.ts` |
 | `validateArgs(schema, args)` — 모델이 준 도구 인자를 도구의 JSON Schema 부분집합으로 검증한다. 위반을 모두 모아 `ValidateArgsResult`(`{ ok: true, value }` \| `{ ok: false, issues }`)로 돌려준다. | `domain/agent/validateArgs.ts` |
 | `findUngroundedNumbers(answer, toolResults)` — 최종 답변의 숫자 토큰 중 같은 턴의 도구 결과 문자열에서 근거를 찾지 못한 것(중복 제거, 등장 순). 잘린 도구 결과는 판별할 수 없으므로 호출자가 JSON 경계에서 자른다. | `domain/agent/groundedNumbers.ts` |
 | `estimateTokens(text)` — 보수적 토큰 추정(ASCII 약 3자/토큰, 비ASCII는 글자당 약 1.2토큰). `selectHistoryWindow` 예산에 쓴다. | `domain/agent/selectHistoryWindow.ts` |

@@ -435,7 +435,7 @@ describe('buildAgentSystemPrompt', () => {
             'It stays the very last line, after the source line.'
         );
         expect(prompt).toContain(
-            `End with one final marker line "${AGENT_FOLLOW_UP_MARKER} A" offering a single deeper next step`
+            `End with one final marker line "${AGENT_FOLLOW_UP_MARKER} A" (except after thanks or greetings, see Conversation) offering a single deeper next step`
         );
         // 옛 본문 메뉴 문구는 더 이상 예시로 남지 않는다.
         expect(prompt).not.toContain('더 깊게 볼까요? ①');
@@ -547,7 +547,69 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-10-25.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-14.1');
+    });
+
+    // Measured 2026-11-14: every follow-up drew the full six-part report again
+    // (the same levels, good/caution side and caveat), because only the Depth
+    // shape existed. The Conversation section splits the two turn kinds.
+    it('새 분석과 이어지는 대화 턴을 구분하고, 대화 턴에는 Depth 형태를 쓰지 않는다', () => {
+        expect(prompt).toContain('## Conversation');
+        expect(prompt.indexOf('## Conversation')).toBeLessThan(
+            prompt.indexOf('## Depth')
+        );
+        expect(prompt).toContain('- A new broad read:');
+        expect(prompt).toContain('- A conversational turn: everything else.');
+        expect(prompt).toContain(
+            'The rules below replace the Depth shape for it'
+        );
+        expect(prompt).toContain('For a new broad read, keep to this shape.');
+        expect(prompt).toContain('Do not say again what an earlier answer');
+        expect(prompt).toContain(
+            'does not turn a conversational turn into a new broad read'
+        );
+        // Thanks get one sentence with no data, source line or follow-ups.
+        expect(prompt).toContain(
+            'reply in one short sentence, with no data, no source line and no follow-up line'
+        );
+        expect(prompt).toContain(
+            'Never offer an item you already offered earlier in this conversation'
+        );
+        expect(prompt).toContain(
+            `The follow-up marker line ("${AGENT_FOLLOW_UP_MARKER} …") still ends the answer`
+        );
+    });
+
+    it('보장 문구·가격대는 대화의 첫 방향 판단에만 붙이고, 출처 줄은 도구 수치를 인용할 때만 요구한다', () => {
+        expect(prompt).toContain(
+            'Every new broad read (see Conversation: the first question on a symbol or market, a switch to another one, or an explicit request for a full analysis) carries'
+        );
+        expect(prompt).not.toContain('- Every directional read carries');
+        expect(prompt).not.toContain('never mid-answer and never omitted');
+        expect(prompt).toContain(
+            'It is required whenever the answer quotes a figure or fact from a tool'
+        );
+        expect(prompt).toContain(
+            'Reminder: a conversational follow-up gets a short, direct answer to that question only.'
+        );
+    });
+
+    it('제안한 후속 질문에 대한 짧은 수락은 인사가 아니라 요청이다', () => {
+        expect(prompt).toContain(
+            'A bare yes or ok ("네", "응", "좋아", "ok") right after you offered follow-up questions is not small talk'
+        );
+        expect(prompt).toContain(
+            '(except after thanks or greetings, see Conversation)'
+        );
+    });
+
+    it('주봉·월봉 질문을 1Week·1Month로 보내고 그 기간의 시야를 정한다', () => {
+        expect(prompt).toContain(
+            '1Month bars → months to years; 1Week → weeks to a few months'
+        );
+        expect(prompt).toContain(
+            'for weekly or monthly charts (주봉, 월봉, 장기 추세) pass timeframe 1Week or 1Month'
+        );
     });
 
     // The examples used 279,000 / 265,000원 — a real KRX symbol's levels at

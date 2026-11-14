@@ -281,6 +281,55 @@ describe('runAgentTurn', () => {
         expect(withTools.calls[0].toolChoice).toBeUndefined();
     });
 
+    it('도구 결과 없는 기록이라도 인사·맞장구에는 도구 호출을 강제하지 않는다', async () => {
+        const thanks = scriptedProvider([
+            {
+                text: '천만에요.',
+                toolCalls: [],
+                stopReason: 'end',
+                usage: USAGE,
+            },
+        ]);
+        const result = await runAgentTurn(
+            params({
+                history: [
+                    { role: 'user', content: '엔비디아 어때?' },
+                    { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+                ],
+                userMessage: '아 그렇구나 고마워',
+            }),
+            deps(thanks)
+        );
+        expect(thanks.calls[0].toolChoice).toBeUndefined();
+        expect(result.ok).toBe(true);
+    });
+
+    it.each(['고마워 근데 주봉은?', '네'])(
+        '감사에 질문이 붙거나 제안을 수락하는 %j는 도구 호출을 계속 강제한다',
+        async userMessage => {
+            const p = scriptedProvider([
+                {
+                    text: '',
+                    toolCalls: [quoteCall],
+                    stopReason: 'tool_use',
+                    usage: USAGE,
+                },
+                { text: '답', toolCalls: [], stopReason: 'end', usage: USAGE },
+            ]);
+            await runAgentTurn(
+                params({
+                    history: [
+                        { role: 'user', content: '엔비디아 어때?' },
+                        { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+                    ],
+                    userMessage,
+                }),
+                deps(p)
+            );
+            expect(p.calls[0].toolChoice).toBe('required');
+        }
+    );
+
     it('첫 질문이면 도구 호출을 강제하지 않는다', async () => {
         const first = scriptedProvider([
             { text: '답', toolCalls: [], stopReason: 'end', usage: USAGE },

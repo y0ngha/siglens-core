@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import {
+    AGENT_BARS_TIMEFRAMES,
     AGENT_TOOL_SPECS,
     AGENT_TOOL_NAMES,
     findToolSpec,
@@ -625,5 +627,58 @@ describe('tool descriptions — consumer-provided freshness and history fields',
             'when there are no live option quotes'
         );
         expect(desc('get_economy')).toContain('treasury.date');
+    });
+});
+
+describe('get_bars_indicators 타임프레임', () => {
+    const enumOf = (tool: string) =>
+        findToolSpec(tool)?.inputSchema.properties.timeframe?.enum;
+
+    it('차트 도구만 주봉·월봉을 받는다', () => {
+        expect(AGENT_BARS_TIMEFRAMES).toEqual([
+            ...TIMEFRAMES,
+            '1Week',
+            '1Month',
+        ]);
+        expect(enumOf('get_bars_indicators')).toEqual(AGENT_BARS_TIMEFRAMES);
+        expect(enumOf('get_cached_analysis')).toEqual(TIMEFRAMES);
+        expect(enumOf('run_fresh_analysis')).toEqual(TIMEFRAMES);
+    });
+
+    it('1Week·1Month 인자를 통과시키고 모르는 값은 거부한다', () => {
+        const spec = findToolSpec('get_bars_indicators')!;
+        expect(
+            validateArgs(spec.inputSchema, {
+                symbol: 'AAPL',
+                timeframe: '1Week',
+            }).ok
+        ).toBe(true);
+        expect(
+            validateArgs(spec.inputSchema, {
+                symbol: 'AAPL',
+                timeframe: '1Month',
+            }).ok
+        ).toBe(true);
+        expect(
+            validateArgs(spec.inputSchema, {
+                symbol: 'AAPL',
+                timeframe: '1Year',
+            }).ok
+        ).toBe(false);
+    });
+
+    it('설명이 주봉·월봉 필드 규칙과 연봉 대체를 말한다', () => {
+        const d = findToolSpec('get_bars_indicators')!.description;
+        expect(d).toContain('Timeframes 1Week and 1Month are built by SIGLENS');
+        // DOM-9: the opening names the new branch, not only a later clause.
+        expect(d.slice(0, 160)).toContain(
+            'weekly (1Week) and monthly (1Month)'
+        );
+        expect(d).toContain('never call it a 52-week high or low');
+        expect(d).toContain('`volumeVsAvg20` is null (a partial period');
+        expect(d).toContain("on 1Week '20bars' is the last 20 weeks");
+        expect(d).toContain(
+            'SIGLENS has no yearly bars, so for 연봉/년봉 use 1Month'
+        );
     });
 });

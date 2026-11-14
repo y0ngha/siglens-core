@@ -276,8 +276,14 @@ computing derived values, so a recomputation from the rendered text matches.
   description's opening and defaults, it does not append a clause to an opening that still
   describes only the old scope: the model picks tools from the opening. Cover every branch the
   consumer emits, state the default for an unqualified question, and tell the retry
-  instruction to keep the new discriminating argument. A description edit changes rendered
-  bytes (bump per the bullet below).
+  instruction to keep the new discriminating argument. State what each shared argument (a
+  `range`, a limit) means on the new branch, since its old meaning may not carry over. A
+  description edit changes rendered bytes (bump per the bullet below).
+- A new value or branch also sweeps the rest of the prompt: every rule that lists, gates on or
+  names the old set (supported timeframes, markers, "first" vs "new" reads, exemptions) is
+  updated in the same change, and a new section is read against the sections around it before
+  it ships. Wording that classifies input (small talk, follow-up) must not capture input that
+  another rule treats as a request.
 - Any change to rendered bytes also bumps the cache version
   (`src/infrastructure/CLAUDE.md#INF-4`).
 

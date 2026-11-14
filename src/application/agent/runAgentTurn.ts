@@ -5,6 +5,7 @@ import {
     composeAgentUserMessage,
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
+import { isSmallTalkMessage } from '@/domain/agent/smallTalk';
 import {
     findToolSpec,
     isFreshAnalysisKind,
@@ -307,9 +308,12 @@ export async function runAgentTurn(
     // Earlier answers with no tool results behind them (guest transcripts carry
     // text only): left to choose, the model re-quotes or invents figures for a
     // "tell me more" instead of fetching. The prompt rule alone did not hold in
-    // production, so the first step must call a tool.
+    // production, so the first step must call a tool. Small talk ("고마워",
+    // "아 그렇구나") has nothing to fetch, so it is exempt: forcing a call there
+    // only added a tool round-trip before a one-line reply.
     const requireToolFirst =
         tools.length > 0 &&
+        !isSmallTalkMessage(params.userMessage) &&
         historyWindow.some(m => m.role === 'assistant') &&
         !historyWindow.some(m => m.role === 'tool');
 

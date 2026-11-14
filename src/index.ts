@@ -274,6 +274,10 @@ export {
 // uses it to build the `higherTimeframe` rollup for `1Day` bars, since the
 // domain has no daily→weekly aggregation of its own. Pure/sync, so Tier 2.
 export { aggregateBarsToWeekly } from './domain/analysis/aggregateBarsToWeekly';
+export { aggregateBarsToMonthly } from './domain/analysis/aggregateBarsToMonthly';
+export { barPeriodStartSeconds } from './domain/analysis/barPeriods';
+export type { BarPeriod } from './domain/analysis/barPeriods';
+export { hasUsablePrices } from './domain/analysis/analysisUtils';
 
 // Analysis normalization / helpers
 export {
@@ -453,6 +457,7 @@ export { classifyProviderError } from './application/shared/providerError';
 export {
     AGENT_TOOL_SPECS,
     AGENT_TOOL_NAMES,
+    AGENT_BARS_TIMEFRAMES,
     FRESH_ANALYSIS_KINDS,
     findToolSpec,
     selectTools,
@@ -1151,7 +1156,10 @@ export type {
     AgentProviderResult,
     CallAgentProvider,
 } from './domain/ports/agentProvider';
-export type { FreshAnalysisKind } from './domain/agent/tools';
+export type {
+    AgentBarsTimeframe,
+    FreshAnalysisKind,
+} from './domain/agent/tools';
 
 // Agent chat (ai.siglens.io) — application use-case, policy, pure helper types
 export type {
