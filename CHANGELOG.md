@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.33.0](https://github.com/y0ngha/siglens-core/compare/v2.32.1...v2.33.0) (2026-11-14)
+
+### Features
+
+* **agent:** 이어지는 대화 턴은 짧게 답하고, 차트 도구에 주봉·월봉을 추가한다 ([32205e4](https://github.com/y0ngha/siglens-core/commit/32205e43edee341d84736716e619e130e2c99ae5))
+
 ## [2.32.1](https://github.com/y0ngha/siglens-core/compare/v2.32.0...v2.32.1) (2026-11-13)
 
 ### Bug Fixes
