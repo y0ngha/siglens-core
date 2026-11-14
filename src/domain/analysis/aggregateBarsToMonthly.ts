@@ -1,12 +1,6 @@
 import { aggregateBarsByPeriod } from '@/domain/analysis/aggregateBarsByPeriod';
-import { MS_PER_SECOND } from '@/domain/constants/time';
+import { monthStartMs } from '@/domain/analysis/barPeriods';
 import type { Bar } from '@/domain/types';
-
-/** @internal Unix-ms timestamp of the 1st of the UTC calendar month containing `unixSeconds`, 00:00:00 UTC. */
-function monthStartMs(unixSeconds: number): number {
-    const d = new Date(unixSeconds * MS_PER_SECOND);
-    return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), 1);
-}
 
 /**
  * Aggregate daily (or any sub-monthly) bars into calendar-month bars (UTC).

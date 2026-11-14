@@ -14,7 +14,11 @@ import type {
     UsageRepository,
 } from '@/index';
 import {
+    AGENT_BARS_TIMEFRAMES,
+    aggregateBarsToMonthly,
     aggregateBarsToWeekly,
+    barPeriodStartSeconds,
+    hasUsablePrices,
     buildPlanCheck,
     calculateMA,
     findMaCrosses,
@@ -182,6 +186,26 @@ describe('public API exports', () => {
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
         expect(trend).toBe('neutral');
+    });
+
+    it('exports the weekly/monthly bar helpers siglens uses for get_bars_indicators 1Week/1Month', () => {
+        expect(AGENT_BARS_TIMEFRAMES).toContain('1Week');
+        expect(AGENT_BARS_TIMEFRAMES).toContain('1Month');
+        const day = Math.floor(Date.UTC(2024, 0, 15) / 1000);
+        const bar = {
+            time: day,
+            open: 1,
+            high: 2,
+            low: 1,
+            close: 2,
+            volume: 10,
+        };
+        expect(aggregateBarsToMonthly([bar])[0]?.time).toBe(
+            Math.floor(Date.UTC(2024, 0, 1) / 1000)
+        );
+        expect(barPeriodStartSeconds('week', day)).toBe(day);
+        expect(hasUsablePrices(bar)).toBe(true);
+        expect(hasUsablePrices({ ...bar, close: 0 })).toBe(false);
     });
 
     it('exports aggregateBarsToWeekly so siglens can build the agent tool higherTimeframe rollup', () => {

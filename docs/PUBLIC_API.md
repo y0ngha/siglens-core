@@ -279,6 +279,8 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | Symbol | Source |
 |---|---|
 | `aggregateBarsToWeekly(bars)` — ISO 주(월요일 시작, UTC) 집계. open=첫 open, close=마지막 close, high/low=주간 최댓값/최솟값, volume=합. OHLC가 비정상(비유한·0·음수)인 봉은 건너뛴다. 마지막 미완성 주도 포함. | `domain/analysis/aggregateBarsToWeekly.ts` |
+| `barPeriodStartSeconds(period, unixSeconds)` — `'week'`(ISO 월요일, UTC)·`'month'`(UTC 달력 월) 기간 시작 시각(초). 주봉·월봉 집계가 그 기간 봉에 찍는 `time`과 같다. 소비자가 "이 날짜가 마지막 주봉·월봉과 같은 기간인가"를 경계 재구현 없이 판정할 때 쓴다(타입 `BarPeriod`). | `domain/analysis/barPeriods.ts` |
+| `hasUsablePrices(bar)` — 봉의 OHLC가 모두 유한한 양수인지. 주봉·월봉 집계가 건너뛰는 봉과 같은 판정이다. | `domain/analysis/analysisUtils.ts` |
 | `aggregateBarsToMonthly(bars)` — 달력 월(UTC) 집계. 각 봉의 `time`은 그달 1일 00:00 UTC. 나머지 규칙은 `aggregateBarsToWeekly`와 같다(비정상 OHLC 건너뜀, 마지막 미완성 월 포함). | `domain/analysis/aggregateBarsToMonthly.ts` |
 
 **플랜 점검 (2)** — siglens `get_cached_analysis` 에이전트 툴이 분석 당시 플랜을 **지금 가격** 기준으로 다시 재는 데(`sinceAnalysis.planNow`) 쓴다 — 분석 파이프라인과 같은 진입 기준가·같은 계산.

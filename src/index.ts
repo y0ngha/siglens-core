@@ -275,6 +275,9 @@ export {
 // domain has no daily→weekly aggregation of its own. Pure/sync, so Tier 2.
 export { aggregateBarsToWeekly } from './domain/analysis/aggregateBarsToWeekly';
 export { aggregateBarsToMonthly } from './domain/analysis/aggregateBarsToMonthly';
+export { barPeriodStartSeconds } from './domain/analysis/barPeriods';
+export type { BarPeriod } from './domain/analysis/barPeriods';
+export { hasUsablePrices } from './domain/analysis/analysisUtils';
 
 // Analysis normalization / helpers
 export {

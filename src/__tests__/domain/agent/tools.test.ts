@@ -675,6 +675,7 @@ describe('get_bars_indicators 타임프레임', () => {
             'weekly (1Week) and monthly (1Month)'
         );
         expect(d).toContain('never call it a 52-week high or low');
+        expect(d).toContain('`volumeVsAvg20` is null (a partial period');
         expect(d).toContain("on 1Week '20bars' is the last 20 weeks");
         expect(d).toContain(
             'SIGLENS has no yearly bars, so for 연봉/년봉 use 1Month'
