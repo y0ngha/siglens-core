@@ -284,6 +284,10 @@ computing derived values, so a recomputation from the rendered text matches.
   updated in the same change, and a new section is read against the sections around it before
   it ships. Wording that classifies input (small talk, follow-up) must not capture input that
   another rule treats as a request.
+- A description names a data source only when it holds for every market the tool serves (or
+  the source is named by a result field), a per-call cap is reported to the model (an error
+  or a row), not applied by silently dropping items, and a rule that sends a question to a
+  tool is checked against the tool's own "never for X" wording.
 - Any change to rendered bytes also bumps the cache version
   (`src/infrastructure/CLAUDE.md#INF-4`).
 
@@ -356,7 +360,11 @@ consumer to add later. Check each condition against the tool description and the
 consumer returns today; if the field is not there yet, word the rule so it degrades safely
 when the field is absent, and name the consumer action in the `PUBLIC_API.md` row. A rule
 that holds at only one of the answer levels it governs (summary vs detail) is applied at
-all of them.
+all of them. A routing row or first-step rule is matched before any tool result exists, so a
+condition that reads a tool result (a session flag, a found/degraded field) says to call that
+tool first and decide in a later step; it never gates a first-step parallel call on a fact
+that does not exist yet. Every field a rule reads is in the described result shape, and a
+row that names a tool is gated by the same availability condition as that tool.
 
 ```typescript
 // ❌ 'Judge the zone from latest.rsiZone.'            // consumers do not return rsiZone yet

@@ -15,6 +15,8 @@ import type {
 } from '@/index';
 import {
     AGENT_BARS_TIMEFRAMES,
+    AGENT_MACRO_INSTRUMENTS,
+    AGENT_MACRO_QUOTES_MAX,
     aggregateBarsToMonthly,
     aggregateBarsToWeekly,
     barPeriodStartSeconds,
@@ -186,6 +188,13 @@ describe('public API exports', () => {
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
         expect(trend).toBe('neutral');
+    });
+
+    it('exports the get_macro_quotes instrument list and per-call cap siglens maps to provider symbols', () => {
+        expect(AGENT_MACRO_INSTRUMENTS).toContain('wti');
+        expect(AGENT_MACRO_INSTRUMENTS).toContain('usd_krw');
+        expect(AGENT_MACRO_INSTRUMENTS).toContain('jpy_krw');
+        expect(AGENT_MACRO_QUOTES_MAX).toBe(8);
     });
 
     it('exports the weekly/monthly bar helpers siglens uses for get_bars_indicators 1Week/1Month', () => {
