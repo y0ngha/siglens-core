@@ -7,7 +7,9 @@ import {
     AGENT_FILING_TEXT_MAX_CHARS,
     AGENT_MACRO_INSTRUMENTS,
     AGENT_MACRO_QUOTES_MAX,
+    AGENT_X_POST_TEXT_MAX_CHARS,
     AGENT_X_POSTS_MAX,
+    AGENT_X_POSTS_PAGE_SIZE,
     AGENT_X_POSTS_WINDOW_DAYS,
     AGENT_TOOL_SPECS,
     AGENT_TOOL_NAMES,
@@ -267,11 +269,26 @@ describe('AGENT_TOOL_SPECS', () => {
     it('get_x_posts 설명은 계정별 읽기 실패와 글 없음을 구분하게 한다', () => {
         const d = findToolSpec('get_x_posts')?.description ?? '';
         for (const term of [
-            'loaded, postsInWindow',
+            'loaded, postsInWindow, moreInWindow',
             '`loaded` false means that account could not be read this time',
             'never that it posted nothing',
             'which says nothing about replies or reposts',
-            'means older ones were left out',
+            'means some of the page was left out of the list',
+        ])
+            expect(d).toContain(term);
+    });
+
+    it('get_x_posts 설명은 글 수가 읽은 한 페이지의 값임과 잘린 본문 처리를 정한다', () => {
+        const d = findToolSpec('get_x_posts')?.description ?? '';
+        for (const term of [
+            `only the newest page of its timeline is read (up to ${AGENT_X_POSTS_PAGE_SIZE} posts)`,
+            'not a total for the period',
+            '`moreInWindow` true means the period holds older items that were not read',
+            'With `moreInWindow` false the page is the whole period: 0 then means no original post in the period',
+            'never say they are all of its posts in the period, give a total, or say it posted nothing',
+            'postedAt, text, truncated, url',
+            `longer than ${AGENT_X_POST_TEXT_MAX_CHARS} characters is cut and \`truncated\` is true`,
+            'say the post continues at `url` and never guess the rest',
         ])
             expect(d).toContain(term);
     });
