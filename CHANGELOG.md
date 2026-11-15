@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.34.0](https://github.com/y0ngha/siglens-core/compare/v2.33.0...v2.34.0) (2026-11-15)
+
+### Features
+
+* 에이전트 도구에 애널리스트 전망·매크로 시세 추가 ([#321](https://github.com/y0ngha/siglens-core/issues/321)) ([89a8365](https://github.com/y0ngha/siglens-core/commit/89a8365c41a61c818d5e6fabad8b72ec994e15a8))
+
 # [2.33.0](https://github.com/y0ngha/siglens-core/compare/v2.32.1...v2.33.0) (2026-11-14)
 
 ### Features
