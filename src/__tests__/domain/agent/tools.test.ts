@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     AGENT_BARS_TIMEFRAMES,
+    AGENT_FILINGS_LIST_MAX,
+    AGENT_FILINGS_WINDOW_DAYS,
+    AGENT_FILING_TEXT_MAX_CHARS,
     AGENT_MACRO_INSTRUMENTS,
     AGENT_MACRO_QUOTES_MAX,
     AGENT_TOOL_SPECS,
@@ -13,9 +16,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('17개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(17);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(17);
+    it('18개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(18);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(18);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -38,6 +41,10 @@ describe('AGENT_TOOL_SPECS', () => {
             get_market_overview: { market: 'us' },
             get_economy: {},
             get_analyst_views: { symbol: 'AAPL' },
+            get_company_filings: {
+                symbol: 'AAPL',
+                accession: '0001193125-26-461016',
+            },
             get_macro_quotes: { instruments: ['wti', 'gold'] },
             get_congress_trades: { symbol: 'AAPL' },
             get_investor_flows: { symbol: 'AAPL' },
@@ -133,7 +140,10 @@ describe('AGENT_TOOL_SPECS', () => {
             'null when it could not be loaded, and then every `upsidePct` is null',
             'say that one aggregator could not be loaded only when the answer gives a price target',
             'reason not_a_stock',
-            '`actions.available` false (Korean stocks)',
+            'When `actions.available` is false there is no history to read and `actions.tally` is null',
+            'if `degraded` lists yahoo the history failed to load this time',
+            'never quote zero changes',
+            'reason no_analyst_data',
             'never map one firm',
             '목표가 상향/하향',
         ])
@@ -190,6 +200,38 @@ describe('AGENT_TOOL_SPECS', () => {
             '`targetSourcesDisagree`',
             '`consensusAnalysts`',
             '`consensusSource`',
+        ])
+            expect(d).toContain(term);
+    });
+
+    it('get_company_filings는 심볼만 필수이고 accession은 선택이다', () => {
+        const spec = findToolSpec('get_company_filings');
+        expect(spec?.costClass).toBe('cached');
+        expect(spec?.inputSchema.required).toEqual(['symbol']);
+        const schema = spec!.inputSchema;
+        expect(validateArgs(schema, { symbol: 'IONQ' }).ok).toBe(true);
+        expect(validateArgs(schema, { symbol: 'IONQ', accession: 12 }).ok).toBe(
+            false
+        );
+    });
+
+    it('get_company_filings 설명은 두 단계 사용·읽기 상한·잘림·미공시 종목·오류를 담는다', () => {
+        const d = findToolSpec('get_company_filings')?.description ?? '';
+        for (const term of [
+            'call without `accession` first',
+            `At most ${AGENT_TURN_CAPS.maxFilingReads} filing texts can be read per turn`,
+            'refused with a per-turn quota error',
+            `up to ${AGENT_FILINGS_LIST_MAX}, from the last ${AGENT_FILINGS_WINDOW_DAYS} days`,
+            `the first ${AGENT_FILING_TEXT_MAX_CHARS} characters`,
+            'dashes optional',
+            'instead of retrying',
+            'When `truncated` is true the text is only the opening part',
+            'never state that something is absent from the filing',
+            'reason no_sec_filer',
+            'error unknown_filing',
+            'empty for a 6-K',
+            'GAAP versus adjusted (non-GAAP) labels',
+            '보도자료 원문',
         ])
             expect(d).toContain(term);
     });

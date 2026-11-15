@@ -15,6 +15,13 @@ export const AGENT_TURN_CAPS = {
     maxToolCalls: 30,
     maxWebSearch: 4,
     maxFreshAnalysis: 3,
+    /**
+     * Filing texts one turn may read through `get_company_filings` (a call
+     * with `accession`). A text is up to `AGENT_FILING_TEXT_MAX_CHARS`, so a
+     * third read would crowd the context the answer still needs. Listing
+     * filings (no `accession`) is not counted.
+     */
+    maxFilingReads: 2,
     maxDistinctSymbols: 5,
     turnDeadlineMs: 600_000,
 } as const;

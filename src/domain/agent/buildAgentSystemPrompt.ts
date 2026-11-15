@@ -14,7 +14,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-15.1';
+export const AGENT_PROMPT_VERSION = '2026-11-15.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -157,6 +157,24 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
             `News, events, lawsuits, rulings, or "why did it move / what happened" about a symbol or market → get_news.${available.has('get_analyst_views') ? ' For "why did it move" about a US company stock — not an ETF, an index or a coin — (왜 떨어졌어, 왜 올랐어, 급락 이유, 급등 이유), also call get_analyst_views in the same step: rating and target changes published around the move belong in the answer, each with its date and firm.' : ''}`,
     },
     {
+        // A second call that waits for the first result (the earnings-timing
+        // carve-out below is the other such row): the model cannot know which
+        // filing to read before it has seen the list. US-only is stated first
+        // because the Korean triggers (공시, 임원 변경) also fit Korean stocks,
+        // which have no SEC filings — a caveat at the end of the row came too
+        // late and cost a wasted call.
+        requires: ['get_company_filings'],
+        text: available => {
+            const elsewhere = available.has('get_news')
+                ? 'use the news row for those'
+                : 'answer those from the other matching rows';
+            const beforeSearch = available.has('web_search')
+                ? " For a company's own announcement never call web_search in the first step: list and read the filing first, and search only in a later step if the filings do not cover it."
+                : '';
+            return `For a US-listed company only (a Korean stock or a coin files nothing with the SEC — ${elsewhere}): the details of something the company itself announced — the figures, guidance or the reason behind a number in its earnings release, the terms of a contract, acquisition, share offering or financing, an executive appointment or departure, or "what did it file / announce" (공시 뭐 나왔어, 8-K, 보도자료 원문, 실적 발표 내용, 가이던스, 계약 조건, 인수 조건, 임원 변경, 매출로 잡혀?, 왜 순이익이 늘었어?) → get_company_filings without \`accession\` first; then, in the next step, call it again with the \`accession\` of the filing whose items and headline match, and answer from its text. A follow-up that digs into an announcement an earlier answer mentioned matches this row too.${beforeSearch}`;
+        },
+    },
+    {
         requires: ['get_options_summary'],
         text: 'Options, implied volatility, put/call ratio, max pain, expirations or expected move → get_options_summary.',
     },
@@ -266,7 +284,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         // to web_search; a row that did so without being listed here read as
         // a contradiction and the model declined the search.
         text: available =>
-            `Market, company or economic facts none of the SIGLENS tools above hold (regulation, corporate events the news tool lacks) → web_search. Never for prices, indicators or anything a SIGLENS tool returns a value for, except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying when krInvestorTrend is null or absent; the null-value fallback row${available.has('get_macro_quotes') ? '; a commodity, futures or exchange-rate quote that is not on the get_macro_quotes list' : ''}).`,
+            `Market, company or economic facts none of the SIGLENS tools above hold (regulation, corporate events ${available.has('get_company_filings') ? 'neither the news tool nor a company filing covers' : 'the news tool lacks'}) → web_search. Never for prices, indicators or anything a SIGLENS tool returns a value for, except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying when krInvestorTrend is null or absent; the null-value fallback row${available.has('get_macro_quotes') ? '; a commodity, futures or exchange-rate quote that is not on the get_macro_quotes list' : ''}).`,
     },
     {
         requires: ['web_search'],
@@ -307,7 +325,7 @@ function ruleLines(
 ): string {
     return [
         '- Never quote a price, indicator value, earnings figure, options metric or news item from memory. Fetch it with a tool every time.',
-        '- Call every tool the answer needs in parallel in one step; do not wait for one result to decide the next unless a rule below says so.',
+        '- Call every tool the answer needs in parallel in one step; do not wait for one result to decide the next unless a routing row or a rule says so.',
         '- Computed figures: when a tool result carries a computed figure (derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, upsidePct, gapPct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp, options maxPainDistancePct/impliedMoveRange, macro changes/range52w, other …Pct fields), quote it as given — never recompute it or replace it with your own figure. When the user needs a figure no tool provides, you may compute it from numbers that appear in tool results in this conversation: show the inputs and the operation in one short clause (e.g. "335.26 × 100 = 33,526") so it can be checked. That is one operation for one figure: never chain several calculations, never show working for a figure a tool already gave, and never put a run of arithmetic in parentheses mid-sentence. Never use a number that is not in a tool result as an input.',
         available.has('get_bars_indicators') &&
             '- Horizon: every directional read names its horizon from the timeframe it came from — 1Month bars → months to years; 1Week → weeks to a few months; 1Day bars → days to a few weeks; 4Hour/1Hour → a few days; 30Min and shorter → intraday to a day or two.',
@@ -340,7 +358,7 @@ function ruleLines(
         available.has('get_analyst_views') &&
             '- Analyst actions: cite a rating or target change with its date and firm, and take the number of upgrades, downgrades, target raises or cuts over the last 30 or 90 days from actions.tally, never by counting rows; for any other window list the dated rows inside it without giving a total. Beside a price move, a change is something published on that date: say it coincided with the move, never that it caused it.',
         available.has('get_macro_quotes') &&
-            '- Commodity and futures quotes: a get_macro_quotes item whose contract is not null is the front-month futures price — say so once and never call it the spot price. When its quoteDelayMinutes is above zero say the quote is delayed by that many minutes; when it is 0 or null do not mention a delay. A null changes entry or a null range52w means that history is not available: leave it out, never fill it in.',
+            '- Commodity and futures quotes: a get_macro_quotes item whose contract is not null is the front-month futures price (근월물 in Korean, never 전월물) — say so once and never call it the spot price. When its quoteDelayMinutes is above zero say the quote is delayed by that many minutes; when it is 0 or null do not mention a delay. A null changes entry or a null range52w means that history is not available: leave it out, never fill it in.',
         '- If a tool returns an error, tell the user what could not be fetched; never fabricate a substitute.',
         '- If a tool returns {"error":"login_required"}, say in one sentence that this needs logging in (never call the login "free"), then answer with what you could fetch. Do not call that tool again in this turn.',
     ]
@@ -451,10 +469,10 @@ ${toolList}
 
 ### How to call
 - A message that calls tools contains tool calls only: its text content stays empty. Do not write any text before or between tool calls — no "I'll look up…", "Let me check…" or any other announcement, in any language.
-- Decide everything the answer needs and request it together; once you start writing the answer, finish it without calling more tools.
+- Decide everything the answer needs and request it together, except where a routing row tells you to make a second call after seeing the first result; once you start writing the answer, finish it without calling more tools.
 
 ### Which tools to call
-Match the question against every row below; call the union of all matching rows in one step.
+Match the question against every row below; call the union of all matching rows in one step, except where a row tells you to make a second call after seeing the first result.
 ${routingTable(available)}
 
 ### Rules
@@ -493,7 +511,7 @@ ${AGENT_WRITING_STYLE}
 ## User
 ${
     input.guest
-        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}web search) works without it.`
+        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_company_filings') ? 'company SEC filings, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}web search) works without it.`
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'

@@ -518,6 +518,44 @@ describe('runAgentTurn', () => {
         ).toBeGreaterThan(0);
     });
 
+    it('get_company_filings 본문 읽기는 턴당 상한까지만 실행하고, 목록 조회는 세지 않는다', async () => {
+        const cap = AGENT_TURN_CAPS.maxFilingReads;
+        const read = (id: string) => ({
+            id,
+            name: 'get_company_filings',
+            args: { symbol: 'IONQ', accession: `0001193125-26-00000${id}` },
+        });
+        const list = (id: string, extra: Record<string, unknown> = {}) => ({
+            id,
+            name: 'get_company_filings',
+            args: { symbol: 'IONQ', ...extra },
+        });
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [
+                    list('l0'),
+                    list('l1', { accession: '  ' }),
+                    ...Array.from({ length: cap + 1 }, (_, i) => read(`${i}`)),
+                ],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        await runAgentTurn(
+            params({ availableTools: new Set(['get_company_filings']) }),
+            d
+        );
+        // 목록 2건(accession 없음·공백)은 상한과 무관하게 실행되고, 본문은 cap건만 실행된다.
+        expect(d.executeTool).toHaveBeenCalledTimes(2 + cap);
+        expect(toolResults(p.calls[1]!)[2 + cap]).toEqual({
+            error: 'quota',
+            scope: 'per_turn',
+        });
+    });
+
     it('게스트(free): 턴은 하루 한도로 세고, 새 분석·웹 검색은 제한 없이 실행한다', async () => {
         const p = scriptedProvider([
             {

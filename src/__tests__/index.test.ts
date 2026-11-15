@@ -15,6 +15,9 @@ import type {
 } from '@/index';
 import {
     AGENT_BARS_TIMEFRAMES,
+    AGENT_FILINGS_LIST_MAX,
+    AGENT_FILINGS_WINDOW_DAYS,
+    AGENT_FILING_TEXT_MAX_CHARS,
     AGENT_MACRO_INSTRUMENTS,
     AGENT_MACRO_QUOTES_MAX,
     aggregateBarsToMonthly,
@@ -195,6 +198,12 @@ describe('public API exports', () => {
         expect(AGENT_MACRO_INSTRUMENTS).toContain('usd_krw');
         expect(AGENT_MACRO_INSTRUMENTS).toContain('jpy_krw');
         expect(AGENT_MACRO_QUOTES_MAX).toBe(8);
+    });
+
+    it('exports the get_company_filings contract numbers the siglens executor implements', () => {
+        expect(AGENT_FILINGS_LIST_MAX).toBe(10);
+        expect(AGENT_FILINGS_WINDOW_DAYS).toBe(120);
+        expect(AGENT_FILING_TEXT_MAX_CHARS).toBe(12_000);
     });
 
     it('exports the weekly/monthly bar helpers siglens uses for get_bars_indicators 1Week/1Month', () => {
