@@ -372,7 +372,12 @@ all of them. A routing row or first-step rule is matched before any tool result 
 condition that reads a tool result (a session flag, a found/degraded field) says to call that
 tool first and decide in a later step; it never gates a first-step parallel call on a fact
 that does not exist yet. Every field a rule reads is in the described result shape, and a
-row that names a tool is gated by the same availability condition as that tool.
+row that names a tool is gated by the same availability condition as that tool. A described
+output field must also be one the executor can compute at the cost the tool is allowed to
+spend, and a contract never encodes an unverified provider behaviour: promise what one bounded
+read yields ("in the page read") plus an explicit flag for "more exists", not an exact total
+that would need every item fetched (or billed). Otherwise the model quotes a number nobody
+computed.
 
 ```typescript
 // ❌ 'Judge the zone from latest.rsiZone.'            // consumers do not return rsiZone yet
