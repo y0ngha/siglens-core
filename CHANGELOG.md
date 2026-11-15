@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.36.1](https://github.com/y0ngha/siglens-core/compare/v2.36.0...v2.36.1) (2026-11-15)
+
+### Bug Fixes
+
+* get_x_posts 출력 계약 보완 (한 페이지 읽기·더 있음 표시·본문 상한) ([#324](https://github.com/y0ngha/siglens-core/issues/324)) ([b13ad78](https://github.com/y0ngha/siglens-core/commit/b13ad7835fd338f90cea68929e10472fd4b0a6cd))
+
 # [2.36.0](https://github.com/y0ngha/siglens-core/compare/v2.35.0...v2.36.0) (2026-11-15)
 
 ### Features
