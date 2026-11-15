@@ -91,8 +91,11 @@ export { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
  * market data). 30s covers the first retries but deliberately not the full
  * 10+15+20s ladder: a provider that is still rate-limiting after that is better
  * reported as a failed tool call the model can explain than held for 45s+.
- * `external` is `web_search` (Brave), which has no such backoff; 15s only
- * absorbs its slow tail.
+ * `external` tools are the billed third-party reads: `web_search` (Brave) and
+ * `get_x_posts` (X). Neither has such a backoff; 15s only absorbs a slow tail.
+ * A `get_x_posts` executor reads up to two accounts, so its own per-request
+ * timeouts must add up to less than this ceiling or a slow X turns a partial
+ * result into a failed tool call.
  */
 export const TOOL_TIMEOUT_MS: Readonly<Record<AgentToolCostClass, number>> = {
     free: 30_000,

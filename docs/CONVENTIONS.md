@@ -767,7 +767,9 @@ only the ones labelled "example").
 
 Delete or rewrite placeholders (`expect(true).toBe(true)`, a lone `toBeDefined()`).
 Do not wrap assertions in `if (row)`: assert the row exists, then its value. A loop that
-may `continue` asserts a count showing it checked something. Cover both signs or
+may `continue` asserts a count showing it checked something. An absence assertion on a
+filtered or matched row set (`rows.every(r => !r.includes(x))`, `not.toContain` on a
+match) first asserts the set is non-empty; an empty set passes it vacuously. Cover both signs or
 directions of a rule, and mutation-check wiring tests so they fail when the wiring is
 removed.
 

@@ -189,6 +189,7 @@ class TurnBudget {
     private webSearches = 0;
     private freshRuns = 0;
     private filingReads = 0;
+    private xPostCalls = 0;
     private readonly symbols = new Set<string>();
 
     /** Returns a quota scope when the call must be refused, else null. */
@@ -208,6 +209,11 @@ class TurnBudget {
         const filingRead = isFilingRead(name, args);
         if (filingRead && this.filingReads >= AGENT_TURN_CAPS.maxFilingReads)
             return 'per_turn';
+        if (
+            name === 'get_x_posts' &&
+            this.xPostCalls >= AGENT_TURN_CAPS.maxXPostCalls
+        )
+            return 'per_turn';
         const next = new Set(this.symbols);
         for (const s of symbolsOf(args)) next.add(s);
         if (next.size > AGENT_TURN_CAPS.maxDistinctSymbols)
@@ -216,6 +222,7 @@ class TurnBudget {
         if (name === 'web_search') this.webSearches += 1;
         if (name === 'run_fresh_analysis') this.freshRuns += 1;
         if (filingRead) this.filingReads += 1;
+        if (name === 'get_x_posts') this.xPostCalls += 1;
         for (const s of next) this.symbols.add(s);
         return null;
     }

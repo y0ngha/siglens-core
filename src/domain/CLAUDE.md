@@ -288,6 +288,14 @@ computing derived values, so a recomputation from the rendered text matches.
   the source is named by a result field), a per-call cap is reported to the model (an error
   or a row), not applied by silently dropping items, and a rule that sends a question to a
   tool is checked against the tool's own "never for X" wording.
+- A billed tool's trigger examples (in its description and its routing row) each name the
+  billed venue; a venue-less phrase that other free tools can answer sends the model to pay
+  for a read it did not need. Pin a removed venue-less example absent by test.
+
+  ```text
+  ❌ trigger: "what did the CEO say"          // answerable from filings/news
+  ✅ trigger: "what did the CEO post on X"    // names the billed venue
+  ```
 - Any change to rendered bytes also bumps the cache version
   (`src/infrastructure/CLAUDE.md#INF-4`).
 
