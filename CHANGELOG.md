@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.35.0](https://github.com/y0ngha/siglens-core/compare/v2.34.0...v2.35.0) (2026-11-15)
+
+### Features
+
+* 기업 공시 조회 에이전트 도구 추가 ([#322](https://github.com/y0ngha/siglens-core/issues/322)) ([3662c9e](https://github.com/y0ngha/siglens-core/commit/3662c9e5494fa77ee4e650a0bf127bc9f156561a))
+
 # [2.34.0](https://github.com/y0ngha/siglens-core/compare/v2.33.0...v2.34.0) (2026-11-15)
 
 ### Features
