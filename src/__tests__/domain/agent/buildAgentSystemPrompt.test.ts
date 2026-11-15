@@ -547,7 +547,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-15.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-15.2');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -877,7 +877,7 @@ describe('buildAgentSystemPrompt', () => {
                     guest: true,
                 });
             expect(guestOf(AGENT_TOOL_SPECS)).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, commodity, futures and exchange-rate quotes, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, commodity, futures and exchange-rate quotes, web search'
             );
             expect(
                 guestOf(
@@ -886,7 +886,7 @@ describe('buildAgentSystemPrompt', () => {
                     )
                 )
             ).toContain(
-                'congress trades, analyst targets and rating changes, commodity, futures and exchange-rate quotes, web search) works without it'
+                'congress trades, analyst targets and rating changes, company SEC filings, commodity, futures and exchange-rate quotes, web search) works without it'
             );
         });
 
@@ -913,7 +913,7 @@ describe('buildAgentSystemPrompt', () => {
                 guest: true,
             });
             expect(guest).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, commodity, futures and exchange-rate quotes, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, commodity, futures and exchange-rate quotes, web search'
             );
         });
     });
@@ -1614,6 +1614,99 @@ describe('buildAgentSystemPrompt analyst views and macro quotes', () => {
         );
         expect(guest(['get_macro_quotes'])).not.toContain(
             'commodity, futures and exchange-rate quotes'
+        );
+    });
+});
+
+describe('buildAgentSystemPrompt company filings', () => {
+    const build = (names: readonly string[] | null, guest = false): string =>
+        buildAgentSystemPrompt({
+            locale: 'ko',
+            tools:
+                names === null
+                    ? AGENT_TOOL_SPECS
+                    : AGENT_TOOL_SPECS.filter(t => !names.includes(t.name)),
+            guest,
+        });
+    const rowOf = (prompt: string, needle: string): string =>
+        prompt.split('\n').find(l => l.includes(needle)) ?? '';
+
+    it('회사 발표의 세부 질문을 get_company_filings로 보내고 한국어 트리거를 싣는다', () => {
+        const row = rowOf(build(null), '→ get_company_filings');
+        for (const term of [
+            '공시 뭐 나왔어',
+            '보도자료 원문',
+            '실적 발표 내용',
+            '매출로 잡혀?',
+            '왜 순이익이 늘었어?',
+        ])
+            expect(row).toContain(term);
+    });
+
+    it('목록을 먼저 받고 다음 단계에서 본문을 읽는 두 단계 호출을 지시한다', () => {
+        const row = rowOf(build(null), '→ get_company_filings');
+        expect(row).toContain('without `accession` first');
+        expect(row).toContain(
+            'in the next step, call it again with the `accession`'
+        );
+    });
+
+    it('두 단계 호출이 "한 번에 요청하라"는 세 문장 모두와 어긋나지 않게 예외를 적는다', () => {
+        const prompt = build(null);
+        expect(prompt).toContain('unless a routing row or a rule says so.');
+        expect(prompt).toContain(
+            'except where a routing row tells you to make a second call after seeing the first result'
+        );
+        expect(prompt).toContain(
+            'call the union of all matching rows in one step, except where a row tells you to make a second call after seeing the first result.'
+        );
+    });
+
+    it('미국 상장사 한정을 행 맨 앞에 두고 한국 종목·코인은 뉴스 행으로 보낸다', () => {
+        const row = rowOf(build(null), '→ get_company_filings');
+        expect(row.startsWith('- For a US-listed company only')).toBe(true);
+        expect(row).toContain('use the news row for those');
+    });
+
+    it('get_news가 없으면 없는 뉴스 행을 가리키지 않는다', () => {
+        const row = rowOf(build(['get_news']), '→ get_company_filings');
+        expect(row).not.toContain('news row');
+        expect(row).toContain('answer those from the other matching rows');
+    });
+
+    it('회사 발표는 첫 단계에서 web_search를 부르지 않게 한다', () => {
+        const row = rowOf(build(null), '→ get_company_filings');
+        expect(row).toContain(
+            'never call web_search in the first step: list and read the filing first'
+        );
+        expect(rowOf(build(null), 'Never for prices, indicators')).toContain(
+            'neither the news tool nor a company filing covers'
+        );
+    });
+
+    it('web_search가 없으면 공시 행이 그 도구 이름을 싣지 않는다', () => {
+        const row = rowOf(build(['web_search']), '→ get_company_filings');
+        expect(row).not.toContain('web_search');
+    });
+
+    it('get_company_filings가 없으면 web_search 행은 기존 문구로 돌아간다', () => {
+        expect(
+            rowOf(
+                build(['get_company_filings']),
+                'Never for prices, indicators'
+            )
+        ).toContain('corporate events the news tool lacks');
+    });
+
+    it('도구가 없으면 행과 게스트 문구가 모두 빠진다', () => {
+        const without = build(['get_company_filings'], true);
+        expect(without).not.toContain('get_company_filings');
+        expect(without).not.toContain('company SEC filings');
+    });
+
+    it('근월물을 전월물로 옮기지 않게 한국어 표기를 적어 둔다', () => {
+        expect(rowOf(build(null), '- Commodity and futures quotes:')).toContain(
+            '근월물 in Korean, never 전월물'
         );
     });
 });

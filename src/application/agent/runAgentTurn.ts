@@ -167,11 +167,28 @@ async function safeRefund(store: CounterStore, subject: string): Promise<void> {
     }
 }
 
+/**
+ * A `get_company_filings` call that reads a filing's text (non-empty
+ * `accession`), as opposed to listing filings. Only reads count toward
+ * `AGENT_TURN_CAPS.maxFilingReads`: a text is thousands of characters, the
+ * list is not. Counted here rather than in the consumer executor because the
+ * executor has no turn identity and a step's calls run in parallel — this
+ * reservation is synchronous, so parallel reads are counted in model order.
+ */
+function isFilingRead(name: string, args: Record<string, unknown>): boolean {
+    return (
+        name === 'get_company_filings' &&
+        typeof args.accession === 'string' &&
+        args.accession.trim() !== ''
+    );
+}
+
 /** Per-turn budget: caps from `AGENT_TURN_CAPS`, all pure and local to one turn. */
 class TurnBudget {
     private toolCalls = 0;
     private webSearches = 0;
     private freshRuns = 0;
+    private filingReads = 0;
     private readonly symbols = new Set<string>();
 
     /** Returns a quota scope when the call must be refused, else null. */
@@ -188,6 +205,9 @@ class TurnBudget {
             this.freshRuns >= AGENT_TURN_CAPS.maxFreshAnalysis
         )
             return 'per_turn';
+        const filingRead = isFilingRead(name, args);
+        if (filingRead && this.filingReads >= AGENT_TURN_CAPS.maxFilingReads)
+            return 'per_turn';
         const next = new Set(this.symbols);
         for (const s of symbolsOf(args)) next.add(s);
         if (next.size > AGENT_TURN_CAPS.maxDistinctSymbols)
@@ -195,6 +215,7 @@ class TurnBudget {
         this.toolCalls += 1;
         if (name === 'web_search') this.webSearches += 1;
         if (name === 'run_fresh_analysis') this.freshRuns += 1;
+        if (filingRead) this.filingReads += 1;
         for (const s of next) this.symbols.add(s);
         return null;
     }

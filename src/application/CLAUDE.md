@@ -205,6 +205,21 @@ the output for everyone until the TTL expires. Copy the pattern of the sibling u
 Use-cases that end the same kind of lifecycle (logout and account deletion both end a
 session) return the same metadata shape, so a caller can chain the same follow-up logic.
 
+<a id="APP-7"></a>
+#### APP-7 — A per-turn agent cap is enforced in `TurnBudget`, not in the consumer executor
+
+A cap on how many times a tool may run in one agent turn (`AGENT_TURN_CAPS` in
+`src/domain/agent/turnCaps.ts`) is checked by `TurnBudget.reserve` in
+`src/application/agent/runAgentTurn.ts`, which refuses the call with a quota scope. The
+consumer executor has no turn identity and runs one step's calls in parallel, so a counter
+there is racy and resets per call. Add the field to `AGENT_TURN_CAPS` and a branch in
+`reserve`; never ask the consumer to count.
+
+```typescript
+// ❌ executor: if (++filingReads > 2) return { error: 'too_many' }   // no turn identity, parallel
+// ✅ AGENT_TURN_CAPS.maxFilingReads, refused in TurnBudget.reserve
+```
+
 ## Testing
 
 - Coverage target: **90% branch coverage** (required).
