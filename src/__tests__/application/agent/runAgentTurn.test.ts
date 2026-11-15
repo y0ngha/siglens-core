@@ -556,6 +556,36 @@ describe('runAgentTurn', () => {
         });
     });
 
+    it('get_x_posts는 턴당 상한까지만 실행하고 초과분은 per_turn quota로 거절한다', async () => {
+        const cap = AGENT_TURN_CAPS.maxXPostCalls;
+        // cap + 1 distinct symbols: a repeated call must not be what gets refused.
+        const symbols = ['TSLA', 'NVDA', 'AAPL', 'PLTR'];
+        expect(symbols.length).toBe(cap + 1);
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: Array.from({ length: cap + 1 }, (_, i) => ({
+                    id: `x${i}`,
+                    name: 'get_x_posts',
+                    args: { symbol: symbols[i % symbols.length] },
+                })),
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        await runAgentTurn(
+            params({ availableTools: new Set(['get_x_posts']) }),
+            d
+        );
+        expect(d.executeTool).toHaveBeenCalledTimes(cap);
+        expect(toolResults(p.calls[1]!)[cap]).toEqual({
+            error: 'quota',
+            scope: 'per_turn',
+        });
+    });
+
     it('게스트(free): 턴은 하루 한도로 세고, 새 분석·웹 검색은 제한 없이 실행한다', async () => {
         const p = scriptedProvider([
             {

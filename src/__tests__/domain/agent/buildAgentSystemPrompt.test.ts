@@ -547,7 +547,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-15.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.1');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -877,7 +877,7 @@ describe('buildAgentSystemPrompt', () => {
                     guest: true,
                 });
             expect(guestOf(AGENT_TOOL_SPECS)).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, commodity, futures and exchange-rate quotes, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, web search'
             );
             expect(
                 guestOf(
@@ -886,7 +886,7 @@ describe('buildAgentSystemPrompt', () => {
                     )
                 )
             ).toContain(
-                'congress trades, analyst targets and rating changes, company SEC filings, commodity, futures and exchange-rate quotes, web search) works without it'
+                'congress trades, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, web search) works without it'
             );
         });
 
@@ -913,7 +913,7 @@ describe('buildAgentSystemPrompt', () => {
                 guest: true,
             });
             expect(guest).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, commodity, futures and exchange-rate quotes, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, web search'
             );
         });
     });
@@ -1708,6 +1708,53 @@ describe('buildAgentSystemPrompt company filings', () => {
         expect(rowOf(build(null), '- Commodity and futures quotes:')).toContain(
             '근월물 in Korean, never 전월물'
         );
+    });
+});
+
+describe('buildAgentSystemPrompt X posts', () => {
+    const build = (names: readonly string[] | null, guest = false): string =>
+        buildAgentSystemPrompt({
+            locale: 'ko',
+            tools:
+                names === null
+                    ? AGENT_TOOL_SPECS
+                    : AGENT_TOOL_SPECS.filter(t => !names.includes(t.name)),
+            guest,
+        });
+    const rowOf = (prompt: string, needle: string): string =>
+        prompt.split('\n').find(l => l.includes(needle)) ?? '';
+
+    it('회사·CEO가 X에 올린 글을 묻는 질문만 get_x_posts로 보낸다', () => {
+        const row = rowOf(build(null), '→ get_x_posts');
+        for (const term of [
+            'CEO가 X에 뭐라고 올렸어',
+            '최근 트윗',
+            '트위터에서 뭐래',
+            'The question must name X, Twitter or a tweet',
+            'on an earnings call, in an interview or in a filing matches the other rows',
+        ])
+            expect(row).toContain(term);
+        expect(row).toContain(
+            'never part of a general news, outlook or "why did it move" answer'
+        );
+        // No venue named → not this row (it would bill an X read for a filing/news question).
+        expect(row).not.toContain('CEO가 뭐라고 했어');
+    });
+
+    it('뉴스·등락 이유 행은 get_x_posts를 가리키지 않는다', () => {
+        const prompt = build(null);
+        const newsRows = prompt
+            .split('\n')
+            .filter(l => l.includes('→ get_news'));
+        // An empty match would make the negative assertion pass on nothing.
+        expect(newsRows.length).toBeGreaterThan(0);
+        for (const row of newsRows) expect(row).not.toContain('get_x_posts');
+    });
+
+    it('도구가 없으면 행과 게스트 문구가 모두 빠진다', () => {
+        const without = build(['get_x_posts'], true);
+        expect(without).not.toContain('get_x_posts');
+        expect(without).not.toContain('official company and CEO posts on X');
     });
 });
 

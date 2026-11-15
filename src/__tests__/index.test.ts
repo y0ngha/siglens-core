@@ -20,6 +20,8 @@ import {
     AGENT_FILING_TEXT_MAX_CHARS,
     AGENT_MACRO_INSTRUMENTS,
     AGENT_MACRO_QUOTES_MAX,
+    AGENT_X_POSTS_MAX,
+    AGENT_X_POSTS_WINDOW_DAYS,
     aggregateBarsToMonthly,
     aggregateBarsToWeekly,
     barPeriodStartSeconds,
@@ -198,6 +200,11 @@ describe('public API exports', () => {
         expect(AGENT_MACRO_INSTRUMENTS).toContain('usd_krw');
         expect(AGENT_MACRO_INSTRUMENTS).toContain('jpy_krw');
         expect(AGENT_MACRO_QUOTES_MAX).toBe(8);
+    });
+
+    it('exports the get_x_posts contract numbers the siglens executor implements', () => {
+        expect(AGENT_X_POSTS_MAX).toBe(12);
+        expect(AGENT_X_POSTS_WINDOW_DAYS).toBe(14);
     });
 
     it('exports the get_company_filings contract numbers the siglens executor implements', () => {

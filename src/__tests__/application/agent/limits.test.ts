@@ -34,6 +34,7 @@ describe('AGENT_LIMITS', () => {
             maxWebSearch: 4,
             maxFreshAnalysis: 3,
             maxFilingReads: 2,
+            maxXPostCalls: 3,
             maxDistinctSymbols: 5,
         });
         expect(AGENT_TURN_CAPS.turnDeadlineMs).toBe(600_000);

@@ -14,7 +14,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-15.2';
+export const AGENT_PROMPT_VERSION = '2026-11-16.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -257,6 +257,12 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
                 : '';
             return `Which sectors, stocks or coins are worth looking at now, or candidates to watch, with no symbol named → get_market_overview for the market the question is about ('kr' for Korean stocks, 'crypto' for coins, 'us' otherwise)${thenBars}. Read the scan for the market asked about only, and never run a fresh analysis to screen candidates.`;
         },
+    },
+    {
+        // Explicit-ask only: every call is billed per post read, so this row
+        // must not ride along with news or outlook questions.
+        requires: ['get_x_posts'],
+        text: 'What a company or its chief executive posted on X or Twitter, asked for explicitly (일론 머스크 최근 트윗, CEO가 X에 뭐라고 올렸어, 공식 X 계정에 뭐 올라왔어, 트위터에서 뭐래) → get_x_posts. The question must name X, Twitter or a tweet: what an executive said on an earnings call, in an interview or in a filing matches the other rows, not this one, and get_x_posts is never part of a general news, outlook or "why did it move" answer.',
     },
     {
         requires: ['get_macro_quotes'],
@@ -511,7 +517,7 @@ ${AGENT_WRITING_STYLE}
 ## User
 ${
     input.guest
-        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_company_filings') ? 'company SEC filings, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}web search) works without it.`
+        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_company_filings') ? 'company SEC filings, ' : ''}${available.has('get_x_posts') ? 'official company and CEO posts on X, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}web search) works without it.`
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'
