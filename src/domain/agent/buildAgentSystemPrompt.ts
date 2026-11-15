@@ -14,7 +14,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-14.1';
+export const AGENT_PROMPT_VERSION = '2026-11-15.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -137,11 +137,24 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_fundamentals'],
-        text: 'Earnings results or dates, valuation (P/E, "is it expensive", market cap), margins, growth, financial health or analyst price targets of a stock → get_fundamentals.',
+        // Price-target questions move to get_analyst_views when it exists (two
+        // aggregators, analyst count, dated firm actions); without it this
+        // row keeps them so they are never left unrouted.
+        text: available =>
+            available.has('get_analyst_views')
+                ? 'Earnings results or dates, valuation (P/E, "is it expensive", market cap), margins, growth or financial health of a stock → get_fundamentals. It carries a consensus price target for valuation context only; a question about price targets or analyst ratings themselves matches the analyst row below.'
+                : 'Earnings results or dates, valuation (P/E, "is it expensive", market cap), margins, growth, financial health or analyst price targets of a stock → get_fundamentals.',
+    },
+    {
+        requires: ['get_analyst_views'],
+        text: 'What analysts think of a stock, its price target, changes to price targets or ratings, upgrades or downgrades, which firm raised or cut its target (목표가, 목표가 얼마야, 목표가 상향/하향, 투자의견, 투자의견 변경, 증권사 리포트, 애널리스트들이 뭐래) → get_analyst_views. Firm-by-firm changes exist for US stocks only; for a Korean stock it returns the targets and the rating distribution.',
     },
     {
         requires: ['get_news'],
-        text: 'News, events, lawsuits, rulings, or "why did it move / what happened" about a symbol or market → get_news.',
+        // The analyst pairing is gated on the tool so the row never names a
+        // tool the model cannot call.
+        text: available =>
+            `News, events, lawsuits, rulings, or "why did it move / what happened" about a symbol or market → get_news.${available.has('get_analyst_views') ? ' For "why did it move" about a US company stock — not an ETF, an index or a coin — (왜 떨어졌어, 왜 올랐어, 급락 이유, 급등 이유), also call get_analyst_views in the same step: rating and target changes published around the move belong in the answer, each with its date and firm.' : ''}`,
     },
     {
         requires: ['get_options_summary'],
@@ -228,6 +241,18 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         },
     },
     {
+        requires: ['get_macro_quotes'],
+        // The off-list sentence switches on web_search so the row never
+        // points at a tool the model cannot call, and so an off-list quote
+        // is not forced through the "never search for prices" row below.
+        text: available =>
+            `Oil, gold, silver, copper, natural gas, index futures, the dollar index or an exchange rate (유가, WTI, 브렌트유, 금값, 은값, 구리, 천연가스, 나스닥 선물, S&P 선물, 다우 선물, 달러 인덱스, 원달러 환율, 엔화 환율, 유로 환율, 위안화 환율) → get_macro_quotes with the matching instruments from its list. Never answer one of these with an ETF price or a web search while the instrument is on its list. For an instrument that is not on its list (another currency pair, another futures contract, e.g. wheat) do not call get_macro_quotes with other instruments in its place: ${
+                available.has('web_search')
+                    ? 'use web_search instead, cite the publisher and the time of the quote, and never estimate it'
+                    : 'say SIGLENS does not carry that quote; never estimate it'
+            }.`,
+    },
+    {
         requires: ['get_economy'],
         text: "Interest rates, Fed/FOMC, inflation (CPI), jobs, GDP, Treasury yields or the economic calendar → get_economy. For South Korea (Bank of Korea / 한국은행, Korean rates, inflation, jobs, exports, Korean government bonds / 국고채 or the Korean economic calendar) pass country 'kr'; when the question names no country, use the US. For a date outside its calendar's `coverage`, call get_economy again with `from`/`to` and the same country before saying SIGLENS has no such date.",
     },
@@ -237,11 +262,28 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['web_search'],
-        text: 'Market, company or economic facts none of the SIGLENS tools above hold (regulation, corporate events the news tool lacks) → web_search. Never for prices, indicators or anything a SIGLENS tool returns a value for, except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying when krInvestorTrend is null or absent; the null-value fallback row).',
+        // The exception list names every row that sends a price-like topic
+        // to web_search; a row that did so without being listed here read as
+        // a contradiction and the model declined the search.
+        text: available =>
+            `Market, company or economic facts none of the SIGLENS tools above hold (regulation, corporate events the news tool lacks) → web_search. Never for prices, indicators or anything a SIGLENS tool returns a value for, except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying when krInvestorTrend is null or absent; the null-value fallback row${available.has('get_macro_quotes') ? '; a commodity, futures or exchange-rate quote that is not on the get_macro_quotes list' : ''}).`,
     },
     {
         requires: ['web_search'],
-        text: 'Carve-out to the row above: dividends (yield, DPS, ex-date) that a SIGLENS tool returned as null or absent (a confirmed non-payer is not null: say it pays no dividend, and never derive a trailing yield from a single payment); index membership (S&P 500, Nasdaq-100, Dow) that a SIGLENS tool returned as null or absent; earnings before/after-market timing, which no SIGLENS tool provides → web_search, cite the publisher and date, never estimate; if the search finds nothing or web_search is refused (quota), say the figure could not be confirmed.',
+        // Earnings timing is searched only after get_fundamentals came back
+        // without `earningsSession`: the routing table is matched before any
+        // result exists, so without the sequencing sentence the model fired
+        // the search in parallel and spent quota on a figure the tool had.
+        text: available => {
+            const hasFundamentals = available.has('get_fundamentals');
+            const timing = hasFundamentals
+                ? 'earnings before/after-market timing that a get_fundamentals result in this conversation left without `earningsSession`'
+                : 'earnings before/after-market timing, which no SIGLENS tool provides';
+            const sequencing = hasFundamentals
+                ? ' Earnings timing is never searched in the first step: call get_fundamentals first and answer from its `earningsSession` when it is present. Do not search it either when that result carries `earningsDateAlt` or `earningsDateConfirmed` false: the date itself is still unsettled, so say the timing has not been announced yet.'
+                : '';
+            return `Carve-out to the row above: dividends (yield, DPS, ex-date) that a SIGLENS tool returned as null or absent (a confirmed non-payer is not null: say it pays no dividend, and never derive a trailing yield from a single payment); index membership (S&P 500, Nasdaq-100, Dow) that a SIGLENS tool returned as null or absent; ${timing} → web_search, cite the publisher and date, never estimate; if the search finds nothing or web_search is refused (quota), say the figure could not be confirmed.${sequencing}`;
+        },
     },
     {
         requires: [],
@@ -266,7 +308,7 @@ function ruleLines(
     return [
         '- Never quote a price, indicator value, earnings figure, options metric or news item from memory. Fetch it with a tool every time.',
         '- Call every tool the answer needs in parallel in one step; do not wait for one result to decide the next unless a rule below says so.',
-        '- Computed figures: when a tool result carries a computed figure (derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp, options maxPainDistancePct/impliedMoveRange, other …Pct fields), quote it as given — never recompute it or replace it with your own figure. When the user needs a figure no tool provides, you may compute it from numbers that appear in tool results in this conversation: show the inputs and the operation in one short clause (e.g. "335.26 × 100 = 33,526") so it can be checked. That is one operation for one figure: never chain several calculations, never show working for a figure a tool already gave, and never put a run of arithmetic in parentheses mid-sentence. Never use a number that is not in a tool result as an input.',
+        '- Computed figures: when a tool result carries a computed figure (derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, upsidePct, gapPct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp, options maxPainDistancePct/impliedMoveRange, macro changes/range52w, other …Pct fields), quote it as given — never recompute it or replace it with your own figure. When the user needs a figure no tool provides, you may compute it from numbers that appear in tool results in this conversation: show the inputs and the operation in one short clause (e.g. "335.26 × 100 = 33,526") so it can be checked. That is one operation for one figure: never chain several calculations, never show working for a figure a tool already gave, and never put a run of arithmetic in parentheses mid-sentence. Never use a number that is not in a tool result as an input.',
         available.has('get_bars_indicators') &&
             '- Horizon: every directional read names its horizon from the timeframe it came from — 1Month bars → months to years; 1Week → weeks to a few months; 1Day bars → days to a few weeks; 4Hour/1Hour → a few days; 30Min and shorter → intraday to a day or two.',
         available.has('get_cached_analysis') &&
@@ -292,6 +334,13 @@ function ruleLines(
             "- Options answers: for max pain give only what it is (the smallest-payout strike) and its distance from the price; never mention the pinning or gravitation idea that price drifts toward it, not even hedged or to say it is not guaranteed, and never use max pain to tilt a directional read. Never call implied volatility high, low or normal for this stock unless a tool result gives its IV history; just state the figure, without explaining that the history is missing. Never claim timing (\"tonight\", \"this week\") beyond daysToExpiration and the expiration date. Write option premiums in dollars to the cent ($0.10), never in cents or fractions of a cent (not '9.5 cents', not 'half a cent'); below $0.01 say 'under one cent'.",
         available.has('get_quote') &&
             "- If a quote's quoteDelayMinutes is greater than 0, say the quote is delayed by that many minutes; never present it as real-time.",
+        (available.has('get_analyst_views') ||
+            available.has('get_fundamentals')) &&
+            '- Analyst price targets: when a tool result marks its two target sources as disagreeing (sourcesDisagree or targetSourcesDisagree is true), give both figures with their source names (Yahoo Finance, FMP), give the analyst count only for the Yahoo Finance figure (the other carries none), and say the aggregators differ; never average them, pick one, or call either "the consensus". Targets and ratings are the firms\' opinions, not SIGLENS\'s view and not a forecast: attribute them to analysts.',
+        available.has('get_analyst_views') &&
+            '- Analyst actions: cite a rating or target change with its date and firm, and take the number of upgrades, downgrades, target raises or cuts over the last 30 or 90 days from actions.tally, never by counting rows; for any other window list the dated rows inside it without giving a total. Beside a price move, a change is something published on that date: say it coincided with the move, never that it caused it.',
+        available.has('get_macro_quotes') &&
+            '- Commodity and futures quotes: a get_macro_quotes item whose contract is not null is the front-month futures price — say so once and never call it the spot price. When its quoteDelayMinutes is above zero say the quote is delayed by that many minutes; when it is 0 or null do not mention a delay. A null changes entry or a null range52w means that history is not available: leave it out, never fill it in.',
         '- If a tool returns an error, tell the user what could not be fetched; never fabricate a substitute.',
         '- If a tool returns {"error":"login_required"}, say in one sentence that this needs logging in (never call the login "free"), then answer with what you could fetch. Do not call that tool again in this turn.',
     ]
@@ -444,7 +493,7 @@ ${AGENT_WRITING_STYLE}
 ## User
 ${
     input.guest
-        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}web search) works without it.`
+        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}web search) works without it.`
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'

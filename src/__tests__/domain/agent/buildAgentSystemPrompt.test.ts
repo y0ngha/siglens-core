@@ -547,7 +547,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-14.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-15.1');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -877,7 +877,7 @@ describe('buildAgentSystemPrompt', () => {
                     guest: true,
                 });
             expect(guestOf(AGENT_TOOL_SPECS)).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, commodity, futures and exchange-rate quotes, web search'
             );
             expect(
                 guestOf(
@@ -885,7 +885,9 @@ describe('buildAgentSystemPrompt', () => {
                         t => t.name !== 'get_investor_flows'
                     )
                 )
-            ).toContain('congress trades, web search) works without it');
+            ).toContain(
+                'congress trades, analyst targets and rating changes, commodity, futures and exchange-rate quotes, web search) works without it'
+            );
         });
 
         it('leaves no investor-flows row when the tool is not provided', () => {
@@ -911,7 +913,7 @@ describe('buildAgentSystemPrompt', () => {
                 guest: true,
             });
             expect(guest).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, commodity, futures and exchange-rate quotes, web search'
             );
         });
     });
@@ -1067,7 +1069,7 @@ describe('buildAgentSystemPrompt', () => {
     it('계산 금지·수평선·컨플루언스 명칭·상위 타임프레임 규칙이 들어 있다', () => {
         expect(prompt).toContain('Computed figures:');
         expect(prompt).toContain(
-            'derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp'
+            'derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, upsidePct, gapPct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp'
         );
         expect(prompt).toContain('quote it as given — never recompute it');
         // User decision 2026-09-19: arithmetic on figures no tool provides is
@@ -1343,7 +1345,7 @@ describe('buildAgentSystemPrompt', () => {
         for (const term of [
             'dividends (yield, DPS, ex-date)',
             'never derive a trailing yield from a single payment',
-            'index membership (S&P 500, Nasdaq-100, Dow) that a SIGLENS tool returned as null or absent; earnings before/after-market timing, which no SIGLENS tool provides',
+            'index membership (S&P 500, Nasdaq-100, Dow) that a SIGLENS tool returned as null or absent; earnings before/after-market timing that a get_fundamentals result in this conversation left without `earningsSession`',
             'cite the publisher and date',
             'never estimate',
             'web_search is refused (quota), say the figure could not be confirmed',
@@ -1352,7 +1354,7 @@ describe('buildAgentSystemPrompt', () => {
             expect(fallback).toContain(term);
         expect(fallback).not.toContain('never decline');
         expect(prompt).toContain(
-            'except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying when krInvestorTrend is null or absent; the null-value fallback row)'
+            'except the routing rows that explicitly send a topic to web_search (Korean investor-type net buying when krInvestorTrend is null or absent; the null-value fallback row; a commodity, futures or exchange-rate quote that is not on the get_macro_quotes list)'
         );
         expect(prompt).not.toContain('the only carve-out');
         const noSearch = buildAgentSystemPrompt({
@@ -1434,6 +1436,185 @@ describe('buildAgentSystemPrompt', () => {
         );
         // 기존 경계(수량·손절·분할)는 그대로 남는다.
         expect(prompt).toContain('Still not yours to decide');
+    });
+});
+
+describe('buildAgentSystemPrompt analyst views and macro quotes', () => {
+    const build = (names: readonly string[] | null): string =>
+        buildAgentSystemPrompt({
+            locale: 'ko',
+            tools:
+                names === null
+                    ? AGENT_TOOL_SPECS
+                    : AGENT_TOOL_SPECS.filter(t => !names.includes(t.name)),
+        });
+    const rowOf = (prompt: string, needle: string): string =>
+        prompt.split('\n').find(l => l.includes(needle)) ?? '';
+
+    it('목표가·투자의견 질문을 get_analyst_views로 보내고 한국어 트리거를 싣는다', () => {
+        const row = rowOf(build(null), '→ get_analyst_views.');
+        expect(row).toContain('목표가 상향/하향');
+        expect(row).toContain('투자의견 변경');
+        expect(row).toContain('애널리스트들이 뭐래');
+        expect(row).toContain('Firm-by-firm changes exist for US stocks only');
+    });
+
+    it('get_analyst_views가 있으면 펀더멘털 행은 목표가 질문을 애널리스트 행으로 넘긴다', () => {
+        const row = rowOf(build(null), '→ get_fundamentals.');
+        expect(row).not.toContain('or analyst price targets of a stock');
+        expect(row).toContain('matches the analyst row below');
+    });
+
+    it('get_analyst_views가 없으면 펀더멘털 행이 목표가 질문을 계속 받는다', () => {
+        const prompt = build(['get_analyst_views']);
+        expect(prompt).not.toContain('get_analyst_views');
+        expect(rowOf(prompt, '→ get_fundamentals.')).toContain(
+            'financial health or analyst price targets of a stock'
+        );
+    });
+
+    it('미국 종목의 등락 이유 질문은 뉴스와 함께 애널리스트 뷰를 부르게 한다', () => {
+        const row = rowOf(build(null), '→ get_news.');
+        expect(row).toContain('왜 떨어졌어');
+        expect(row).toContain('also call get_analyst_views in the same step');
+        expect(
+            rowOf(build(['get_analyst_views']), '→ get_news.')
+        ).not.toContain('get_analyst_views');
+    });
+
+    it('두 출처 목표가가 다르면 둘 다 말하게 하고, 애널리스트 수는 Yahoo 수치에만 붙인다', () => {
+        const prompt = build(null);
+        expect(prompt).toContain(
+            'give both figures with their source names (Yahoo Finance, FMP), give the analyst count only for the Yahoo Finance figure (the other carries none)'
+        );
+        expect(prompt).toContain('never average them, pick one');
+    });
+
+    it('변경 건수는 30·90일만 tally에서 가져오고, 다른 기간은 합계 없이 행을 나열하게 한다', () => {
+        const prompt = build(null);
+        expect(prompt).toContain(
+            'over the last 30 or 90 days from actions.tally, never by counting rows'
+        );
+        expect(prompt).toContain(
+            'for any other window list the dated rows inside it without giving a total'
+        );
+        expect(prompt).toContain(
+            'say it coincided with the move, never that it caused it'
+        );
+    });
+
+    it('등락 이유 행의 애널리스트 뷰 호출은 미국 기업 주식으로 한정한다', () => {
+        expect(rowOf(build(null), '→ get_news.')).toContain(
+            'not an ETF, an index or a coin'
+        );
+    });
+
+    it('애널리스트 행동 규칙은 도구가 없으면 빠지고, 목표가 불일치 규칙은 펀더멘털만 있어도 남는다', () => {
+        const prompt = build(['get_analyst_views']);
+        expect(prompt).not.toContain('- Analyst actions:');
+        expect(prompt).toContain('- Analyst price targets:');
+        expect(build(['get_analyst_views', 'get_fundamentals'])).not.toContain(
+            '- Analyst price targets:'
+        );
+    });
+
+    it('원자재·선물·환율 질문을 get_macro_quotes로 보내고 ETF 대체를 금지한다', () => {
+        const row = rowOf(build(null), '→ get_macro_quotes');
+        for (const term of ['유가', '금값', '은값', '나스닥 선물', '엔화 환율'])
+            expect(row).toContain(term);
+        expect(row).toContain(
+            'Never answer one of these with an ETF price or a web search'
+        );
+    });
+
+    it('목록에 없는 환율·선물은 web_search 유무에 따라 검색하거나 없다고 말하게 한다', () => {
+        expect(rowOf(build(null), '→ get_macro_quotes')).toContain(
+            'use web_search instead, cite the publisher and the time of the quote'
+        );
+        const row = rowOf(build(['web_search']), '→ get_macro_quotes');
+        expect(row).toContain('say SIGLENS does not carry that quote');
+        expect(row).not.toContain('web_search instead');
+    });
+
+    it('선물 시세는 근월물이라고 말하게 하고, 지연은 0보다 클 때만 말하게 한다', () => {
+        const prompt = build(null);
+        expect(prompt).toContain(
+            'whose contract is not null is the front-month futures price'
+        );
+        expect(prompt).toContain('when it is 0 or null do not mention a delay');
+    });
+
+    it('목록 밖 시세 검색을 web_search 행의 가격 금지 예외에 함께 올린다', () => {
+        const row = rowOf(build(null), 'Never for prices, indicators');
+        expect(row).toContain(
+            'a commodity, futures or exchange-rate quote that is not on the get_macro_quotes list'
+        );
+        expect(rowOf(build(null), '→ get_macro_quotes')).toContain(
+            'do not call get_macro_quotes with other instruments in its place'
+        );
+    });
+
+    it('get_macro_quotes가 없으면 web_search 행의 예외 목록에 그 도구 이름이 없다', () => {
+        const row = rowOf(
+            build(['get_macro_quotes']),
+            'Never for prices, indicators'
+        );
+        expect(row).toContain('the null-value fallback row).');
+        expect(row).not.toContain('get_macro_quotes');
+    });
+
+    it('날짜가 확정되지 않은 실적은 시간대를 검색하지 않게 한다', () => {
+        expect(rowOf(build(null), 'Carve-out to the row above')).toContain(
+            'Do not search it either when that result carries `earningsDateAlt` or `earningsDateConfirmed` false'
+        );
+    });
+
+    it('이력이 null인 시세 항목은 채우지 않고 빼게 한다', () => {
+        expect(build(null)).toContain(
+            'A null changes entry or a null range52w means that history is not available: leave it out, never fill it in.'
+        );
+    });
+
+    it('get_macro_quotes가 없으면 행과 규칙이 모두 빠진다', () => {
+        const without = build(['get_macro_quotes']);
+        expect(without).not.toContain('get_macro_quotes');
+        expect(without).not.toContain('- Commodity and futures quotes:');
+    });
+
+    it('실적 장전·장후는 get_fundamentals를 먼저 부르고 earningsSession이 없을 때만 검색하게 한다', () => {
+        const row = rowOf(build(null), 'Carve-out to the row above');
+        expect(row).toContain(
+            'Earnings timing is never searched in the first step: call get_fundamentals first'
+        );
+        expect(row).toContain(
+            '→ web_search, cite the publisher and date, never estimate'
+        );
+    });
+
+    it('get_fundamentals가 없으면 실적 시간대는 바로 검색 대상이고 그 도구 이름을 싣지 않는다', () => {
+        const row = rowOf(
+            build(['get_fundamentals']),
+            'Carve-out to the row above'
+        );
+        expect(row).toContain(
+            'earnings before/after-market timing, which no SIGLENS tool provides'
+        );
+        expect(row).not.toContain('get_fundamentals');
+    });
+
+    it('게스트 안내의 새 기능 문구는 도구가 있을 때만 들어간다', () => {
+        const guest = (names: readonly string[]): string =>
+            buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(t => !names.includes(t.name)),
+                guest: true,
+            });
+        expect(guest(['get_analyst_views'])).not.toContain(
+            'analyst targets and rating changes'
+        );
+        expect(guest(['get_macro_quotes'])).not.toContain(
+            'commodity, futures and exchange-rate quotes'
+        );
     });
 });
 

@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { TIMEFRAMES } from '@/domain/constants/market';
 import {
     AGENT_BARS_TIMEFRAMES,
+    AGENT_MACRO_INSTRUMENTS,
+    AGENT_MACRO_QUOTES_MAX,
     AGENT_TOOL_SPECS,
     AGENT_TOOL_NAMES,
     findToolSpec,
@@ -11,9 +13,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('15개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(15);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(15);
+    it('17개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(17);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(17);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -35,6 +37,8 @@ describe('AGENT_TOOL_SPECS', () => {
             get_fundamentals: { symbol: 'AAPL' },
             get_market_overview: { market: 'us' },
             get_economy: {},
+            get_analyst_views: { symbol: 'AAPL' },
+            get_macro_quotes: { instruments: ['wti', 'gold'] },
             get_congress_trades: { symbol: 'AAPL' },
             get_investor_flows: { symbol: 'AAPL' },
             get_guide: { query: '이중바닥' },
@@ -109,6 +113,85 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(
             findToolSpec('get_economy')?.inputSchema.required
         ).toBeUndefined();
+    });
+
+    it('get_analyst_views는 주식 심볼 하나를 받고 두 출처·tally·한국 종목 한계를 설명한다', () => {
+        const spec = findToolSpec('get_analyst_views');
+        expect(spec?.costClass).toBe('cached');
+        expect(spec?.inputSchema.required).toEqual(['symbol']);
+        const d = spec?.description ?? '';
+        for (const term of [
+            '`targets.yahoo`',
+            '`targets.fmp`',
+            '`targets.gapPct`',
+            '`targets.sourcesDisagree`',
+            'never pick one, average them or call either the consensus',
+            '`actions.tally.last30d`',
+            'never count the rows for them',
+            'without giving a total',
+            '`targets.fmp` is always null for Korean stocks',
+            'null when it could not be loaded, and then every `upsidePct` is null',
+            'say that one aggregator could not be loaded only when the answer gives a price target',
+            'reason not_a_stock',
+            '`actions.available` false (Korean stocks)',
+            'never map one firm',
+            '목표가 상향/하향',
+        ])
+            expect(d).toContain(term);
+    });
+
+    it('get_macro_quotes는 닫힌 목록의 종목만 받는다', () => {
+        const spec = findToolSpec('get_macro_quotes');
+        expect(spec?.costClass).toBe('free');
+        expect(spec?.inputSchema.properties.instruments?.items?.enum).toEqual(
+            AGENT_MACRO_INSTRUMENTS
+        );
+        const schema = spec!.inputSchema;
+        expect(validateArgs(schema, { instruments: ['usd_krw'] }).ok).toBe(
+            true
+        );
+        expect(validateArgs(schema, { instruments: ['CL=F'] }).ok).toBe(false);
+        expect(validateArgs(schema, {}).ok).toBe(false);
+    });
+
+    it('get_macro_quotes 설명은 근월물·지연·롤오버·ETF 대체 금지를 담고 상한 숫자를 상수에서 가져온다', () => {
+        const d = findToolSpec('get_macro_quotes')?.description ?? '';
+        for (const term of [
+            `At most ${AGENT_MACRO_QUOTES_MAX} per call`,
+            'rejected with error too_many_instruments',
+            'front-month futures price, never the spot price',
+            'when it is 0 or null do not mention a delay',
+            'is not available from this tool',
+            'carries only {instrument, found}',
+            'An empty list is rejected with error no_instruments',
+            'a null entry or a null range52w means that history could not be loaded',
+            'multiply by 100 and say so',
+            'includes roll effects',
+            'never substitute an ETF price',
+            '유가',
+            '원달러',
+        ])
+            expect(d).toContain(term);
+    });
+
+    it('get_fundamentals 설명은 실적 세션·대체 날짜·목표가 병기·의견 분포 출처를 담는다', () => {
+        const d = findToolSpec('get_fundamentals')?.description ?? '';
+        for (const term of [
+            '`earningsSession`',
+            'US stocks, and only for a confirmed date',
+            '`earningsCallAt`',
+            '`earningsDateAlt`',
+            '`priceTargetYahoo`',
+            '`priceTargetSource`',
+            'appears only when `priceTargetSource` is fmp',
+            'do not search for the session timing',
+            'give the analyst count only for the Yahoo Finance figure',
+            'so neither date is confirmed and `earningsSession` is absent',
+            '`targetSourcesDisagree`',
+            '`consensusAnalysts`',
+            '`consensusSource`',
+        ])
+            expect(d).toContain(term);
     });
 
     describe('new tool output contracts', () => {

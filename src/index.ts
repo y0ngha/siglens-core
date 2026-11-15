@@ -458,6 +458,8 @@ export {
     AGENT_TOOL_SPECS,
     AGENT_TOOL_NAMES,
     AGENT_BARS_TIMEFRAMES,
+    AGENT_MACRO_INSTRUMENTS,
+    AGENT_MACRO_QUOTES_MAX,
     FRESH_ANALYSIS_KINDS,
     findToolSpec,
     selectTools,
@@ -1158,6 +1160,7 @@ export type {
 } from './domain/ports/agentProvider';
 export type {
     AgentBarsTimeframe,
+    AgentMacroInstrument,
     FreshAnalysisKind,
 } from './domain/agent/tools';
 
