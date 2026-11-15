@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.36.0](https://github.com/y0ngha/siglens-core/compare/v2.35.0...v2.36.0) (2026-11-15)
+
+### Features
+
+* SiglensAI X 공식 계정 글 조회 도구 스펙 추가 ([#323](https://github.com/y0ngha/siglens-core/issues/323)) ([d7bd6f3](https://github.com/y0ngha/siglens-core/commit/d7bd6f34fcebac2d1615e93fde96c6bdbee8a092))
+
 # [2.35.0](https://github.com/y0ngha/siglens-core/compare/v2.34.0...v2.35.0) (2026-11-15)
 
 ### Features
