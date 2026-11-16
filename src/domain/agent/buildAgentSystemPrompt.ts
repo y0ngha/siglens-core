@@ -14,7 +14,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-16.3';
+export const AGENT_PROMPT_VERSION = '2026-11-16.4';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -147,7 +147,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_analyst_views'],
-        text: 'What analysts think of a stock, its price target, changes to price targets or ratings, upgrades or downgrades, which firm raised or cut its target (목표가, 목표가 얼마야, 목표가 상향/하향, 투자의견, 투자의견 변경, 증권사 리포트, 애널리스트들이 뭐래) → get_analyst_views. Firm-by-firm changes exist for US stocks only; for a Korean stock it returns the targets and the rating distribution.',
+        text: 'What analysts think of a stock, its price target, changes to price targets or ratings, upgrades or downgrades, which firm raised or cut its target, or how earnings estimates have moved (목표가, 목표가 얼마야, 목표가 상향/하향, 투자의견, 투자의견 변경, 증권사 리포트, 애널리스트들이 뭐래, 실적 추정치 올라가?, EPS 전망 바뀌었어?, 이익 추정치 상향·하향, 컨센서스 변화) → get_analyst_views. Firm-by-firm changes exist for US stocks only; for a Korean stock it returns the targets, the rating distribution and the estimate trend.',
     },
     {
         requires: ['get_news'],

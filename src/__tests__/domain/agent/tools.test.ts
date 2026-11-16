@@ -351,6 +351,49 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain(term);
     });
 
+    it('get_analyst_views는 추정치 추이(기간·변화 단위·적자 EPS·매출 이력 없음)를 담는다', () => {
+        const d = findToolSpec('get_analyst_views')?.description ?? '';
+        for (const term of [
+            "period ('0q' current quarter, '+1q' next quarter, '0y' current fiscal year, '+1y' next fiscal year)",
+            'name the period by it, since fiscal years differ from calendar years',
+            'in currency per share — precomputed, quote them as given and never turn them into a percentage',
+            'with a negative EPS a positive change means a smaller expected loss (never higher profit) and a negative change a larger loss',
+            'say it moved from an expected loss to an expected profit, or the reverse',
+            '`revisions.up7d` / `up30d` count analysts who raised',
+            'say the estimate trend is not available for the stock this time',
+            "never present `get_fundamentals`' single `analystEstimate` as a trend",
+            'US and Korean stocks; null when it could not be loaded',
+            'there is no revenue history, so never say revenue estimates rose or fell',
+            'when both are cited and differ, name each source',
+            '실적 추정치',
+            '추정치 리비전',
+        ])
+            expect(d).toContain(term);
+    });
+
+    it('get_fundamentals의 analystEstimate는 FMP 한 기간 값이고 추이는 get_analyst_views로 보낸다', () => {
+        const d = findToolSpec('get_fundamentals')?.description ?? '';
+        expect(d).toContain(
+            "`analystEstimate` (FMP's consensus EPS/revenue for one period"
+        );
+        expect(d).toContain(
+            "for how estimates have moved over time use get_analyst_views' `estimates`"
+        );
+    });
+
+    it('get_investor_flows는 미국 종목 보유 비율(ownershipShares)을 출처와 함께 근사치로 전하게 한다', () => {
+        const d = findToolSpec('get_investor_flows')?.description ?? '';
+        for (const term of [
+            '`ownershipShares` ({institutionsPct, institutionsFloatPct, insidersPct, institutionCount, source}',
+            'null when it could not be loaded or for a Korean stock',
+            'quote them as approximate aggregates with the source',
+            'never add the list up to compare it with institutionsPct',
+            "answer holders' stakes from the DART disclosures instead",
+            '기관 보유 비율',
+        ])
+            expect(d).toContain(term);
+    });
+
     describe('new tool output contracts', () => {
         const desc = (name: string): string =>
             findToolSpec(name)?.description ?? '';

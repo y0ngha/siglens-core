@@ -387,6 +387,18 @@ A quote template takes every number it names from a field the output carries (ad
 e.g. a `positive` count, rather than make the model derive it); when two fields could answer
 the same phrasing, the description says which one answers which.
 
+A rule that interprets a signed change (a revision, a delta, growth on a base that can be
+negative) covers every sign branch the data allows, including the base crossing zero and a
+change that grows the loss; a pair of counters (up/down) is mapped field by field to its
+meaning, never left as prose the model must pair up. Otherwise the model improvises the branch
+the rule skipped, and a "higher" figure on a negative base gets read as good news.
+
+```typescript
+// ❌ 'A positive change means estimates rose.'   // on negative EPS, or across zero?
+// ✅ 'revisionsUp = analysts raising, revisionsDown = lowering. Change on negative EPS:
+//     toward zero = smaller loss, crossing zero = turned profitable, away = larger loss.'
+```
+
 ```typescript
 // ❌ 'Judge the zone from latest.rsiZone.'            // consumers do not return rsiZone yet
 // ✅ 'Use latest.rsiZone when present; otherwise treat 30-70 as neutral.'
