@@ -14,7 +14,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-16.2';
+export const AGENT_PROMPT_VERSION = '2026-11-16.3';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -257,6 +257,15 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
                 : '';
             return `Which sectors, stocks or coins are worth looking at now, or candidates to watch, with no symbol named → get_market_overview for the market the question is about ('kr' for Korean stocks, 'crypto' for coins, 'us' otherwise)${thenBars}. Read the scan for the market asked about only, and never run a fresh analysis to screen candidates.`;
         },
+    },
+    {
+        requires: ['get_theme_snapshot'],
+        text: available =>
+            `The mood, rally or sell-off of an investment theme rather than one stock or a GICS sector (양자 테마 분위기, 네오클라우드 매도세, AI 반도체 관련주, 원전주, 우주항공주, 코인 관련주, 2차전지, 방산주, 조선주) → get_theme_snapshot with the matching theme${available.has('get_news') ? '; when the user asks why it moved, call get_theme_snapshot first and then, in the next step, get_news for the best and worst names its summary lists' : ''}. When no theme on its list matches (로봇, 바이오, 게임 …), do not call get_theme_snapshot at all — not even with a neighbouring theme as a stand-in: say SIGLENS has no basket for that theme and answer from the market overview or the news.`,
+    },
+    {
+        requires: ['get_index_history_stats'],
+        text: 'Historical or seasonal statistics of the S&P 500, Nasdaq Composite, KOSPI or KOSDAQ — returns by year, by calendar month or by presidential-cycle year, the year after a midterm election, the worst years (중간선거 뒤 상승장, 9월은 원래 약해?, 1월 효과, 연말 랠리, 역대 최악의 해, 평균 연간 수익률) → get_index_history_stats with that index (sp500 when the question names no index and is about the US market, kospi for the Korean market). Quote its sample counts and period, and never turn the past into a forecast.',
     },
     {
         // Explicit-ask only: every call is billed per post read, so this row
@@ -517,7 +526,7 @@ ${AGENT_WRITING_STYLE}
 ## User
 ${
     input.guest
-        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_company_filings') ? 'company SEC filings, ' : ''}${available.has('get_x_posts') ? 'official company and CEO posts on X, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}web search) works without it.`
+        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_company_filings') ? 'company SEC filings, ' : ''}${available.has('get_x_posts') ? 'official company and CEO posts on X, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}${available.has('get_theme_snapshot') ? 'theme baskets, ' : ''}${available.has('get_index_history_stats') ? 'long-run index statistics, ' : ''}web search) works without it.`
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'

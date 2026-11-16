@@ -256,6 +256,10 @@ computing derived values, so a recomputation from the rendered text matches.
   explicit carve-out in any style rule that could suppress it.
 - A rule split by condition (depth level, tool availability) keeps null and absence handling
   in every branch; otherwise the uncovered branch fills the gap with an unsupported guess.
+- A closed-list tool's off-list branch forbids the substitute call explicitly, in both the
+  tool description and its routing row ("never call it with a neighbouring entry as a
+  stand-in"); "say no match" alone is read as permission to call the nearest entry.
+  ❌ robots asked, `get_themes({theme:'ev'})` called "for the overlap". ✅ No call; say the theme is not covered.
 - Style rules never override required content.
 - A rule restated in two places (section intro and writing rules) changes in both together.
 - Before adding a prohibition ("never say X"), read every existing rule that mentions the
@@ -378,6 +382,10 @@ spend, and a contract never encodes an unverified provider behaviour: promise wh
 read yields ("in the page read") plus an explicit flag for "more exists", not an exact total
 that would need every item fetched (or billed). Otherwise the model quotes a number nobody
 computed.
+
+A quote template takes every number it names from a field the output carries (add the field,
+e.g. a `positive` count, rather than make the model derive it); when two fields could answer
+the same phrasing, the description says which one answers which.
 
 ```typescript
 // ❌ 'Judge the zone from latest.rsiZone.'            // consumers do not return rsiZone yet

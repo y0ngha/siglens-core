@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { TIMEFRAMES } from '@/domain/constants/market';
+import { AGENT_HISTORY_INDICES } from '@/domain/agent/indexHistoryStats';
+import { AGENT_THEME_IDS, AGENT_THEMES } from '@/domain/agent/themes';
 import {
     AGENT_BARS_TIMEFRAMES,
     AGENT_FILINGS_LIST_MAX,
@@ -20,9 +22,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('19개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(19);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(19);
+    it('21개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(21);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(21);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -51,6 +53,8 @@ describe('AGENT_TOOL_SPECS', () => {
                 accession: '0001193125-26-461016',
             },
             get_macro_quotes: { instruments: ['wti', 'gold'] },
+            get_theme_snapshot: { theme: 'quantum' },
+            get_index_history_stats: { index: 'sp500' },
             get_congress_trades: { symbol: 'AAPL' },
             get_investor_flows: { symbol: 'AAPL' },
             get_guide: { query: '이중바닥' },
@@ -305,6 +309,46 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain(term);
         // "CEO가 뭐라고 했어" names no venue; it must not be listed as a trigger.
         expect(d).not.toContain('CEO가 뭐라고 했어');
+    });
+
+    it('get_theme_snapshot은 닫힌 테마 목록만 받고, 바스켓이 SIGLENS 선택임·집계 인용·원인 단정 금지를 담는다', () => {
+        const spec = findToolSpec('get_theme_snapshot');
+        expect(spec?.costClass).toBe('cached');
+        expect(spec?.inputSchema.properties.theme).toMatchObject({
+            enum: [...AGENT_THEME_IDS],
+        });
+        const d = spec?.description ?? '';
+        for (const theme of AGENT_THEMES)
+            expect(d).toContain(`${theme.id} (${theme.nameKo})`);
+        for (const term of [
+            "SIGLENS's own pick of representative pure plays, not an official index",
+            "'20d' is about a month, never call it exactly one month",
+            'quote it, do not recompute it',
+            'never infer a reason from prices alone',
+            'A theme that is not on the list (for example robots, biotech or games) has no basket',
+            'Never call this tool with a neighbouring theme as a stand-in',
+            'reason provider_failed',
+        ])
+            expect(d).toContain(term);
+    });
+
+    it('get_index_history_stats는 네 지수만 받고, 표본 수 인용·예측 금지·월말 기준 한계를 담는다', () => {
+        const spec = findToolSpec('get_index_history_stats');
+        expect(spec?.costClass).toBe('cached');
+        expect(spec?.inputSchema.properties.index).toMatchObject({
+            enum: [...AGENT_HISTORY_INDICES],
+        });
+        const d = spec?.description ?? '';
+        for (const term of [
+            'sp500 (S&P 500, from 1950)',
+            'price returns without dividends, from month-end closes only',
+            'the daily low was deeper',
+            'with the sample count and the period',
+            'This is the past, not a forecast',
+            'never present a calendar month or the political cycle as the cause',
+            'US indices only, otherwise null',
+        ])
+            expect(d).toContain(term);
     });
 
     describe('new tool output contracts', () => {
