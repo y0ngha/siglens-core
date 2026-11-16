@@ -472,6 +472,35 @@ export {
     selectTools,
 } from './domain/agent/tools';
 export { validateArgs } from './domain/agent/validateArgs';
+export {
+    AGENT_THEMES,
+    AGENT_THEME_IDS,
+    findAgentTheme,
+} from './domain/agent/themes';
+export type { AgentTheme, AgentThemeId } from './domain/agent/themes';
+export {
+    THEME_CHANGE_WINDOWS,
+    summarizeTheme,
+} from './domain/agent/themeSnapshot';
+export type {
+    ThemeChangeWindow,
+    ThemeMemberCloses,
+    ThemeMemberStats,
+    ThemeSnapshot,
+    ThemeWindowSummary,
+} from './domain/agent/themeSnapshot';
+export {
+    AGENT_HISTORY_INDICES,
+    computeIndexHistoryStats,
+} from './domain/agent/indexHistoryStats';
+export type {
+    AgentHistoryIndex,
+    AnnualReturn,
+    IndexHistoryStats,
+    MonthEndClose,
+    PresidentialCyclePosition,
+    ReturnStats,
+} from './domain/agent/indexHistoryStats';
 export { findUngroundedNumbers } from './domain/agent/groundedNumbers';
 export {
     AGENT_FOLLOW_UP_MARKER,

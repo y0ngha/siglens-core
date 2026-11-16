@@ -1,3 +1,5 @@
+import { AGENT_HISTORY_INDICES } from '@/domain/agent/indexHistoryStats';
+import { AGENT_THEME_IDS, AGENT_THEMES } from '@/domain/agent/themes';
 import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { TIMEFRAMES } from '@/domain/constants/market';
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
@@ -373,6 +375,39 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
                 },
             },
             required: ['instruments'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_theme_snapshot',
+        description: `How a SIGLENS-curated theme basket is trading. Themes: ${AGENT_THEMES.map(theme => `${theme.id} (${theme.nameKo})`).join(', ')}. Returns {asOf, theme {id, nameKo, nameEn, market}, members [{symbol, name, lastClose, lastDate, changePct {'1d', '5d', '20d'}, fromHigh52wPct}] (best 1-day change first), summary per window '1d', '5d' and '20d' {members, avgPct (equal-weight average), medianPct, up, down, flat, best {symbol, pct}, worst {symbol, pct}}, missing (basket symbols whose prices could not be loaded)}. Windows count completed daily sessions: '20d' is about a month, never call it exactly one month; fromHigh52wPct is the distance from the highest close of the last 252 sessions (null with less history). Every figure is precomputed: quote it, do not recompute it. The basket is SIGLENS's own pick of representative pure plays, not an official index: say once that the figures are for SIGLENS's basket of N names and name them when asked. Describe the mood from breadth (how many rose and fell) and the average together, and name the best and worst. For why a theme moved, add get_news for its leading names; never infer a reason from prices alone. When missing is not empty say those names could not be loaded. available false with reason provider_failed means no member could be loaded: say so. Use for theme mood, rallies and sell-offs (양자 테마, 양자컴퓨터 관련주, 네오클라우드, AI 데이터센터, AI 반도체, 원전·SMR, 우주항공, 코인 관련주, 전기차, 국내 반도체·2차전지·방산·조선 분위기, 매도세, 급등). A theme that is not on the list (for example robots, biotech or games) has no basket: say so and answer from the market overview or the news. Never call this tool with a neighbouring theme as a stand-in (robots are not ev) and never describe another basket as the asked theme's mood. Not for a single stock (use the stock tools) or a GICS sector (get_market_overview).`,
+        costClass: 'cached',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                theme: {
+                    type: 'string',
+                    enum: [...AGENT_THEME_IDS],
+                    description: 'Theme id from the list',
+                },
+            },
+            required: ['theme'],
+            additionalProperties: false,
+        },
+    },
+    {
+        name: 'get_index_history_stats',
+        description: `Long-run statistics of a stock index from month-end closes: sp500 (S&P 500, from 1950), nasdaq (Nasdaq Composite, from 1971), kospi (from the end of 1996) and kosdaq (from late 2000). Returns {asOf, index, firstMonth, lastMonth, firstFullYear, lastFullYear, annual [{year, returnPct, maxDrawdownPct}], annualSummary {samples, positive, avgPct, medianPct, positivePct}, monthly [{month (1–12), samples, positive, avgPct, medianPct, positivePct}] (each calendar month's own return), presidentialCycle (US indices only, otherwise null) [{position (post_election, midterm, pre_election, election), years, samples, positive, avgPct, medianPct, positivePct}] — calendar-year returns of those years — and midtermForward12m (US indices only, otherwise null) {rows [{year, returnPct}] from the end of October of each midterm year to a year later, summary}}. For 'after a midterm election' use midtermForward12m; for 'in a midterm, election or pre-election year' use presidentialCycle. Figures are price returns without dividends, from month-end closes only: maxDrawdownPct is between month-end closes (the daily low was deeper), and nothing here is daily. The month in progress and the first partial year are left out. Quote the figures as given with the sample count and the period, taking N from samples and M from positive (e.g. 1950년 이후 N번 중 M번 상승). This is the past, not a forecast: never say a pattern will repeat, and never present a calendar month or the political cycle as the cause of a return. A question this table cannot express (a single day, an event such as an FOMC meeting, another index) has no SIGLENS statistic: say so. Use for 중간선거 뒤 상승장, 대선 해 수익률, 9월 약세, 1월 효과, 연말 랠리(12월), 역대 연간 수익률, 최악의 해, 연평균 수익률 questions about these indices.`,
+        costClass: 'cached',
+        inputSchema: {
+            type: 'object',
+            properties: {
+                index: {
+                    type: 'string',
+                    enum: [...AGENT_HISTORY_INDICES],
+                },
+            },
+            required: ['index'],
             additionalProperties: false,
         },
     },

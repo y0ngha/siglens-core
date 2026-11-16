@@ -547,7 +547,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.3');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -877,7 +877,7 @@ describe('buildAgentSystemPrompt', () => {
                     guest: true,
                 });
             expect(guestOf(AGENT_TOOL_SPECS)).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, web search'
             );
             expect(
                 guestOf(
@@ -886,7 +886,7 @@ describe('buildAgentSystemPrompt', () => {
                     )
                 )
             ).toContain(
-                'congress trades, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, web search) works without it'
+                'congress trades, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, web search) works without it'
             );
         });
 
@@ -913,7 +913,7 @@ describe('buildAgentSystemPrompt', () => {
                 guest: true,
             });
             expect(guest).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, web search'
             );
         });
     });
@@ -1782,5 +1782,57 @@ describe('buildAgentSystemPrompt wording rules', () => {
         expect(prompt).toContain('use latest.rsiZone');
         expect(prompt).toContain('when present; otherwise treat an RSI');
         expect(prompt).toContain('oversold, overbought, or "near" either');
+    });
+});
+
+describe('buildAgentSystemPrompt — 테마·지수 통계 라우팅', () => {
+    const build = (without: readonly string[]) =>
+        buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(t => !without.includes(t.name)),
+            now: NOW,
+            etSessionStatus: 'open',
+            guest: false,
+        });
+    const rowOf = (prompt: string, needle: string): string =>
+        prompt.split('\n').find(l => l.includes(needle)) ?? '';
+
+    it('테마 질문은 get_theme_snapshot, 이유를 물으면 같은 단계에서 get_news를 함께', () => {
+        const row = rowOf(build([]), '→ get_theme_snapshot');
+        for (const term of [
+            '양자 테마 분위기',
+            '네오클라우드 매도세',
+            '방산주',
+        ])
+            expect(row).toContain(term);
+        expect(row).toContain(
+            'call get_theme_snapshot first and then, in the next step, get_news for the best and worst names'
+        );
+        expect(row).toContain('SIGLENS has no basket for that theme');
+        expect(row).toContain(
+            'not even with a neighbouring theme as a stand-in'
+        );
+        expect(
+            rowOf(build(['get_news']), '→ get_theme_snapshot')
+        ).not.toContain('get_news');
+    });
+
+    it('과거·계절 통계는 get_index_history_stats, 표본 수 인용·예측 금지', () => {
+        const row = rowOf(build([]), '→ get_index_history_stats');
+        for (const term of [
+            '중간선거 뒤 상승장',
+            '9월은 원래 약해?',
+            '연말 랠리',
+        ])
+            expect(row).toContain(term);
+        expect(row).toContain('never turn the past into a forecast');
+        expect(row).toContain('sp500 when the question names no index');
+    });
+
+    it('도구가 없으면 행이 빠진다', () => {
+        const prompt = build(['get_theme_snapshot', 'get_index_history_stats']);
+        expect(prompt).not.toContain('get_theme_snapshot');
+        expect(prompt).not.toContain('get_index_history_stats');
+        expect(prompt).not.toContain('theme baskets');
     });
 });
