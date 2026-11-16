@@ -9,12 +9,13 @@ import {
     formatNowLine,
     type AgentLocale,
 } from './promptShared';
+import { SWING_THRESHOLD_GUIDE, SWING_TRIGGER_EXAMPLES } from './swingHistory';
 import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-16.5';
+export const AGENT_PROMPT_VERSION = '2026-11-17.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -265,7 +266,13 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_index_history_stats'],
-        text: 'Historical or seasonal statistics of the S&P 500, Nasdaq Composite, KOSPI or KOSDAQ — returns by year, by calendar month or by presidential-cycle year, the year after a midterm election, the worst years (중간선거 뒤 상승장, 9월은 원래 약해?, 1월 효과, 연말 랠리, 역대 최악의 해, 평균 연간 수익률) → get_index_history_stats with that index (sp500 when the question names no index and is about the US market, kospi for the Korean market). Quote its sample counts and period, and never turn the past into a forecast.',
+        // The carve-out names the swings row, so it renders only when that row does.
+        text: available =>
+            `Historical or seasonal statistics of the S&P 500, Nasdaq Composite, KOSPI or KOSDAQ — returns by year, by calendar month or by presidential-cycle year, the year after a midterm election, the worst years (중간선거 뒤 상승장, 9월은 원래 약해?, 1월 효과, 연말 랠리, 역대 최악의 해, 평균 연간 수익률) → get_index_history_stats with that index (sp500 when the question names no index and is about the US market, kospi for the Korean market). Quote its sample counts and period, and never turn the past into a forecast.${available.has('get_swing_history') ? ' How long declines or rallies of an index last is not this row: that is the swings row.' : ''}`,
+    },
+    {
+        requires: ['get_swing_history'],
+        text: `How long or how far declines or rallies of one symbol usually go, how long it takes to get back to the high, or how the current decline or rally compares (${SWING_TRIGGER_EXAMPLES}) → get_swing_history with that symbol (${SWING_THRESHOLD_GUIDE}); for a whole index pass its tracking ETF. Never count past swings from bars yourself while this tool is available. Quote its medians with the sample count and the period, and never turn the past into a forecast of when the current leg ends.`,
     },
     {
         // Every call is billed per post read, so the row names its two triggers
@@ -532,7 +539,7 @@ ${AGENT_WRITING_STYLE}
 ## User
 ${
     input.guest
-        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_company_filings') ? 'company SEC filings, ' : ''}${available.has('get_x_posts') ? 'official company and CEO posts on X, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}${available.has('get_theme_snapshot') ? 'theme baskets, ' : ''}${available.has('get_index_history_stats') ? 'long-run index statistics, ' : ''}web search) works without it.`
+        ? `- The user is not logged in. Their own holdings need logging in; everything else (quotes, indicators, SIGLENS analyses including fresh ones, news, options, fundamentals, market overview, economy, congress trades, ${available.has('get_investor_flows') ? 'investor flows (수급) for US and Korean stocks, ' : ''}${available.has('get_analyst_views') ? 'analyst targets and rating changes, ' : ''}${available.has('get_company_filings') ? 'company SEC filings, ' : ''}${available.has('get_x_posts') ? 'official company and CEO posts on X, ' : ''}${available.has('get_macro_quotes') ? 'commodity, futures and exchange-rate quotes, ' : ''}${available.has('get_theme_snapshot') ? 'theme baskets, ' : ''}${available.has('get_index_history_stats') ? 'long-run index statistics, ' : ''}${available.has('get_swing_history') ? 'past declines and rallies of a symbol, ' : ''}web search) works without it.`
         : input.portfolioSymbols && input.portfolioSymbols.length > 0
           ? `- The user currently holds: ${input.portfolioSymbols.join(', ')} (call get_my_portfolio for quantities).`
           : '- No holdings on file.'

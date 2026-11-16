@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { TIMEFRAMES } from '@/domain/constants/market';
+import {
+    SWING_EPISODES_LISTED_MAX,
+    SWING_LOOKBACK_YEARS,
+    SWING_MIN_PCT,
+    SWING_THRESHOLD_GUIDE,
+    SWING_TRIGGER_EXAMPLES,
+} from '@/domain/agent/swingHistory';
 import { AGENT_HISTORY_INDICES } from '@/domain/agent/indexHistoryStats';
 import { AGENT_THEME_IDS, AGENT_THEMES } from '@/domain/agent/themes';
 import {
@@ -22,9 +29,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('21개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(21);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(21);
+    it('22개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(22);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(22);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -55,6 +62,7 @@ describe('AGENT_TOOL_SPECS', () => {
             get_macro_quotes: { instruments: ['wti', 'gold'] },
             get_theme_snapshot: { theme: 'quantum' },
             get_index_history_stats: { index: 'sp500' },
+            get_swing_history: { symbol: 'QQQ', minSwingPct: 10 },
             get_congress_trades: { symbol: 'AAPL' },
             get_investor_flows: { symbol: 'AAPL' },
             get_guide: { query: '이중바닥' },
@@ -395,6 +403,53 @@ describe('AGENT_TOOL_SPECS', () => {
             '기관 보유 비율',
         ])
             expect(d).toContain(term);
+    });
+
+    it('get_swing_history는 symbol 필수, 기준·기간은 범위 있는 정수다', () => {
+        const spec = findToolSpec('get_swing_history');
+        if (spec === undefined) throw new Error('missing spec');
+        expect(spec.costClass).toBe('cached');
+        expect(spec.inputSchema.required).toEqual(['symbol']);
+        const ok = (args: Record<string, unknown>) =>
+            validateArgs(spec.inputSchema, { symbol: 'QQQ', ...args }).ok;
+        expect(ok({ minSwingPct: SWING_MIN_PCT.min })).toBe(true);
+        expect(ok({ minSwingPct: SWING_MIN_PCT.max })).toBe(true);
+        expect(ok({ minSwingPct: SWING_MIN_PCT.min - 1 })).toBe(false);
+        expect(ok({ minSwingPct: SWING_MIN_PCT.max + 1 })).toBe(false);
+        expect(ok({ minSwingPct: 10.5 })).toBe(false);
+        expect(ok({ lookbackYears: SWING_LOOKBACK_YEARS.min })).toBe(true);
+        expect(ok({ lookbackYears: SWING_LOOKBACK_YEARS.max })).toBe(true);
+        expect(ok({ lookbackYears: SWING_LOOKBACK_YEARS.min - 1 })).toBe(false);
+        expect(ok({ lookbackYears: SWING_LOOKBACK_YEARS.max + 1 })).toBe(false);
+    });
+
+    it('get_swing_history 설명은 양방향 정의·기준 고점·일수 단위·인용·예측 금지·지수 대용 ETF를 담는다', () => {
+        const d = findToolSpec('get_swing_history')?.description ?? '';
+        for (const term of [
+            'every completed decline',
+            'every completed rally',
+            'ends the decline and starts a rally',
+            'The swing high is the latest one, not the all-time high',
+            'windowHigh.fromHighPct',
+            'pastBiggerThanNow counts those that went further than extremePct',
+            "pastLongerThanNow counts those whose start-to-extreme took more calendar days than this leg's daysToExtreme",
+            'quote them as M of pastEpisodes',
+            'startDate/startClose is the confirmed swing point',
+            '229200.KS for KOSDAQ',
+            'Days are calendar days and sessions are trading days: say which',
+            'intraday extremes went further',
+            'quote it, do not recompute it or count episodes yourself',
+            'never when it will end',
+            'This is the past, not a forecast',
+            'SPY for the S&P 500, QQQ for the Nasdaq',
+            `at most ${SWING_EPISODES_LISTED_MAX}`,
+            'reason provider_failed',
+            SWING_THRESHOLD_GUIDE,
+            SWING_TRIGGER_EXAMPLES,
+        ])
+            expect(d).toContain(term);
+        // 제공자 이력 길이를 약속하지 않고 결과 필드(firstDate)로 말하게 한다.
+        expect(d).not.toContain('1970');
     });
 
     describe('new tool output contracts', () => {

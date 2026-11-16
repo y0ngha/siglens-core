@@ -355,6 +355,8 @@ or an earlier unrelated filing. A derived score likewise carries the inputs it w
 ```typescript
 // ❌ `stake: 5.2% (prev 4.1%)`                          // which "previous"?
 // ✅ `stake: 5.2% (4.1% as of the last filing before this window, 2026-03-02)`
+// ❌ pastLonger = pastDaysToExtreme > currentDaysSinceStart   // extreme vs last close: two bases
+// ✅ compare the same span on both sides (start-to-extreme with start-to-extreme)
 ```
 
 <a id="DOM-14"></a>
@@ -580,6 +582,8 @@ A calculation whose result can be undefined (warm-up, division by zero) returns 
 ```typescript
 // ❌ return (next - prev) / prev;                       // NaN when prev === 0
 // ✅ const change = (next - prev) / prev; return Number.isFinite(change) ? change : null;
+// ❌ /^\d{4}-\d{2}-\d{2}$/.test(d)    // '2020-13-01' passes the shape and yields NaN days
+// ✅ shape check, then round-trip: Date.UTC(y, m - 1, day) must give back the same y, m, day
 ```
 
 <a id="DOM-2"></a>
