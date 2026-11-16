@@ -547,7 +547,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.4');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.5');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -1724,21 +1724,40 @@ describe('buildAgentSystemPrompt X posts', () => {
     const rowOf = (prompt: string, needle: string): string =>
         prompt.split('\n').find(l => l.includes(needle)) ?? '';
 
-    it('회사·CEO가 X에 올린 글을 묻는 질문만 get_x_posts로 보낸다', () => {
+    it('X를 명시한 질문과 한 회사의 "요즘 소식" 질문을 get_x_posts로 보내고, 시세·전망·등락 이유·여러 종목·시장 전체는 뺀다', () => {
         const row = rowOf(build(null), '→ get_x_posts');
         for (const term of [
             'CEO가 X에 뭐라고 올렸어',
             '최근 트윗',
             '트위터에서 뭐래',
-            'The question must name X, Twitter or a tweet',
+            'what is new with one specific company lately',
+            '테슬라 요즘 무슨 소식 있어?',
+            '회사가 직접 올린 거 있어?',
+            'call it in the same step as get_news',
+            'never the only basis of the answer',
             'on an earnings call, in an interview or in a filing matches the other rows',
         ])
             expect(row).toContain(term);
         expect(row).toContain(
-            'never part of a general news, outlook or "why did it move" answer'
+            'It is not called for a stock\'s price, chart, valuation, outlook or "why did it move" question, for several stocks at once or for the market as a whole'
         );
-        // No venue named → not this row (it would bill an X read for a filing/news question).
+        // No venue and no "what is new" → not this row (it would bill an X read for a filing question).
         expect(row).not.toContain('CEO가 뭐라고 했어');
+    });
+
+    it('X 행과 get_x_posts 설명은 같은 "요즘 소식" 예시와 뉴스 동반 호출을 말한다(한쪽만 바뀌지 않게)', () => {
+        const row = rowOf(build(null), '→ get_x_posts');
+        const description =
+            AGENT_TOOL_SPECS.find(spec => spec.name === 'get_x_posts')
+                ?.description ?? '';
+        for (const example of ['무슨 소식 있어', '근황', '회사가 직접 올린 거'])
+            for (const text of [row, description])
+                expect(text).toContain(example);
+        expect(row).toContain('in the same step as get_news');
+        expect(description).toContain('together with the news tool');
+        // 공시·보도자료로 "밝힌" 내용은 공시 행의 몫이다 — 이 표현을 트리거로 쓰지 않는다.
+        for (const text of [row, description])
+            expect(text).not.toContain('직접 밝힌');
     });
 
     it('뉴스·등락 이유 행은 get_x_posts를 가리키지 않는다', () => {

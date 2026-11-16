@@ -264,7 +264,7 @@ describe('AGENT_TOOL_SPECS', () => {
             'reason provider_failed',
             `at most ${AGENT_TURN_CAPS.maxXPostCalls} calls per turn, and every call counts`,
             'global_day',
-            'never called for general news, outlook, price',
+            'never called for price, chart, valuation, outlook or "why did it move" questions',
             '최근 트윗',
         ])
             expect(d).toContain(term);
@@ -297,10 +297,13 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain(term);
     });
 
-    it('get_x_posts 설명은 X를 명시한 질문에만 부르게 하고 CEO 직함·출처 표기를 정한다', () => {
+    it('get_x_posts 설명은 X를 명시한 질문과 한 회사의 요즘 소식에 부르게 하고 CEO 직함·출처 표기를 정한다', () => {
         const d = findToolSpec('get_x_posts')?.description ?? '';
         for (const term of [
-            'Call only when the user explicitly asks about X or Twitter',
+            'Call when the user asks what a company or its chief executive posted on X or Twitter',
+            'asks what is new with one specific company lately',
+            'then together with the news tool',
+            'for several stocks at once or for the market as a whole',
             'A question about what an executive said elsewhere (an earnings call, an interview, a filing) is not for this tool',
             'can lag a recent change',
             'only when another tool result says so',

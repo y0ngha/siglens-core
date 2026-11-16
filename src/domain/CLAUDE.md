@@ -294,7 +294,15 @@ computing derived values, so a recomputation from the rendered text matches.
   tool is checked against the tool's own "never for X" wording.
 - A billed tool's trigger examples (in its description and its routing row) each name the
   billed venue; a venue-less phrase that other free tools can answer sends the model to pay
-  for a read it did not need. Pin a removed venue-less example absent by test.
+  for a read it did not need. The one exception is a question the free tools cannot fully
+  answer alone ("what is new with this company" — its own posts are part of the answer): a
+  venue-less trigger is allowed only when the row scopes it to one symbol, calls the billed
+  tool in the same step as the free one, and lists the high-volume questions it excludes
+  (price, outlook, "why did it move", several stocks, the whole market). Pin a removed
+  venue-less example absent by test. A trigger
+  verb must not also match the row it excludes ("posted" vs "said" against the filings
+  row), and one test asserts the shared trigger list against both the row and the
+  description so neither drifts.
 
   ```text
   ❌ trigger: "what did the CEO say"          // answerable from filings/news
