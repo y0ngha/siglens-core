@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.37.0](https://github.com/y0ngha/siglens-core/compare/v2.36.1...v2.37.0) (2026-11-16)
+
+### Features
+
+* SiglensAI 테마 바스켓·지수 장기 통계 도구 스펙 추가 ([#325](https://github.com/y0ngha/siglens-core/issues/325)) ([9b94a7f](https://github.com/y0ngha/siglens-core/commit/9b94a7f15e0b5a32ba59a9f1692157a9ccc9a5c9))
+
 ## [2.36.1](https://github.com/y0ngha/siglens-core/compare/v2.36.0...v2.36.1) (2026-11-15)
 
 ### Bug Fixes
