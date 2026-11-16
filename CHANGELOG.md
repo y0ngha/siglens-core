@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.38.0](https://github.com/y0ngha/siglens-core/compare/v2.37.0...v2.38.0) (2026-11-16)
+
+### Features
+
+* 애널리스트 도구에 실적 추정치 추이, 수급 도구에 보유 비율 계약 추가 ([#326](https://github.com/y0ngha/siglens-core/issues/326)) ([67cf066](https://github.com/y0ngha/siglens-core/commit/67cf066ea3edb7ba66d9b27c4ca48d6e3a59bcfc))
+
 # [2.37.0](https://github.com/y0ngha/siglens-core/compare/v2.36.1...v2.37.0) (2026-11-16)
 
 ### Features
