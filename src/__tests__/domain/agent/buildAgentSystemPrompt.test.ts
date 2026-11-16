@@ -9,7 +9,11 @@ import {
     buildAgentTurnContext,
     composeAgentUserMessage,
 } from '@/domain/agent/buildAgentSystemPrompt';
-import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
+import { AGENT_TOOL_SPECS, findToolSpec } from '@/domain/agent/tools';
+import {
+    SWING_THRESHOLD_GUIDE,
+    SWING_TRIGGER_EXAMPLES,
+} from '@/domain/agent/swingHistory';
 import { AGENT_BRAND, type AgentLocale } from '@/domain/agent/promptShared';
 
 const NEW_TOOLS: readonly string[] = [
@@ -547,7 +551,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.5');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-17.1');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -877,7 +881,7 @@ describe('buildAgentSystemPrompt', () => {
                     guest: true,
                 });
             expect(guestOf(AGENT_TOOL_SPECS)).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, web search'
             );
             expect(
                 guestOf(
@@ -886,7 +890,7 @@ describe('buildAgentSystemPrompt', () => {
                     )
                 )
             ).toContain(
-                'congress trades, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, web search) works without it'
+                'congress trades, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, web search) works without it'
             );
         });
 
@@ -913,7 +917,7 @@ describe('buildAgentSystemPrompt', () => {
                 guest: true,
             });
             expect(guest).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, web search'
             );
         });
     });
@@ -1848,8 +1852,49 @@ describe('buildAgentSystemPrompt — 테마·지수 통계 라우팅', () => {
         expect(row).toContain('sp500 when the question names no index');
     });
 
+    it('조정·상승 구간 질문은 get_swing_history, 직접 세기·예측 금지, 기준은 설명과 같은 문구', () => {
+        const row = rowOf(build([]), '→ get_swing_history');
+        for (const term of [
+            '월봉 조정 기간',
+            'for a whole index pass its tracking ETF',
+            SWING_THRESHOLD_GUIDE,
+            SWING_TRIGGER_EXAMPLES,
+        ])
+            expect(row).toContain(term);
+        expect(row).toContain(
+            'Never count past swings from bars yourself while this tool is available'
+        );
+        expect(row).toContain(
+            'never turn the past into a forecast of when the current leg ends'
+        );
+        const description =
+            findToolSpec('get_swing_history')?.description ?? '';
+        expect(description).toContain(SWING_THRESHOLD_GUIDE);
+        expect(description).toContain(SWING_TRIGGER_EXAMPLES);
+    });
+
+    it('지수 통계 행은 스윙 기간 질문을 스윙 행으로 넘긴다(스윙 도구가 있을 때만)', () => {
+        const carveOut =
+            'How long declines or rallies of an index last is not this row';
+        expect(rowOf(build([]), '→ get_index_history_stats')).toContain(
+            carveOut
+        );
+        const withoutSwing = rowOf(
+            build(['get_swing_history']),
+            '→ get_index_history_stats'
+        );
+        expect(withoutSwing).toContain('9월은 원래 약해?');
+        expect(withoutSwing).not.toContain(carveOut);
+    });
+
     it('도구가 없으면 행이 빠진다', () => {
-        const prompt = build(['get_theme_snapshot', 'get_index_history_stats']);
+        const prompt = build([
+            'get_theme_snapshot',
+            'get_index_history_stats',
+            'get_swing_history',
+        ]);
+        expect(prompt).not.toContain('get_swing_history');
+        expect(prompt).not.toContain('past declines and rallies');
         expect(prompt).not.toContain('get_theme_snapshot');
         expect(prompt).not.toContain('get_index_history_stats');
         expect(prompt).not.toContain('theme baskets');

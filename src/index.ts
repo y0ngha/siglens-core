@@ -501,6 +501,31 @@ export type {
     PresidentialCyclePosition,
     ReturnStats,
 } from './domain/agent/indexHistoryStats';
+export {
+    SWING_EPISODES_LISTED_MAX,
+    SWING_LOOKBACK_YEARS,
+    SWING_MIN_PCT,
+    computeSwingHistory,
+} from './domain/agent/swingHistory';
+export type {
+    ChangeStats,
+    DayStats,
+    DeclineBand,
+    DeclineEpisode,
+    DeclineHistory,
+    DeclineSummary,
+    RallyBand,
+    RallyEpisode,
+    RallyHistory,
+    RallySummary,
+    SizeBandBounds,
+    SwingBand,
+    SwingCurrent,
+    SwingHistory,
+    SwingHistoryOptions,
+    SwingSummary,
+    WindowHigh,
+} from './domain/agent/swingHistory';
 export { findUngroundedNumbers } from './domain/agent/groundedNumbers';
 export {
     AGENT_FOLLOW_UP_MARKER,
