@@ -547,7 +547,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.3');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-16.4');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -1834,5 +1834,27 @@ describe('buildAgentSystemPrompt — 테마·지수 통계 라우팅', () => {
         expect(prompt).not.toContain('get_theme_snapshot');
         expect(prompt).not.toContain('get_index_history_stats');
         expect(prompt).not.toContain('theme baskets');
+    });
+});
+
+describe('buildAgentSystemPrompt — 추정치 추이 라우팅', () => {
+    it('실적 추정치 변화 질문은 get_analyst_views로 보낸다', () => {
+        const prompt = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS,
+            now: NOW,
+            etSessionStatus: 'open',
+            guest: false,
+        });
+        const row =
+            prompt.split('\n').find(l => l.includes('→ get_analyst_views.')) ??
+            '';
+        for (const term of [
+            '실적 추정치 올라가?',
+            'EPS 전망 바뀌었어?',
+            '컨센서스 변화',
+        ])
+            expect(row).toContain(term);
+        expect(row).toContain('the estimate trend');
     });
 });
