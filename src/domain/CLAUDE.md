@@ -294,7 +294,10 @@ computing derived values, so a recomputation from the rendered text matches.
   tool is checked against the tool's own "never for X" wording.
 - A billed tool's trigger examples (in its description and its routing row) each name the
   billed venue; a venue-less phrase that other free tools can answer sends the model to pay
-  for a read it did not need. Pin a removed venue-less example absent by test.
+  for a read it did not need. Pin a removed venue-less example absent by test. A trigger
+  verb must not also match the row it excludes ("posted" vs "said" against the filings
+  row), and one test asserts the shared trigger list against both the row and the
+  description so neither drifts.
 
   ```text
   ❌ trigger: "what did the CEO say"          // answerable from filings/news

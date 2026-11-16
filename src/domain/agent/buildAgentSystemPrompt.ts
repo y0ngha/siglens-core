@@ -14,7 +14,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-16.4';
+export const AGENT_PROMPT_VERSION = '2026-11-16.5';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -268,10 +268,16 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         text: 'Historical or seasonal statistics of the S&P 500, Nasdaq Composite, KOSPI or KOSDAQ — returns by year, by calendar month or by presidential-cycle year, the year after a midterm election, the worst years (중간선거 뒤 상승장, 9월은 원래 약해?, 1월 효과, 연말 랠리, 역대 최악의 해, 평균 연간 수익률) → get_index_history_stats with that index (sp500 when the question names no index and is about the US market, kospi for the Korean market). Quote its sample counts and period, and never turn the past into a forecast.',
     },
     {
-        // Explicit-ask only: every call is billed per post read, so this row
-        // must not ride along with news or outlook questions.
+        // Every call is billed per post read, so the row names its two triggers
+        // and its exclusions: an explicit X question, or "what is new with this
+        // one company" (explicit-only routing skipped X for those questions and
+        // answered "no specific news" while the company had posted). Price,
+        // outlook, "why did it move", multi-stock and market-wide questions stay
+        // out — those are the high-volume questions that would drain the budget.
+        // "Posted" rather than "said": what a company said in a filing or press
+        // release belongs to the filings row.
         requires: ['get_x_posts'],
-        text: 'What a company or its chief executive posted on X or Twitter, asked for explicitly (일론 머스크 최근 트윗, CEO가 X에 뭐라고 올렸어, 공식 X 계정에 뭐 올라왔어, 트위터에서 뭐래) → get_x_posts. The question must name X, Twitter or a tweet: what an executive said on an earnings call, in an interview or in a filing matches the other rows, not this one, and get_x_posts is never part of a general news, outlook or "why did it move" answer.',
+        text: 'What a company or its chief executive posted on X or Twitter (일론 머스크 최근 트윗, CEO가 X에 뭐라고 올렸어, 공식 X 계정에 뭐 올라왔어, 트위터에서 뭐래), or what is new with one specific company lately — its recent news, updates or what it has posted itself (테슬라 요즘 무슨 소식 있어?, 근황 알려줘, 최근에 별일 없어?, 회사가 직접 올린 거 있어?) → get_x_posts. For the recent-news case call it in the same step as get_news; its posts are one source next to the news, never the only basis of the answer. It is not called for a stock\'s price, chart, valuation, outlook or "why did it move" question, for several stocks at once or for the market as a whole, and what an executive said on an earnings call, in an interview or in a filing matches the other rows, not this one.',
     },
     {
         requires: ['get_macro_quotes'],
