@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.38.1](https://github.com/y0ngha/siglens-core/compare/v2.38.0...v2.38.1) (2026-11-16)
+
+### Bug Fixes
+
+* 한 회사의 "요즘 소식" 질문에도 X 게시물 도구를 뉴스와 함께 부른다 ([#327](https://github.com/y0ngha/siglens-core/issues/327)) ([039a632](https://github.com/y0ngha/siglens-core/commit/039a63202930f81238a644b5bafe0878c84130ee))
+
 # [2.38.0](https://github.com/y0ngha/siglens-core/compare/v2.37.0...v2.38.0) (2026-11-16)
 
 ### Features
