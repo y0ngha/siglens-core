@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.39.0](https://github.com/y0ngha/siglens-core/compare/v2.38.1...v2.39.0) (2026-11-16)
+
+### Features
+
+* SiglensAI 종목별 조정·상승 구간 통계 도구(get_swing_history) 스펙 추가 ([#328](https://github.com/y0ngha/siglens-core/issues/328)) ([89f7932](https://github.com/y0ngha/siglens-core/commit/89f7932efe605468b60418503c8e540c17670449))
+
 ## [2.38.1](https://github.com/y0ngha/siglens-core/compare/v2.38.0...v2.38.1) (2026-11-16)
 
 ### Bug Fixes
