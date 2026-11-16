@@ -133,7 +133,7 @@ export interface RallyHistory {
 }
 
 /** The open leg, measured from its confirmed starting swing point to the last close. */
-interface OpenLegBase {
+export interface SwingOpenLeg {
     /** The confirmed swing point the leg started from (a high for a decline, a low for a rally). */
     startDate: string;
     startClose: number;
@@ -169,12 +169,12 @@ interface OpenLegBase {
  * window holds no confirmed swing point yet, so neither leg has a known start.
  */
 export type SwingCurrent =
-    | ({ state: 'in_decline' } & OpenLegBase)
+    | ({ state: 'in_decline' } & SwingOpenLeg)
     | ({
           state: 'in_rally';
           /** Last close vs the rally's highest close, ≤ 0. */
           fromExtremePct: number;
-      } & OpenLegBase)
+      } & SwingOpenLeg)
     | { state: 'no_confirmed_swing'; lastClose: number };
 
 /** The window's highest close, for "how far from the high" questions a swing high misses. */
@@ -496,7 +496,7 @@ function openLeg(
     start: number,
     extreme: number,
     past: readonly { days: number; changePct: number }[]
-): OpenLegBase {
+): SwingOpenLeg {
     const s = rows[start]!;
     const x = rows[extreme]!;
     const last = rows.at(-1)!;
@@ -580,6 +580,9 @@ function windowHigh(rows: readonly MarketDailyClose[]): WindowHigh {
  * closes more than that many years before the last close are dropped first. Invalid closes and
  * impossible dates are dropped and dates deduplicated. Options outside {@link SWING_MIN_PCT} /
  * {@link SWING_LOOKBACK_YEARS}, or fewer than two closes, return `null`. Pure.
+ *
+ * Server entry (`index.ts`) only, not `index.client.ts`: only the agent tool executor computes it,
+ * and no browser bundle needs it.
  */
 export function computeSwingHistory(
     closes: readonly MarketDailyClose[],

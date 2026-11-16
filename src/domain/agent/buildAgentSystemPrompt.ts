@@ -2,7 +2,6 @@ import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import type { EtSessionStatus } from '@/domain/types';
 import { AGENT_CONVERSATION_RULES } from './agentConversation';
 import { AGENT_FOLLOW_UP_MARKER } from './agentFollowUps';
-import { SWING_THRESHOLD_GUIDE, SWING_TRIGGER_EXAMPLES } from './swingHistory';
 import { AGENT_WRITING_STYLE } from './agentWritingStyle';
 import {
     AGENT_BRAND,
@@ -10,6 +9,7 @@ import {
     formatNowLine,
     type AgentLocale,
 } from './promptShared';
+import { SWING_THRESHOLD_GUIDE, SWING_TRIGGER_EXAMPLES } from './swingHistory';
 import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 
 export type { AgentLocale };

@@ -501,6 +501,7 @@ export type {
     PresidentialCyclePosition,
     ReturnStats,
 } from './domain/agent/indexHistoryStats';
+// Server entry only: the swing statistics run in the agent tool executor, never in a browser bundle.
 export {
     SWING_EPISODES_LISTED_MAX,
     SWING_LOOKBACK_YEARS,
@@ -523,6 +524,7 @@ export type {
     SwingCurrent,
     SwingHistory,
     SwingHistoryOptions,
+    SwingOpenLeg,
     SwingSummary,
     WindowHigh,
 } from './domain/agent/swingHistory';

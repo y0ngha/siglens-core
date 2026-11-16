@@ -1,3 +1,4 @@
+import { AGENT_HISTORY_INDICES } from '@/domain/agent/indexHistoryStats';
 import {
     SWING_EPISODES_LISTED_MAX,
     SWING_LOOKBACK_YEARS,
@@ -5,7 +6,6 @@ import {
     SWING_THRESHOLD_GUIDE,
     SWING_TRIGGER_EXAMPLES,
 } from '@/domain/agent/swingHistory';
-import { AGENT_HISTORY_INDICES } from '@/domain/agent/indexHistoryStats';
 import { AGENT_THEME_IDS, AGENT_THEMES } from '@/domain/agent/themes';
 import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { TIMEFRAMES } from '@/domain/constants/market';
