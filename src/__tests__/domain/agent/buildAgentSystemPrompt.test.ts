@@ -551,7 +551,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-17.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-17.2');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -1863,6 +1863,9 @@ describe('buildAgentSystemPrompt — 테마·지수 통계 라우팅', () => {
             expect(row).toContain(term);
         expect(row).toContain(
             'Never count past swings from bars yourself while this tool is available'
+        );
+        expect(row).toContain(
+            'quote afterThisAge as a past distribution, never as a date'
         );
         expect(row).toContain(
             'never turn the past into a forecast of when the current leg ends'

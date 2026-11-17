@@ -357,6 +357,8 @@ or an earlier unrelated filing. A derived score likewise carries the inputs it w
 // ✅ `stake: 5.2% (4.1% as of the last filing before this window, 2026-03-02)`
 // ❌ pastLonger = pastDaysToExtreme > currentDaysSinceStart   // extreme vs last close: two bases
 // ✅ compare the same span on both sides (start-to-extreme with start-to-extreme)
+// ❌ "given the open leg at age a": past = legs.filter(l => l.endDays > a)   // ignores that the open leg's start is confirmed
+// ✅ select past episodes by every state the open leg is in: startConfirmedDays <= a && a < endDays
 ```
 
 <a id="DOM-14"></a>

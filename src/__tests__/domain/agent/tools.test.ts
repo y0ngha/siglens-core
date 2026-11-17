@@ -432,8 +432,20 @@ describe('AGENT_TOOL_SPECS', () => {
             'The swing high is the latest one, not the all-time high',
             'windowHigh.fromHighPct',
             'pastBiggerThanNow counts those that went further than extremePct',
-            "pastLongerThanNow counts those whose start-to-extreme took more calendar days than this leg's daysToExtreme",
-            'quote them as M of pastEpisodes',
+            'quote it as M of pastEpisodes',
+            'quote afterThisAge as above (unended at this age: start already confirmed, end still to come)',
+            'afterThisAge answers how much longer a leg of this age usually ran',
+            'Say that the low or high may already be in',
+            "never invent another level such as the leg's start",
+            "The extra days run from this age (today's point in the leg) to the extreme, never from the start",
+            'never turn it into a date or a promise',
+            'When unendedAtThisAge is 0, no past episode of this direction was still unended this long',
+            'taking N from unendedAtThisAge, K from extremeAlreadyIn, M from extraDaysToExtreme.samples',
+            'When extraDaysToExtreme.samples is 0 (every one of them had already set its low or high), say so and leave out the extra-days clause',
+            'start already confirmed, end still to come',
+            "using this call's minSwingPct",
+            "never measure a decline's level from its high",
+            'measured from the low for a decline and from the high for a rally',
             'startDate/startClose is the confirmed swing point',
             '229200.KS for KOSDAQ',
             'Days are calendar days and sessions are trading days: say which',
@@ -450,6 +462,9 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain(term);
         // 제공자 이력 길이를 약속하지 않고 결과 필드(firstDate)로 말하게 한다.
         expect(d).not.toContain('1970');
+        // Deprecated and no longer filled: never named to the model.
+        expect(d).not.toContain('pastLongerThanNow');
+        expect(d).not.toContain('stillRunning');
     });
 
     describe('new tool output contracts', () => {

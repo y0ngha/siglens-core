@@ -20,13 +20,15 @@ export const SWING_THRESHOLD_GUIDE =
  * row so the two trigger lists never drift apart.
  */
 export const SWING_TRIGGER_EXAMPLES =
-    '조정은 보통 며칠 가?, 월봉 조정 기간, 상승 구간은 보통 얼마나 가?, 평균 낙폭, 평균 상승폭, 고점 회복까지 얼마나 걸려, 역대 하락장·상승장, 지금 조정 깊은 편이야?, 이번 상승 오래된 편이야?';
+    '조정은 보통 며칠 가?, 월봉 조정 기간, 상승 구간은 보통 얼마나 가?, 평균 낙폭, 평균 상승폭, 고점 회복까지 얼마나 걸려, 역대 하락장·상승장, 지금 조정 깊은 편이야?, 이번 상승 오래된 편이야?, 조정 며칠째야?, 이번 하락은 보통 며칠 더 가?';
 
 /** Lower edges (percent) of the size bands above `minSwingPct`. */
 const DECLINE_BAND_EDGES: readonly number[] = [10, 20, 30, 50];
 const RALLY_BAND_EDGES: readonly number[] = [10, 20, 30, 50, 100];
 /** Slack on the threshold comparisons so an exact `minSwingPct` move counts despite float error. */
 const THRESHOLD_EPSILON = 1e-9;
+/** Fewest samples whose nearest-rank quartiles are both inner values (below it p25 is the minimum). */
+const QUARTILE_MIN_SAMPLES = 5;
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
 /** A completed decline: a confirmed swing high, the lowest close after it, ended by a rebound. */
@@ -132,6 +134,38 @@ export interface RallyHistory {
     notListed: number;
 }
 
+/**
+ * Spread of the extra calendar days in {@link AgeConditional}. Quartiles are nearest-rank (at
+ * least a quarter / three quarters of the samples took that many days or fewer) and `null` below
+ * {@link QUARTILE_MIN_SAMPLES} samples, where they would just be the minimum and the maximum.
+ */
+export interface ExtraDayStats {
+    samples: number;
+    medianDays: number | null;
+    p25Days: number | null;
+    p75Days: number | null;
+    maxDays: number | null;
+}
+
+/**
+ * Base rate for an open leg of this age. The open leg is known to have started (its start was
+ * confirmed by a `minSwingPct` move) and not to have ended (no `minSwingPct` reversal yet), so it
+ * is compared with the completed episodes of the same direction that were in the same state
+ * `ageDays` calendar days after their start: start already confirmed, ending reversal still to
+ * come. Some of those had already set their extreme by then; the rest set it later. A past
+ * distribution, not a forecast.
+ */
+export interface AgeConditional {
+    /** The open leg's age in calendar days (same as `daysSinceStart`). */
+    ageDays: number;
+    /** Completed episodes already confirmed but not yet ended `ageDays` after their start. */
+    unendedAtThisAge: number;
+    /** Of those, the ones whose extreme had already come by `ageDays` (0 more days needed). */
+    extremeAlreadyIn: number;
+    /** The rest: calendar days from `ageDays` to their extreme (`days - ageDays`). */
+    extraDaysToExtreme: ExtraDayStats;
+}
+
 /** The open leg, measured from its confirmed starting swing point to the last close. */
 export interface SwingOpenLeg {
     /** The confirmed swing point the leg started from (a high for a decline, a low for a rally). */
@@ -152,13 +186,24 @@ export interface SwingOpenLeg {
     /** Completed episodes of the same direction (same as that side's `summary.episodes`). */
     pastEpisodes: number;
     /**
-     * Completed episodes whose start-to-extreme took more calendar days than this leg's
-     * start-to-extreme so far (`daysToExtreme`) — like with like, so days spent drifting after
-     * the extreme do not count.
+     * @deprecated No longer filled (always absent): it counted against `daysToExtreme` while
+     * `afterThisAge` counts against `daysSinceStart`, and near-equal counts were quoted together
+     * as one. Use `afterThisAge`.
      */
-    pastLongerThanNow: number;
+    pastLongerThanNow?: number;
     /** Completed episodes whose size went beyond `extremePct` (deeper decline or larger rally). */
     pastBiggerThanNow: number;
+    /**
+     * How much longer past episodes in the same state at this leg's age (start already confirmed,
+     * ending reversal still to come) went on.
+     */
+    afterThisAge: AgeConditional;
+    /**
+     * The close that would end this leg under this tool's rule: `minSwingPct` above the low so
+     * far (decline, rounded up) or below the high so far (rally, rounded down), so a close at the
+     * shown level does end it. It moves when a new extreme is set.
+     */
+    endsAtClose: number;
 }
 
 /**
@@ -207,6 +252,10 @@ export interface SwingHistoryOptions {
 interface SwingPair {
     peak: number;
     trough: number;
+    /** The close that confirmed the peak (the first `threshold` decline from it). */
+    peakConfirmedAt: number;
+    /** The close that confirmed the trough and ended the decline (the rebound). */
+    troughConfirmedAt: number;
 }
 
 /** Completed declines in order, and the open leg's running high and (if falling) its low. */
@@ -216,6 +265,19 @@ interface Swings {
     openPeak: number;
     /** Low of the open decline; `null` while the leg is up. */
     openLow: number | null;
+    /** The close that confirmed `openPeak` (ended the rally before the open decline); `null` while up. */
+    openPeakConfirmedAt: number | null;
+}
+
+/** When a completed episode reached its extreme and when its ending reversal came. */
+interface EpisodeTiming {
+    /** Calendar days from the start to the extreme. */
+    days: number;
+    /** Calendar days from the start to the close that confirmed the start (the `threshold` move). */
+    startConfirmedDays: number;
+    /** Calendar days from the start to the close that ended the episode. */
+    endDays: number;
+    changePct: number;
 }
 
 function isRealIsoDate(value: string): boolean {
@@ -263,6 +325,51 @@ function average(values: readonly number[]): number | null {
         : round2(values.reduce((sum, v) => sum + v, 0) / values.length);
 }
 
+/** Nearest-rank quantile (`q` in (0, 1]) of an ascending-sorted list of at least one value. */
+function nearestRank(sorted: readonly number[], q: number): number {
+    return sorted[Math.ceil(q * sorted.length) - 1]!;
+}
+
+function extraDayStats(values: readonly number[]): ExtraDayStats {
+    const sorted = values.toSorted((a, b) => a - b);
+    const quartiles = sorted.length >= QUARTILE_MIN_SAMPLES;
+    return {
+        samples: sorted.length,
+        medianDays: medianOfSorted(sorted),
+        p25Days: quartiles ? nearestRank(sorted, 0.25) : null,
+        p75Days: quartiles ? nearestRank(sorted, 0.75) : null,
+        maxDays: sorted.at(-1) ?? null,
+    };
+}
+
+function ageConditional(
+    past: readonly EpisodeTiming[],
+    ageDays: number
+): AgeConditional {
+    const unended = past.filter(
+        e => e.startConfirmedDays <= ageDays && e.endDays > ageDays
+    );
+    const later = unended.filter(e => e.days > ageDays);
+    return {
+        ageDays,
+        unendedAtThisAge: unended.length,
+        extremeAlreadyIn: unended.length - later.length,
+        extraDaysToExtreme: extraDayStats(later.map(e => e.days - ageDays)),
+    };
+}
+
+/** Rounds `value` toward `direction` at the precision {@link roundPrice} shows. */
+function roundPriceToward(value: number, direction: 'up' | 'down'): number {
+    const decimals = value >= 1 ? 2 : 4 - Math.floor(Math.log10(value));
+    const scale = 10 ** decimals;
+    const scaled = value * scale;
+    const rounded =
+        direction === 'up'
+            ? Math.ceil(scaled - THRESHOLD_EPSILON)
+            : Math.floor(scaled + THRESHOLD_EPSILON);
+    return Number((rounded / scale).toFixed(decimals));
+}
+
 function dayStats(values: readonly number[]): DayStats {
     return {
         samples: values.length,
@@ -306,6 +413,7 @@ function findSwings(
     const declines: SwingPair[] = [];
     let peak = 0;
     let low: number | null = null;
+    let peakConfirmedAt = 0;
     for (let i = 1; i < rows.length; i++) {
         const close = rows[i]!.close;
         if (low === null) {
@@ -313,21 +421,33 @@ function findSwings(
             else if (
                 close / rows[peak]!.close - 1 <=
                 -threshold + THRESHOLD_EPSILON
-            )
+            ) {
                 low = i;
+                peakConfirmedAt = i;
+            }
         } else if (close < rows[low]!.close) {
             low = i;
         } else if (
             close / rows[low]!.close - 1 >=
             threshold - THRESHOLD_EPSILON
         ) {
-            declines.push({ peak, trough: low });
+            declines.push({
+                peak,
+                trough: low,
+                peakConfirmedAt,
+                troughConfirmedAt: i,
+            });
             // Every close since the low stayed under this one, so it is the new running high.
             peak = i;
             low = null;
         }
     }
-    return { declines, openPeak: peak, openLow: low };
+    return {
+        declines,
+        openPeak: peak,
+        openLow: low,
+        openPeakConfirmedAt: low === null ? null : peakConfirmedAt,
+    };
 }
 
 /** First index after `from` whose close is at or above `level`, or `null`. */
@@ -493,15 +613,17 @@ function declineBands(
 
 function openLeg(
     rows: readonly MarketDailyClose[],
-    start: number,
-    extreme: number,
-    past: readonly { days: number; changePct: number }[]
+    leg: { start: number; extreme: number; direction: 'down' | 'up' },
+    threshold: number,
+    past: readonly EpisodeTiming[]
 ): SwingOpenLeg {
+    const { start, extreme, direction } = leg;
     const s = rows[start]!;
     const x = rows[extreme]!;
     const last = rows.at(-1)!;
     const extremePct = pct(s.close, x.close);
     const daysToExtreme = calendarDays(s.date, x.date);
+    const daysSinceStart = calendarDays(s.date, last.date);
     return {
         startDate: s.date,
         startClose: roundPrice(s.close),
@@ -510,21 +632,26 @@ function openLeg(
         extremePct,
         lastClose: roundPrice(last.close),
         changePct: pct(s.close, last.close),
-        daysSinceStart: calendarDays(s.date, last.date),
+        daysSinceStart,
         daysToExtreme,
         pastEpisodes: past.length,
-        pastLongerThanNow: past.filter(e => e.days > daysToExtreme).length,
         pastBiggerThanNow: past.filter(
             e => Math.abs(e.changePct) > Math.abs(extremePct)
         ).length,
+        afterThisAge: ageConditional(past, daysSinceStart),
+        endsAtClose:
+            direction === 'down'
+                ? roundPriceToward(x.close * (1 + threshold), 'up')
+                : roundPriceToward(x.close * (1 - threshold), 'down'),
     };
 }
 
 function currentState(
     rows: readonly MarketDailyClose[],
     swings: Swings,
-    declines: readonly DeclineEpisode[],
-    rallies: readonly RallyEpisode[]
+    declines: readonly EpisodeTiming[],
+    rallies: readonly EpisodeTiming[],
+    threshold: number
 ): SwingCurrent {
     const lastTrough = swings.declines.at(-1)?.trough;
     if (swings.openLow !== null) {
@@ -536,7 +663,16 @@ function currentState(
             };
         return {
             state: 'in_decline',
-            ...openLeg(rows, swings.openPeak, swings.openLow, declines),
+            ...openLeg(
+                rows,
+                {
+                    start: swings.openPeak,
+                    extreme: swings.openLow,
+                    direction: 'down',
+                },
+                threshold,
+                declines
+            ),
         };
     }
     if (lastTrough === undefined)
@@ -546,7 +682,12 @@ function currentState(
         };
     return {
         state: 'in_rally',
-        ...openLeg(rows, lastTrough, swings.openPeak, rallies),
+        ...openLeg(
+            rows,
+            { start: lastTrough, extreme: swings.openPeak, direction: 'up' },
+            threshold,
+            rallies
+        ),
         fromExtremePct: pct(rows[swings.openPeak]!.close, rows.at(-1)!.close),
     };
 }
@@ -607,17 +748,65 @@ export function computeSwingHistory(
 
     const swings = findSwings(rows, minSwingPct / 100);
     // The first decline's high was reached from the window's first close, not a confirmed low.
-    const declines = swings.declines
-        .slice(1)
-        .map(pair => toDecline(rows, pair));
+    const confirmedDeclines = swings.declines.slice(1);
+    const declines = confirmedDeclines.map(pair => toDecline(rows, pair));
+    const declineTimings: EpisodeTiming[] = confirmedDeclines.map(
+        (pair, i) => ({
+            days: declines[i]!.days,
+            startConfirmedDays: calendarDays(
+                rows[pair.peak]!.date,
+                rows[pair.peakConfirmedAt]!.date
+            ),
+            endDays: calendarDays(
+                rows[pair.peak]!.date,
+                rows[pair.troughConfirmedAt]!.date
+            ),
+            changePct: declines[i]!.changePct,
+        })
+    );
+    // A rally runs from a decline's trough to the next confirmed peak, and ends at the close that
+    // confirmed that peak.
     const rallyEnds = [
-        ...swings.declines.slice(1).map(pair => pair.peak),
-        ...(swings.openLow === null ? [] : [swings.openPeak]),
+        ...confirmedDeclines.map(pair => ({
+            peak: pair.peak,
+            confirmedAt: pair.peakConfirmedAt,
+        })),
+        ...(swings.openPeakConfirmedAt === null
+            ? []
+            : [
+                  {
+                      peak: swings.openPeak,
+                      confirmedAt: swings.openPeakConfirmedAt,
+                  },
+              ]),
     ];
-    const rallies = swings.declines.flatMap((pair, i) => {
+    const rallyPairs = swings.declines.flatMap((pair, i) => {
         const end = rallyEnds[i];
-        return end === undefined ? [] : [toRally(rows, pair.trough, end)];
+        return end === undefined
+            ? []
+            : [
+                  {
+                      trough: pair.trough,
+                      troughConfirmedAt: pair.troughConfirmedAt,
+                      ...end,
+                  },
+              ];
     });
+    const rallies = rallyPairs.map(pair =>
+        toRally(rows, pair.trough, pair.peak)
+    );
+    const rallyTimings: EpisodeTiming[] = rallyPairs.map((pair, i) => ({
+        days: rallies[i]!.days,
+        startConfirmedDays: calendarDays(
+            rows[pair.trough]!.date,
+            rows[pair.troughConfirmedAt]!.date
+        ),
+        endDays: calendarDays(
+            rows[pair.trough]!.date,
+            rows[pair.confirmedAt]!.date
+        ),
+        changePct: rallies[i]!.changePct,
+    }));
 
     return {
         minSwingPct,
@@ -637,6 +826,12 @@ export function computeSwingHistory(
             episodes: rallies.toReversed().slice(0, SWING_EPISODES_LISTED_MAX),
             notListed: Math.max(0, rallies.length - SWING_EPISODES_LISTED_MAX),
         },
-        current: currentState(rows, swings, declines, rallies),
+        current: currentState(
+            rows,
+            swings,
+            declineTimings,
+            rallyTimings,
+            minSwingPct / 100
+        ),
     };
 }
