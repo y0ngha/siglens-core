@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.40.0](https://github.com/y0ngha/siglens-core/compare/v2.39.0...v2.40.0) (2026-11-17)
+
+### Features
+
+* 스윙 도구에 진행 구간 경과일 조건부 통계 추가 ([#329](https://github.com/y0ngha/siglens-core/issues/329)) ([9442833](https://github.com/y0ngha/siglens-core/commit/94428336430809e99600e3552c56a92dfeeb2161))
+
 # [2.39.0](https://github.com/y0ngha/siglens-core/compare/v2.38.1...v2.39.0) (2026-11-16)
 
 ### Features
