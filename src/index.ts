@@ -509,12 +509,14 @@ export {
     computeSwingHistory,
 } from './domain/agent/swingHistory';
 export type {
+    AgeConditional,
     ChangeStats,
     DayStats,
     DeclineBand,
     DeclineEpisode,
     DeclineHistory,
     DeclineSummary,
+    ExtraDayStats,
     RallyBand,
     RallyEpisode,
     RallyHistory,

@@ -171,12 +171,192 @@ describe('computeSwingHistory — 현재 구간', () => {
             daysSinceStart: 3,
             daysToExtreme: 2,
             pastEpisodes: 1,
-            pastLongerThanNow: 0,
             pastBiggerThanNow: 0,
+            endsAtClose: 108,
+            afterThisAge: {
+                ageDays: 3,
+                unendedAtThisAge: 0,
+                extremeAlreadyIn: 0,
+                extraDaysToExtreme: {
+                    samples: 0,
+                    medianDays: null,
+                    p25Days: null,
+                    p75Days: null,
+                    maxDays: null,
+                },
+            },
         });
     });
 
-    it('열린 하락은 과거 하락 중 더 길거나 더 깊었던 개수를 센다(같으면 세지 않는다)', () => {
+    /**
+     * Confirmed on day 1 (88, a 12% drop), low of 80 on day k, rebound to 100 on day k + 1.
+     * A one-day decline goes straight to 80.
+     */
+    const decline = (days: number) => [
+        ...Array.from({ length: days }, (_, j) =>
+            days === 1 ? 80 : 88 - (8 * j) / (days - 1)
+        ),
+        100,
+    ];
+    /** A slow decline only confirmed on day 5 (90), low of 85 on day 6, rebound on day 7. */
+    const slowDecline = [98, 96, 94, 92, 90, 85, 100];
+    /** Down to 80 on day 1, then `drift` days at 82 before the rebound (low early, ended late). */
+    const earlyLow = (drift: number) => [
+        80,
+        ...Array<number>(drift).fill(82),
+        100,
+    ];
+
+    it('이 나이에 끝나지 않았던 과거 구간만 골라 극값까지 더 걸린 일수를 낸다(표본이 적으면 사분위는 null)', () => {
+        // Past declines are confirmed on day 1, bottom 1, 3, 5, 6 days after their high and end a
+        // day later; the open decline is 2 days old. Unended at day 2: the 3-, 5- and 6-day ones.
+        const h = run([
+            50,
+            100,
+            80,
+            100,
+            ...[1, 3, 5, 6].flatMap(decline),
+            95,
+            85,
+        ]);
+        expect(openLeg(h.current, 'in_decline').afterThisAge).toEqual({
+            ageDays: 2,
+            unendedAtThisAge: 3,
+            extremeAlreadyIn: 0,
+            extraDaysToExtreme: {
+                samples: 3,
+                medianDays: 3,
+                p25Days: null,
+                p75Days: null,
+                maxDays: 4,
+            },
+        });
+    });
+
+    it('이 나이에 끝나지 않았지만 극값은 이미 나와 있던 구간을 따로 세고, 5개 이상이면 사분위를 낸다', () => {
+        // earlyLow(3): low on day 1, ended on day 5 → unended at day 2 with its low already in.
+        // The 3-, 5-, 6-, 8- and 9-day declines need 1, 3, 4, 6 and 7 more days.
+        const h = run([
+            50,
+            100,
+            80,
+            100,
+            ...earlyLow(3),
+            ...[3, 5, 6, 8, 9].flatMap(decline),
+            95,
+            85,
+        ]);
+        expect(openLeg(h.current, 'in_decline').afterThisAge).toEqual({
+            ageDays: 2,
+            unendedAtThisAge: 6,
+            extremeAlreadyIn: 1,
+            extraDaysToExtreme: {
+                samples: 5,
+                medianDays: 4,
+                p25Days: 3,
+                p75Days: 6,
+                maxDays: 7,
+            },
+        });
+    });
+
+    it('표본이 4개면 사분위는 아직 null이다(p25가 최솟값이 되므로)', () => {
+        const h = run([
+            50,
+            100,
+            80,
+            100,
+            ...[3, 5, 6, 8].flatMap(decline),
+            95,
+            85,
+        ]);
+        expect(
+            openLeg(h.current, 'in_decline').afterThisAge.extraDaysToExtreme
+        ).toEqual({
+            samples: 4,
+            medianDays: 3.5,
+            p25Days: null,
+            p75Days: null,
+            maxDays: 6,
+        });
+    });
+
+    it('이 나이에 아직 시작이 확정되지 않았던 과거 구간은 세지 않는다', () => {
+        // The slow decline was only confirmed on day 5; at day 2 it was not yet a decline.
+        const h = run([50, 100, 80, 100, ...slowDecline, 95, 85]);
+        expect(openLeg(h.current, 'in_decline').afterThisAge).toMatchObject({
+            ageDays: 2,
+            unendedAtThisAge: 0,
+        });
+    });
+
+    it('나이와 같은 날 극값을 찍은 구간은 이미 극값이 나온 것으로 센다', () => {
+        // Past decline: low on day 2, ended on day 3. The open decline is 2 days old.
+        const h = run([50, 100, 80, 100, 90, 80, 100, 95, 85]);
+        expect(openLeg(h.current, 'in_decline').afterThisAge).toMatchObject({
+            unendedAtThisAge: 1,
+            extremeAlreadyIn: 1,
+            extraDaysToExtreme: { samples: 0, medianDays: null },
+        });
+    });
+
+    it('열린 상승은 과거 하락이 아니라 과거 상승의 시점과 비교한다', () => {
+        // Past rallies: 80 → 120 (high day 4, ended day 5) and 105 → 130 (day 2, ended day 3).
+        // Past declines end on days 2 and 3, so only the rally timings leave one unended at day 3.
+        const h = run([
+            50, 100, 80, 90, 100, 110, 120, 105, 116, 130, 117, 100, 112, 125,
+            140,
+        ]);
+        expect(openLeg(h.current, 'in_rally').afterThisAge).toEqual({
+            ageDays: 3,
+            unendedAtThisAge: 1,
+            extremeAlreadyIn: 0,
+            extraDaysToExtreme: {
+                samples: 1,
+                medianDays: 1,
+                p25Days: null,
+                p75Days: null,
+                maxDays: 1,
+            },
+        });
+    });
+
+    it('이 나이에 아직 저점이 확정되지 않았던(반등이 느렸던) 과거 상승은 세지 않는다', () => {
+        // Past rally from 80: the rebound only reaches +10% (88) on day 4, high 110 on day 6,
+        // ended on day 7. The open rally from 99 is 3 days old, so that rally was not yet a rally.
+        const h = run([
+            50, 100, 80, 82, 84, 86, 88, 100, 110, 99, 110, 120, 130,
+        ]);
+        const current = openLeg(h.current, 'in_rally');
+        expect(current.pastEpisodes).toBe(1);
+        expect(current.afterThisAge).toMatchObject({
+            ageDays: 3,
+            unendedAtThisAge: 0,
+        });
+    });
+
+    it('열린 하락은 저점보다 minSwingPct 위 종가에서 끝난다(endsAtClose)', () => {
+        // Open decline 100 → 85 (low so far); a close of 93.5 (85 × 1.1) would end it.
+        const h = run([50, 100, 80, 100, 95, 85], 10);
+        expect(openLeg(h.current, 'in_decline').endsAtClose).toBe(93.5);
+    });
+
+    it('endsAtClose는 하락이면 올림, 상승이면 내림이라 보이는 가격의 종가가 실제로 구간을 끝낸다', () => {
+        // 85.0036 × 1.1 = 93.50396 → 93.51 (93.50 would not end it).
+        const down = run([50, 100, 80, 100, 95, 85.0036], 10);
+        expect(openLeg(down.current, 'in_decline').endsAtClose).toBe(93.51);
+        // 356.2733 × 0.9 = 320.64597 → 320.64 (320.65 would not end it).
+        const up = run([50, 100, 80, 100, 70, 90, 356.2733, 350]);
+        expect(openLeg(up.current, 'in_rally').endsAtClose).toBe(320.64);
+    });
+
+    it('1 미만 가격의 endsAtClose도 유효숫자 5자리에서 올림한다', () => {
+        // 0.000123451 × 1.1 = 0.0001357961 → 0.0001358 (5 significant digits, rounded up).
+        const h = run([0.00005, 0.0002, 0.00016, 0.0002, 0.000123451]);
+        expect(openLeg(h.current, 'in_decline').endsAtClose).toBe(0.0001358);
+    });
+
+    it('열린 하락은 과거 하락 중 더 깊었던 개수를 센다(같으면 세지 않는다)', () => {
         // Completed declines with a confirmed high: 100→70 (1 day, −30%), 120→96 (2 days, −20%).
         // Open: 130 → 104 (−20%) over 2 days, last 105 three days after the high.
         const h = run([
@@ -190,32 +370,35 @@ describe('computeSwingHistory — 현재 구간', () => {
             daysSinceStart: 3,
             daysToExtreme: 2,
             pastEpisodes: 2,
-            // Past start-to-low took 1 and 2 days; neither is longer than this leg's 2 (a tie).
-            pastLongerThanNow: 0,
             // −30% is deeper; −20% ties and does not count.
             pastBiggerThanNow: 1,
         });
     });
 
-    it('과거 구간이 지금보다 길면 센다', () => {
-        // Completed: 100 → 70 over 3 days. Open: 120 → 105 in 1 day.
+    it('과거 구간이 이 나이에 끝나지 않았으면 unendedAtThisAge로 센다', () => {
+        // Completed: 100 → 70 over 3 days, ended on day 4. Open: 120 → 105, 1 day old.
         const h = run([50, 100, 80, 100, 90, 85, 70, 90, 120, 105]);
-        expect(openLeg(h.current, 'in_decline')).toMatchObject({
-            daysSinceStart: 1,
-            pastLongerThanNow: 1,
+        expect(openLeg(h.current, 'in_decline').afterThisAge).toMatchObject({
+            ageDays: 1,
+            unendedAtThisAge: 1,
+            extremeAlreadyIn: 0,
+            extraDaysToExtreme: { samples: 1, medianDays: 2 },
         });
     });
 
-    it('지금 구간의 길이는 극값까지의 일수로 비교한다(극값 뒤 옆걸음은 세지 않는다)', () => {
-        // Past: 100 → 70 over 2 days. Open: 120 → 105 on day 1, then drifts for 5 more days.
+    it('나이는 극값까지가 아니라 오늘까지의 일수다(극값 뒤 옆걸음도 나이에 든다)', () => {
+        // Past: 100 → 70 over 2 days. Open: 120 → 105 on day 1, then drifts to day 6.
         const h = run([
             50, 100, 80, 100, 85, 70, 90, 120, 105, 106, 107, 106, 107, 106,
         ]);
-        expect(openLeg(h.current, 'in_decline')).toMatchObject({
-            daysToExtreme: 1,
-            daysSinceStart: 6,
-            pastLongerThanNow: 1,
+        const current = openLeg(h.current, 'in_decline');
+        expect(current).toMatchObject({ daysToExtreme: 1, daysSinceStart: 6 });
+        expect(current.afterThisAge).toMatchObject({
+            ageDays: 6,
+            unendedAtThisAge: 0,
         });
+        // The deprecated count is no longer filled.
+        expect('pastLongerThanNow' in current).toBe(false);
     });
 
     it('1 미만 가격(코인)은 유효숫자 5자리로 내고 비율은 반올림 전 종가로 계산한다', () => {

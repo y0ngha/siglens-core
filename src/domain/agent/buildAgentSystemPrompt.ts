@@ -15,7 +15,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-17.1';
+export const AGENT_PROMPT_VERSION = '2026-11-17.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -272,7 +272,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     },
     {
         requires: ['get_swing_history'],
-        text: `How long or how far declines or rallies of one symbol usually go, how long it takes to get back to the high, or how the current decline or rally compares (${SWING_TRIGGER_EXAMPLES}) → get_swing_history with that symbol (${SWING_THRESHOLD_GUIDE}); for a whole index pass its tracking ETF. Never count past swings from bars yourself while this tool is available. Quote its medians with the sample count and the period, and never turn the past into a forecast of when the current leg ends.`,
+        text: `How long or how far declines or rallies of one symbol usually go, how long it takes to get back to the high, or how the current decline or rally compares or how much longer a decline or rally of this age usually ran (${SWING_TRIGGER_EXAMPLES}) → get_swing_history with that symbol (${SWING_THRESHOLD_GUIDE}); for a whole index pass its tracking ETF. Never count past swings from bars yourself while this tool is available. Quote its medians with the sample count and the period, and never turn the past into a forecast of when the current leg ends: for 언제 끝날까?, 바닥은 언제쯤?, 며칠 더 갈까? quote afterThisAge as a past distribution, never as a date.`,
     },
     {
         // Every call is billed per post read, so the row names its two triggers
