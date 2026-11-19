@@ -551,7 +551,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-19.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-19.3');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -657,10 +657,31 @@ describe('buildAgentSystemPrompt', () => {
         it('그림이 나은 질문을 show_chart로 보내고 답변당 두 장으로 묶는다', () => {
             expect(prompt).toContain('→ show_chart with the matching kind');
             expect(prompt).toContain('At most two charts per answer.');
+            // 시간 축 없는 몇 개의 현재 값 비교는 그림이 아니라 답변 안 마크다운 표로 쓴다(사용자 결정 2026-11-19).
+            // 라우팅 시점에는 데이터가 없으므로 경계는 "이미 받은 값"이 아니라 질문 모양(시간 축 유무)이다(DOM-15).
+            expect(prompt).toContain(
+                'A comparison of a few current values with no time axis'
+            );
+            expect(prompt).toContain(
+                'is not a chart either: answer it with a markdown table.'
+            );
+            // 추이·비교 차트 예시는 그대로 남는다 — 위 예외와 겹치지 않는다.
+            expect(prompt).toContain(
+                '엔비디아랑 AMD 6개월 수익률 비교, 애플 실적 추이'
+            );
             expect(prompt).toContain(
                 'never a neighbouring theme as a stand-in'
             );
             expect(prompt).toContain('portfolio weights, ');
+        });
+
+        it('비교를 요청받으면 마크다운 표로 쓰되 폭 상한과 Plain 숫자 예산을 따른다', () => {
+            expect(prompt).toContain(
+                'When the user asks to compare a few symbols or periods on the same measures, put those figures in one markdown table'
+            );
+            expect(prompt).toContain(
+                'at the Plain level its figures count toward the figure budget'
+            );
         });
 
         it('show_chart가 없으면 행을 내지 않는다', () => {

@@ -263,7 +263,9 @@ computing derived values, so a recomputation from the rendered text matches.
   A second tool that reuses the same closed list (e.g. a chart tool taking the same `theme`
   argument) copies the carve-out too, in its description and its conditional row text; a row
   sentence naming another tool is emitted only when that tool is available.
-- Style rules never override required content.
+- Style rules never override required content. A new formatting rule (a markdown table for
+  side-by-side figures) is scoped to the explicit ask it serves and counted against each
+  answer level's figure budget, so it cannot expand a level that caps figures.
 - A rule restated in two places (section intro and writing rules) changes in both together.
 - Before adding a prohibition ("never say X"), read every existing rule that mentions the
   same output; a new ban must not contradict gap-reporting or required-wording rules.
@@ -390,7 +392,11 @@ that holds at only one of the answer levels it governs (summary vs detail) is ap
 all of them. A routing row or first-step rule is matched before any tool result exists, so a
 condition that reads a tool result (a session flag, a found/degraded field) says to call that
 tool first and decide in a later step; it never gates a first-step parallel call on a fact
-that does not exist yet. Every field a rule reads is in the described result shape, and a
+that does not exist yet. The same holds for an exclusion or boundary between two routes
+("not when you already have the figures from a tool"): word it as a shape of the question
+("a comparison of a few current values with no time axis"), and keep its examples disjoint
+from the neighbouring row's own examples (a 2-symbol compare, a quarterly trend), or the
+model cannot tell which row wins. Every field a rule reads is in the described result shape, and a
 row that names a tool is gated by the same availability condition as that tool. A described
 output field must also be one the executor can compute at the cost the tool is allowed to
 spend, and a contract never encodes an unverified provider behaviour: promise what one bounded
