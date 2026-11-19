@@ -15,7 +15,7 @@ import {
 describe('index — agent exports', () => {
     it('runAgentTurn·툴 카탈로그·CounterStoreUnavailableError를 값으로 내보낸다', () => {
         expect(typeof runAgentTurn).toBe('function');
-        expect(AGENT_TOOL_SPECS.length).toBe(22);
+        expect(AGENT_TOOL_SPECS.length).toBe(23);
         expect(new CounterStoreUnavailableError('p')).toBeInstanceOf(Error);
     });
 

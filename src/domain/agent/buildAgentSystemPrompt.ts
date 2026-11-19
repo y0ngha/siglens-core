@@ -3,6 +3,7 @@ import type { EtSessionStatus } from '@/domain/types';
 import { AGENT_CONVERSATION_RULES } from './agentConversation';
 import { AGENT_FOLLOW_UP_MARKER } from './agentFollowUps';
 import { AGENT_WRITING_STYLE } from './agentWritingStyle';
+import { formatAttachedImagesMarker } from './attachedImages';
 import {
     AGENT_BRAND,
     LANGUAGE_NAME,
@@ -15,7 +16,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-17.2';
+export const AGENT_PROMPT_VERSION = '2026-11-19.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -336,6 +337,11 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         text: 'Comparing several symbols → apply the matching rows to each symbol.',
     },
     {
+        requires: ['show_chart'],
+        text: available =>
+            `A comparison over time, a trend across quarters or years, an options distribution, investor flows, ${available.has('get_my_portfolio') ? 'portfolio weights, ' : ''}a market or theme board, or dividend history — when a picture reads better than a list of numbers (엔비디아랑 AMD 비교, 애플 실적 추이, 옵션 어디에 몰려 있어, 외국인 수급 추이, 오늘 섹터 한눈에, 배당 추이) → show_chart with the matching kind in the same step as the data tools the answer needs. Not for a single figure, a definition or a yes/no question. At most two charts per answer.${available.has('get_theme_snapshot') ? ' A theme board only for a theme on the get_theme_snapshot list — never a neighbouring theme as a stand-in.' : ''}`,
+    },
+    {
         requires: [],
         text: 'Out-of-scope requests (code, homework, unrelated topics) → no tools.',
     },
@@ -353,6 +359,7 @@ function ruleLines(
 ): string {
     return [
         '- Never quote a price, indicator value, earnings figure, options metric or news item from memory. Fetch it with a tool every time.',
+        `- Attached images: read them yourself. For a chart screenshot, name the symbol, timeframe and the price area you can see, then check the figures with the tools; tool figures win over what the image shows, and a figure read only from the image is called "as shown in the image" (이미지 기준). When you cannot tell which symbol it is, ask instead of guessing. Never repeat account numbers, names or other personal details visible in an image. A line ${formatAttachedImagesMarker('N')} in an earlier message means the user showed images you can no longer see: rely on your earlier answer, and ask them to attach the image again when you must look at it.`,
         '- Call every tool the answer needs in parallel in one step; do not wait for one result to decide the next unless a routing row or a rule says so.',
         '- Computed figures: when a tool result carries a computed figure (derived, sinceAnalysis, pnl/pnlPct/weightPct, targetUpsidePct, upsidePct, gapPct, daysToEarnings, tally, ageHours, spread2s10s, bestWorstSpreadPp, options maxPainDistancePct/impliedMoveRange, macro changes/range52w, other …Pct fields), quote it as given — never recompute it or replace it with your own figure. When the user needs a figure no tool provides, you may compute it from numbers that appear in tool results in this conversation: show the inputs and the operation in one short clause (e.g. "335.26 × 100 = 33,526") so it can be checked. That is one operation for one figure: never chain several calculations, never show working for a figure a tool already gave, and never put a run of arithmetic in parentheses mid-sentence. Never use a number that is not in a tool result as an input.',
         available.has('get_bars_indicators') &&

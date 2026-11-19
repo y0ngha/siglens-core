@@ -1,5 +1,6 @@
 import type { AgentLocale } from '@/domain/agent/buildAgentSystemPrompt';
 import type {
+    AgentImage,
     AgentMessage,
     AgentStreamEvent,
     CallAgentProvider,
@@ -32,8 +33,13 @@ export interface RunAgentTurnParams {
     locale: AgentLocale;
     /** Full stored transcript (the loop selects the window itself). */
     history: readonly AgentMessage[];
-    /** The new user message for this turn. */
+    /** The new user message for this turn. May be empty when `userImages` is not. */
     userMessage: string;
+    /**
+     * Images attached to this turn's message. Sent to the provider with the message; only the first
+     * `AGENT_IMAGES_PER_MESSAGE_MAX` are kept. History never carries images (see `formatAttachedImagesMarker`).
+     */
+    userImages?: readonly AgentImage[];
     /** Tool names the consumer can execute right now. */
     availableTools: ReadonlySet<string>;
     /** Symbols the user holds, for the system prompt. */

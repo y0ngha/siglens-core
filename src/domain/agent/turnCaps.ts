@@ -31,6 +31,11 @@ export const AGENT_TURN_CAPS = {
      * budget is the consumer's to enforce.
      */
     maxXPostCalls: 3,
+    /**
+     * `show_chart` calls one turn may make. The chat shows at most three charts under one answer, so a fourth would be
+     * drawn for nobody; the prompt asks for two at most, this is the hard stop.
+     */
+    maxCharts: 3,
     maxDistinctSymbols: 5,
     turnDeadlineMs: 600_000,
 } as const;

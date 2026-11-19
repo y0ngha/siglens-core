@@ -468,9 +468,17 @@ export {
     AGENT_X_POSTS_PAGE_SIZE,
     AGENT_X_POSTS_WINDOW_DAYS,
     FRESH_ANALYSIS_KINDS,
+    AGENT_CHART_KINDS,
+    AGENT_CHART_PERIODS,
+    AGENT_COMPARE_SYMBOLS_MIN,
+    AGENT_COMPARE_SYMBOLS_MAX,
     findToolSpec,
     selectTools,
 } from './domain/agent/tools';
+export {
+    AGENT_IMAGES_PER_MESSAGE_MAX,
+    formatAttachedImagesMarker,
+} from './domain/agent/attachedImages';
 export { validateArgs } from './domain/agent/validateArgs';
 export {
     AGENT_THEMES,
@@ -1212,6 +1220,8 @@ export type {
 export type {
     AgentRole,
     AgentToolCall,
+    AgentImage,
+    AgentImageMediaType,
     AgentMessage,
     JsonSchemaProperty,
     JsonSchemaObject,
@@ -1225,6 +1235,8 @@ export type {
 } from './domain/ports/agentProvider';
 export type {
     AgentBarsTimeframe,
+    AgentChartKind,
+    AgentChartPeriod,
     AgentMacroInstrument,
     FreshAnalysisKind,
 } from './domain/agent/tools';

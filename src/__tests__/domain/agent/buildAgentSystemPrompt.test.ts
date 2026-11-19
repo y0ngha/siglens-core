@@ -551,7 +551,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-17.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-19.1');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -651,6 +651,62 @@ describe('buildAgentSystemPrompt', () => {
         expect(prompt).toContain(
             'which has been the riskier case (washoutBelowMa200)'
         );
+    });
+
+    describe('show_chart routing', () => {
+        it('그림이 나은 질문을 show_chart로 보내고 답변당 두 장으로 묶는다', () => {
+            expect(prompt).toContain('→ show_chart with the matching kind');
+            expect(prompt).toContain('At most two charts per answer.');
+            expect(prompt).toContain(
+                'never a neighbouring theme as a stand-in'
+            );
+            expect(prompt).toContain('portfolio weights, ');
+        });
+
+        it('show_chart가 없으면 행을 내지 않는다', () => {
+            const without = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(t => t.name !== 'show_chart'),
+                now: NOW,
+                etSessionStatus: 'open',
+            });
+            expect(without).not.toContain('→ show_chart');
+        });
+
+        it('보유종목 도구가 없으면(게스트) 비중 문구를 뺀다', () => {
+            const guest = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(
+                    t => t.name !== 'get_my_portfolio'
+                ),
+                now: NOW,
+                etSessionStatus: 'open',
+            });
+            expect(guest).toContain('→ show_chart');
+            expect(guest).not.toContain('portfolio weights, ');
+        });
+
+        it('테마 도구가 없으면 테마 대체 금지 문장을 빼고 행은 남긴다', () => {
+            const noTheme = buildAgentSystemPrompt({
+                locale: 'ko',
+                tools: AGENT_TOOL_SPECS.filter(
+                    t => t.name !== 'get_theme_snapshot'
+                ),
+                now: NOW,
+                etSessionStatus: 'open',
+            });
+            expect(noTheme).toContain('→ show_chart');
+            expect(noTheme).not.toContain(
+                'never a neighbouring theme as a stand-in'
+            );
+        });
+    });
+
+    it('첨부 이미지 규칙: 도구 수치 우선, 개인정보 미기재, 이전 이미지 재첨부 요청', () => {
+        expect(prompt).toContain('- Attached images: read them yourself.');
+        expect(prompt).toContain('tool figures win over what the image shows');
+        expect(prompt).toContain('Never repeat account numbers');
+        expect(prompt).toContain('ask them to attach the image again');
     });
 
     describe('get_investor_flows routing', () => {
