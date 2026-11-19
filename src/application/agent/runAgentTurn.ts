@@ -1,4 +1,8 @@
 import {
+    AGENT_IMAGES_PER_MESSAGE_MAX,
+    formatAttachedImagesMarker,
+} from '@/domain/agent/attachedImages';
+import {
     AGENT_PROMPT_VERSION,
     buildAgentSystemPrompt,
     buildAgentTurnContext,
@@ -6,10 +10,6 @@ import {
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
 import { isSmallTalkMessage } from '@/domain/agent/smallTalk';
-import {
-    AGENT_IMAGES_PER_MESSAGE_MAX,
-    formatAttachedImagesMarker,
-} from '@/domain/agent/attachedImages';
 import {
     findToolSpec,
     isFreshAnalysisKind,
