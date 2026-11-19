@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.42.0](https://github.com/y0ngha/siglens-core/compare/v2.41.0...v2.42.0) (2026-11-19)
+
+### Features
+
+* 시간 축 없는 현재 값 비교는 차트 대신 마크다운 표로 답하게 ([#331](https://github.com/y0ngha/siglens-core/issues/331)) ([71e61fc](https://github.com/y0ngha/siglens-core/commit/71e61fcc4cb065e6e1ccb4e14f41a7915ee93939))
+
 # [2.41.0](https://github.com/y0ngha/siglens-core/compare/v2.40.0...v2.41.0) (2026-11-19)
 
 ### Features
