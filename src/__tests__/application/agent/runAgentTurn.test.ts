@@ -21,6 +21,7 @@ import type {
 import type { CounterStore } from '@/domain/ports/counterStore';
 import { CounterStoreUnavailableError } from '@/domain/ports/counterStore';
 import { AGENT_PROMPT_VERSION } from '@/domain/agent/buildAgentSystemPrompt';
+import { AGENT_IMAGES_PER_MESSAGE_MAX } from '@/domain/agent/attachedImages';
 
 const USAGE = {
     promptTokens: 10,
@@ -577,6 +578,36 @@ describe('runAgentTurn', () => {
         const d = deps(p);
         await runAgentTurn(
             params({ availableTools: new Set(['get_x_posts']) }),
+            d
+        );
+        expect(d.executeTool).toHaveBeenCalledTimes(cap);
+        expect(toolResults(p.calls[1]!)[cap]).toEqual({
+            error: 'quota',
+            scope: 'per_turn',
+        });
+    });
+
+    it('show_chart는 턴당 상한까지만 실행하고 초과분은 per_turn quota로 거절한다', async () => {
+        const cap = AGENT_TURN_CAPS.maxCharts;
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: Array.from({ length: cap + 1 }, (_, i) => ({
+                    id: `ch${i}`,
+                    name: 'show_chart',
+                    args: {
+                        kind: 'heatmap',
+                        market: i % 2 === 0 ? 'us' : 'kr',
+                    },
+                })),
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        const d = deps(p);
+        await runAgentTurn(
+            params({ availableTools: new Set(['show_chart']) }),
             d
         );
         expect(d.executeTool).toHaveBeenCalledTimes(cap);
@@ -1322,5 +1353,136 @@ describe('runAgentTurn', () => {
         ]);
         const r = await runAgentTurn(params(), deps(p));
         expect(r.ok && r.stopReason).toBe('max_tokens');
+    });
+});
+
+describe('runAgentTurn — 첨부 이미지', () => {
+    const image = { mediaType: 'image/webp' as const, data: 'AAAA' };
+    const answer = (): AgentProviderResult => ({
+        text: '답',
+        toolCalls: [],
+        stopReason: 'end',
+        usage: USAGE,
+    });
+
+    it('이번 턴 user 메시지에만 이미지를 싣는다', async () => {
+        const p = scriptedProvider([answer()]);
+        await runAgentTurn(
+            params({
+                history: [
+                    {
+                        role: 'user',
+                        content: '이전 질문\n[attached images: 1]',
+                    },
+                    { role: 'assistant', content: '이전 답' },
+                ],
+                userMessage: '이 차트 어때?',
+                userImages: [image],
+            }),
+            deps(p)
+        );
+        const sent = p.calls[0]!.messages;
+        expect(sent.at(-1)).toMatchObject({ role: 'user', images: [image] });
+        expect(sent.slice(0, -1).every(m => m.images === undefined)).toBe(true);
+    });
+
+    it('기록 메시지에 남은 이미지는 다시 보내지 않는다', async () => {
+        const p = scriptedProvider([answer()]);
+        await runAgentTurn(
+            params({
+                history: [
+                    { role: 'user', content: '이전 질문', images: [image] },
+                    { role: 'assistant', content: '이전 답' },
+                ],
+            }),
+            deps(p)
+        );
+        const sent = p.calls[0]!.messages;
+        expect(sent.some(m => m.images !== undefined)).toBe(false);
+        expect(sent[0]).toEqual({
+            role: 'user',
+            content: '이전 질문\n[attached images: 1]',
+        });
+    });
+
+    it('소비자가 이미 붙인 표식은 다시 붙이지 않는다', async () => {
+        const p = scriptedProvider([answer()]);
+        await runAgentTurn(
+            params({
+                history: [
+                    {
+                        role: 'user',
+                        content: '이전 질문\n[attached images: 1]',
+                        images: [image],
+                    },
+                    { role: 'assistant', content: '이전 답' },
+                ],
+            }),
+            deps(p)
+        );
+        expect(p.calls[0]!.messages[0]!.content).toBe(
+            '이전 질문\n[attached images: 1]'
+        );
+    });
+
+    it('형식이 맞지 않거나 데이터가 빈 이미지는 보내지 않는다', async () => {
+        const p = scriptedProvider([answer()]);
+        const bogus = [
+            { mediaType: 'image/gif', data: 'AAAA' },
+            { mediaType: 'image/png', data: '' },
+        ] as unknown as NonNullable<RunAgentTurnParams['userImages']>;
+        await runAgentTurn(params({ userImages: [...bogus, image] }), deps(p));
+        expect(p.calls[0]!.messages.at(-1)!.images).toEqual([image]);
+    });
+
+    it('상한을 넘는 이미지는 앞에서부터 상한까지만 보낸다', async () => {
+        const p = scriptedProvider([answer()]);
+        const images = Array.from(
+            { length: AGENT_IMAGES_PER_MESSAGE_MAX + 2 },
+            (_, i) => ({ mediaType: 'image/png' as const, data: `D${i}` })
+        );
+        await runAgentTurn(params({ userImages: images }), deps(p));
+        expect(p.calls[0]!.messages.at(-1)!.images).toEqual(
+            images.slice(0, AGENT_IMAGES_PER_MESSAGE_MAX)
+        );
+    });
+
+    it('이미지가 없으면 images 필드를 두지 않는다', async () => {
+        const p = scriptedProvider([answer()]);
+        await runAgentTurn(params({ userImages: [] }), deps(p));
+        expect(p.calls[0]!.messages.at(-1)).not.toHaveProperty('images');
+    });
+
+    it('텍스트 없이 이미지만 있어도 턴을 진행한다', async () => {
+        const p = scriptedProvider([answer()]);
+        const result = await runAgentTurn(
+            params({ userMessage: '', userImages: [image] }),
+            deps(p)
+        );
+        expect(result.ok).toBe(true);
+    });
+
+    it('이미지 턴도 도구 결과 없는 이전 답변이 있으면 첫 스텝 도구 호출을 강제한다', async () => {
+        const p = scriptedProvider([
+            {
+                text: '',
+                toolCalls: [quoteCall],
+                stopReason: 'tool_use',
+                usage: USAGE,
+            },
+            answer(),
+        ]);
+        await runAgentTurn(
+            params({
+                history: [
+                    { role: 'user', content: '엔비디아 어때?' },
+                    { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+                ],
+                userMessage: '이건 어때?',
+                userImages: [image],
+            }),
+            deps(p)
+        );
+        expect(p.calls[0]!.toolChoice).toBe('required');
     });
 });

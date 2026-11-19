@@ -22,6 +22,9 @@ import {
     AGENT_X_POSTS_WINDOW_DAYS,
     AGENT_TOOL_SPECS,
     AGENT_TOOL_NAMES,
+    AGENT_CHART_KINDS,
+    AGENT_COMPARE_SYMBOLS_MAX,
+    AGENT_COMPARE_SYMBOLS_MIN,
     findToolSpec,
     selectTools,
 } from '@/domain/agent/tools';
@@ -29,9 +32,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('22개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(22);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(22);
+    it('23개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(23);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(23);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -69,6 +72,11 @@ describe('AGENT_TOOL_SPECS', () => {
             run_fresh_analysis: { symbol: 'AAPL', kind: 'technical' },
             web_search: { query: 'Apple earnings', freshness: 'week' },
             get_my_portfolio: {},
+            show_chart: {
+                kind: 'compare',
+                symbols: ['NVDA', 'AMD'],
+                period: '6M',
+            },
         };
         for (const spec of AGENT_TOOL_SPECS) {
             expect(validateArgs(spec.inputSchema, samples[spec.name]).ok).toBe(
@@ -1036,5 +1044,50 @@ describe('get_bars_indicators 타임프레임', () => {
         expect(d).toContain(
             'SIGLENS has no yearly bars, so for 연봉/년봉 use 1Month'
         );
+    });
+});
+
+describe('show_chart', () => {
+    const spec = findToolSpec('show_chart');
+
+    it('모든 kind와 인자 조합이 스키마를 통과한다', () => {
+        const cases: Record<string, unknown>[] = [
+            { kind: 'compare', symbols: ['NVDA', 'AMD', 'AVGO'] },
+            { kind: 'financials', symbol: 'AAPL' },
+            { kind: 'options', symbol: 'TSLA', expiry: '2026-12-18' },
+            { kind: 'flows', symbol: '005930.KS' },
+            { kind: 'portfolio' },
+            { kind: 'heatmap', market: 'kr' },
+            { kind: 'heatmap', theme: 'quantum' },
+            { kind: 'dividends', symbol: 'KO' },
+        ];
+        for (const args of cases) {
+            expect(validateArgs(spec!.inputSchema, args).ok).toBe(true);
+        }
+    });
+
+    it('목록 밖 kind·period·market과 문자열이 아닌 symbols 항목을 거절한다', () => {
+        const bad: Record<string, unknown>[] = [
+            { kind: 'pie' },
+            { kind: 'compare', symbols: ['A', 'B'], period: '5Y' },
+            { kind: 'heatmap', market: 'jp' },
+            { kind: 'compare', symbols: ['A', 3] },
+            { symbol: 'AAPL' },
+        ];
+        for (const args of bad) {
+            expect(validateArgs(spec!.inputSchema, args).ok).toBe(false);
+        }
+    });
+
+    it('설명이 턴 상한과 비교 종목 수 범위를 인용한다', () => {
+        expect(spec!.description).toContain(
+            `hard limit ${AGENT_TURN_CAPS.maxCharts} per turn`
+        );
+        expect(spec!.description).toContain(
+            `${AGENT_COMPARE_SYMBOLS_MIN}–${AGENT_COMPARE_SYMBOLS_MAX} tickers`
+        );
+        for (const kind of AGENT_CHART_KINDS) {
+            expect(spec!.description).toContain(kind);
+        }
     });
 });

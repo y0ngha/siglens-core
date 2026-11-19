@@ -260,6 +260,9 @@ computing derived values, so a recomputation from the rendered text matches.
   tool description and its routing row ("never call it with a neighbouring entry as a
   stand-in"); "say no match" alone is read as permission to call the nearest entry.
   ❌ robots asked, `get_themes({theme:'ev'})` called "for the overlap". ✅ No call; say the theme is not covered.
+  A second tool that reuses the same closed list (e.g. a chart tool taking the same `theme`
+  argument) copies the carve-out too, in its description and its conditional row text; a row
+  sentence naming another tool is emitted only when that tool is available.
 - Style rules never override required content.
 - A rule restated in two places (section intro and writing rules) changes in both together.
 - Before adding a prohibition ("never say X"), read every existing rule that mentions the

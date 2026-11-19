@@ -7,6 +7,10 @@ import {
 import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
 import { isSmallTalkMessage } from '@/domain/agent/smallTalk';
 import {
+    AGENT_IMAGES_PER_MESSAGE_MAX,
+    formatAttachedImagesMarker,
+} from '@/domain/agent/attachedImages';
+import {
     findToolSpec,
     isFreshAnalysisKind,
     selectTools,
@@ -17,7 +21,12 @@ import {
     resolveAgentTimeZone,
 } from '@/domain/agent/userTimeZone';
 import { validateArgs } from '@/domain/agent/validateArgs';
-import type { AgentMessage, AgentToolCall } from '@/domain/ports/agentProvider';
+import type {
+    AgentImage,
+    AgentImageMediaType,
+    AgentMessage,
+    AgentToolCall,
+} from '@/domain/ports/agentProvider';
 import {
     CounterStoreUnavailableError,
     type CounterStore,
@@ -183,6 +192,38 @@ function isFilingRead(name: string, args: Record<string, unknown>): boolean {
     );
 }
 
+const SENDABLE_IMAGE_TYPES: ReadonlySet<string> = new Set<AgentImageMediaType>([
+    'image/webp',
+    'image/jpeg',
+    'image/png',
+]);
+
+/**
+ * An image a provider can take: a known format and some data. Types are erased at the consumer's JSON boundary, so
+ * an empty or unknown entry is dropped here instead of failing the whole provider call (and refunding the turn).
+ */
+function isSendableImage(image: AgentImage): boolean {
+    return (
+        SENDABLE_IMAGE_TYPES.has(image.mediaType) &&
+        typeof image.data === 'string' &&
+        image.data !== ''
+    );
+}
+
+/**
+ * History never re-sends images (they would be billed again every turn). A stored message that still carries images
+ * loses them here, and gets the {@link formatAttachedImagesMarker} line when the consumer did not add it, so the model
+ * still knows the user showed something it can no longer see.
+ */
+function withoutImages(message: AgentMessage): AgentMessage {
+    const { images, ...rest } = message;
+    if (images === undefined || images.length === 0) return rest;
+    const marker = formatAttachedImagesMarker(images.length);
+    return rest.content.includes(marker)
+        ? rest
+        : { ...rest, content: `${rest.content}\n${marker}` };
+}
+
 /** Per-turn budget: caps from `AGENT_TURN_CAPS`, all pure and local to one turn. */
 class TurnBudget {
     private toolCalls = 0;
@@ -190,6 +231,7 @@ class TurnBudget {
     private freshRuns = 0;
     private filingReads = 0;
     private xPostCalls = 0;
+    private charts = 0;
     private readonly symbols = new Set<string>();
 
     /** Returns a quota scope when the call must be refused, else null. */
@@ -214,6 +256,8 @@ class TurnBudget {
             this.xPostCalls >= AGENT_TURN_CAPS.maxXPostCalls
         )
             return 'per_turn';
+        if (name === 'show_chart' && this.charts >= AGENT_TURN_CAPS.maxCharts)
+            return 'per_turn';
         const next = new Set(this.symbols);
         for (const s of symbolsOf(args)) next.add(s);
         if (next.size > AGENT_TURN_CAPS.maxDistinctSymbols)
@@ -223,6 +267,7 @@ class TurnBudget {
         if (name === 'run_fresh_analysis') this.freshRuns += 1;
         if (filingRead) this.filingReads += 1;
         if (name === 'get_x_posts') this.xPostCalls += 1;
+        if (name === 'show_chart') this.charts += 1;
         for (const s of next) this.symbols.add(s);
         return null;
     }
@@ -325,12 +370,19 @@ export async function runAgentTurn(
         timeZone,
         etSessionStatus: getEtSessionStatus(now),
     });
-    const historyWindow = selectHistoryWindow(params.history, HISTORY_WINDOW);
+    const historyWindow = selectHistoryWindow(
+        params.history,
+        HISTORY_WINDOW
+    ).map(withoutImages);
+    const userImages = (params.userImages ?? [])
+        .filter(isSendableImage)
+        .slice(0, AGENT_IMAGES_PER_MESSAGE_MAX);
     const messages: AgentMessage[] = [
         ...historyWindow,
         {
             role: 'user',
             content: composeAgentUserMessage(turnContext, params.userMessage),
+            ...(userImages.length > 0 ? { images: userImages } : {}),
         },
     ];
     // Earlier answers with no tool results behind them (guest transcripts carry
@@ -338,7 +390,8 @@ export async function runAgentTurn(
     // "tell me more" instead of fetching. The prompt rule alone did not hold in
     // production, so the first step must call a tool. Small talk ("고마워",
     // "아 그렇구나") has nothing to fetch, so it is exempt: forcing a call there
-    // only added a tool round-trip before a one-line reply.
+    // only added a tool round-trip before a one-line reply. A message with images is NOT exempt: "이거 기준으로 더
+    // 알려줘" with a screenshot is still a follow-up whose figures must come from a tool, not from the image or memory.
     const requireToolFirst =
         tools.length > 0 &&
         !isSmallTalkMessage(params.userMessage) &&

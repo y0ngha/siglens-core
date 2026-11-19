@@ -13,6 +13,17 @@ export interface AgentToolCall {
     args: Record<string, unknown>;
 }
 
+/** Image formats a user message may carry (the consumer re-encodes uploads to one of these). */
+export type AgentImageMediaType = 'image/webp' | 'image/jpeg' | 'image/png';
+
+/** One image attached to a user message — raw base64 without a `data:` prefix. */
+export interface AgentImage {
+    /** Format of `data`. */
+    mediaType: AgentImageMediaType;
+    /** Base64-encoded image bytes (no `data:` URL prefix). */
+    data: string;
+}
+
 /**
  * Provider-neutral transcript entry. Adapters map this to each SDK's wire
  * shape and back; nothing provider-specific is stored here (P3 adds
@@ -29,6 +40,12 @@ export interface AgentMessage {
     toolCallId?: string;
     /** Present on `tool` messages — the tool name that produced `content`. */
     toolName?: string;
+    /**
+     * Images the user attached to this message. Only the current turn's user message carries them — earlier turns
+     * reach history as text with a `formatAttachedImagesMarker` line instead, so a provider never re-reads old
+     * images. Adapters map them to their own image parts.
+     */
+    images?: readonly AgentImage[];
 }
 
 /** JSON Schema (draft-07 subset) accepted by every provider we ship. */
