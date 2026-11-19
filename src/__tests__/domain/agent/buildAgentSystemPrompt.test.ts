@@ -551,7 +551,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-19.2');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-19.3');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -666,7 +666,9 @@ describe('buildAgentSystemPrompt', () => {
                 'is not a chart either: answer it with a markdown table.'
             );
             // 추이·비교 차트 예시는 그대로 남는다 — 위 예외와 겹치지 않는다.
-            expect(prompt).toContain('엔비디아랑 AMD 비교, 애플 실적 추이');
+            expect(prompt).toContain(
+                '엔비디아랑 AMD 6개월 수익률 비교, 애플 실적 추이'
+            );
             expect(prompt).toContain(
                 'never a neighbouring theme as a stand-in'
             );

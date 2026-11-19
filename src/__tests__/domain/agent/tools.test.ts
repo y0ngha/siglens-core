@@ -7,6 +7,7 @@ import {
     SWING_THRESHOLD_GUIDE,
     SWING_TRIGGER_EXAMPLES,
 } from '@/domain/agent/swingHistory';
+import { buildAgentSystemPrompt } from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_HISTORY_INDICES } from '@/domain/agent/indexHistoryStats';
 import { AGENT_THEME_IDS, AGENT_THEMES } from '@/domain/agent/themes';
 import {
@@ -1081,7 +1082,7 @@ describe('show_chart', () => {
 
     it('시간 축 없는 현재 값 비교는 차트 대신 마크다운 표로 쓰라고 설명한다', () => {
         expect(spec!.description).toContain(
-            "a comparison of a few current values with no time axis (today's P/E or change of a few symbols) — put that in a markdown table in the answer"
+            "a comparison of a few current values with no time axis (today's P/E, market cap or change of a few symbols, the latest quarter's EPS) — put that in a markdown table in the answer"
         );
     });
 
@@ -1095,5 +1096,18 @@ describe('show_chart', () => {
         for (const kind of AGENT_CHART_KINDS) {
             expect(spec!.description).toContain(kind);
         }
+    });
+});
+
+describe('show_chart — 라우팅 행과 설명의 예외 예시 동기화', () => {
+    it('두 곳이 같은 "시간 축 없는 현재 값" 예시 목록을 쓴다', () => {
+        const examples =
+            "today's P/E, market cap or change of a few symbols, the latest quarter's EPS";
+        const prompt = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS,
+        });
+        expect(findToolSpec('show_chart')?.description).toContain(examples);
+        expect(prompt).toContain(examples);
     });
 });

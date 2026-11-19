@@ -16,7 +16,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-19.2';
+export const AGENT_PROMPT_VERSION = '2026-11-19.3';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -339,7 +339,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     {
         requires: ['show_chart'],
         text: available =>
-            `A comparison over time, a trend across quarters or years, an options distribution, investor flows, ${available.has('get_my_portfolio') ? 'portfolio weights, ' : ''}a market or theme board, or dividend history — when a picture reads better than a list of numbers (엔비디아랑 AMD 비교, 애플 실적 추이, 옵션 어디에 몰려 있어, 외국인 수급 추이, 오늘 섹터 한눈에, 배당 추이) → show_chart with the matching kind in the same step as the data tools the answer needs. Not for a single figure, a definition or a yes/no question. A comparison of a few current values with no time axis (today's P/E, market cap or change of a few symbols, the latest quarter's EPS) is not a chart either: answer it with a markdown table. At most two charts per answer.${available.has('get_theme_snapshot') ? ' A theme board only for a theme on the get_theme_snapshot list — never a neighbouring theme as a stand-in.' : ''}`,
+            `A comparison over time, a trend across quarters or years, an options distribution, investor flows, ${available.has('get_my_portfolio') ? 'portfolio weights, ' : ''}a market or theme board, or dividend history — when a picture reads better than a list of numbers (엔비디아랑 AMD 6개월 수익률 비교, 애플 실적 추이, 옵션 어디에 몰려 있어, 외국인 수급 추이, 오늘 섹터 한눈에, 배당 추이) → show_chart with the matching kind in the same step as the data tools the answer needs. Not for a single figure, a definition or a yes/no question. A comparison of a few current values with no time axis (today's P/E, market cap or change of a few symbols, the latest quarter's EPS) is not a chart either: answer it with a markdown table. At most two charts per answer.${available.has('get_theme_snapshot') ? ' A theme board only for a theme on the get_theme_snapshot list — never a neighbouring theme as a stand-in.' : ''}`,
     },
     {
         requires: [],
