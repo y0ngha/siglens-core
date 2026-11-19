@@ -1,5 +1,11 @@
 # Changelog
 
+# [2.41.0](https://github.com/y0ngha/siglens-core/compare/v2.40.0...v2.41.0) (2026-11-19)
+
+### Features
+
+* 에이전트 이미지 입력과 show_chart 시각화 도구 추가 ([#330](https://github.com/y0ngha/siglens-core/issues/330)) ([e39569d](https://github.com/y0ngha/siglens-core/commit/e39569d72000938478aea8e76815c89401ac6085))
+
 # [2.40.0](https://github.com/y0ngha/siglens-core/compare/v2.39.0...v2.40.0) (2026-11-17)
 
 ### Features
