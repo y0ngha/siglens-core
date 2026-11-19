@@ -1079,6 +1079,12 @@ describe('show_chart', () => {
         }
     });
 
+    it('시간 축 없는 현재 값 비교는 차트 대신 마크다운 표로 쓰라고 설명한다', () => {
+        expect(spec!.description).toContain(
+            "a comparison of a few current values with no time axis (today's P/E or change of a few symbols) — put that in a markdown table in the answer"
+        );
+    });
+
     it('설명이 턴 상한과 비교 종목 수 범위를 인용한다', () => {
         expect(spec!.description).toContain(
             `hard limit ${AGENT_TURN_CAPS.maxCharts} per turn`

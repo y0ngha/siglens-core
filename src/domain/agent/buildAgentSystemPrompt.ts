@@ -16,7 +16,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-19.1';
+export const AGENT_PROMPT_VERSION = '2026-11-19.2';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -339,7 +339,7 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
     {
         requires: ['show_chart'],
         text: available =>
-            `A comparison over time, a trend across quarters or years, an options distribution, investor flows, ${available.has('get_my_portfolio') ? 'portfolio weights, ' : ''}a market or theme board, or dividend history — when a picture reads better than a list of numbers (엔비디아랑 AMD 비교, 애플 실적 추이, 옵션 어디에 몰려 있어, 외국인 수급 추이, 오늘 섹터 한눈에, 배당 추이) → show_chart with the matching kind in the same step as the data tools the answer needs. Not for a single figure, a definition or a yes/no question. At most two charts per answer.${available.has('get_theme_snapshot') ? ' A theme board only for a theme on the get_theme_snapshot list — never a neighbouring theme as a stand-in.' : ''}`,
+            `A comparison over time, a trend across quarters or years, an options distribution, investor flows, ${available.has('get_my_portfolio') ? 'portfolio weights, ' : ''}a market or theme board, or dividend history — when a picture reads better than a list of numbers (엔비디아랑 AMD 비교, 애플 실적 추이, 옵션 어디에 몰려 있어, 외국인 수급 추이, 오늘 섹터 한눈에, 배당 추이) → show_chart with the matching kind in the same step as the data tools the answer needs. Not for a single figure, a definition or a yes/no question. A comparison of a few current values with no time axis (today's P/E, market cap or change of a few symbols, the latest quarter's EPS) is not a chart either: answer it with a markdown table. At most two charts per answer.${available.has('get_theme_snapshot') ? ' A theme board only for a theme on the get_theme_snapshot list — never a neighbouring theme as a stand-in.' : ''}`,
     },
     {
         requires: [],
@@ -539,7 +539,7 @@ ${ruleLines(available, newsGapRule)}
 - Do not make ${brand.service} the subject of a sentence or heading that explains how its analysis finds, draws, computes or interprets something, even when a tool result or guide is written that way (guides use headings like "${brand.service}는 이렇게 찾아요" / "How ${brand.service} detects it"); attribute it to the analysis instead, e.g. ${brandSubjectExample}, and as a heading ${brandHeadingExample}. Introducing the service itself (what ${brand.service} is) is fine.
 - Never write internal tool names (get_quote, get_news, run_fresh_analysis, …) or function-call syntax in the answer. Call them ${brand.service} quotes / bars & indicators / analysis / news / options / portfolio / guide / web search, in the answer language.
 - Internal labels: the data and these rules use the internal terms rule engine, confluence (컨플루언스), washout (워시아웃) and a score out of 100. Never write them, and never quote an "x/100" or "x / 100" agreement score. Say how many indicator groups agree (or that the indicators are split), and describe a pullback reading as a sharp short-term drop inside a longer-term uptrend.
-- Short paragraphs, bullets for lists, no tables wider than 4 columns. Do not emit markdown images.
+- Short paragraphs, bullets for lists. When the user asks to compare a few symbols or periods on the same measures, put those figures in one markdown table instead of a run of sentences (at most 4 columns; at the Plain level its figures count toward the figure budget). Do not emit markdown images.
 
 ${AGENT_WRITING_STYLE}
 
