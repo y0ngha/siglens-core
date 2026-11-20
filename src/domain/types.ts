@@ -2399,8 +2399,11 @@ export type ClaudeEffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
  * Unlike Claude, GPT expresses "no reasoning" as an effort value (`'none'`),
  * so the unions intentionally differ. Not every GPT model accepts `'none'` —
  * the vendor docs say the Responses API rejects it for `gpt-6.2-astra` and
- * `gpt-6.2-sol` (not yet measured), so their floor is `'low'`, which the spec
- * records via {@link ReasoningModes.hardOff}.
+ * `gpt-6.2-sol` (per vendor docs; `'none'` was not sent), so their floor is
+ * `'low'`, which the spec records via {@link ReasoningModes.hardOff}.
+ * `'low'` and `'high'` were measured on `/v1/responses` on 2026-11-21 02:57 KST
+ * for both models (`status: completed`, strict `json_schema` output). The
+ * default effort is not stated in the docs, so effort is always sent.
  *
  * `'max'` is deliberately absent: the OpenAI API documents it, but the
  * installed SDK's `ReasoningEffort` type does not yet include it, and no spec
@@ -2609,8 +2612,14 @@ export interface ChatGPTModelSpec extends BaseModelSpec {
      * top-level `instructions` field. `'developer_message'` sends it as the first
      * `input` item with role `developer`: from GPT-6.2 on, OpenAI appends
      * `instructions` after `input`, outside the cacheable prefix, and bills them
-     * uncached on every request (per vendor docs read 2026-11-21). The system
-     * text itself is identical in both placements.
+     * uncached on every request (per vendor docs). The system text itself is
+     * identical in both placements. Measured on `/v1/responses` on 2026-11-21
+     * 02:57 KST for `gpt-6.2-sol`: with the `developer` placement, three calls
+     * with the same prefix reported 0, 3,669 and 3,669 cached input tokens of
+     * 3,672, so the prefix is cacheable. In a single sample, a `high` call right
+     * after a `low` call wrote the cache again instead of reading it, so the
+     * cache entry appears to depend on the effort as well as the text. The
+     * `instructions` placement was not measured.
      */
     systemPlacement?: 'instructions' | 'developer_message';
 }
@@ -4754,10 +4763,11 @@ export interface PatternArbitrationDrop {
  * - `cachedTokens`: cache **reads** — input served from a prior cache write
  *   (billed at ~0.1x by Anthropic).
  * - `cacheWriteTokens`: cache **writes** — input persisted into the cache on
- *   this call (billed at ~1.25x by Anthropic). Only Claude reports a separate
- *   cache-write metric; Gemini and OpenAI have none, so this is always 0 for
+ *   this call (billed at ~1.25x by Anthropic). Claude and the OpenAI Responses
+ *   API (`input_tokens_details.cache_write_tokens`) report a separate
+ *   cache-write metric; Gemini and DeepSeek have none, so this is always 0 for
  *   them. Kept out of `promptTokens` so the standard-price bucket is not
- *   distorted by the 1.25x cache-write premium.
+ *   distorted by the write premium.
  */
 export interface NormalizedUsage {
     /** Standard-price, non-cached input tokens. */

@@ -82,10 +82,22 @@ export function extractGeminiUsage(
  * `prompt_tokens_details.cached_tokens` / `completion_tokens`). This extractor
  * matches the actually-installed SDK's Responses API shape; using the Chat
  * Completions field names here would silently extract all-zero usage.
+ *
+ * `input_tokens` is inclusive of both `cached_tokens` (reads) and
+ * `cache_write_tokens` (writes), so `promptTokens` is the remainder, matching
+ * the module convention `promptTokens + cachedTokens + cacheWriteTokens` =
+ * provider-reported input. The installed SDK's Responses usage type declares
+ * `input_tokens_details.cache_write_tokens`; it is read with `?? 0` because
+ * older or compatible endpoints omit it. The field was observed non-zero on
+ * first calls and zero on cached repeats on `/v1/responses` (2026-11-21
+ * 02:57 KST).
  */
 export interface OpenAIUsageLike {
     input_tokens?: number;
-    input_tokens_details?: { cached_tokens?: number };
+    input_tokens_details?: {
+        cached_tokens?: number;
+        cache_write_tokens?: number;
+    };
     output_tokens?: number;
 }
 
@@ -93,15 +105,15 @@ export function extractOpenAIUsage(
     usage: OpenAIUsageLike | undefined | null
 ): NormalizedUsage {
     if (!usage) return { ...ZERO_USAGE };
+    const cached = usage.input_tokens_details?.cached_tokens ?? 0;
+    const cacheWrite = usage.input_tokens_details?.cache_write_tokens ?? 0;
     return {
         promptTokens: Math.max(
             0,
-            (usage.input_tokens ?? 0) -
-                (usage.input_tokens_details?.cached_tokens ?? 0)
+            (usage.input_tokens ?? 0) - cached - cacheWrite
         ),
-        cachedTokens: usage.input_tokens_details?.cached_tokens ?? 0,
-        // OpenAI has no separate cache-write metric.
-        cacheWriteTokens: 0,
+        cachedTokens: cached,
+        cacheWriteTokens: cacheWrite,
         outputTokens: usage.output_tokens ?? 0,
     };
 }

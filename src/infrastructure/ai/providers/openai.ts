@@ -115,8 +115,10 @@ export async function callChatGPT(
     // 스펙이 OFF/ON 두 상태를 모두 들고 있으므로, 호출자가 준 설정이 없으면
     // 기본 상태를 해석한다. GPT는 "추론 없음"을 effort 값(`'none'`)으로
     // 표현하므로 별도의 non-reasoning 분기가 필요 없다 — 단, 모든 모델이
-    // `'none'`을 받는 건 아니다. 벤더 문서 기준(2026-11-21 KST 열람, 미실측)으로
-    // `gpt-6.2-astra`와 `gpt-6.2-sol`은 Responses API에서 `'none'`을 거부한다.
+    // `'none'`을 받는 건 아니다. `gpt-6.2-astra`와 `gpt-6.2-sol`은 Responses API
+    // (`/v1/responses`)에서 `low`/`high`와 첫 `input` 항목 `developer` 메시지로 보낸
+    // system 텍스트를 2026-11-21 02:57 KST에 실측했다(`status: completed`, strict
+    // json_schema 출력). `'none'` 거부는 벤더 문서 기준이며 보내 보지 않았다.
     // 모델별 최저값은 스펙의 `reasoning.off`에 기록돼 있다.
     const useEffort = (
         options.reasoning ?? resolveReasoningConfig(spec.reasoning, undefined)
