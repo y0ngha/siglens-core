@@ -141,9 +141,12 @@ export async function callClaude(
     // 실측:
     // - claude-sonnet-5-5는 `between_tools`와 함께든 아니든 forced tool_choice(`tool`/`any`)를
     //   400("not supported for this model")으로 거부하고, `auto`에서는 tool_use로 응답한다.
-    // - opus-5-5·fable-5-1도 forced를 거부하지만 thinking을 끌 수 없어(off가 adaptive)
+    // - opus-5-5도 forced를 거부하지만 thinking을 끌 수 없어(off가 adaptive)
     //   항상 이 `auto` 경로를 탄다.
     // - haiku-5-5는 `disabled`에서 forced를 받는다.
+    //
+    // 미실측(벤더 문서 기준, 2026-11-21 열람): fable-5-2도 forced tool_choice를 거부하고
+    // thinking을 끌 수 없다고 적혀 있다. off가 adaptive라 opus-5-5와 같은 `auto` 경로를 탄다.
     const thinkingActive =
         adaptiveConfig !== undefined
             ? adaptiveConfig.mode !== 'disabled'

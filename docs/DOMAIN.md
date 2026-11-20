@@ -191,6 +191,16 @@ free-tier analysis gating부터 `timeframes`/`infoDepth`는 `member`와 `pro`가
 `requestChatCompletion`에 usage 옵션/저장소를 주입하면 성공한 요청은
 `usage_logs`에 사용량 집계 목적 로그로 기록된다.
 
+퇴역한 모델 id와 후속 id는 다음과 같다. 로스터에서 빠진 id는 `callAnalysisAi`가
+`Unknown model` 오류로 거절하며 core는 매핑을 제공하지 않으므로, 저장된 id는 소비자가
+옮긴다.
+
+| 퇴역 id | 후속 id |
+|---|---|
+| `claude-fable-5-1` | `claude-fable-5-2` |
+| `gpt-6.1-sol` | `gpt-6.2-sol` |
+| `gpt-6-astra` | `gpt-6.2-astra` |
+
 ---
 
 ## 인디케이터 상수
@@ -1557,7 +1567,7 @@ display:
   - Claude: 보내지 않는다. API 버전 2026-10-21(`@anthropic-ai/sdk` 1.x)은 `temperature`·`top_p`·`top_k`를
     기본값이라도 400으로 거부한다. budget 스펙의 `temperature`는 타입 호환용으로만 남아 있다(`@deprecated`).
   - Gemini: 보내지 않는다. 3.6 Flash부터 Google 기본값으로 고정됐다.
-  - ChatGPT: 보내지 않는다(reasoning 모델).
+  - ChatGPT: 보내지 않는다(reasoning 모델). system 프롬프트는 `instructions`로 보내고, `systemPlacement: 'developer_message'`인 행(GPT-6.2)은 `input` 맨 앞의 `developer` 메시지로 보낸다. 어느 쪽이든 system 텍스트의 바이트는 같다.
   - DeepSeek: 추론 OFF일 때만 `temperature`를 보낸다(추론 ON이면 API가 무시한다).
 - 동일 입력 → 동일 프롬프트 문자열을 보장한다.
   `buildAnalysisPrompt`는 입력 `skills` 배열의 순서와 무관하게 byte-identical 결과를 반환해야 한다.

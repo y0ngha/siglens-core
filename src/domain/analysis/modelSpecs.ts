@@ -276,40 +276,44 @@ export const MODEL_SPECS = {
             hardOff: false,
         },
     },
-    'claude-fable-5-1': {
+    'claude-fable-5-2': {
         provider: 'claude',
         thinkingApi: 'adaptive',
-        apiModelId: 'claude-fable-5-1',
+        apiModelId: 'claude-fable-5-2',
         maxOutputTokens: 128_000,
         reasoning: {
-            // Fable thinks unconditionally: both `{type:'disabled'}` and
-            // `{type:'enabled', budget_tokens}` return 400. The lowest reachable
-            // strength is adaptive thinking at `low` effort.
+            // Per vendor docs read 2026-11-21, not yet measured: Fable thinks
+            // unconditionally (`{type:'disabled'}` and `budget_tokens` are
+            // 400), so the floor is adaptive thinking at `low`.
             off: { mode: 'adaptive', effort: 'low' },
             on: { mode: 'adaptive', effort: 'high' },
             default: 'on',
             hardOff: false,
         },
     },
-    'gpt-6-astra': {
+    'gpt-6.2-astra': {
         provider: 'chatgpt',
-        apiModelId: 'gpt-6-astra',
+        apiModelId: 'gpt-6.2-astra',
         maxOutputTokens: 128_000,
+        // Per vendor docs read 2026-11-21, not yet measured: the API rejects
+        // `effort: 'none'`; low, medium, high, xhigh and max are listed. The
+        // default effort is not stated, so effort is always sent explicitly.
+        systemPlacement: 'developer_message',
         reasoning: {
-            // Unlike the 5.6 family, astra returns 400 for `effort: 'none'`.
             off: { effort: 'low' },
             on: { effort: 'high' },
             default: 'on',
             hardOff: false,
         },
     },
-    'gpt-6.1-sol': {
+    'gpt-6.2-sol': {
         provider: 'chatgpt',
-        apiModelId: 'gpt-6.1-sol',
+        apiModelId: 'gpt-6.2-sol',
         maxOutputTokens: 128_000,
+        // Per vendor docs read 2026-11-21, not yet measured: same effort
+        // surface as `gpt-6.2-astra` (`none` rejected, floor `low`).
+        systemPlacement: 'developer_message',
         reasoning: {
-            // Verified live 2026-10-15: `effort: 'none'` returns 400; the API
-            // accepts low, medium, high, xhigh and max.
             off: { effort: 'low' },
             on: { effort: 'high' },
             default: 'on',
@@ -323,6 +327,44 @@ export const MODEL_SPECS = {
         reasoning: {
             // Verified live 2026-10-15: rejects `minimal` with a 400 ("not
             // supported for this model"); `low` and `high` work. Floor `low`.
+            off: { level: 'low' },
+            on: { level: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
+    },
+    // Gemini 4 Carbon, Neon and Hydrogen (per vendor docs read 2026-11-21, not
+    // yet measured): `minimal` is documented as unsupported, so the floor is
+    // `low`. The docs only show the Interactions API; that `generateContent`
+    // with `thinkingLevel` / `responseJsonSchema` / `seed` is accepted is
+    // assumed from `gemini-4-argon`.
+    'gemini-4-carbon': {
+        provider: 'gemini',
+        apiModelId: 'gemini-4-carbon',
+        maxOutputTokens: 65_536,
+        reasoning: {
+            off: { level: 'low' },
+            on: { level: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
+    },
+    'gemini-4-neon': {
+        provider: 'gemini',
+        apiModelId: 'gemini-4-neon',
+        maxOutputTokens: 65_536,
+        reasoning: {
+            off: { level: 'low' },
+            on: { level: 'high' },
+            default: 'on',
+            hardOff: false,
+        },
+    },
+    'gemini-4-hydrogen': {
+        provider: 'gemini',
+        apiModelId: 'gemini-4-hydrogen',
+        maxOutputTokens: 65_536,
+        reasoning: {
             off: { level: 'low' },
             on: { level: 'high' },
             default: 'on',

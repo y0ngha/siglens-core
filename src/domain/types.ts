@@ -2398,7 +2398,8 @@ export type ClaudeEffortLevel = 'low' | 'medium' | 'high' | 'xhigh' | 'max';
  *
  * Unlike Claude, GPT expresses "no reasoning" as an effort value (`'none'`),
  * so the unions intentionally differ. Not every GPT model accepts `'none'` —
- * `gpt-6-astra` returns 400 for it and bottoms out at `'low'`, which the spec
+ * the vendor docs say the Responses API rejects it for `gpt-6.2-astra` and
+ * `gpt-6.2-sol` (not yet measured), so their floor is `'low'`, which the spec
  * records via {@link ReasoningModes.hardOff}.
  *
  * `'max'` is deliberately absent: the OpenAI API documents it, but the
@@ -2603,6 +2604,15 @@ export interface ChatGPTModelSpec extends BaseModelSpec {
     reasoning: ReasoningModes<ChatGptReasoningConfig>;
     /** GPT reasoning models do not accept sampling temperature. */
     temperature?: undefined;
+    /**
+     * Where the system prompt is sent on the Responses API. Omitted means the
+     * top-level `instructions` field. `'developer_message'` sends it as the first
+     * `input` item with role `developer`: from GPT-6.2 on, OpenAI appends
+     * `instructions` after `input`, outside the cacheable prefix, and bills them
+     * uncached on every request (per vendor docs read 2026-11-21). The system
+     * text itself is identical in both placements.
+     */
+    systemPlacement?: 'instructions' | 'developer_message';
 }
 
 /**
@@ -2741,17 +2751,20 @@ export type TierModel =
     | 'gemini-3.6-flash'
     | 'gemini-3.8-flash'
     | 'gemini-4-argon'
+    | 'gemini-4-carbon'
+    | 'gemini-4-neon'
+    | 'gemini-4-hydrogen'
     | 'claude-haiku-5-5'
     | 'claude-sonnet-5-5'
     | 'claude-opus-4-8'
     | 'claude-opus-5'
     | 'claude-opus-5-5'
-    | 'claude-fable-5-1'
+    | 'claude-fable-5-2'
     | 'gpt-6-luna'
     | 'gpt-6-sol'
     | 'gpt-5.6-sol'
-    | 'gpt-6-astra'
-    | 'gpt-6.1-sol'
+    | 'gpt-6.2-astra'
+    | 'gpt-6.2-sol'
     | 'deepseek-v4.1-flash'
     | 'deepseek-v4.1-pro';
 

@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { callChatGPT } from '@/infrastructure/ai/providers/openai';
 import type { ChatGPTModelId } from '@/domain/analysis/modelSpecs';
+import { AI_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 
 const mockCreate = vi.hoisted(() => vi.fn());
 
@@ -356,6 +357,115 @@ describe('callChatGPT — usage telemetry', () => {
         expect(infoSpy).not.toHaveBeenCalled();
         infoSpy.mockRestore();
     });
+});
+
+/** The body the adapter put on the wire for the most recent call. */
+function lastSentBody(): Record<string, unknown> {
+    const last = mockCreate.mock.lastCall;
+    if (last === undefined) throw new Error('create was not called');
+    return last[0] as Record<string, unknown>;
+}
+
+// GPT-6.2 rows send the system prompt as a leading `developer` input message
+// (per vendor docs read 2026-11-21, not yet measured) so it stays inside the
+// cacheable prefix; every other row keeps top-level `instructions`.
+describe.each(['gpt-6.2-sol', 'gpt-6.2-astra'] as const)(
+    'callChatGPT request shape — %s',
+    model => {
+        beforeEach(() => {
+            mockCreate.mockClear();
+        });
+
+        it('sends the system prompt as the first developer input item and no instructions', async () => {
+            mockCreate.mockResolvedValueOnce(SUCCESS);
+
+            await callChatGPT('the prompt', { model, apiKey: 'key' });
+
+            const body = lastSentBody();
+            expect(body).not.toHaveProperty('instructions');
+            expect(body.model).toBe(model);
+            expect(body.input).toEqual([
+                { role: 'developer', content: AI_SYSTEM_PROMPT },
+                { role: 'user', content: 'the prompt' },
+            ]);
+            expect(body.reasoning).toEqual({ effort: 'high' });
+            expect(body.max_output_tokens).toBe(128_000);
+            expect(body.text).toEqual({ format: { type: 'json_object' } });
+            expect(body).not.toHaveProperty('temperature');
+        });
+
+        it('sends effort low for the off state', async () => {
+            mockCreate.mockResolvedValueOnce(SUCCESS);
+
+            await callChatGPT('prompt', {
+                model,
+                apiKey: 'key',
+                reasoning: { effort: 'low' },
+            });
+
+            expect(lastSentBody().reasoning).toEqual({ effort: 'low' });
+        });
+
+        it('keeps strict json_schema when responseSchema is present', async () => {
+            mockCreate.mockResolvedValueOnce(SUCCESS);
+            const schema = { type: 'object', properties: {} };
+
+            await callChatGPT('prompt', {
+                model,
+                apiKey: 'key',
+                responseSchema: schema,
+            });
+
+            expect(lastSentBody().text).toEqual({
+                format: {
+                    type: 'json_schema',
+                    name: 'analysis_response',
+                    strict: true,
+                    schema,
+                },
+            });
+        });
+
+        it('puts a caller system override in the developer item', async () => {
+            mockCreate.mockResolvedValueOnce(SUCCESS);
+
+            await callChatGPT('prompt', {
+                model,
+                apiKey: 'key',
+                system: 'custom system',
+            });
+
+            const body = lastSentBody();
+            expect(body).not.toHaveProperty('instructions');
+            expect(body.input).toEqual([
+                { role: 'developer', content: 'custom system' },
+                { role: 'user', content: 'prompt' },
+            ]);
+        });
+    }
+);
+
+describe('callChatGPT request shape — rows without systemPlacement', () => {
+    beforeEach(() => {
+        mockCreate.mockClear();
+    });
+
+    it.each(['gpt-6-sol', 'gpt-5.6-sol'] as const)(
+        'keeps top-level instructions and a string input for %s',
+        async model => {
+            mockCreate.mockResolvedValueOnce(SUCCESS);
+
+            await callChatGPT('the prompt', {
+                model,
+                apiKey: 'key',
+                system: 'custom system',
+            });
+
+            const body = lastSentBody();
+            expect(body.instructions).toBe('custom system');
+            expect(body.input).toBe('the prompt');
+        }
+    );
 });
 
 // 이미 취소된 signal은 'abort' 이벤트를 다시 발생시키지 않는다. 리스너만 다는 전파로는

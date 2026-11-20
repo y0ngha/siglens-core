@@ -1233,7 +1233,14 @@ the comments about that variable or section.
 
 A comment such as "provider X does not support json_schema" is true for one endpoint or SDK
 version. Name the endpoint, and re-check the claim when the SDK or the endpoint set changes;
-a half-true claim silently disables a feature.
+a half-true claim silently disables a feature. Say how the claim was established
+(measured live vs read in vendor docs, with the endpoint and date) and never copy it from a
+sibling mode's note. A rename does not carry a measurement over: a new id that was only read
+in docs is worded "per vendor docs, not yet measured", and a "measured" list keeps only
+measured ids.
+
+- ❌ `// returns 400 for gpt-new` after renaming the id in a note that measured `gpt-old`.
+- ✅ `// per vendor docs, not yet measured: gpt-new rejects X`.
 
 <a id="DS-3"></a>
 #### DS-3 — Algorithmic and causal claims are recomputed

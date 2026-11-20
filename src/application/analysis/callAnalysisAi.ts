@@ -118,6 +118,13 @@ export async function callAnalysisAi(
         fallbackOnProviderFailure = false,
     } = options;
 
+    // 레지스트리에 없는 id(퇴역했거나 타입을 지우고 넘어온 값)는 키 정책과 무관하게
+    // provider 호출 전에 이름을 밝혀 거절한다 — 그렇지 않으면 `supportsHardOff`나
+    // 디스패치에서 "Cannot read properties of undefined"로 죽는다.
+    if (!Object.hasOwn(MODEL_SPECS, model)) {
+        throw new Error(`[callAnalysisAi] Unknown model: ${model}`);
+    }
+
     // `byok-only` never reaches `resolveServerApiKey`: `shouldUseServerKey`
     // answers false for every model and tier, so the server-key branch below —
     // and the fallback in `generate`, which is gated on `useServerKey` — are

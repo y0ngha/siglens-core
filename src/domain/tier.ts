@@ -49,7 +49,9 @@ const MEMBER_INFO_DEPTH: readonly TierInfoDepth[] = [...PRO_INFO_DEPTH];
 // 배치 기준은 출력 단가다. Free ≤ $5 < Member ≤ $12 < Byok ≥ $20으로 구간이
 // 겹치지 않는다. provider 내부 순위가 아니라 절대 단가로 자르는 이유는, provider마다
 // 가격 스케일이 달라 상대 순위로 나누면 싼 모델이 상위 등급에 올라가는 역전이
-// 생기기 때문이다.
+// 생기기 때문이다. 구간은 서버가 대납하는 등급에 대한 기준이다 — 선임 모델이 없는
+// 새 id는 서버 대납 여부를 정하기 전까지 byok에 두므로, byok에는 Member 구간
+// 단가의 id(`gpt-6.2-sol`, `gemini-4-hydrogen`)도 들어 있다.
 
 /** 서버 키로 대납하며 비회원도 호출할 수 있는 모델. */
 const FREE_MODELS: readonly TierModel[] = [
@@ -88,10 +90,13 @@ const BYOK_MODELS: readonly TierModel[] = [
     'claude-opus-4-8',
     'claude-opus-5',
     'claude-opus-5-5',
-    'claude-fable-5-1',
-    'gpt-6-astra',
-    'gpt-6.1-sol',
+    'claude-fable-5-2',
+    'gpt-6.2-astra',
+    'gpt-6.2-sol',
     'gemini-4-argon',
+    'gemini-4-carbon',
+    'gemini-4-neon',
+    'gemini-4-hydrogen',
 ];
 
 /** 등급별 누적 허용 목록 — 상위 등급은 하위 등급 모델을 모두 포함한다. */
