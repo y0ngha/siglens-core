@@ -126,6 +126,12 @@ const overallResult: OverallAnalysisResponse = {
     scenarios: [],
     riskFactorsKo: [],
 };
+/**
+ * What the model sends back: the schema marks `optionsOiStale` required (nullable),
+ * so a reply without the key is treated as truncated. Core, not the model, sets the
+ * real flag afterwards.
+ */
+const overallModelReply = { ...overallResult, optionsOiStale: null };
 const newsItem: EnrichedNewsItem = {
     id: 'news-001',
     symbol: 'AAPL',
@@ -213,7 +219,7 @@ beforeEach(() => {
         bars: [],
         indicators: { buySellVolume: [] },
     });
-    const body = JSON.stringify(overallResult);
+    const body = JSON.stringify(overallModelReply);
     for (const adapter of ADAPTERS) vi.mocked(adapter).mockResolvedValue(body);
     throwOnServerKey();
 });
@@ -488,7 +494,7 @@ describe('runOverallAnalysis — cache key ignores keyPolicy', () => {
             bars: [],
             indicators: { buySellVolume: [] },
         });
-        const body = JSON.stringify(overallResult);
+        const body = JSON.stringify(overallModelReply);
         for (const adapter of ADAPTERS)
             vi.mocked(adapter).mockResolvedValue(body);
         throwOnServerKey();
@@ -514,7 +520,7 @@ describe('runOverallAnalysis — concurrent runs do not join across policies or 
         const gate = new Promise<void>(resolve => {
             release = resolve;
         });
-        const text = JSON.stringify(overallResult);
+        const text = JSON.stringify(overallModelReply);
         for (const adapter of ADAPTERS) {
             vi.mocked(adapter).mockImplementation((async (
                 _p: unknown,

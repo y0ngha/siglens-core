@@ -174,4 +174,21 @@ describe('extractReconciledActionLines', () => {
 
         expect(result).toBeUndefined();
     });
+
+    it('목표가를 제외해 인덱스가 당겨져도 AI 값과 같은 목표가는 다시 그리지 않는다', () => {
+        const rec: ActionRecommendation = {
+            ...baseRec,
+            stopLoss: 145,
+            takeProfitPrices: [140, 160, 170],
+            reconciledLevels: {
+                stopLoss: 145,
+                takeProfitPrices: [160, 170],
+                exit: '',
+                riskReward: '',
+                reason: '',
+            },
+        };
+
+        expect(extractReconciledActionLines(rec)).toBeUndefined();
+    });
 });

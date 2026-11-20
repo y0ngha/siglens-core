@@ -548,10 +548,11 @@ describe('buildFinancialsCacheKey', () => {
 });
 
 describe('currency wording template versions (p32 bump set)', () => {
-    // p33 (technical) and p11 (overall) bumped again for the descriptive-prose
-    // change; the other six still sit at their currency-rule versions.
+    // p34 (technical) and p11 (overall) bumped again after the currency rule; p34 is the
+    // reference-level correctness change (2026-11-20). The other six still sit at their
+    // currency-rule versions.
     it('pins every version whose non-Korean prompt bytes gained the currency rule', () => {
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p33');
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p34');
         expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).toBe('f7');
         expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p11');
         expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p12');
@@ -1141,7 +1142,9 @@ describe('positionBucket이 캐시 키에 반영될 때', () => {
         // p30 (2026-10-18): KRX ETF/ETN 호가 표, KRW 보수 목표가를 호가 단위 정수로 찍는다.
         // p33 (2026-11-06): 손절·진입·사이징 문구를 actionRecommendation 안으로 가두고
         // 직전 분석 회고에서 적중 평가를 뺀다(크롤러가 읽는 summary 산문).
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p33');
+        // p34 (2026-11-20): 일봉 VWAP 제거, 마감 뒤 일봉 피벗은 마지막 봉, 호라이즌별 피보 기준 스윙,
+        // 거래량 프로파일 구간 명시, SMC 유동성 라벨·Chikou 판독 수정, 계획 목표가는 지어내지 않는다.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p34');
     });
 });
 

@@ -23,11 +23,15 @@ export function calculateRSI(
     const initialAvgLoss =
         losses.slice(0, period).reduce((sum, l) => sum + l, 0) / period;
 
-    const toRSI = (avgGain: number, avgLoss: number): number =>
-        avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+    // No movement at all (both averages zero) leaves the ratio undefined, so the bar is
+    // `null` like a warm-up bar. Only a zero loss against a positive gain is a true 100.
+    const toRSI = (avgGain: number, avgLoss: number): number | null => {
+        if (avgLoss === 0) return avgGain === 0 ? null : 100;
+        return 100 - 100 / (1 + avgGain / avgLoss);
+    };
 
     const tailDiffs = diffs.slice(period);
-    const rsiValues: number[] = new Array(tailDiffs.length + 1);
+    const rsiValues: (number | null)[] = new Array(tailDiffs.length + 1);
     rsiValues[0] = toRSI(initialAvgGain, initialAvgLoss);
     let wilderState: WilderState = {
         avgGain: initialAvgGain,

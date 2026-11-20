@@ -10,7 +10,9 @@ import type {
     IndicatorResult,
     ReferenceLevel,
     ReferenceLevels,
+    Timeframe,
 } from '@/domain/types';
+import { isSessionVwapMeaningful } from '@/domain/indicators/vwap';
 
 /** Number of round levels to emit on each side of price. */
 const ROUND_LEVELS_PER_SIDE = 2;
@@ -150,7 +152,8 @@ type LevelCandidate = readonly [
 export function collectIndicatorLevels(
     currentPrice: number,
     indicators: IndicatorResult,
-    options?: IndicatorLevelOptions
+    options?: IndicatorLevelOptions,
+    timeframe?: Timeframe
 ): ReferenceLevel[] {
     const vp =
         options?.volumeProfile !== undefined
@@ -221,7 +224,14 @@ export function collectIndicatorLevels(
             'Supertrend',
             'supertrend',
         ],
-        [lastFiniteNumber(indicators.vwap), 'VWAP', 'vwap'],
+        // On `1Day` the VWAP series is each bar's typical price, not a level.
+        [
+            timeframe === undefined || isSessionVwapMeaningful(timeframe)
+                ? lastFiniteNumber(indicators.vwap)
+                : null,
+            'VWAP',
+            'vwap',
+        ],
     ];
 
     return candidates

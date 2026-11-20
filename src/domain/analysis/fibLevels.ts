@@ -177,6 +177,51 @@ export const computeFibonacciProjection = (
 };
 
 /**
+ * The most extreme usable swing of `swings` as a 0/1-element list: `keepsBest(best,
+ * candidate)` says the current best survives; otherwise the candidate takes over, so a
+ * price tie goes to the later (more recent) swing.
+ */
+const pickExtreme = (
+    swings: readonly SMCSwingPoint[],
+    keepsBest: (best: number, candidate: number) => boolean
+): SMCSwingPoint[] => {
+    const best = swings
+        .filter(s => isUsablePrice(s.price))
+        .reduce<SMCSwingPoint | null>(
+            (acc, s) =>
+                acc === null || !keepsBest(acc.price, s.price) ? s : acc,
+            null
+        );
+    return best === null ? [] : [best];
+};
+
+/**
+ * @internal
+ * Fibonacci projection anchored on the **dominant** swing pair of a window: the
+ * highest swing high and the lowest swing low in it (the most recent one on a
+ * price tie), not the last confirmed pair.
+ *
+ * Every horizon used to anchor on the same last pair — whenever the short window
+ * held the two latest swings, all three horizons printed the identical leg. The
+ * dominant pair grows with the window, so a longer horizon can resolve to a
+ * different, larger leg, and a horizon that still resolves to the same swings as
+ * another is a genuine duplicate the caller can collapse.
+ *
+ * Returns `null` on the same conditions as {@link computeFibonacciProjection}.
+ *
+ * @param smc - SMC result whose swing points are already filtered to the window.
+ */
+export const computeDominantFibonacciProjection = (
+    smc: SMCResult
+): FibonacciProjection | null => {
+    return computeFibonacciProjection({
+        ...smc,
+        swingHighs: pickExtreme(smc.swingHighs, (best, c) => best > c),
+        swingLows: pickExtreme(smc.swingLows, (best, c) => best < c),
+    });
+};
+
+/**
  * @internal
  * Whether a close after the leg's end has gone past the leg's start — the
  * 100% retracement. The leg's swings are confirmed with a lag, so a fast

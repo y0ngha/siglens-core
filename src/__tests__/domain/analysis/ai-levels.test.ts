@@ -55,6 +55,12 @@ describe('isValidBullishStopLoss', () => {
         expect(isValidBullishStopLoss(tooLow, entryPrice, atr)).toBe(false);
     });
 
+    it('SL이 진입 구간 하단 이상이면 중앙값 아래여도 무효하다', () => {
+        expect(isValidBullishStopLoss(98, entryPrice, atr, 96)).toBe(false);
+        expect(isValidBullishStopLoss(96, entryPrice, atr, 96)).toBe(false);
+        expect(isValidBullishStopLoss(95.9, entryPrice, atr, 96)).toBe(true);
+    });
+
     it('ATR이 없으면 ATR 한도 검증을 건너뛴다', () => {
         const veryLow = 1;
         expect(isValidBullishStopLoss(veryLow, entryPrice, undefined)).toBe(
@@ -87,6 +93,16 @@ describe('isValidBullishTakeProfit', () => {
     it('ATR이 없으면 ATR 한도 검증을 건너뛴다', () => {
         const veryHigh = 9999;
         expect(isValidBullishTakeProfit(veryHigh, entryPrice, undefined)).toBe(
+            true
+        );
+    });
+});
+
+describe('isValidBullishTakeProfit — 진입 구간 상단', () => {
+    it('TP가 진입 구간 상단 이하면 중앙값 위여도 무효하다', () => {
+        expect(isValidBullishTakeProfit(103, entryPrice, atr, 104)).toBe(false);
+        expect(isValidBullishTakeProfit(104, entryPrice, atr, 104)).toBe(false);
+        expect(isValidBullishTakeProfit(104.1, entryPrice, atr, 104)).toBe(
             true
         );
     });
@@ -331,7 +347,7 @@ describe('reconcileBullishActionRecommendation', () => {
         ).not.toContain('손절');
     });
 
-    it('AI TP가 무효하면 fallback으로 보정한다', () => {
+    it('AI TP가 무효하면 지어내지 않고 제외한다 — 남은 목표가가 없으면 목표가도 위험:보상도 비운다', () => {
         const rec: ActionRecommendation = {
             ...baseRec,
             takeProfitPrices: [50],
@@ -344,10 +360,221 @@ describe('reconcileBullishActionRecommendation', () => {
             'USD'
         );
 
+        const levels = result.recommendation.reconciledLevels;
         expect(result.wasReconciled).toBe(true);
-        expect(
-            result.recommendation.reconciledLevels?.takeProfitPrices?.[0]
-        ).toBeGreaterThan(entryPrice);
+        // never `entry + 2*ATR` (104): that level was nobody's proposal
+        expect(levels?.takeProfitPrices).toEqual([]);
+        expect(levels?.riskReward).toBe('');
+        expect(levels?.exit).not.toContain('목표');
+        expect(levels?.exit).toContain('손절');
+        expect(result.changes).toHaveLength(1);
+        expect(result.changes[0]).toContain('dropped');
+    });
+
+    it('AI가 목표가를 아예 주지 않으면 보정하지 않고 목표가를 채우지 않는다', () => {
+        const rec: ActionRecommendation = {
+            ...baseRec,
+            takeProfitPrices: undefined,
+        };
+
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            entryPrice,
+            atr,
+            'USD'
+        );
+
+        expect(result.wasReconciled).toBe(false);
+        expect(result.recommendation.reconciledLevels).toBeUndefined();
+    });
+
+    describe('ATR 상한은 첫 목표가에만 적용된다', () => {
+        const rec: ActionRecommendation = {
+            ...baseRec,
+            entryPrices: [100, 110],
+            stopLoss: 96,
+            takeProfitPrices: [115, 140], // ATR 2 -> cap 100 + 20 = 120 for the first only
+        };
+
+        it('구간 위의 먼 두 번째 목표가는 그대로 남기고 보정하지 않는다', () => {
+            const result = reconcileBullishActionRecommendation(
+                rec,
+                105,
+                2,
+                'USD'
+            );
+
+            expect(result.wasReconciled).toBe(false);
+        });
+
+        it('다른 목표가 때문에 보정이 일어나도 먼 두 번째 목표가는 남는다', () => {
+            const result = reconcileBullishActionRecommendation(
+                { ...rec, takeProfitPrices: [108, 115, 140] },
+                105,
+                2,
+                'USD'
+            );
+
+            const levels = result.recommendation.reconciledLevels;
+            expect(levels?.takeProfitPrices).toEqual([115, 140]);
+            expect(levels?.reason).toContain('진입 구간 위가 아닌');
+            expect(levels?.reason).not.toContain('ATR');
+        });
+
+        it('첫 목표가가 ATR 상한을 넘으면 제외하고 그 이유를 정확히 적는다', () => {
+            const result = reconcileBullishActionRecommendation(
+                { ...rec, takeProfitPrices: [140, 150] },
+                105,
+                2,
+                'USD'
+            );
+
+            const levels = result.recommendation.reconciledLevels;
+            expect(levels?.takeProfitPrices).toEqual([150]);
+            expect(levels?.reason).toContain(
+                '첫 번째 목표가가 ATR 기준 상한을 넘어'
+            );
+            expect(levels?.reason).not.toContain('진입 구간 위가 아닌');
+            expect(result.changes).toEqual([
+                'takeProfitPrices[0]: 140 dropped (beyond the ATR cap)',
+            ]);
+        });
+    });
+
+    it('AI가 손절가를 주지 않았으면 이유에 보정이 아니라 계산했다고 적는다', () => {
+        const result = reconcileBullishActionRecommendation(
+            { ...baseRec, stopLoss: undefined, takeProfitPrices: [95, 106] },
+            entryPrice,
+            atr,
+            'USD'
+        );
+
+        const reason = result.recommendation.reconciledLevels?.reason ?? '';
+        expect(reason).toContain('AI가 손절가를 제시하지 않아');
+        expect(reason).toContain('진입 구간 위가 아닌');
+        expect(reason).not.toContain('보정하고');
+    });
+
+    it('AI 손절가가 있었지만 무효면 보정했다고 적는다', () => {
+        const result = reconcileBullishActionRecommendation(
+            { ...baseRec, stopLoss: 200, takeProfitPrices: [95, 106] },
+            entryPrice,
+            atr,
+            'USD'
+        );
+
+        const reason = result.recommendation.reconciledLevels?.reason ?? '';
+        expect(reason).toContain('손절가가 내부 기준을 벗어나 보정했습니다');
+        expect(reason).toContain('진입 구간 위가 아닌');
+    });
+
+    describe('진입 구간 경계 기준 검증 (중앙값만 보지 않는다)', () => {
+        const zoneRec: ActionRecommendation = {
+            ...baseRec,
+            entryPrices: [96, 104], // mid 100
+            stopLoss: 94,
+            takeProfitPrices: [108, 112],
+        };
+
+        it('구간 안쪽 손절(중앙값 아래, 하단 위)은 무효라 fallback으로 보정한다', () => {
+            const result = reconcileBullishActionRecommendation(
+                { ...zoneRec, stopLoss: 98 },
+                100,
+                atr,
+                'USD'
+            );
+
+            const stop = result.recommendation.reconciledLevels?.stopLoss;
+            expect(result.wasReconciled).toBe(true);
+            expect(stop).toBeLessThan(96);
+        });
+
+        it('구간 하단 바로 아래 손절은 그대로 유효하다', () => {
+            const result = reconcileBullishActionRecommendation(
+                { ...zoneRec, stopLoss: 95.5 },
+                100,
+                atr,
+                'USD'
+            );
+
+            expect(result.wasReconciled).toBe(false);
+        });
+
+        it('구간 상단 이하의 목표가는 제외하고 위의 목표가는 남긴다', () => {
+            const result = reconcileBullishActionRecommendation(
+                { ...zoneRec, takeProfitPrices: [102, 104, 108, 112] },
+                100,
+                atr,
+                'USD'
+            );
+
+            const levels = result.recommendation.reconciledLevels;
+            expect(result.wasReconciled).toBe(true);
+            expect(levels?.takeProfitPrices).toEqual([108, 112]);
+            expect(levels?.riskReward).toContain('+8.0%');
+        });
+
+        it('목표가를 제외해도 순서를 오름차순으로 돌려준다', () => {
+            const result = reconcileBullishActionRecommendation(
+                { ...zoneRec, takeProfitPrices: [112, 90, 108] },
+                100,
+                atr,
+                'USD'
+            );
+
+            expect(
+                result.recommendation.reconciledLevels?.takeProfitPrices
+            ).toEqual([108, 112]);
+        });
+
+        it('뒤집힌 진입 구간 배열도 같은 경계로 읽는다', () => {
+            const result = reconcileBullishActionRecommendation(
+                { ...zoneRec, entryPrices: [104, 96], takeProfitPrices: [103] },
+                100,
+                atr,
+                'USD'
+            );
+
+            expect(result.wasReconciled).toBe(true);
+            expect(
+                result.recommendation.reconciledLevels?.takeProfitPrices
+            ).toEqual([]);
+        });
+
+        it('폭이 넓은 구간에서 중앙값 기준 fallback이 구간 안이면 하단 기준으로 계산한다', () => {
+            const result = reconcileBullishActionRecommendation(
+                {
+                    ...zoneRec,
+                    entryPrices: [90, 110],
+                    stopLoss: 95,
+                    takeProfitPrices: [120],
+                },
+                100,
+                10,
+                'USD'
+            );
+
+            // mid-based fallback = 100 - 15 = 85 is already below 90 → kept as is
+            expect(
+                result.recommendation.reconciledLevels?.stopLoss
+            ).toBeCloseTo(85);
+
+            const wide = reconcileBullishActionRecommendation(
+                {
+                    ...zoneRec,
+                    entryPrices: [70, 130],
+                    stopLoss: 95,
+                    takeProfitPrices: [140],
+                },
+                100,
+                10,
+                'USD'
+            );
+            // mid-based 85 would sit inside [70, 130] → measured from the low edge: 70 - 15
+            expect(wide.recommendation.reconciledLevels?.stopLoss).toBeCloseTo(
+                55
+            );
+        });
     });
 
     it('sub-dollar fallback note는 4 유효숫자로 표기한다', () => {
@@ -897,17 +1124,92 @@ describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels i
             atr
         );
 
-        // nearest target above entryPrice among [110, 95, 102] is 102, not 110 or the
-        // sub-entry 95 — buildBullishRiskRewardText([102]) is the same line the
-        // filter+sort should produce.
+        // 95 sits below the entry and is dropped; nearest remaining target above
+        // entryPrice is 102, not 110 — buildBullishRiskRewardText([102]) is the same
+        // line the filter+sort should produce. It rides on reconciledLevels now,
+        // because the target list was corrected.
         const expectedLine = buildBullishRiskRewardText(entryPrice, 97, [102]);
-        expect(result.actionRecommendation?.riskReward).toBe(expectedLine);
+        const levels = result.actionRecommendation?.reconciledLevels;
+        expect(levels?.takeProfitPrices).toEqual([102, 110]);
+        expect(levels?.riskReward).toBe(expectedLine);
+        expect(levels?.riskReward).not.toContain('모델이 채운');
 
         // planCheck measures via the same nearest-target-above-price rule, so the two
         // never disagree.
         expect(
             result.actionRecommendation?.planCheck?.riskRewardAtEntry
         ).toBeCloseTo((102 - 100) / (100 - 97));
+    });
+});
+
+describe('postProcessAnalysisWithReconcile — plan edges and no fabricated target', () => {
+    const response = (
+        rec: Partial<ActionRecommendation>
+    ): AnalysisResponse => ({
+        ...({
+            patternSummaries: [],
+        } as unknown as AnalysisResponse),
+        actionRecommendation: { ...baseRec, ...rec },
+    });
+
+    it('TP[0]이 중앙값 이하일 때 entry+2*ATR을 끼워 넣지 않는다 (1:0.0 줄의 원인)', () => {
+        const result = postProcessAnalysisWithReconcile(
+            response({ takeProfitPrices: [95, 108] }),
+            entryPrice,
+            atr
+        );
+
+        const levels = result.actionRecommendation?.reconciledLevels;
+        // old behaviour: [104, 108] with 104 = 100 + 2*2 invented
+        expect(levels?.takeProfitPrices).toEqual([108]);
+        expect(levels?.riskReward).toContain('1:2.7');
+        expect(levels?.riskReward).not.toContain('1:0.0');
+    });
+
+    it('남은 목표가가 없으면 위험:보상 줄을 붙이지 않고 planCheck도 비율이 없다', () => {
+        const result = postProcessAnalysisWithReconcile(
+            response({ takeProfitPrices: [95, 99], riskReward: '' }),
+            entryPrice,
+            atr
+        );
+
+        const rec = result.actionRecommendation;
+        expect(rec?.reconciledLevels?.takeProfitPrices).toEqual([]);
+        expect(rec?.reconciledLevels?.riskReward).toBe('');
+        expect(rec?.riskReward).toBe('');
+        expect(rec?.planCheck?.riskRewardAtEntry).toBeNull();
+        expect(rec?.planCheck?.riskRewardAtCurrent).toBeNull();
+    });
+
+    it('진입 구간 안쪽의 손절과 목표가를 함께 걸러낸다', () => {
+        const result = postProcessAnalysisWithReconcile(
+            response({
+                entryPrices: [98, 102],
+                stopLoss: 99,
+                takeProfitPrices: [101, 106],
+            }),
+            entryPrice,
+            atr
+        );
+
+        const levels = result.actionRecommendation?.reconciledLevels;
+        expect(levels?.stopLoss).toBeCloseTo(97); // 100 - 1.5 * 2 is below 98
+        expect(levels?.takeProfitPrices).toEqual([106]);
+        expect(levels?.reason).toContain('제외');
+    });
+
+    it('이미 유효한 계획은 그대로 둔다 (원본 참조 유지, reconciledLevels 없음)', () => {
+        const result = postProcessAnalysisWithReconcile(
+            response({
+                entryPrices: [98, 102],
+                stopLoss: 96,
+                takeProfitPrices: [104, 108],
+            }),
+            entryPrice,
+            atr
+        );
+
+        expect(result.actionRecommendation?.reconciledLevels).toBeUndefined();
     });
 });
 
@@ -1230,8 +1532,10 @@ describe('KRX ETF/ETN tick table', () => {
             'KRW'
         ).actionRecommendation?.reconciledLevels;
 
-        const etpLevels = [etp!.stopLoss!, ...etp!.takeProfitPrices!];
-        const shareLevels = [share!.stopLoss!, ...share!.takeProfitPrices!];
+        // Only the stop is a computed level now; no target is invented.
+        expect(etp?.takeProfitPrices).toBeUndefined();
+        const etpLevels = [etp!.stopLoss!];
+        const shareLevels = [share!.stopLoss!];
         expect(etpLevels.filter(n => n % 5 !== 0)).toEqual([]);
         expect(etpLevels.filter(n => n % 50 !== 0).length).toBeGreaterThan(0);
         expect(shareLevels.filter(n => n % 50 !== 0)).toEqual([]);

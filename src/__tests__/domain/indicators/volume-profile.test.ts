@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
+import {
+    calculateVolumeProfile,
+    volumeProfileRowsFor,
+} from '@/domain/indicators/volume-profile';
 import {
     VP_MIN_BARS,
     VP_DEFAULT_ROW_SIZE,
@@ -116,5 +119,37 @@ describe('calculateVolumeProfile', () => {
                 expect(row.volume).toBeGreaterThanOrEqual(0);
             });
         });
+    });
+});
+
+describe('volumeProfileRowsFor / minBars', () => {
+    const bars = (n: number): Bar[] =>
+        Array.from({ length: n }, (_, i) =>
+            makeBar(100 + (i % 5), 90 + (i % 5), 95, i)
+        );
+
+    it('keeps the default row count at or above the minimum bar count', () => {
+        expect(volumeProfileRowsFor(VP_MIN_BARS)).toBe(VP_DEFAULT_ROW_SIZE);
+        expect(volumeProfileRowsFor(200)).toBe(VP_DEFAULT_ROW_SIZE);
+    });
+
+    it('scales the row count down in proportion for a shorter window', () => {
+        expect(volumeProfileRowsFor(20)).toBe(16);
+        expect(volumeProfileRowsFor(26)).toBe(21);
+        expect(volumeProfileRowsFor(1)).toBe(2);
+    });
+
+    it('builds a profile from a window below the default minimum when minBars allows it', () => {
+        expect(calculateVolumeProfile(bars(20))).toBeNull();
+        const vp = calculateVolumeProfile(
+            bars(20),
+            volumeProfileRowsFor(20),
+            20
+        );
+        expect(vp?.profile).toHaveLength(16);
+    });
+
+    it('still returns null below an explicit minBars', () => {
+        expect(calculateVolumeProfile(bars(19), 16, 20)).toBeNull();
     });
 });

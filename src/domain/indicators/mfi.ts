@@ -29,7 +29,9 @@ export function calculateMFI(
             .map((tp, j) => (tp < windowTPs[j] ? windowMFs[j + 1] : 0))
             .reduce((sum, v) => sum + v, 0);
 
-        if (negative === 0) return MFI_MAX;
+        // No money flow in either direction (a flat typical price or zero volume across
+        // the window) leaves the ratio undefined: `null`, like a warm-up bar.
+        if (negative === 0) return positive === 0 ? null : MFI_MAX;
         const mfRatio = positive / negative;
         return MFI_MAX - MFI_MAX / (1 + mfRatio);
     });

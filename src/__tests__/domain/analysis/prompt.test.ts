@@ -81,6 +81,7 @@ import type {
     SqueezeMomentumResult,
 } from '@/domain/types';
 import type { PriceQuoting } from '@/domain/analysis/promptFormat';
+import { US_EQUITY_SESSION } from '@/domain/session';
 
 const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
 
@@ -722,8 +723,45 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain(
-                'Volume Profile: POC N/A / VAH N/A / VAL N/A'
+                'Volume Profile (all 0 bars): POC N/A / VAH N/A / VAL N/A'
             );
+        });
+
+        it('프로파일이 어느 구간 기준인지 봉 수로 밝히고, 호라이즌 블록은 자기 구간을 쓴다고 알린다', () => {
+            const bars = Array.from({ length: 40 }, (_, i) => makeBar(i));
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators({
+                    volumeProfile: {
+                        poc: 100,
+                        vah: 110,
+                        val: 90,
+                        profile: [],
+                    },
+                }),
+                []
+            );
+            expect(result).toContain(
+                'Volume Profile (all 40 bars): POC 100.00 / VAH 110.00 / VAL 90.00'
+            );
+            expect(result).toContain(
+                "computed over that block's own bar window"
+            );
+        });
+
+        it('POC를 유일한 최강 지지/저항으로 단정하지 않고, 프로파일마다 구간을 함께 인용하라고 한다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                []
+            );
+            expect(result).not.toContain('POC is the strongest');
+            expect(result).not.toContain('high-probability reaction zone');
+            expect(result).toContain('cite a profile together with its window');
         });
 
         it('volumeProfile 값이 있을 때 POC/VAH/VAL 값을 포함한다', () => {
@@ -938,7 +976,114 @@ describe('prompt', () => {
             expect(result).toContain(TEST_ICHIMOKU_KIJUN.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_SENKOU_A.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_SENKOU_B.toFixed(2));
-            expect(result).toContain(TEST_ICHIMOKU_CHIKOU.toFixed(2));
+        });
+
+        describe('Chikou (후행스팬) 판독', () => {
+            const closeAt = (i: number): number => 100 + i;
+            const bars = Array.from({ length: 40 }, (_, i) =>
+                makeBar(i, closeAt(i))
+            );
+
+            it('마지막 봉의 chikou 시리즈는 항상 null이어도 N/A가 아니라 현재 종가와 26봉 전 종가의 비교를 찍는다', () => {
+                // calculateIchimoku's last entry is null by construction.
+                const result = buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    bars,
+                    makeIndicators({
+                        ichimoku: [
+                            {
+                                tenkan: 1,
+                                kijun: 1,
+                                senkouA: 1,
+                                senkouB: 1,
+                                chikou: null,
+                            },
+                        ],
+                    }),
+                    []
+                );
+                // last close 139, 26 bars earlier (index 13) close 113
+                expect(result).toContain(
+                    'Chikou 139.00 (close vs 113.00 26 bars ago: above)'
+                );
+            });
+
+            it('26봉 전보다 낮으면 below, 같으면 equal', () => {
+                const falling = bars.map((b, i) => ({
+                    ...b,
+                    close: 200 - i,
+                }));
+                const flat = bars.map(b => ({ ...b, close: 150 }));
+                const render = (b: Bar[]): string =>
+                    buildAnalysisPrompt(
+                        TEST_SYMBOL,
+                        TEST_COMPANY_NAME,
+                        b,
+                        makeIndicators(),
+                        []
+                    );
+                expect(render(falling)).toContain('26 bars ago: below)');
+                expect(render(flat)).toContain('26 bars ago: equal)');
+            });
+
+            it('봉이 26개 이하면 N/A로 둔다', () => {
+                const result = buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    bars.slice(0, 26),
+                    makeIndicators(),
+                    []
+                );
+                expect(result).toContain('Chikou N/A');
+            });
+        });
+    });
+
+    describe('지표 섹션 - 움직임 없는 구간의 RSI/MFI', () => {
+        it('마지막 값이 null이면 이전 값을 현재처럼 찍지 않고 N/A로 읽는다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [makeBar(0, 150)],
+                makeIndicators({ rsi: [55, null], mfi: [60, null] }),
+                []
+            );
+            expect(result).toContain(`RSI(${RSI_DEFAULT_PERIOD}): N/A`);
+            expect(result).toContain(`MFI(${MFI_DEFAULT_PERIOD}): N/A`);
+            expect(result).toContain('RSI zone: N/A');
+            expect(result).not.toContain(`MFI(${MFI_DEFAULT_PERIOD}): 60`);
+        });
+    });
+
+    describe('지표 섹션 - VWAP', () => {
+        const vwapIndicators = makeIndicators({ vwap: [145.5] });
+        const bars = [makeBar(0, 150)];
+
+        it('일봉에서는 봉의 대표가격과 같아지는 VWAP 줄을 찍지 않는다', () => {
+            const result = buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                vwapIndicators,
+                [],
+                '1Day'
+            );
+            expect(result).not.toContain('- VWAP:');
+        });
+
+        it('분봉·시간봉에서는 VWAP 줄을 그대로 찍는다', () => {
+            for (const timeframe of ['15Min', '1Hour', '4Hour'] as const) {
+                const result = buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    bars,
+                    vwapIndicators,
+                    [],
+                    timeframe
+                );
+                expect(result).toContain('- VWAP: 145.50');
+            }
         });
     });
 
@@ -4440,10 +4585,10 @@ describe('prompt', () => {
                 makeIndicators({ smc })
             );
             expect(result).toContain(
-                '- Equal Highs at 165.00 (sell-side liquidity) (-17.09% from price) (14 bars ago, span 15 bars)'
+                '- Equal Highs at 165.00 (buy-side liquidity) (-17.09% from price) (14 bars ago, span 15 bars)'
             );
             expect(result).toContain(
-                '- Equal Lows at 140.00 (buy-side liquidity) (-29.65% from price) (21 bars ago, span 18 bars)'
+                '- Equal Lows at 140.00 (sell-side liquidity) (-29.65% from price) (21 bars ago, span 18 bars)'
             );
             expect(result).toContain('Liquidity Pools');
         });
@@ -6663,6 +6808,124 @@ describe('### Writing About Computed Sections', () => {
         ).toBe(true);
         expect(CHART_OVERLAY_CANDIDATES_SECTION_INTRO).toContain(
             `${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines`
+        );
+    });
+});
+
+describe('buildAnalysisPrompt — horizon blocks', () => {
+    const bars250 = Array.from({ length: 250 }, (_, i) => makeBar(i));
+    const swingPoint = (index: number, price: number, type: 'high' | 'low') =>
+        ({ index, price, type }) as unknown as SMCResult['swingHighs'][number];
+    const countOf = (text: string, needle: string): number =>
+        countOccurrences(text, needle);
+
+    const horizonBlock = (text: string, label: string): string => {
+        const start = text.indexOf(`### ${label}`);
+        const next = text.indexOf('\n### ', start + 1);
+        const pivot = text.indexOf('\nPivot table:', start);
+        const end = [next, pivot, text.length]
+            .filter(i => i > start)
+            .reduce((m, i) => Math.min(m, i), text.length);
+        return text.slice(start, end);
+    };
+
+    it('prints a Fib anchor and table once, and points later horizons on the same leg at it without repeating the Fib rows', () => {
+        const smc: SMCResult = {
+            ...EMPTY_SMC_RESULT,
+            swingHighs: [swingPoint(245, 360, 'high')],
+            swingLows: [swingPoint(240, 330, 'low')],
+        };
+        const result = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            bars250,
+            makeIndicators({ smc }),
+            []
+        );
+
+        // Anchored at a line start: the guidance text also mentions the phrase.
+        expect(countOf(result, '\nFib anchor: swing')).toBe(1);
+        expect(countOf(result, '\nFib table:')).toBe(1);
+        const short = horizonBlock(result, 'Short-term');
+        const medium = horizonBlock(result, 'Medium-term');
+        const long = horizonBlock(result, 'Long-term');
+        expect(short).toContain('Fib anchor: swing');
+        expect(medium).toContain(
+            'Fib anchor: same leg as Short-term (see above)'
+        );
+        expect(long).toContain(
+            'Fib anchor: same leg as Short-term (see above)'
+        );
+        expect(medium).not.toMatch(/\(Fib (ext )?\d/);
+        expect(long).not.toMatch(/\(Fib (ext )?\d/);
+    });
+
+    it('prints one Fib anchor per horizon when the horizons resolve to different legs', () => {
+        const smc: SMCResult = {
+            ...EMPTY_SMC_RESULT,
+            swingHighs: [
+                swingPoint(60, 400, 'high'),
+                swingPoint(200, 300, 'high'),
+                swingPoint(240, 260, 'high'),
+            ],
+            swingLows: [
+                swingPoint(70, 50, 'low'),
+                swingPoint(210, 150, 'low'),
+                swingPoint(235, 220, 'low'),
+            ],
+        };
+        const result = buildAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            bars250,
+            makeIndicators({ smc }),
+            []
+        );
+
+        expect(countOf(result, '\nFib anchor: swing')).toBe(3);
+        expect(result).not.toContain('same leg as');
+        expect(result).toContain('swing low 220.00 → swing high 260.00');
+        expect(result).toContain('swing high 300.00 → swing low 150.00');
+        expect(result).toContain('swing high 400.00 → swing low 50.00');
+    });
+
+    it('uses the last bar for the daily pivot table once the session has closed, and the bar before while it is forming', () => {
+        const day = (d: number, high: number, low: number, close: number) => ({
+            time: Date.UTC(2026, 8, d) / 1000,
+            open: close,
+            high,
+            low,
+            close,
+            volume: 1000,
+        });
+        const dailyBars = [day(8, 111, 95, 105), day(9, 100, 98.5, 99)];
+        const build = (now: Date): string => {
+            const { dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                dailyBars,
+                makeIndicators(),
+                [],
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                'USD',
+                'share',
+                undefined,
+                { session: US_EQUITY_SESSION, now }
+            );
+            return dynamic;
+        };
+
+        expect(build(new Date('2026-09-09T21:00:00Z'))).toContain(
+            'Standard PP 99.17'
+        );
+        expect(build(new Date('2026-09-09T15:00:00Z'))).toContain(
+            'Standard PP 103.67'
         );
     });
 });

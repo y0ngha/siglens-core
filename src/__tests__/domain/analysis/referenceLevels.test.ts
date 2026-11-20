@@ -7,7 +7,12 @@ import {
     lastFiniteNumber,
 } from '@/domain/analysis/referenceLevels';
 import { MAX_REFERENCE_LEVELS_PER_SIDE } from '@/domain/analysis/marketReferenceConstants';
-import type { Bar, IndicatorResult, ReferenceLevel } from '@/domain/types';
+import type {
+    Bar,
+    IndicatorResult,
+    ReferenceLevel,
+    Timeframe,
+} from '@/domain/types';
 
 const lvl = (price: number, currentPrice = 100): ReferenceLevel => ({
     price,
@@ -200,6 +205,21 @@ describe('collectIndicatorLevels', () => {
             supertrend: [{ supertrend: 96 }],
             vwap: [99, 98],
         }) as unknown as IndicatorResult;
+
+    it('leaves VWAP out on a daily chart, where it is the bar typical price, and keeps it intraday', () => {
+        const kindsFor = (timeframe: Timeframe | undefined): string[] =>
+            collectIndicatorLevels(
+                100,
+                fullIndicators(),
+                undefined,
+                timeframe
+            ).map(l => l.kind);
+
+        expect(kindsFor('1Day')).not.toContain('vwap');
+        expect(kindsFor('15Min')).toContain('vwap');
+        expect(kindsFor('4Hour')).toContain('vwap');
+        expect(kindsFor(undefined)).toContain('vwap');
+    });
 
     it('emits a POC level from the volume profile', () => {
         const levels = collectIndicatorLevels(100, fullIndicators());

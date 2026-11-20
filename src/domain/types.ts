@@ -1677,7 +1677,7 @@ export type EntryRecommendation = 'enter' | 'wait' | 'avoid';
 export interface ReconciledActionLevels {
     /** Reconciled stop-loss — the AI value when valid, otherwise the domain-derived fallback. */
     readonly stopLoss?: number;
-    /** Reconciled take-profit prices — the full array, with only the invalid entries replaced (other AI values preserved). */
+    /** Reconciled take-profit prices — the AI array with every target that is not strictly above the entry zone's top edge (or past the ATR cap) dropped. A dropped target is never replaced by a computed one, so the array can be shorter than the AI's, or empty (no valid target: `riskReward` is then `''`). */
     readonly takeProfitPrices?: readonly number[];
     /** Regenerated exit-strategy text reflecting the reconciled levels. */
     readonly exit: string;

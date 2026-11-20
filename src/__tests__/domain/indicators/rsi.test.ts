@@ -81,6 +81,21 @@ describe('calculateRSI', () => {
         });
     });
 
+    describe('움직임이 전혀 없는 입력', () => {
+        it('평균 이득과 평균 손실이 모두 0이면 100이 아니라 null이다', () => {
+            const closes = new Array<number>(30).fill(50);
+            expect(calculateRSI(closes, 14).every(v => v === null)).toBe(true);
+        });
+
+        it('평탄한 구간 뒤 첫 상승 봉부터는 다시 값이 나온다 (손실만 0이면 100)', () => {
+            const closes = [...new Array<number>(20).fill(50), 51, 52];
+            const result = calculateRSI(closes, 14);
+            expect(result[19]).toBeNull();
+            expect(result[20]).toBe(100);
+            expect(result[21]).toBe(100);
+        });
+    });
+
     describe('극단 입력', () => {
         it('period=1이면 단 한 개의 선행 null 뒤로 RSI를 계산한다', () => {
             // period=1: 첫 봉만 null, 이후 각 봉은 직전 대비 상승=100/하락=0

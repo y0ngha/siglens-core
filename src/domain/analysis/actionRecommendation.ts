@@ -43,12 +43,15 @@ export function extractReconciledActionLines(
 
     const reconciledTps = reconciled.takeProfitPrices ?? [];
     const totalCount = reconciledTps.length;
+    const aiTps = rec.takeProfitPrices ?? [];
     const tpsToRender = reconciledTps.flatMap((reconciledTp, index) => {
-        const aiTp = rec.takeProfitPrices?.[index];
+        // Compared by value, not by index: reconciliation drops targets, so a kept
+        // AI target can sit at a lower index than in the AI array and must not be
+        // drawn a second time as a "reconciled" line.
         if (
             reconciledTp === undefined ||
             reconciledTp <= 0 ||
-            reconciledTp === aiTp
+            aiTps.includes(reconciledTp)
         ) {
             return [];
         }

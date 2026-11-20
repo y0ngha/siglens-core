@@ -469,7 +469,13 @@ async function runAnalysisImpl(
         marketEventCandidates,
         options.currency,
         options.krxTickTable,
-        options.earningsDates
+        options.earningsDates,
+        // The daily pivot block needs to know whether the last bar's session has closed.
+        // `priorAnalysisNow` is the one instant this run already reads once; reusing it
+        // keeps the prompt from depending on a second clock read.
+        options.session === undefined
+            ? undefined
+            : { session: options.session, now: priorAnalysisNow }
     );
     // Logged here, before the model call, so a failure is reported even when
     // the generation itself fails: without it a throwing qualifier reads as

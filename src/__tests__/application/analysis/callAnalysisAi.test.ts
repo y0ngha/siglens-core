@@ -381,7 +381,10 @@ describe('callAnalysisAi — 파싱 불가 응답 1회 재생성', () => {
         expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
         expect(warn).toHaveBeenCalledWith(
             '[callAnalysisAi] response was not parseable JSON; regenerating once',
-            expect.objectContaining({ model: DEEPSEEK_FREE })
+            expect.objectContaining({
+                model: DEEPSEEK_FREE,
+                reason: 'SyntaxError',
+            })
         );
         warn.mockRestore();
     });
@@ -406,6 +409,75 @@ describe('callAnalysisAi — 파싱 불가 응답 1회 재생성', () => {
         ).resolves.toBe(OK);
 
         expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(1);
+    });
+
+    describe('required keys of the response schema', () => {
+        const responseSchema = {
+            type: 'object',
+            properties: { summary: {}, actionRecommendation: {} },
+            required: ['summary', 'actionRecommendation'],
+        };
+        const COMPLETE = '{"summary":"s","actionRecommendation":{"a":1}}';
+        const TRUNCATED = '{"summary":"s"}';
+
+        it('regenerates once when a required key is missing and returns the complete answer', async () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            vi.mocked(callDeepSeekWithRetry)
+                .mockResolvedValueOnce(TRUNCATED)
+                .mockResolvedValueOnce(COMPLETE);
+
+            await expect(
+                callAnalysisAi({
+                    prompt: 'p',
+                    model: DEEPSEEK_FREE,
+                    tier: 'free',
+                    responseSchema,
+                })
+            ).resolves.toBe(COMPLETE);
+
+            expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
+            // The log names the cause, so a missing-key regeneration can be told apart
+            // from an unparseable one without reading the message text.
+            expect(warn).toHaveBeenCalledWith(
+                '[callAnalysisAi] response was not parseable JSON; regenerating once',
+                expect.objectContaining({
+                    reason: 'IncompleteJsonResponseError',
+                })
+            );
+            warn.mockRestore();
+        });
+
+        it('never returns an incomplete answer: a second miss fails and no third call is made', async () => {
+            const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+            vi.mocked(callDeepSeekWithRetry).mockResolvedValue(TRUNCATED);
+
+            await expect(
+                callAnalysisAi({
+                    prompt: 'p',
+                    model: DEEPSEEK_FREE,
+                    tier: 'free',
+                    responseSchema,
+                })
+            ).rejects.toBeInstanceOf(SyntaxError);
+
+            expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
+            warn.mockRestore();
+        });
+
+        it('accepts a complete answer without regenerating', async () => {
+            vi.mocked(callDeepSeekWithRetry).mockResolvedValueOnce(COMPLETE);
+
+            await expect(
+                callAnalysisAi({
+                    prompt: 'p',
+                    model: DEEPSEEK_FREE,
+                    tier: 'free',
+                    responseSchema,
+                })
+            ).resolves.toBe(COMPLETE);
+
+            expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(1);
+        });
     });
 
     it('빈 재생성 응답은 빈 응답 오류로 드러낸다', async () => {

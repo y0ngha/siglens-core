@@ -1072,9 +1072,25 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * support/resistance rules drop their stop-loss, take-profit and "for the
  * investor" wording. Bytes change for every technical prompt.
  *
+ * **`p34`** — reference-level correctness (2026-11-20). A daily chart no longer
+ * prints a `- VWAP:` line or lists VWAP as a level (it was the bar's own typical
+ * price); its pivot table reads the last bar once that session has closed;
+ * `Volume Profile` names its window (`all N bars`), the short horizon gets a
+ * profile, and the POC wording no longer claims it is "the strongest" level;
+ * each horizon anchors its `Fib anchor` / `Fib table` on its own dominant swing
+ * pair and an anchor already printed by an earlier horizon is not repeated;
+ * equal highs / lows read buy-side / sell-side liquidity; `Chikou` prints the
+ * close against the close 26 bars back instead of `N/A`. Computed values change
+ * too: RSI / MFI are `null` for a series with no movement (their prompt lines
+ * read the latest element, so `N/A`), and the reconciled plan drops targets that
+ * are not above the entry zone instead of inventing one. (Parabolic SAR now
+ * resets its acceleration to `afStart` on a reversal, which changes nothing at
+ * the defaults because `PSAR_AF_START` equals `PSAR_AF_INCREMENT`.) Bytes change
+ * for every technical prompt.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p33' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p34' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

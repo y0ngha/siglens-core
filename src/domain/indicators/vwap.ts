@@ -1,5 +1,5 @@
 import { SECONDS_PER_DAY } from '@/domain/constants/time';
-import type { Bar } from '@/domain/types';
+import type { Bar, Timeframe } from '@/domain/types';
 import { typicalPrice } from './utils';
 
 interface VWAPState {
@@ -32,4 +32,17 @@ export function calculateVWAP(bars: Bar[]): (number | null)[] {
         },
         { cumulativeTPV: 0, cumulativeVolume: 0, dayKey: -1, results: [] }
     ).results;
+}
+
+/**
+ * @internal Whether a VWAP reading is meaningful on `timeframe`.
+ *
+ * {@link calculateVWAP} restarts at every UTC day, which is a session anchor only
+ * when a day holds several bars. On a daily bar the "session" is that one bar, so
+ * the value is its own typical price `(H+L+C)/3` — not a volume-weighted average
+ * of anything, and not a level. Prompt and reference-level builders skip VWAP on
+ * `1Day` (the coarsest timeframe) instead of printing it as a support/resistance.
+ */
+export function isSessionVwapMeaningful(timeframe: Timeframe): boolean {
+    return timeframe !== '1Day';
 }

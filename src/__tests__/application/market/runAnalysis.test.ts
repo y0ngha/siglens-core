@@ -2009,15 +2009,44 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 }
             );
 
-            expect(mockBuildAnalysisPrompt.mock.lastCall?.slice(-3)).toEqual([
+            expect(mockBuildAnalysisPrompt.mock.lastCall?.slice(-4)).toEqual([
                 'KRW',
                 'etp',
+                undefined,
                 undefined,
             ]);
             const postArgs =
                 mockPostProcessAnalysisWithReconcile.mock.lastCall!;
             expect(postArgs[3]).toBe('KRW');
             expect(postArgs[5]).toBe('etp');
+        });
+
+        it('session이 있으면 같은 세션과 시각을 프롬프트 빌더에 시장 시계로 넘기고, 없으면 넘기지 않는다', async () => {
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider, session: US_EQUITY_SESSION }
+            );
+            const withSession = mockBuildAnalysisPrompt.mock.lastCall?.at(-1);
+            expect(withSession).toMatchObject({ session: US_EQUITY_SESSION });
+            expect(
+                (withSession as { now: unknown } | undefined)?.now
+            ).toBeInstanceOf(Date);
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            expect(
+                mockBuildAnalysisPrompt.mock.lastCall?.at(-1)
+            ).toBeUndefined();
         });
 
         it('후보 빌더가 실패하면 candidate builder failed 경고에 kind를 남긴다', async () => {
