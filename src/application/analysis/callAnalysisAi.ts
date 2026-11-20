@@ -143,7 +143,7 @@ export async function callAnalysisAi(
         throw new Error('AI returned an empty response');
     }
     try {
-        return normalizeJsonResponse(raw);
+        return normalizeJsonResponse(raw, responseSchema);
     } catch (error) {
         if (!(error instanceof SyntaxError)) throw error;
         // One fresh generation when the provider returned text that no salvage step
@@ -161,7 +161,7 @@ export async function callAnalysisAi(
         if (retried.trim() === '') {
             throw new Error('AI returned an empty response');
         }
-        return normalizeJsonResponse(retried);
+        return normalizeJsonResponse(retried, responseSchema);
     }
 
     /**

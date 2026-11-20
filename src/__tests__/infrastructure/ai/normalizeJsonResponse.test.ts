@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeJsonResponse } from '@/infrastructure/ai/normalizeJsonResponse';
+import {
+    IncompleteJsonResponseError,
+    normalizeJsonResponse,
+    responseSchemaKeys,
+} from '@/infrastructure/ai/normalizeJsonResponse';
 
 describe('normalizeJsonResponse', () => {
     it('removes json code fence only when both start and end markers are present', () => {
@@ -111,5 +115,120 @@ describe('normalizeJsonResponse — prose before the object', () => {
             out = null;
         }
         expect(out).not.toBe('{}');
+    });
+});
+
+describe('normalizeJsonResponse — response schema completeness', () => {
+    const schema = {
+        type: 'object',
+        properties: {
+            summary: { type: 'string' },
+            actionRecommendation: { type: 'object' },
+            note: { type: 'string' },
+        },
+        required: ['summary', 'actionRecommendation'],
+    };
+
+    it('returns a reply that carries every required key', () => {
+        const raw = '{"summary":"s","actionRecommendation":{"a":1}}';
+
+        expect(normalizeJsonResponse(raw, schema)).toBe(raw);
+    });
+
+    it('throws a SyntaxError subclass when a required key is missing', () => {
+        const raw = '{"summary":"s"}';
+
+        expect(() => normalizeJsonResponse(raw, schema)).toThrow(
+            IncompleteJsonResponseError
+        );
+        expect(() => normalizeJsonResponse(raw, schema)).toThrow(SyntaxError);
+        expect(() => normalizeJsonResponse(raw, schema)).toThrow(
+            /actionRecommendation/
+        );
+    });
+
+    it('rejects a jsonrepair-salvaged truncation that lost a required key', () => {
+        // Cut mid-stream: jsonrepair closes the object and the later keys are gone.
+        const raw = '{"summary":"s","note":"n"';
+
+        expect(() => normalizeJsonResponse(raw, schema)).toThrow(
+            IncompleteJsonResponseError
+        );
+    });
+
+    it('rejects a stray closing brace that dropped a trailing required key', () => {
+        const raw = '{"summary":"s"}, "actionRecommendation":{"a":1}}';
+
+        expect(() => normalizeJsonResponse(raw, schema)).toThrow(SyntaxError);
+    });
+
+    it('rejects a kept head whose discarded tail holds an optional schema key', () => {
+        const raw =
+            '{"summary":"s","actionRecommendation":{"a":1}}\n"note":"n"}';
+
+        expect(() => normalizeJsonResponse(raw, schema)).toThrow(
+            /lost keys after a stray closing brace: note/
+        );
+    });
+
+    it('does not mistake a schema key name inside a string value of the tail for a lost key', () => {
+        const raw =
+            '{"summary":"s","actionRecommendation":{"a":1}}\n{"other":"note","list":["note"]}';
+
+        expect(normalizeJsonResponse(raw, schema)).toBe(
+            '{"summary":"s","actionRecommendation":{"a":1}}'
+        );
+        const asValue =
+            '{"summary":"s","actionRecommendation":{"a":1}}\n{"x":"\\"note\\": 1","y":"note"}';
+        expect(normalizeJsonResponse(asValue, schema)).toBe(
+            '{"summary":"s","actionRecommendation":{"a":1}}'
+        );
+    });
+
+    it('matches a lost key with whitespace before the colon', () => {
+        const raw =
+            '{"summary":"s","actionRecommendation":{"a":1}}\n"note"  : "n"}';
+
+        expect(() => normalizeJsonResponse(raw, schema)).toThrow(
+            /lost keys after a stray closing brace: note/
+        );
+    });
+
+    it('keeps a complete first object followed by a plain second copy', () => {
+        const first = '{"summary":"s","actionRecommendation":{"a":1}}';
+
+        expect(normalizeJsonResponse(`${first}\n${first}`, schema)).toBe(first);
+    });
+
+    it('does not check keys without a schema, or for a schema with no required list', () => {
+        expect(normalizeJsonResponse('{"a":1}')).toBe('{"a":1}');
+        expect(normalizeJsonResponse('{"a":1}', { type: 'object' })).toBe(
+            '{"a":1}'
+        );
+        expect(normalizeJsonResponse('{"a":1}', 'not a schema')).toBe(
+            '{"a":1}'
+        );
+    });
+
+    it('skips the check for a non-object root', () => {
+        expect(normalizeJsonResponse('[1,2]', schema)).toBe('[1,2]');
+    });
+});
+
+describe('responseSchemaKeys', () => {
+    it('reads the top-level required and property names', () => {
+        expect(
+            responseSchemaKeys({
+                properties: { a: {}, b: {} },
+                required: ['a', 7],
+            })
+        ).toEqual({ required: ['a'], properties: ['a', 'b'] });
+    });
+
+    it('returns empty lists for anything that is not a schema object', () => {
+        expect(responseSchemaKeys(undefined)).toEqual({
+            required: [],
+            properties: [],
+        });
     });
 });

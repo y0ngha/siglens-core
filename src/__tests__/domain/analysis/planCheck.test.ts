@@ -258,6 +258,20 @@ describe('buildPlanCheck', () => {
         expect(check?.riskRewardAtEntry).toBeNull();
     });
 
+    it('discards a stop inside the entry zone (below the mid, above the low edge)', () => {
+        const insideZone = rec({
+            entryRecommendation: 'avoid',
+            entryPrices: [96, 104],
+            stopLoss: 98,
+            takeProfitPrices: [110],
+        });
+
+        const check = buildPlanCheck(insideZone, 100, 100);
+
+        expect(check?.belowStopLoss).toBe(false);
+        expect(check?.riskRewardAtEntry).toBeNull();
+    });
+
     it('falls back to the AI levels when nothing was reconciled', () => {
         const check = buildPlanCheck(plan, 105, 99);
         expect(check?.riskRewardAtCurrent).toBeCloseTo(

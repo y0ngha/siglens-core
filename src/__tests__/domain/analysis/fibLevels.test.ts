@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     computeFibonacciProjection,
+    computeDominantFibonacciProjection,
     computeAbcExtension,
 } from '@/domain/analysis/fibLevels';
 import type { SMCResult, SMCSwingPoint } from '@/domain/types';
@@ -177,5 +178,73 @@ describe('computeAbcExtension', () => {
             )
         );
         expect(abc).toBeNull();
+    });
+});
+
+describe('computeDominantFibonacciProjection', () => {
+    const point = (index: number, price: number): SMCSwingPoint =>
+        ({ index, price, time: index }) as unknown as SMCSwingPoint;
+    const withSwings = (
+        swingHighs: SMCSwingPoint[],
+        swingLows: SMCSwingPoint[]
+    ): SMCResult =>
+        ({
+            swingHighs,
+            swingLows,
+            structureBreaks: [],
+        }) as unknown as SMCResult;
+
+    it('anchors on the highest high and the lowest low, not the last pair', () => {
+        const fib = computeDominantFibonacciProjection(
+            withSwings(
+                [point(10, 200), point(60, 150), point(90, 160)],
+                [point(20, 100), point(70, 130), point(95, 140)]
+            )
+        );
+        const last = computeFibonacciProjection(
+            withSwings(
+                [point(10, 200), point(60, 150), point(90, 160)],
+                [point(20, 100), point(70, 130), point(95, 140)]
+            )
+        );
+
+        expect(last).toMatchObject({ high: 160, low: 140 });
+        expect(fib).toMatchObject({
+            high: 200,
+            low: 100,
+            highIndex: 10,
+            lowIndex: 20,
+            direction: 'down',
+        });
+    });
+
+    it('reads the leg direction from the dominant swings order', () => {
+        const fib = computeDominantFibonacciProjection(
+            withSwings([point(10, 200)], [point(40, 100), point(80, 120)])
+        );
+        expect(fib?.direction).toBe('down');
+    });
+
+    it('takes the most recent swing on a price tie', () => {
+        const fib = computeDominantFibonacciProjection(
+            withSwings([point(10, 200), point(50, 200)], [point(30, 100)])
+        );
+        expect(fib?.highIndex).toBe(50);
+    });
+
+    it('is null without a usable pair, like the last-pair projection', () => {
+        expect(
+            computeDominantFibonacciProjection(withSwings([], [point(1, 100)]))
+        ).toBeNull();
+        expect(
+            computeDominantFibonacciProjection(
+                withSwings([point(1, Number.NaN)], [point(2, 100)])
+            )
+        ).toBeNull();
+        expect(
+            computeDominantFibonacciProjection(
+                withSwings([point(1, 90)], [point(2, 100)])
+            )
+        ).toBeNull();
     });
 });

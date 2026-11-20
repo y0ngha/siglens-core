@@ -63,12 +63,37 @@ function expandValueArea(
     return state;
 }
 
-/** @internal Volume Profile — per-price-row volume distribution with POC and value area. */
+/**
+ * @internal Row count for a profile over `barCount` bars when the window is
+ * shorter than {@link VP_MIN_BARS}: the default row count scaled by the window's
+ * share of that minimum. 24 rows over 20 bars would leave most rows empty, so a
+ * short window gets proportionally fewer. Never fewer than 2 rows (a profile
+ * needs a range to split); windows at or above the minimum keep the default.
+ */
+export function volumeProfileRowsFor(barCount: number): number {
+    if (barCount >= VP_MIN_BARS) return VP_DEFAULT_ROW_SIZE;
+    return Math.max(
+        2,
+        Math.round((VP_DEFAULT_ROW_SIZE * barCount) / VP_MIN_BARS)
+    );
+}
+
+/**
+ * @internal Volume Profile — per-price-row volume distribution with POC and value area.
+ *
+ * @param bars - Bars the profile is built over.
+ * @param rowSize - Number of price rows.
+ * @param minBars - Fewest bars a profile may be built from. Defaults to
+ *   {@link VP_MIN_BARS}; a caller whose whole window is shorter (the short horizon)
+ *   passes that window's size, with a matching `rowSize` from
+ *   {@link volumeProfileRowsFor}.
+ */
 export function calculateVolumeProfile(
     bars: Bar[],
-    rowSize: number = VP_DEFAULT_ROW_SIZE
+    rowSize: number = VP_DEFAULT_ROW_SIZE,
+    minBars: number = VP_MIN_BARS
 ): VolumeProfileResult | null {
-    if (bars.length < VP_MIN_BARS) return null;
+    if (bars.length < minBars) return null;
 
     const highMax = bars.reduce(
         (max: number, bar: Bar) => Math.max(max, bar.high),

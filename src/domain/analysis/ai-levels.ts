@@ -1,5 +1,7 @@
 import {
     buildPlanCheck,
+    entryZoneBottom,
+    entryZoneTop,
     nearestTargetAbove,
 } from '@/domain/analysis/planCheck';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
@@ -46,6 +48,10 @@ export const SL_FALLBACK_ATR_MULTIPLIER = 1.5;
 /**
  * @internal Fallback TP ATR 배수.
  * Fallback TP 배수 — entryPrice + ATR*2.0 (risk:reward ≈ 1:1.33).
+ *
+ * @deprecated No longer used by reconcile: a target that fails validation is dropped,
+ * never replaced by an invented level. Kept only because the consumer's backtest
+ * scripts still import it; remove once they stop.
  */
 export const TP_FALLBACK_ATR_MULTIPLIER = 2.0;
 
@@ -60,14 +66,19 @@ function hasUsableAtr(atr: number | undefined): atr is number {
 /**
  * @internal Validates a bullish stop-loss level.
  * SL이 bullish 포지션에서 유효한지 검증한다 (양수·entry 미만·ATR 배수 범위 내).
+ * `entryLow`(진입 구간 하단, 기본값 `entryPrice`)보다도 낮아야 한다 — 구간 중앙값만
+ * 기준으로 삼으면 구간 안쪽의 손절이 통과한다.
  */
 export function isValidBullishStopLoss(
     sl: number | undefined,
     entryPrice: number,
-    atr: number | undefined
+    atr: number | undefined,
+    entryLow: number = entryPrice
 ): boolean {
     if (!isFinitePositive(sl)) return false;
-    if (sl >= entryPrice) return false;
+    // A stop inside the entry zone (at or above its low edge) is not below the
+    // entry: price entering the zone at its low would already be stopped out.
+    if (sl >= entryPrice || sl >= entryLow) return false;
     if (hasUsableAtr(atr)) {
         const minSl = entryPrice - atr * SL_MAX_ATR_MULTIPLIER;
         if (sl < minSl) return false;
@@ -78,14 +89,16 @@ export function isValidBullishStopLoss(
 /**
  * @internal Validates a bullish take-profit level.
  * TP가 bullish 포지션에서 유효한지 검증한다 (entry 초과·ATR 배수 범위 내).
+ * `entryHigh`(진입 구간 상단, 기본값 `entryPrice`)보다도 높아야 한다.
  */
 export function isValidBullishTakeProfit(
     tp: number | undefined,
     entryPrice: number,
-    atr: number | undefined
+    atr: number | undefined,
+    entryHigh: number = entryPrice
 ): boolean {
     if (!isFinitePositive(tp)) return false;
-    if (tp <= entryPrice) return false;
+    if (tp <= entryPrice || tp <= entryHigh) return false;
     if (hasUsableAtr(atr)) {
         const maxTp = entryPrice + atr * TP_MAX_ATR_MULTIPLIER;
         if (tp > maxTp) return false;
@@ -102,7 +115,13 @@ export function deriveFallbackStopLoss(
     return entryPrice - atr * SL_FALLBACK_ATR_MULTIPLIER;
 }
 
-/** @internal Derives an ATR-based fallback take-profit. */
+/**
+ * @internal Derives an ATR-based fallback take-profit.
+ *
+ * @deprecated No longer used by reconcile: a target that fails validation is dropped,
+ * never replaced by an invented level. Kept only because the consumer's backtest
+ * scripts still import it; remove once they stop.
+ */
 export function deriveFallbackTakeProfit(
     entryPrice: number,
     atr: number | undefined
@@ -115,19 +134,32 @@ export function deriveFallbackTakeProfit(
 export function resolveBullishStopLoss(
     aiValue: number | undefined,
     entryPrice: number,
-    atr: number | undefined
+    atr: number | undefined,
+    entryLow: number = entryPrice
 ): ResolvedLevel {
-    if (isValidBullishStopLoss(aiValue, entryPrice, atr)) {
+    if (isValidBullishStopLoss(aiValue, entryPrice, atr, entryLow)) {
         return { value: aiValue, source: 'ai' };
     }
-    const fallback = deriveFallbackStopLoss(entryPrice, atr);
+    // The fallback is measured from the zone's low edge when the mid-based one
+    // would land inside the zone (a zone wider than the fallback distance).
+    const fromMid = deriveFallbackStopLoss(entryPrice, atr);
+    const fallback =
+        fromMid !== undefined && fromMid >= entryLow
+            ? deriveFallbackStopLoss(entryLow, atr)
+            : fromMid;
     if (fallback !== undefined) {
         return { value: fallback, source: 'fallback' };
     }
     return { value: undefined, source: 'missing' };
 }
 
-/** @internal Resolves the effective bullish take-profit (AI value or fallback). */
+/**
+ * @internal Resolves the effective bullish take-profit (AI value or fallback).
+ *
+ * @deprecated No longer used by reconcile: a target that fails validation is dropped,
+ * never replaced by an invented level. Kept only because the consumer's backtest
+ * scripts still import it; remove once they stop.
+ */
 export function resolveBullishTakeProfit(
     aiValue: number | undefined,
     entryPrice: number,
@@ -318,26 +350,35 @@ export function buildBullishRiskRewardText(
     return template(slLabel, tpLabel, ratio);
 }
 
-/** 보정 경위 문장 생성 (SL·TP 누락·무효 여부 조합 4가지). */
+/**
+ * 보정 경위 문장 생성 — 손절 보정(AI 값 무효 / 미제시)과 목표가 제외(진입 구간 위가 아님 /
+ * 첫 목표가가 ATR 상한 초과)를 각각 정확한 문장으로 잇는다.
+ *
+ * 목표가는 값을 만들어 채우지 않고 기준을 벗어난 것만 제외하므로, 목표가 쪽 문장은
+ * "계산했습니다"가 아니라 "제외했습니다"다.
+ */
 function buildReconcileReason(
     slWas: boolean,
-    tpWas: boolean,
     aiSlMissing: boolean,
-    aiTpMissing: boolean
+    zoneDropped: boolean,
+    capDropped: boolean
 ): string {
-    if (slWas && tpWas) {
-        return aiSlMissing && aiTpMissing
-            ? 'AI가 손절·목표가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.'
-            : 'AI가 제시한 손절·목표가 중 일부가 내부 기준을 벗어나 보정했습니다.';
-    }
-    if (slWas) {
-        return aiSlMissing
-            ? 'AI가 손절가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.'
-            : 'AI가 제시한 손절가가 내부 기준을 벗어나 보정했습니다.';
-    }
-    return aiTpMissing
-        ? 'AI가 목표가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.'
-        : 'AI가 제시한 목표가가 내부 기준을 벗어나 보정했습니다.';
+    const stopPart = !slWas
+        ? []
+        : aiSlMissing
+          ? ['AI가 손절가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.']
+          : ['AI가 제시한 손절가가 내부 기준을 벗어나 보정했습니다.'];
+    return [
+        ...stopPart,
+        ...(zoneDropped
+            ? ['AI가 제시한 목표가 중 진입 구간 위가 아닌 값은 제외했습니다.']
+            : []),
+        ...(capDropped
+            ? [
+                  'AI가 제시한 첫 번째 목표가가 ATR 기준 상한을 넘어 제외했습니다.',
+              ]
+            : []),
+    ].join(' ');
 }
 
 /**
@@ -364,44 +405,47 @@ export function reconcileBullishActionRecommendation(
         currency === 'KRW' && r.value !== undefined
             ? { ...r, value: roundToKrxTick(r.value, krxTick) }
             : r;
+    // Zone edges (order-independent); the single mid reference when the zone has no
+    // usable element.
+    const entryLow = entryZoneBottom(rec.entryPrices) ?? entryPrice;
+    const entryHigh = entryZoneTop(rec.entryPrices) ?? entryPrice;
     const slResolved = quoted(
-        resolveBullishStopLoss(rec.stopLoss, entryPrice, atr)
+        resolveBullishStopLoss(rec.stopLoss, entryPrice, atr, entryLow)
     );
-    const tpResolved = quoted(
-        resolveBullishTakeProfit(rec.takeProfitPrices?.[0], entryPrice, atr)
+
+    // Targets are filtered, never replaced: one that is not strictly above the zone's
+    // top edge is dropped and the rest stay. Inventing a level to stand in for it
+    // produced a target nobody proposed, and when it landed as the furthest one it read
+    // as a "1:0.0" risk:reward. The ATR cap keeps its original scope, the FIRST target
+    // only: a far later target is a deliberate stretch goal, not an error.
+    const aiTargets = rec.takeProfitPrices ?? [];
+    const aboveZone = (tp: number): boolean =>
+        Number.isFinite(tp) && tp > 0 && tp > entryHigh && tp > entryPrice;
+    const firstTarget = aiTargets[0];
+    const capDropped =
+        firstTarget !== undefined &&
+        aboveZone(firstTarget) &&
+        !isValidBullishTakeProfit(firstTarget, entryPrice, atr, entryHigh);
+    const keptTargets = aiTargets.filter(
+        (tp, i) => aboveZone(tp) && !(i === 0 && capDropped)
     );
+    const zoneDropped = aiTargets.some(tp => !aboveZone(tp));
+    const tpDropped = zoneDropped || capDropped;
 
     const slWasReconciled =
         slResolved.source === 'fallback' && slResolved.value !== undefined;
-    const tpWasReconciled =
-        tpResolved.source === 'fallback' && tpResolved.value !== undefined;
 
-    if (!slWasReconciled && !tpWasReconciled) {
+    if (!slWasReconciled && !tpDropped) {
         return { recommendation: rec, wasReconciled: false, changes: [] };
     }
 
-    // tpWasReconciled 게이트로 value가 number임이 런타임 보장되지만 TS가 좁히기를
-    // 전파하지 못해, narrowing을 지역 const로 고정해 `!` 단언을 제거한다.
-    const tpFallback = tpResolved.value;
-    // TP 배열 보정 시 entryPrice 초과 유효값만 유지하고 오름차순 정렬.
-    // [0]이 fallback으로 교체됐을 때 기존 [1..]과 순서가 역전되는 경우 방지.
-    const reconciledTpArr: readonly number[] | undefined =
-        tpWasReconciled && tpFallback !== undefined
-            ? [
-                  tpFallback,
-                  ...(rec.takeProfitPrices?.slice(1) ?? []).filter(
-                      tp => Number.isFinite(tp) && tp > entryPrice
-                  ),
-              ].sort((a, b) => a - b)
-            : rec.takeProfitPrices;
+    const reconciledTpArr: readonly number[] | undefined = tpDropped
+        ? [...keptTargets].sort((a, b) => a - b)
+        : rec.takeProfitPrices;
 
     const reconciledSl = slWasReconciled ? slResolved.value : rec.stopLoss;
 
     const aiSlMissing = rec.stopLoss === undefined;
-    const aiTpMissing =
-        rec.takeProfitPrices === undefined ||
-        rec.takeProfitPrices.length === 0 ||
-        rec.takeProfitPrices[0] === undefined;
 
     const reconciled: ReconciledActionLevels = {
         stopLoss: reconciledSl,
@@ -421,9 +465,9 @@ export function reconcileBullishActionRecommendation(
         ),
         reason: buildReconcileReason(
             slWasReconciled,
-            tpWasReconciled,
             aiSlMissing,
-            aiTpMissing
+            zoneDropped,
+            capDropped
         ),
     };
 
@@ -433,9 +477,14 @@ export function reconcileBullishActionRecommendation(
                   `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency, krxTick)} (fallback)`,
               ]
             : []),
-        ...(tpWasReconciled
+        ...(zoneDropped
             ? [
-                  `takeProfitPrices[0]: ${rec.takeProfitPrices?.[0] ?? 'null'} → ${formatPrice(tpResolved.value, currency, krxTick)} (fallback)`,
+                  `takeProfitPrices: ${aiTargets.filter(tp => !aboveZone(tp)).join(', ')} dropped (not above the entry zone)`,
+              ]
+            : []),
+        ...(capDropped
+            ? [
+                  `takeProfitPrices[0]: ${firstTarget} dropped (beyond the ATR cap)`,
               ]
             : []),
     ];

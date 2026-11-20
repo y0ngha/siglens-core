@@ -1,12 +1,18 @@
 import { describe, expect, it, vi } from 'vitest';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
 import { HORIZON_WINDOWS_BY_TIMEFRAME } from '@/domain/analysis/marketReferenceConstants';
+import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
 import * as pivotLevels from '@/domain/analysis/pivotLevels';
 import {
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
 } from '@/domain/indicators/constants';
-import type { Bar, IndicatorResult, SMCSwingPoint } from '@/domain/types';
+import type {
+    Bar,
+    IndicatorResult,
+    MarketSessionSpec,
+    SMCSwingPoint,
+} from '@/domain/types';
 
 const DAY_WINDOWS = HORIZON_WINDOWS_BY_TIMEFRAME['1Day'];
 
@@ -607,5 +613,283 @@ describe('computeMarketReference pivots', () => {
             spSpy.mockRestore();
             camSpy.mockRestore();
         }
+    });
+});
+
+describe('computeMarketReference daily pivots and the session clock', () => {
+    const SESSION_DAY_1 = Date.UTC(2026, 8, 8) / 1000;
+    const SESSION_DAY_2 = Date.UTC(2026, 8, 9) / 1000;
+    const bar = (
+        time: number,
+        high: number,
+        low: number,
+        close: number
+    ): Bar => ({ time, open: close, high, low, close, volume: 1000 });
+    // Two daily bars stamped at UTC midnight of their trading date (Tue 9/8, Wed 9/9).
+    const dailyBars = [
+        bar(SESSION_DAY_1, 111, 95, 105),
+        bar(SESSION_DAY_2, 100, 98.5, 99),
+    ];
+    const PP_OF_DAY_1 = (111 + 95 + 105) / 3;
+    const PP_OF_DAY_2 = (100 + 98.5 + 99) / 3;
+    const KR_SESSION: MarketSessionSpec = {
+        kind: 'scheduled',
+        timeZone: 'Asia/Seoul',
+        openMinute: 9 * 60,
+        closeMinute: 15 * 60 + 30,
+        weekendDays: [0, 6],
+    };
+    const ppAt = (
+        session: MarketSessionSpec,
+        now: Date,
+        currency: 'USD' | 'KRW' = 'USD'
+    ): number | undefined =>
+        computeMarketReference(dailyBars, makeInd(), '1Day', {
+            currency,
+            clock: { session, now },
+        }).pivots?.standard?.pp;
+
+    it('uses the last bar once the U.S. session has closed', () => {
+        // 17:00 EDT on 9/9, an hour after the bell.
+        expect(
+            ppAt(US_EQUITY_SESSION, new Date('2026-09-09T21:00:00Z'))
+        ).toBeCloseTo(PP_OF_DAY_2, 6);
+    });
+
+    it('treats the close minute itself as finished', () => {
+        expect(
+            ppAt(US_EQUITY_SESSION, new Date('2026-09-09T20:00:00Z'))
+        ).toBeCloseTo(PP_OF_DAY_2, 6);
+    });
+
+    it('keeps the bar before the last while the last bar is still forming', () => {
+        // 11:00 EDT on 9/9, mid-session.
+        expect(
+            ppAt(US_EQUITY_SESSION, new Date('2026-09-09T15:00:00Z'))
+        ).toBeCloseTo(PP_OF_DAY_1, 6);
+        // One minute before the bell.
+        expect(
+            ppAt(US_EQUITY_SESSION, new Date('2026-09-09T19:59:00Z'))
+        ).toBeCloseTo(PP_OF_DAY_1, 6);
+    });
+
+    it('uses the last bar before the next open and over a weekend', () => {
+        expect(
+            ppAt(US_EQUITY_SESSION, new Date('2026-09-10T11:00:00Z'))
+        ).toBeCloseTo(PP_OF_DAY_2, 6);
+        expect(
+            ppAt(US_EQUITY_SESSION, new Date('2026-09-12T15:00:00Z'))
+        ).toBeCloseTo(PP_OF_DAY_2, 6);
+    });
+
+    it('reads the KRX session in KST', () => {
+        // 16:00 KST on 9/9: after the 15:30 close.
+        expect(
+            ppAt(KR_SESSION, new Date('2026-09-09T07:00:00Z'), 'KRW')
+        ).toBeCloseTo(PP_OF_DAY_2, 6);
+        // 14:00 KST on 9/9: still trading.
+        expect(
+            ppAt(KR_SESSION, new Date('2026-09-09T05:00:00Z'), 'KRW')
+        ).toBeCloseTo(PP_OF_DAY_1, 6);
+        // 00:30 KST on 9/10 is still 9/9 in UTC; the KST date has moved on.
+        expect(
+            ppAt(KR_SESSION, new Date('2026-09-09T15:30:00Z'), 'KRW')
+        ).toBeCloseTo(PP_OF_DAY_2, 6);
+    });
+
+    it('honours the exchange calendar close (13:00 half day)', () => {
+        // 2026-11-27 is the day after Thanksgiving: NYSE closes at 13:00 ET.
+        const halfDayBars = [
+            bar(Date.UTC(2026, 10, 25) / 1000, 111, 95, 105),
+            bar(Date.UTC(2026, 10, 27) / 1000, 100, 98.5, 99),
+        ];
+        const ppOn = (now: Date): number | undefined =>
+            computeMarketReference(halfDayBars, makeInd(), '1Day', {
+                clock: { session: US_EQUITY_SESSION, now },
+            }).pivots?.standard?.pp;
+        // 14:00 ET: closed early, though a 16:00 schedule would still read open.
+        expect(ppOn(new Date('2026-11-27T19:00:00Z'))).toBeCloseTo(
+            PP_OF_DAY_2,
+            6
+        );
+        // 12:00 ET: still trading.
+        expect(ppOn(new Date('2026-11-27T17:00:00Z'))).toBeCloseTo(
+            PP_OF_DAY_1,
+            6
+        );
+    });
+
+    it('without a clock, or on a 24/7 session, keeps the previous behaviour', () => {
+        const noClock = computeMarketReference(dailyBars, makeInd(), '1Day');
+        expect(noClock.pivots?.standard?.pp).toBeCloseTo(PP_OF_DAY_1, 6);
+        expect(
+            ppAt(CRYPTO_SESSION, new Date('2026-09-09T21:00:00Z'))
+        ).toBeCloseTo(PP_OF_DAY_1, 6);
+    });
+
+    it('has no pivots when the only bar is the forming one', () => {
+        const ref = computeMarketReference(
+            dailyBars.slice(1),
+            makeInd(),
+            '1Day',
+            {
+                clock: {
+                    session: US_EQUITY_SESSION,
+                    now: new Date('2026-09-09T15:00:00Z'),
+                },
+            }
+        );
+        expect(ref.pivots?.standard).toBeNull();
+    });
+
+    it('a single finished bar is enough once its session has closed', () => {
+        const ref = computeMarketReference(
+            dailyBars.slice(1),
+            makeInd(),
+            '1Day',
+            {
+                clock: {
+                    session: US_EQUITY_SESSION,
+                    now: new Date('2026-09-09T21:00:00Z'),
+                },
+            }
+        );
+        expect(ref.pivots?.standard?.pp).toBeCloseTo(PP_OF_DAY_2, 6);
+    });
+
+    it('does not change intraday pivots', () => {
+        const hourBars = [
+            bar(Date.UTC(2026, 8, 8, 14) / 1000, 111, 95, 105),
+            bar(Date.UTC(2026, 8, 9, 14) / 1000, 100, 98.5, 99),
+        ];
+        const withClock = computeMarketReference(hourBars, makeInd(), '1Hour', {
+            clock: {
+                session: US_EQUITY_SESSION,
+                now: new Date('2026-09-09T21:00:00Z'),
+            },
+        });
+        const without = computeMarketReference(hourBars, makeInd(), '1Hour');
+        expect(withClock.pivots).toEqual(without.pivots);
+    });
+});
+
+describe('computeMarketReference daily VWAP', () => {
+    const levelsOf = (
+        ref: ReturnType<typeof computeMarketReference>
+    ): string[] =>
+        [...ref.short.levels.support, ...ref.short.levels.resistance].map(
+            l => l.label
+        );
+    const bars = makeVolatileBars(60);
+    // Far from the close so the level survives the at-price filter on both timeframes.
+    const indicators = (): IndicatorResult => ({
+        ...makeInd(),
+        vwap: bars.map(() => 140),
+    });
+
+    it('does not list VWAP as a level on a daily chart, where it is the bar typical price', () => {
+        const ref = computeMarketReference(bars, indicators(), '1Day');
+        expect(levelsOf(ref)).not.toContain('VWAP');
+    });
+
+    it('still lists VWAP on an intraday chart', () => {
+        const ref = computeMarketReference(bars, indicators(), '15Min');
+        expect(levelsOf(ref)).toContain('VWAP');
+    });
+});
+
+describe('computeMarketReference short-horizon volume profile', () => {
+    // POC / VAH / VAL are listed only when they clear the at-price band and the
+    // per-side cap, so a horizon "has a profile" when any of the three shows up.
+    const VP_LABELS = ['POC', 'VAH', 'VAL'];
+    const hasProfileLevel = (
+        ref: ReturnType<typeof computeMarketReference>,
+        key: 'short' | 'medium' | 'long'
+    ): boolean =>
+        [...ref[key].levels.support, ...ref[key].levels.resistance].some(l =>
+            VP_LABELS.includes(l.label)
+        );
+
+    it('builds a profile for the 20-bar short window instead of always null', () => {
+        const ref = computeMarketReference(
+            makeVolatileBars(250),
+            makeInd(),
+            '1Day'
+        );
+        expect(ref.short.window.bars).toBe(DAY_WINDOWS.short);
+        expect(DAY_WINDOWS.short).toBeLessThan(30);
+        expect(hasProfileLevel(ref, 'short')).toBe(true);
+        expect(hasProfileLevel(ref, 'medium')).toBe(true);
+    });
+
+    it('still gives no profile when fewer bars exist than the short window', () => {
+        const ref = computeMarketReference(
+            makeVolatileBars(DAY_WINDOWS.short - 1),
+            makeInd(),
+            '1Day'
+        );
+        expect(hasProfileLevel(ref, 'short')).toBe(false);
+    });
+
+    it('keeps the 30-bar minimum for the medium and long windows', () => {
+        const ref = computeMarketReference(
+            makeVolatileBars(25),
+            makeInd(),
+            '1Day'
+        );
+        expect(hasProfileLevel(ref, 'medium')).toBe(false);
+        expect(hasProfileLevel(ref, 'long')).toBe(false);
+        expect(hasProfileLevel(ref, 'short')).toBe(true);
+    });
+});
+
+describe('computeMarketReference Fibonacci anchor per horizon', () => {
+    const swingAt = (
+        index: number,
+        price: number,
+        type: 'high' | 'low'
+    ): SMCSwingPoint => ({ index, price, type }) as unknown as SMCSwingPoint;
+    const bars = makeBars(250);
+
+    it('anchors each horizon on the dominant swing pair inside its own window', () => {
+        // 250 bars: short window starts at 230, medium at 190, long at 50.
+        const swingHighs = [
+            swingAt(60, 400, 'high'),
+            swingAt(200, 300, 'high'),
+            swingAt(240, 260, 'high'),
+        ];
+        const swingLows = [
+            swingAt(70, 50, 'low'),
+            swingAt(210, 150, 'low'),
+            swingAt(235, 220, 'low'),
+        ];
+        const ref = computeMarketReference(
+            bars,
+            makeInd({ swingHighs, swingLows }),
+            '1Day'
+        );
+
+        expect(ref.short.fibProjection).toMatchObject({
+            high: 260,
+            low: 220,
+        });
+        expect(ref.medium.fibProjection).toMatchObject({
+            high: 300,
+            low: 150,
+        });
+        expect(ref.long.fibProjection).toMatchObject({ high: 400, low: 50 });
+    });
+
+    it('lets horizons resolve to the same leg when no larger swing exists', () => {
+        const ref = computeMarketReference(
+            bars,
+            makeInd({
+                swingHighs: [swingAt(245, 260, 'high')],
+                swingLows: [swingAt(240, 220, 'low')],
+            }),
+            '1Day'
+        );
+        expect(ref.short.fibProjection).toEqual(ref.medium.fibProjection);
+        expect(ref.medium.fibProjection).toEqual(ref.long.fibProjection);
     });
 });

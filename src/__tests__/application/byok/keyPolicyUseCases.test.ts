@@ -293,6 +293,9 @@ const SCENARIOS: Scenario[] = [
             strategyResults: [],
             candlePatterns: [],
             trendlines: [],
+            // Schema-required keys: a reply without them is treated as truncated.
+            trendlineIds: [],
+            actionRecommendation: null,
         },
         run: a =>
             runAnalysis('AAPL', 'Apple Inc.', '1Day', false, undefined, {
@@ -383,6 +386,10 @@ const SCENARIOS: Scenario[] = [
             sentiment: 'neutral',
             keyObservationsKo: [],
             strategySuggestionsKo: [],
+            // Schema-required keys: a reply without them is treated as truncated.
+            summary: '옵션 시장 중립.',
+            perExpiration: [],
+            signals: [],
         },
         run: a =>
             runOptionsAnalysis({

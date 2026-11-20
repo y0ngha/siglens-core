@@ -22,6 +22,7 @@ import {
     HURST_RANDOM_WALK,
     ICHIMOKU_BASE_PERIOD,
     ICHIMOKU_CONVERSION_PERIOD,
+    ICHIMOKU_DISPLACEMENT,
     ICHIMOKU_SPAN_B_PERIOD,
     KELTNER_ATR_PERIOD,
     KELTNER_EMA_PERIOD,
@@ -50,6 +51,7 @@ import {
     VR_RANDOM_WALK,
     WILLIAMS_R_DEFAULT_PERIOD,
 } from '@/domain/indicators/constants';
+import { isSessionVwapMeaningful } from '@/domain/indicators/vwap';
 import { detectCandlePattern } from '@/domain/analysis/candle';
 import { getCandlePatternLabel } from '@/domain/analysis/candle-labels';
 import {
@@ -118,6 +120,7 @@ import { buildOverlayCandidates } from '@/domain/overlays/buildOverlayCandidates
 import {
     computeMarketReference,
     formatFibRatio,
+    type MarketReferenceClock,
 } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
@@ -625,6 +628,8 @@ const nearestTag = <T>(
           : '';
 
 // Equal Highs/Lows differ only by label + liquidity-kind text; share one formatter.
+// ICT naming: the stops resting above equal highs are buy-side liquidity (shorts' buy stops
+// and breakout buyers), the stops below equal lows are sell-side liquidity.
 const formatLiquidityLine = (
     label: string,
     liquidityKind: string,
@@ -764,7 +769,7 @@ const formatSMCSection = (
                   ...eqHighs.map(eq =>
                       formatLiquidityLine(
                           'Equal Highs',
-                          'sell-side liquidity',
+                          'buy-side liquidity',
                           eq,
                           totalBars,
                           quoting,
@@ -775,7 +780,7 @@ const formatSMCSection = (
                   ...eqLows.map(eq =>
                       formatLiquidityLine(
                           'Equal Lows',
-                          'buy-side liquidity',
+                          'sell-side liquidity',
                           eq,
                           totalBars,
                           quoting,
@@ -936,7 +941,7 @@ const MARKET_REFERENCE_HEADER =
     '## Market Reference (deterministic · advisory)';
 
 const MARKET_REFERENCE_FRAMING =
-    'The values below are a deterministic computation of reference levels and structure that market participants commonly watch. They are NOT validated forward predictors — backtesting shows precise level/trend prediction is near-random. Use them as context to weigh alongside detected patterns, skills, and your own reasoning; never treat them as guarantees. You may identify additional or better support/resistance from patterns, SMC, and volume that these references do not cover.';
+    "The values below are a deterministic computation of reference levels and structure that market participants commonly watch. They are NOT validated forward predictors — backtesting shows precise level/trend prediction is near-random. Use them as context to weigh alongside detected patterns, skills, and your own reasoning; never treat them as guarantees. You may identify additional or better support/resistance from patterns, SMC, and volume that these references do not cover. Volume-profile levels (POC, VAH, VAL) inside a horizon block are computed over that block's own bar window, so they can differ from the whole-history profile printed under Indicator Values.";
 
 const EFFICIENCY_DECIMAL_PLACES = 2;
 
@@ -1056,13 +1061,20 @@ export const retracementDepthSuffix = (
     return `; price ${formatNullableNumber((pulledBack / range) * PERCENTAGE_FACTOR, RETRACEMENT_DEPTH_DP)}% retraced`;
 };
 
+/** Level kinds that come from a horizon's Fibonacci leg (not the ABC projection). */
+const FIB_LEG_LEVEL_KINDS: readonly ReferenceLevel['kind'][] = [
+    'fib_retracement',
+    'fib_extension',
+];
+
 const formatHorizonBlock = (
     key: HorizonKey,
     horizon: HorizonReference,
     timeframe: Timeframe,
     quoting: PriceQuoting,
     assetClass: AssetClass,
-    currentPrice: number | null
+    currentPrice: number | null,
+    sameFibLegAs: HorizonKey | null
 ): string => {
     const s = horizon.structure;
     const span =
@@ -1079,16 +1091,24 @@ const formatHorizonBlock = (
     // skill (siglens) now tells the model to cite that anchor instead of
     // computing its own levels. One line, only when this horizon actually
     // produced a projection.
-    const fib = horizon.fibProjection;
+    // A horizon whose leg an earlier horizon already printed points at it instead of
+    // repeating the anchor and table, and drops its `Fib …%` level rows (the same prices
+    // as the earlier block's): the same leg three times reads as three independent
+    // confirmations.
+    const fib = sameFibLegAs === null ? horizon.fibProjection : null;
     const fibLine =
-        fib == null
-            ? []
-            : [
-                  (fib.direction === 'up'
-                      ? `Fib anchor: swing low ${formatQuotedPrice(fib.low, quoting)} → swing high ${formatQuotedPrice(fib.high, quoting)} (up leg)`
-                      : `Fib anchor: swing high ${formatQuotedPrice(fib.high, quoting)} → swing low ${formatQuotedPrice(fib.low, quoting)} (down leg)`) +
-                      retracementDepthSuffix(fib, currentPrice),
-              ];
+        sameFibLegAs !== null
+            ? [
+                  `Fib anchor: same leg as ${HORIZON_LABEL[sameFibLegAs]} (see above)`,
+              ]
+            : fib == null
+              ? []
+              : [
+                    (fib.direction === 'up'
+                        ? `Fib anchor: swing low ${formatQuotedPrice(fib.low, quoting)} → swing high ${formatQuotedPrice(fib.high, quoting)} (up leg)`
+                        : `Fib anchor: swing high ${formatQuotedPrice(fib.high, quoting)} → swing low ${formatQuotedPrice(fib.low, quoting)} (down leg)`) +
+                        retracementDepthSuffix(fib, currentPrice),
+                ];
     // Same reasoning as `fibLine`, for the separate A→B→C swing triplet the
     // `Fib ABC ext …%` levels (above) are anchored on.
     // Null far more often than `fib` — only renders once C has confirmed.
@@ -1105,16 +1125,19 @@ const formatHorizonBlock = (
     // set replaces "compute it yourself" with a number to quote.
     const fibTable = fib == null ? [] : [formatFibTableLine(fib, quoting)];
     const abcTable = abc == null ? [] : [formatAbcTableLine(abc, quoting)];
+    const printable = (levels: readonly ReferenceLevel[]): ReferenceLevel[] =>
+        sameFibLegAs === null
+            ? [...levels]
+            : levels.filter(l => !FIB_LEG_LEVEL_KINDS.includes(l.kind));
+    const resistanceLevels = printable(horizon.levels.resistance);
+    const supportLevels = printable(horizon.levels.support);
     const resistance =
-        horizon.levels.resistance.length > 0
-            ? [
-                  'Resistance (above):',
-                  ...horizon.levels.resistance.map(levelLine),
-              ]
+        resistanceLevels.length > 0
+            ? ['Resistance (above):', ...resistanceLevels.map(levelLine)]
             : [];
     const support =
-        horizon.levels.support.length > 0
-            ? ['Support (below):', ...horizon.levels.support.map(levelLine)]
+        supportLevels.length > 0
+            ? ['Support (below):', ...supportLevels.map(levelLine)]
             : [];
     return [
         `### ${HORIZON_LABEL[key]} — ${span} (${horizon.window.bars} bars)`,
@@ -1163,6 +1186,18 @@ export const formatPivotTableLine = (
 // original production position (inline, once, right after the framing
 // sentence) keeps `dynamic` a faithful reproduction of the v0.31 section
 // order rather than introducing a new standalone stable line.
+const HORIZON_KEYS = ['short', 'medium', 'long'] as const;
+
+/** Whether two horizons resolved to the very same swing pair. */
+const isSameFibLeg = (
+    a: HorizonReference['fibProjection'],
+    b: HorizonReference['fibProjection']
+): boolean =>
+    a != null &&
+    b != null &&
+    a.highIndex === b.highIndex &&
+    a.lowIndex === b.lowIndex;
+
 const formatMarketReferenceSection = (
     reference: MarketReference,
     timeframe: Timeframe,
@@ -1174,14 +1209,20 @@ const formatMarketReferenceSection = (
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
         ANTI_FABRICATION_GUARDRAIL,
-        ...(['short', 'medium', 'long'] as const).map(key =>
+        ...HORIZON_KEYS.map((key, index) =>
             formatHorizonBlock(
                 key,
                 reference[key],
                 timeframe,
                 quoting,
                 assetClass,
-                currentPrice
+                currentPrice,
+                HORIZON_KEYS.slice(0, index).find(earlier =>
+                    isSameFibLeg(
+                        reference[earlier].fibProjection,
+                        reference[key].fibProjection
+                    )
+                ) ?? null
             )
         ),
         formatPivotTableLine(reference.pivots, quoting),
@@ -1520,10 +1561,34 @@ const formatProIndicatorSection = (
         formatChandelierLine(indicators, precision.price),
     ].join('\n');
 
+/**
+ * The Ichimoku lagging span's current reading: the last close, which Chikou plots
+ * `ICHIMOKU_DISPLACEMENT` bars back, against the close at that position. The
+ * per-bar `chikou` series is `null` at the last bar by construction (its value
+ * would be a future close), so reading its last entry always printed `N/A`.
+ */
+const compareLabel = (a: number, b: number): 'above' | 'below' | 'equal' =>
+    a > b ? 'above' : a < b ? 'below' : 'equal';
+
+const formatChikouReading = (
+    bars: readonly Bar[],
+    px: (n: number | null) => string
+): string => {
+    const last = bars.at(-1);
+    // `at` returns undefined when there are not enough bars, so this also covers a
+    // history of ICHIMOKU_DISPLACEMENT bars or fewer.
+    const past = bars.at(-1 - ICHIMOKU_DISPLACEMENT);
+    return last === undefined || past === undefined
+        ? 'N/A'
+        : `${px(last.close)} (close vs ${px(past.close)} ${ICHIMOKU_DISPLACEMENT} bars ago: ${compareLabel(last.close, past.close)})`;
+};
+
 const formatIndicatorSection = (
     indicators: IndicatorResult,
     config: PromptConfig,
-    precision: PricePrecision
+    precision: PricePrecision,
+    timeframe: Timeframe,
+    bars: readonly Bar[]
 ): string => {
     // Price-axis values (bands, averages, stops) render at the price precision and
     // differences (MACD, ATR) at the difference precision; bounded oscillators (RSI, DMI,
@@ -1532,7 +1597,9 @@ const formatIndicatorSection = (
         formatQuotedPrice(n, precision.price);
     const dx = (n: number | null): string =>
         formatNullableNumber(n, precision.difference);
-    const lastRSI = lastNonNull(indicators.rsi);
+    // The latest element itself, not the last non-null one: a no-movement window is `null`
+    // and must read N/A, not an older value presented as current.
+    const lastRSI = lastOf(indicators.rsi);
     const lastMACD = lastOf(indicators.macd);
     const lastBollinger = lastOf(indicators.bollinger);
     const lastDMI = lastOf(indicators.dmi);
@@ -1547,7 +1614,7 @@ const formatIndicatorSection = (
     const lastPSAR = lastOf(indicators.parabolicSar);
     const lastWilliamsR = lastNonNull(indicators.williamsR);
     const lastSupertrend = lastOf(indicators.supertrend);
-    const lastMFI = lastNonNull(indicators.mfi);
+    const lastMFI = lastOf(indicators.mfi);
     const lastKeltner = lastOf(indicators.keltnerChannel);
     const lastCMF = lastNonNull(indicators.cmf);
     const lastDonchian = lastOf(indicators.donchianChannel);
@@ -1573,11 +1640,17 @@ const formatIndicatorSection = (
         `- Stochastic(${STOCHASTIC_K_PERIOD},${STOCHASTIC_D_PERIOD},${STOCHASTIC_SMOOTHING}): %K ${fmt(lastStochastic?.percentK ?? null)} / %D ${fmt(lastStochastic?.percentD ?? null)}`,
         `- StochRSI(${STOCH_RSI_RSI_PERIOD},${STOCH_RSI_STOCH_PERIOD},${STOCH_RSI_K_PERIOD},${STOCH_RSI_D_PERIOD}): K ${fmt(lastStochRSI?.k ?? null)} / D ${fmt(lastStochRSI?.d ?? null)}`,
         `- CCI(${CCI_DEFAULT_PERIOD}): ${fmt(lastCCI)}${trendLabel(cciTrend)}`,
-        `- VWAP: ${px(lastVWAP)}`,
-        `- Volume Profile: POC ${px(vp?.poc ?? null)} / VAH ${px(vp?.vah ?? null)} / VAL ${px(vp?.val ?? null)}`,
+        // On a daily chart the "session" VWAP is the bar's own typical price, so the line
+        // is left out rather than shown as a level (see `isSessionVwapMeaningful`).
+        ...(isSessionVwapMeaningful(timeframe)
+            ? [`- VWAP: ${px(lastVWAP)}`]
+            : []),
+        // Names its window: the horizon blocks print their own, shorter profiles, and two
+        // unlabelled value sets in one prompt read as a contradiction.
+        `- Volume Profile (all ${bars.length} bars): POC ${px(vp?.poc ?? null)} / VAH ${px(vp?.vah ?? null)} / VAL ${px(vp?.val ?? null)}`,
         `- MA: ${MA_DEFAULT_PERIODS.map(p => `MA(${p}): ${px(lastNonNull(indicators.ma[p] ?? []))}`).join(' / ')}`,
         `- EMA: ${EMA_DEFAULT_PERIODS.map(p => `EMA(${p}): ${px(lastNonNull(indicators.ema[p] ?? []))}`).join(' / ')}`,
-        `- Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan ${px(lastIchimoku?.tenkan ?? null)} / Kijun ${px(lastIchimoku?.kijun ?? null)} / SpanA ${px(lastIchimoku?.senkouA ?? null)} / SpanB ${px(lastIchimoku?.senkouB ?? null)} / Chikou ${px(lastIchimoku?.chikou ?? null)}`,
+        `- Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan ${px(lastIchimoku?.tenkan ?? null)} / Kijun ${px(lastIchimoku?.kijun ?? null)} / SpanA ${px(lastIchimoku?.senkouA ?? null)} / SpanB ${px(lastIchimoku?.senkouB ?? null)} / Chikou ${formatChikouReading(bars, px)}`,
         `- ATR(${ATR_DEFAULT_PERIOD}): ${dx(lastATR)}${trendLabel(atrTrend)}`,
         `- OBV: ${lastOBV !== null ? formatVolume(lastOBV) : 'N/A'}${trendLabel(obvTrend)}`,
         `- Parabolic SAR: ${px(lastPSAR?.sar ?? null)} (${lastPSAR?.trend ?? 'N/A'})`,
@@ -1741,8 +1814,8 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '### Support/Resistance Assessment',
         '- For keyLevels, you may reuse exact prices from the ## Market Reference section (to avoid arithmetic error) OR derive your own from patterns, SMC, and volume — neither is mandatory. State a brief reason for each level. Do NOT treat reference levels as carrying more conviction merely because they were precomputed; weigh them like any other evidence.',
         `- Check convergence points of moving averages (MA ${MA_DEFAULT_PERIODS.join(',')}, EMA ${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_SHORT_INDEX]}/${EMA_DEFAULT_PERIODS[EMA_SUPPORT_RESISTANCE_LONG_INDEX]}) first`,
-        '- Use Volume Profile levels: POC is the strongest support/resistance, VAH/VAL mark the boundaries of the value area',
-        '- Price returning to POC indicates a high-probability reaction zone; breakouts above VAH or below VAL signal potential trend continuation',
+        "- Use Volume Profile levels: a profile's POC is the price with the most traded volume in the window that profile states, a candidate support/resistance rather than a guaranteed one; VAH/VAL mark the boundaries of its value area. The prompt carries more than one profile (the Indicator Values line spans every supplied bar, each horizon block its own window), so cite a profile together with its window and never mix values across profiles",
+        '- Price returning to a POC can mark a reaction zone; breakouts above VAH or below VAL can signal trend continuation',
         '- Treat high/low of high-volume bars as supply/demand zones',
         '- Reference prior swing highs/lows and Bollinger Band boundaries',
         '- Each level must include a reason',
@@ -2415,6 +2488,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   whole won). Defaults to `'USD'`.
  * @param krxTick - KRX tick table the listing's prices round to (`'etp'` for an
  *   ETF/ETN, `'share'` otherwise). Ignored unless `currency` is `KRW`.
+ * @param marketClock - Optional session schedule and analysis instant. On a daily chart
+ *   it lets the pivot block use the last bar once its session has closed (instead of
+ *   always the bar before). Omitted, daily pivots use the bar before the last, as they
+ *   did before the parameter existed.
  * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
@@ -2435,7 +2512,8 @@ export function buildAnalysisPrompt(
     marketEvents?: readonly MarketEvent[],
     currency: CurrencyCode = 'USD',
     krxTick: KrxTickTable = 'share',
-    earningsDates?: readonly string[]
+    earningsDates?: readonly string[],
+    marketClock?: MarketReferenceClock
 ): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -2516,7 +2594,7 @@ export function buildAnalysisPrompt(
         bars,
         indicators,
         timeframe,
-        { assetClass, currency }
+        { assetClass, currency, clock: marketClock }
     );
     // Every drawable overlay candidate for this prompt — printed into `## Chart Overlay Candidates (computed)` below and
     // handed back to the caller so `resolveChartOverlays` can join the
@@ -2636,7 +2714,7 @@ export function buildAnalysisPrompt(
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),
-        formatIndicatorSection(indicators, config, precision),
+        formatIndicatorSection(indicators, config, precision, timeframe, bars),
         buildIndicatorStateSection({
             price: bars.length > 0 ? bars[bars.length - 1].close : null,
             ma: indicators.ma,
@@ -2662,7 +2740,7 @@ export function buildAnalysisPrompt(
             // slices its own trailing 20-bar window, so
             // this no longer needs to hand-size the slice itself.
             priorVolumes: bars.slice(0, -1).map(b => b.volume),
-            rsi: lastNonNull(indicators.rsi),
+            rsi: lastOf(indicators.rsi),
             lastBar: bars.at(-1),
             prevBar: bars.at(-2),
         }),

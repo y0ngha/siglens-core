@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { calculateVWAP } from '@/domain/indicators/vwap';
+import {
+    calculateVWAP,
+    isSessionVwapMeaningful,
+} from '@/domain/indicators/vwap';
 import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import type { Bar } from '@/domain/types';
 
@@ -76,5 +79,32 @@ describe('calculateVWAP', () => {
         it('음수 가격에서도 VWAP을 계산한다', () => {
             expect(calculateVWAP([makeBar(-100, 1000, 0)])).toEqual([-100]);
         });
+    });
+});
+
+describe('isSessionVwapMeaningful', () => {
+    it('is false on the daily timeframe, where VWAP is the bar typical price', () => {
+        const bar: Bar = {
+            time: 0,
+            open: 10,
+            high: 12,
+            low: 9,
+            close: 11,
+            volume: 500,
+        };
+        expect(calculateVWAP([bar])).toEqual([(12 + 9 + 11) / 3]);
+        expect(isSessionVwapMeaningful('1Day')).toBe(false);
+    });
+
+    it('is true for every intraday timeframe', () => {
+        for (const timeframe of [
+            '5Min',
+            '15Min',
+            '30Min',
+            '1Hour',
+            '4Hour',
+        ] as const) {
+            expect(isSessionVwapMeaningful(timeframe)).toBe(true);
+        }
     });
 });

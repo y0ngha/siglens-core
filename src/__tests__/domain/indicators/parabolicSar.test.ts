@@ -87,4 +87,32 @@ describe('calculateParabolicSAR', () => {
             expect(result[1].sar).toBeCloseTo(90, 5);
         });
     });
+
+    describe('반전 시 가속계수', () => {
+        // 상승 추세(EP 120)에서 i5가 SAR 아래로 급락해 하락 반전한다.
+        const bars = [
+            makeBar(105, 95, 100, 0),
+            makeBar(110, 100, 108, 1),
+            makeBar(120, 108, 118, 2),
+            makeBar(112, 106, 110, 3),
+            makeBar(110, 102, 104, 4),
+            makeBar(100, 70, 75, 5),
+            makeBar(72, 60, 62, 6),
+        ];
+
+        it('반전 직후 AF는 afIncrement가 아니라 afStart로 돌아간다', () => {
+            const result = calculateParabolicSAR(bars, 0.02, 0.05, 0.2);
+
+            expect(result[5]).toEqual({ sar: 120, trend: 'down' });
+            // 120 + afStart * (EP 70 - 120) = 119. With afIncrement it would be 117.5.
+            expect(result[6].sar).toBeCloseTo(119);
+            expect(result[6].trend).toBe('down');
+        });
+
+        it('afStart와 afIncrement가 같으면 두 값의 구분이 사라진다 (기본값에서 증상이 없던 이유)', () => {
+            const result = calculateParabolicSAR(bars, 0.05, 0.05, 0.2);
+
+            expect(result[6].sar).toBeCloseTo(117.5);
+        });
+    });
 });

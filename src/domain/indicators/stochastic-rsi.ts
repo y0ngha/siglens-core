@@ -32,7 +32,8 @@ export function calculateStochRSI(
 
     // ── Pass 1: raw Stochastic RSI ─────────────────────────────────────────────
     // Maintain a circular buffer of the last stochPeriod non-null RSI values.
-    // Once RSI becomes non-null it stays non-null, so the buffer fills contiguously.
+    // RSI is `null` during warm-up and on a bar with no movement at all (undefined ratio);
+    // a null after values have started resets the buffer so a window never spans the gap.
     const rawStochRSI: (number | null)[] = new Array(rsiValues.length).fill(
         null
     );
@@ -42,7 +43,11 @@ export function calculateStochRSI(
 
     for (let i = 0; i < rsiValues.length; i++) {
         const rsi = rsiValues[i];
-        if (rsi === null) continue;
+        if (rsi === null) {
+            rsiCircHead = 0;
+            rsiCircSize = 0;
+            continue;
+        }
 
         if (rsiCircSize < stochPeriod) {
             rsiCircBuf[(rsiCircHead + rsiCircSize) % stochPeriod] = rsi;
@@ -75,7 +80,12 @@ export function calculateStochRSI(
 
     for (let i = 0; i < rawStochRSI.length; i++) {
         const raw = rawStochRSI[i];
-        if (raw === null) continue;
+        if (raw === null) {
+            kBufHead = 0;
+            kBufSize = 0;
+            kSum = 0;
+            continue;
+        }
 
         if (kBufSize < kSmoothing) {
             kBuf[(kBufHead + kBufSize) % kSmoothing] = raw;
@@ -100,7 +110,12 @@ export function calculateStochRSI(
 
     for (let i = 0; i < kValues.length; i++) {
         const k = kValues[i];
-        if (k === null) continue;
+        if (k === null) {
+            dBufHead = 0;
+            dBufSize = 0;
+            dSum = 0;
+            continue;
+        }
 
         if (dBufSize < dPeriod) {
             dBuf[(dBufHead + dBufSize) % dPeriod] = k;

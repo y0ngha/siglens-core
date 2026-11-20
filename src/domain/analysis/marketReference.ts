@@ -7,6 +7,7 @@ import type {
     HorizonReference,
     IndicatorResult,
     MarketReference,
+    MarketSessionSpec,
     PriceVsLevel,
     ReferenceLevel,
     SMCSwingPoint,
@@ -38,7 +39,7 @@ import { hasUsablePrices } from '@/domain/analysis/analysisUtils';
 import { etCalendarDate } from '@/domain/marketCalendar';
 import { anchoredVwap } from '@/domain/analysis/anchoredVwap';
 import {
-    computeFibonacciProjection,
+    computeDominantFibonacciProjection,
     computeAbcExtension,
 } from '@/domain/analysis/fibLevels';
 import {
@@ -61,7 +62,12 @@ import {
     SECONDS_PER_DAY,
     SECONDS_PER_HOUR,
 } from '@/domain/constants/time';
-import { calculateVolumeProfile } from '@/domain/indicators/volume-profile';
+import {
+    calculateVolumeProfile,
+    volumeProfileRowsFor,
+} from '@/domain/indicators/volume-profile';
+import { VP_MIN_BARS } from '@/domain/indicators/constants';
+import { localSessionParts } from '@/domain/session';
 import { findLastIndex } from '@/domain/arrayCompat';
 
 const EFFICIENCY_PERIOD = 20;
@@ -103,8 +109,52 @@ const sessionKeyFor = (
 };
 
 /**
- * The bar floor pivots are computed from: the previous bar on a daily chart, the previous
- * **session** otherwise.
+ * The market clock a daily chart needs to tell a finished last bar from a forming one:
+ * the listing's session schedule and the instant the analysis is made at. Supplied by the
+ * caller — domain code never reads the wall clock.
+ */
+export interface MarketReferenceClock {
+    readonly session: MarketSessionSpec;
+    readonly now: Date;
+}
+
+/**
+ * Whether a daily chart's last bar is a finished session at `clock.now`.
+ *
+ * Daily bars are stamped at UTC midnight of their trading date, which is compared with the
+ * session's own local date: an earlier date is a finished session (a weekend, a pre-open
+ * Monday, or a feed that has not produced today's bar yet), today's bar is finished only at
+ * or after that day's close (the exchange calendar's half-day close counts). Without a clock
+ * — or on a 24/7 session, whose daily bar closes at the UTC boundary and is never "done" at
+ * an arbitrary instant — it reports `false`, the prior behaviour.
+ */
+function isLastDailyBarFinished(
+    lastBar: Bar,
+    clock: MarketReferenceClock | undefined
+): boolean {
+    if (clock === undefined || clock.session.kind === 'always-open') {
+        return false;
+    }
+    const { session, now } = clock;
+    const barDate = new Date(lastBar.time * MS_PER_SECOND);
+    const barKey =
+        barDate.getUTCFullYear() * DATE_KEY_YEAR_FACTOR +
+        (barDate.getUTCMonth() + 1) * DATE_KEY_MONTH_FACTOR +
+        barDate.getUTCDate();
+    const local = localSessionParts(now, session.timeZone);
+    const localKey =
+        local.year * DATE_KEY_YEAR_FACTOR +
+        local.month * DATE_KEY_MONTH_FACTOR +
+        local.day;
+    if (barKey !== localKey) return barKey < localKey;
+    const closeMinute = session.closeMinuteFor?.(now) ?? session.closeMinute;
+    return local.minutesOfDay >= closeMinute;
+}
+
+/**
+ * The bar floor pivots are computed from: on a daily chart the last **finished** session —
+ * the last bar once its session has closed (see {@link isLastDailyBarFinished}), the bar
+ * before it while that bar is still forming — otherwise the previous **session**.
  *
  * Pivots used to come from the previous bar on every timeframe. Standard and Camarilla
  * pivots are defined on the prior session's high/low/close, and on an intraday chart the
@@ -119,13 +169,21 @@ const sessionKeyFor = (
 function pivotSourceBar(
     bars: readonly Bar[],
     timeframe: Timeframe,
-    sessionKey: SessionKey
+    sessionKey: SessionKey,
+    clock: MarketReferenceClock | undefined
 ): Bar | null {
-    if (bars.length < 2) return null;
     if (timeframe === '1Day') {
+        // A finished last bar IS the last finished session: taking the bar before it
+        // printed the previous session's pivots on every post-close analysis.
+        const last = bars.at(-1);
+        if (last !== undefined && isLastDailyBarFinished(last, clock)) {
+            return hasUsablePrices(last) ? last : null;
+        }
+        if (bars.length < 2) return null;
         const prior = bars[bars.length - 2];
         return hasUsablePrices(prior) ? prior : null;
     }
+    if (bars.length < 2) return null;
 
     const lastDay = sessionKey(bars[bars.length - 1]);
     const priorEnd = findLastIndex(bars, b => sessionKey(b) !== lastDay);
@@ -235,6 +293,7 @@ function buildHorizon(
     bars: Bar[],
     indicators: IndicatorResult,
     key: HorizonKey,
+    timeframe: Timeframe,
     windowBars: number,
     standardPivot: StandardPivotLevels | null,
     camarillaPivot: CamarillaPivotLevels | null,
@@ -253,7 +312,19 @@ function buildHorizon(
     const windowSwingLows = indicators.smc.swingLows.filter(
         s => s.index >= startIndex
     );
-    const windowVp = windowLen > 0 ? calculateVolumeProfile(barWindow) : null;
+    // A window shorter than the profile's usual minimum (the short horizon is 20-26 bars
+    // against 30) used to yield `null` always. It now builds from its own full window,
+    // with proportionally fewer rows; a window cut short by missing bars still gets none,
+    // and the medium and long horizons keep the default minimum and row count.
+    const vpMinBars = Math.min(windowBars, VP_MIN_BARS);
+    const windowVp =
+        windowLen > 0
+            ? calculateVolumeProfile(
+                  barWindow,
+                  volumeProfileRowsFor(windowLen),
+                  vpMinBars
+              )
+            : null;
     const periods = HORIZON_MA_PERIODS[key];
 
     const windowSmc = {
@@ -261,7 +332,8 @@ function buildHorizon(
         swingHighs: windowSwingHighs,
         swingLows: windowSwingLows,
     };
-    const fib = computeFibonacciProjection(windowSmc);
+    // The window's dominant swing pair, so the three horizons can resolve to different legs.
+    const fib = computeDominantFibonacciProjection(windowSmc);
     const fibLevels: ReferenceLevel[] = fib
         ? [
               ...fib.retracements.map(r =>
@@ -364,11 +436,16 @@ function buildHorizon(
     // traders actually watch) were competing with, and sometimes losing to,
     // three more pivot families for the same handful of slots.
     const levels: ReferenceLevel[] = [
-        ...collectIndicatorLevels(currentPrice, indicators, {
-            volumeProfile: windowVp,
-            maPeriods: periods.ma,
-            emaPeriods: periods.ema,
-        }),
+        ...collectIndicatorLevels(
+            currentPrice,
+            indicators,
+            {
+                volumeProfile: windowVp,
+                maPeriods: periods.ma,
+                emaPeriods: periods.ema,
+            },
+            timeframe
+        ),
         ...roundNumberLevels(currentPrice),
         ...fibLevels,
         ...abcExtensionLevels,
@@ -423,13 +500,26 @@ export function computeMarketReference(
     bars: Bar[],
     indicators: IndicatorResult,
     timeframe: Timeframe,
-    options: { assetClass?: AssetClass; currency?: CurrencyCode } = {}
+    options: {
+        assetClass?: AssetClass;
+        currency?: CurrencyCode;
+        /**
+         * Session schedule and the analysis instant. On `1Day` it decides whether the last
+         * bar is a finished session (pivots come from it) or still forming (pivots come
+         * from the bar before). Omitted, the daily pivots keep using the bar before.
+         */
+        clock?: MarketReferenceClock;
+    } = {}
 ): MarketReference {
     const w = HORIZON_WINDOWS_BY_TIMEFRAME[timeframe];
     const pivotBar = pivotSourceBar(
         bars,
         timeframe,
-        sessionKeyFor(options.assetClass ?? 'equity', options.currency ?? 'USD')
+        sessionKeyFor(
+            options.assetClass ?? 'equity',
+            options.currency ?? 'USD'
+        ),
+        options.clock
     );
     // Computed once and shared by every horizon plus `pivots` below — pivotBar is the
     // same prior-session bar regardless of horizon, so this used to be recomputed 4x.
@@ -442,6 +532,7 @@ export function computeMarketReference(
             bars,
             indicators,
             key,
+            timeframe,
             w[key],
             standardPivot,
             camarillaPivot,

@@ -80,4 +80,12 @@ describe('calculateStochRSI', () => {
             expect(firstValid?.k).toBeCloseTo(0, 5);
         });
     });
+
+    describe('움직임이 전혀 없는 입력', () => {
+        it('RSI가 정의되지 않으므로 k와 d도 모두 null이다', () => {
+            const closes = new Array<number>(60).fill(50);
+            const result = calculateStochRSI(closes);
+            expect(result.every(r => r.k === null && r.d === null)).toBe(true);
+        });
+    });
 });

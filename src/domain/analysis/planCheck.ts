@@ -162,6 +162,19 @@ export function entryZoneTop(
 }
 
 /**
+ * @internal
+ *
+ * Lowest usable entry price in the plan, or `null` when none is usable — the low
+ * edge of the zone, whatever order `entryPrices` came in.
+ */
+export function entryZoneBottom(
+    entryPrices: readonly number[] | undefined
+): number | null {
+    const usable = (entryPrices ?? []).filter(finitePositive);
+    return usable.length === 0 ? null : Math.min(...usable);
+}
+
+/**
  * Build the deterministic plan check for one recommendation.
  *
  * `entryPrice` is the plan's own reference (the mid of its entry zone), `currentPrice` the
@@ -198,10 +211,15 @@ export function buildPlanCheck(
     // above covers most of these, but not all: reconciliation is skipped entirely for an
     // `avoid` verdict, which would otherwise leave the raw AI level to report a plan as
     // "already stopped out" simply because its stop was nonsense.
+    //
+    // "Below its entry" is measured against the zone's low edge, not only the mid: a
+    // stop inside the zone is hit by a fill at the zone's low.
+    const entryLow = entryZoneBottom(rec.entryPrices);
     const stopLoss =
         finitePositive(entryPrice) &&
         finitePositive(proposedStop) &&
-        proposedStop >= entryPrice
+        (proposedStop >= entryPrice ||
+            (entryLow !== null && proposedStop >= entryLow))
             ? undefined
             : proposedStop;
 

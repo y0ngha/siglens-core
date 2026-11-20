@@ -23,6 +23,7 @@ function nextState(
     bar: Bar,
     prev: PSARState,
     prevBars: [Bar, Bar],
+    afStart: number,
     afIncrement: number,
     afMax: number
 ): PSARNextStateResult {
@@ -44,7 +45,7 @@ function nextState(
                 state: {
                     sar: prev.ep,
                     ep: newEP,
-                    af: afIncrement,
+                    af: afStart,
                     trend: 'down',
                 },
                 result: { sar: prev.ep, trend: 'down' },
@@ -64,7 +65,7 @@ function nextState(
         // 상승 반전
         const newEP = bar.high;
         return {
-            state: { sar: prev.ep, ep: newEP, af: afIncrement, trend: 'up' },
+            state: { sar: prev.ep, ep: newEP, af: afStart, trend: 'up' },
             result: { sar: prev.ep, trend: 'up' },
         };
     }
@@ -115,6 +116,7 @@ export function calculateParabolicSAR(
             bars[i],
             psarState,
             prevBars,
+            afStart,
             afIncrement,
             afMax
         );
