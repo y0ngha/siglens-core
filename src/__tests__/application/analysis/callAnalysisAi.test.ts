@@ -381,7 +381,10 @@ describe('callAnalysisAi — 파싱 불가 응답 1회 재생성', () => {
         expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
         expect(warn).toHaveBeenCalledWith(
             '[callAnalysisAi] response was not parseable JSON; regenerating once',
-            expect.objectContaining({ model: DEEPSEEK_FREE })
+            expect.objectContaining({
+                model: DEEPSEEK_FREE,
+                reason: 'SyntaxError',
+            })
         );
         warn.mockRestore();
     });
@@ -433,6 +436,14 @@ describe('callAnalysisAi — 파싱 불가 응답 1회 재생성', () => {
             ).resolves.toBe(COMPLETE);
 
             expect(callDeepSeekWithRetry).toHaveBeenCalledTimes(2);
+            // The log names the cause, so a missing-key regeneration can be told apart
+            // from an unparseable one without reading the message text.
+            expect(warn).toHaveBeenCalledWith(
+                '[callAnalysisAi] response was not parseable JSON; regenerating once',
+                expect.objectContaining({
+                    reason: 'IncompleteJsonResponseError',
+                })
+            );
             warn.mockRestore();
         });
 

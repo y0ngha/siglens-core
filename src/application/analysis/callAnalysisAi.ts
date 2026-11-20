@@ -155,7 +155,15 @@ export async function callAnalysisAi(
         // that always emits broken JSON still fails here, visibly.
         console.warn(
             '[callAnalysisAi] response was not parseable JSON; regenerating once',
-            { model, correlationId, message: error.message }
+            // `reason` separates a plain parse failure (`SyntaxError`) from an answer
+            // that parsed but lacked schema keys (`IncompleteJsonResponseError`), so a
+            // rise in either one is visible in the logs without reading messages.
+            {
+                model,
+                correlationId,
+                reason: error.name,
+                message: error.message,
+            }
         );
         const retried = await generate();
         if (retried.trim() === '') {

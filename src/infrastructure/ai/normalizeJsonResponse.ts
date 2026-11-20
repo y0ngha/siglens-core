@@ -52,6 +52,8 @@ function firstCompleteObjectWithTrailingContent(text: string): string | null {
  * caller already passes to the provider — there is no second hand-maintained list.
  * A schema without a top-level `required` / `properties` array yields empty lists,
  * which turns the checks off (non-object roots, unknown schema shapes).
+ *
+ * @internal Not part of the consumer contract; exported for `callAnalysisAi` and tests.
  */
 export interface ResponseSchemaKeys {
     readonly required: readonly string[];
@@ -64,6 +66,11 @@ function stringKeys(value: unknown): readonly string[] {
         : [];
 }
 
+/**
+ * Reads {@link ResponseSchemaKeys} from a response schema object.
+ *
+ * @internal Not part of the consumer contract; exported for tests.
+ */
 export function responseSchemaKeys(schema: unknown): ResponseSchemaKeys {
     if (typeof schema !== 'object' || schema === null) {
         return { required: [], properties: [] };
@@ -90,6 +97,9 @@ export function responseSchemaKeys(schema: unknown): ResponseSchemaKeys {
  * Extends `SyntaxError` on purpose. `callAnalysisAi` regenerates once on a
  * `SyntaxError`, so an incomplete answer takes exactly the parse-failure path and
  * never reaches the cache.
+ *
+ * @internal Not part of the consumer contract; callers see a regeneration or the
+ * existing analysis failure, never this class.
  */
 export class IncompleteJsonResponseError extends SyntaxError {
     constructor(message: string) {
