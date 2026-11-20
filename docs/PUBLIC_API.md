@@ -325,7 +325,7 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 **에이전트 턴 컨텍스트 (2)**
 | Symbol | Source |
 |---|---|
-| `buildAgentTurnContext(input: AgentTurnContextInput): string` — 턴별 `## Now` 노트를 만든다: 사용자 현지 시각(요일·월~일 주 포함), 요일이 붙은 UTC·ET·KST 한 줄, US 줄(NYSE/Nasdaq: `open`·`closed`·`pre-market hours`·`after-hours` + 다음 개장/마감 시각과 남은 시간, 휴장일·반장 반영), `krSession`이 `scheduled`이면 KRX 줄. 상태 이름은 시계 구간(04:00 ET~개장, 마감~+4시간)만 가리키며 SIGLENS가 어떤 가격을 싣는지는 주장하지 않는다. `etSessionStatus`는 `@deprecated`(무시), `krSession?: MarketSessionSpec`은 소비자가 넘긴다(KRX 달력은 소비자 소유). | `domain/agent/buildAgentSystemPrompt.ts` |
+| `buildAgentTurnContext(input: AgentTurnContextInput): string` — 턴별 `## Now` 노트를 만든다: 사용자 현지 시각(요일·월~일 주 포함), 요일이 붙은 UTC·ET·KST 한 줄, US 줄(NYSE/Nasdaq: `open`·`closed`·`pre-market hours`·`after-hours` + 다음 개장/마감 시각과 남은 시간, 휴장일·반장 반영), `krSession`이 `scheduled`이면 KRX 줄. 각 개장/마감 시각은 그 시장의 시간대로 적고, 사용자의 시간대에서 시계가 다르게 보이면 요일을 붙여 사용자 시간대로도 함께 적는다(예: `09:30 ET (Fri 2026-11-20 23:30 KST)`) — 모델이 시간대를 직접 환산하지 않게 하기 위해서다. 상태 이름은 시계 구간(04:00 ET~개장, 마감~+4시간)만 가리키며 SIGLENS가 어떤 가격을 싣는지는 주장하지 않는다. `etSessionStatus`는 `@deprecated`(무시), `krSession?: MarketSessionSpec`은 소비자가 넘긴다(KRX 달력은 소비자 소유). | `domain/agent/buildAgentSystemPrompt.ts` |
 | `composeAgentUserMessage(context, userMessage): string` — 그 노트를 최신 사용자 메시지 앞에 붙인다(`## Now … ## Message <text>`). 영속화는 이 결과가 아니라 평문 `userMessage`로 한다. | `domain/agent/buildAgentSystemPrompt.ts` |
 
 의도적으로 서버 전용이다. 두 함수(그리고 `buildAgentSystemPrompt`)는 `index.client.ts`에서 re-export하지 않는다 — provider 요청을 조립하는 일은 서버만 하기 때문이다. `splitAgentFollowUps`는 브라우저가 스트리밍된 답변 텍스트에서 follow-up 마커를 파싱하므로 client entry에 있다. 브라우저에서 프롬프트를 조립하는 코드는 없다.

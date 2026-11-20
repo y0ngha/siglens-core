@@ -6,6 +6,7 @@ import {
     nextRegularSessionBoundaryMs,
 } from '@/domain/session';
 import type { MarketSessionSpec } from '@/domain/types';
+import { timeZoneLabel } from './userTimeZone';
 
 /** @internal Pre-market opens at 04:00 ET (minutes from local midnight, inclusive). */
 export const US_PRE_MARKET_OPEN_MINUTE = 4 * 60;
@@ -110,6 +111,13 @@ export interface MarketLineInput {
      * they claim nothing about which prices SIGLENS carries.
      */
     extendedHours: boolean;
+    /**
+     * The reader's resolved IANA zone. A boundary time is also printed in it
+     * when its clock differs from the market's own, so the model quotes the
+     * conversion instead of doing the arithmetic (a DST-season slip such as
+     * ET 09:30 → "22:30 KST" is the failure this prevents).
+     */
+    userTimeZone?: string;
 }
 
 /** `pre-market hours` / `after-hours` / `closed` for a moment outside the regular session. */
@@ -147,7 +155,7 @@ function closedState(
  * the spec has no trading day in reach the state is printed alone.
  */
 export function formatMarketLine(input: MarketLineInput): string {
-    const { label, zoneLabel, now, spec, extendedHours } = input;
+    const { label, zoneLabel, now, spec, extendedHours, userTimeZone } = input;
     if (spec.kind === 'always-open') return `- ${label}: open`;
     const open = getSessionStatus(spec, now) === 'open';
     const state = open ? 'open' : closedState(spec, now, extendedHours);
@@ -155,5 +163,17 @@ export function formatMarketLine(input: MarketLineInput): string {
     const atMs = nextRegularSessionBoundaryMs(spec, now, boundary);
     if (atMs === null) return `- ${label}: ${state}`;
     const verb = open ? 'closes' : 'opens';
-    return `- ${label}: ${state}; ${verb} ${formatWeekdayClock(new Date(atMs), spec.timeZone)} ${zoneLabel} (${formatLead(atMs - now.getTime())})`;
+    const at = new Date(atMs);
+    const marketClock = formatWeekdayClock(at, spec.timeZone);
+    // The same instant in the reader's zone, weekday included (it can differ
+    // from the market's). Printed once when both zones show the same clock.
+    const userClock =
+        userTimeZone === undefined
+            ? marketClock
+            : formatWeekdayClock(at, userTimeZone);
+    const userPart =
+        userTimeZone === undefined || userClock === marketClock
+            ? ''
+            : ` (${userClock} ${timeZoneLabel(at, userTimeZone)})`;
+    return `- ${label}: ${state}; ${verb} ${marketClock} ${zoneLabel}${userPart} (${formatLead(atMs - now.getTime())})`;
 }

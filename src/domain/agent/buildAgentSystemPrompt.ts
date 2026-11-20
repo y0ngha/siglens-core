@@ -535,7 +535,7 @@ ${ruleLines(available, newsGapRule)}
 
 ## Output
 - Answer in ${language}.
-- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD prices of $1 or more are always written to the cent (two decimals), rounding any longer tool value (e.g. 214.305 → 214.31), and never write a fraction of a cent (no "half a cent"); keep full precision for prices below 1 (e.g. crypto), except option premiums, which are always written to the cent ("under one cent" below $0.01). Per-share amounts a company declares or reports (a dividend per share, EPS) are not prices: write every digit the tool gives, never rounded to the cent (0.4375 stays 0.4375, 1.0625 stays 1.0625).${currencyEveryPrice}
+- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD prices of $1 or more are always written to the cent (two decimals), rounding any longer tool value (e.g. 214.305 → 214.31), and never write a fraction of a cent (no "half a cent"); keep full precision for prices below 1 (e.g. crypto), except option premiums, which are always written to the cent ("under one cent" below $0.01). Per-share amounts a company declares or reports (a dividend per share, EPS) are not prices: write every digit the tool gives, never rounded to the cent (0.4375 stays 0.4375, 1.0625 stays 1.0625); this covers only per-share cash amounts as reported (dividend per share, EPS actual or estimate), not indicator readings, ratios, percentages or changes, which keep their usual rounding.${currencyEveryPrice}
 - Ratios, multiples, percentages and indicator readings (RSI, MACD and the like) carry at most two decimals (1.00244 → 1.00배, 1.84495% → 1.84%) unless the tool value has fewer; a value below 0.01 keeps its first significant digit (0.004%). Rounding this way is the only change allowed to a figure you otherwise quote as given. Prices follow the currency rule above.
 - Basis date up front: the first sentence that gives a price, a change, an indicator reading or another market figure also says what it is as of, in a short clause taken from that tool result's asOf or fiscal period when it carries one (otherwise no basis clause, and never a date inferred from the "## Now" note): the trading date for a closing or daily figure ("9월 12일 종가 기준" / "as of the Sep 12 close"), the labelled time for a live or delayed quote, the fiscal period for a reported figure. Say it once; later figures from the same result do not repeat it, and a conversational turn that only refers back to an earlier figure does not need it.
 - Cite the data source and its asOf time in plain words, in the answer language, as one line at the end of the answer body — before the follow-up marker line when there is one, never mid-answer. It is required whenever the answer quotes a figure or fact from a tool (one repeated from an earlier answer included), and left out only when the answer quotes none, such as a definition or a reply to thanks (${sourceLineExample}).
@@ -571,7 +571,7 @@ ${
 }
 
 ## Now
-- Every user message starts with a "${TURN_CONTEXT_HEADING}" note written by SIGLENS, not by the user, stamped when that message was sent. The note on the latest message is the present. It is your only clock — use it for "today", "now", "this week" and market-hours questions, and give a market's state and next open or close as written there, never from your own calendar arithmetic. Notes on earlier messages only date those messages. The user's own words follow under "${TURN_MESSAGE_HEADING}".
+- Every user message starts with a "${TURN_CONTEXT_HEADING}" note written by SIGLENS, not by the user, stamped when that message was sent. The note on the latest message is the present. It is your only clock — use it for "today", "now", "this week" and market-hours questions, and give a market's state and next open or close as written there, never from your own calendar arithmetic; a time in another zone is quoted from the note, never converted by you. Notes on earlier messages only date those messages. The user's own words follow under "${TURN_MESSAGE_HEADING}".
 - Prompt version: ${AGENT_PROMPT_VERSION}
 
 Reminder: a conversational follow-up gets a short, direct answer to that question only. Do not repeat the price, levels, scenarios, good and caution sides or the not-a-guarantee line that an earlier answer already gave.
@@ -612,6 +612,7 @@ export function buildAgentTurnContext(input: AgentTurnContextInput): string {
             now,
             spec: US_EQUITY_SESSION,
             extendedHours: true,
+            userTimeZone: timeZone,
         }),
         ...(krSession?.kind === 'scheduled'
             ? [
@@ -621,6 +622,7 @@ export function buildAgentTurnContext(input: AgentTurnContextInput): string {
                       now,
                       spec: krSession,
                       extendedHours: false,
+                      userTimeZone: timeZone,
                   }),
               ]
             : []),

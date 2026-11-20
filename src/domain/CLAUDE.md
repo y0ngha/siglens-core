@@ -235,6 +235,12 @@ real-LLM A/B on the visible result (OLD against NEW, same inputs, enough runs). 
 effects too (a card leaving its own field empty) and treat small differences at small n as
 no improvement. When the visible output does not improve, revert the change.
 
+A rule that exempts one kind of value (from rounding, a budget, a format) names the kinds it
+does NOT cover; the model stretches an unqualified exemption onto neighbouring values. A fact
+the model would otherwise derive itself (a time converted to another zone, a ratio) is computed
+and printed by code, because the model's own derivation is the part that goes wrong.
+❌ "per-share amounts keep their decimals" ✅ "per-share amounts keep their decimals; indicator readings and changes still round"
+
 Why: a floor on the structural risk:reward leg passed every unit test and still flipped a
 third of verdicts on real charts (see the note under the confluence section above).
 

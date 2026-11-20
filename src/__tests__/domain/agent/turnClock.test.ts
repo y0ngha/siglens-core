@@ -38,7 +38,7 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-20 23:09 KST (Friday; ${WEEK_NOV_16})`,
                 '- UTC: Fri 2026-11-20 14:09 · ET: Fri 2026-11-20 09:09 · KST: Fri 2026-11-20 23:09',
-                '- US stocks (NYSE/Nasdaq): pre-market hours; opens Fri 2026-11-20 09:30 ET (in 21m)',
+                '- US stocks (NYSE/Nasdaq): pre-market hours; opens Fri 2026-11-20 09:30 ET (Fri 2026-11-20 23:30 KST) (in 21m)',
                 '- Korean stocks (KRX): closed; opens Mon 2026-11-23 09:00 KST (in 2d 9h)',
             ].join('\n')
         );
@@ -50,7 +50,7 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-21 00:00 KST (Saturday; ${WEEK_NOV_16})`,
                 '- UTC: Fri 2026-11-20 15:00 · ET: Fri 2026-11-20 10:00 · KST: Sat 2026-11-21 00:00',
-                '- US stocks (NYSE/Nasdaq): open; closes Fri 2026-11-20 16:00 ET (in 6h 0m)',
+                '- US stocks (NYSE/Nasdaq): open; closes Fri 2026-11-20 16:00 ET (Sat 2026-11-21 06:00 KST) (in 6h 0m)',
                 '- Korean stocks (KRX): closed; opens Mon 2026-11-23 09:00 KST (in 2d 9h)',
             ].join('\n')
         );
@@ -62,7 +62,7 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-21 07:30 KST (Saturday; ${WEEK_NOV_16})`,
                 '- UTC: Fri 2026-11-20 22:30 · ET: Fri 2026-11-20 17:30 · KST: Sat 2026-11-21 07:30',
-                '- US stocks (NYSE/Nasdaq): after-hours; opens Mon 2026-11-23 09:30 ET (in 2d 16h)',
+                '- US stocks (NYSE/Nasdaq): after-hours; opens Mon 2026-11-23 09:30 ET (Mon 2026-11-23 23:30 KST) (in 2d 16h)',
                 '- Korean stocks (KRX): closed; opens Mon 2026-11-23 09:00 KST (in 2d 1h)',
             ].join('\n')
         );
@@ -74,7 +74,7 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-20 10:00 KST (Friday; ${WEEK_NOV_16})`,
                 '- UTC: Fri 2026-11-20 01:00 · ET: Thu 2026-11-19 20:00 · KST: Fri 2026-11-20 10:00',
-                '- US stocks (NYSE/Nasdaq): closed; opens Fri 2026-11-20 09:30 ET (in 13h 30m)',
+                '- US stocks (NYSE/Nasdaq): closed; opens Fri 2026-11-20 09:30 ET (Fri 2026-11-20 23:30 KST) (in 13h 30m)',
                 '- Korean stocks (KRX): open; closes Fri 2026-11-20 15:30 KST (in 5h 30m)',
             ].join('\n')
         );
@@ -86,7 +86,7 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-27 00:00 KST (Friday; ${WEEK_NOV_23})`,
                 '- UTC: Thu 2026-11-26 15:00 · ET: Thu 2026-11-26 10:00 · KST: Fri 2026-11-27 00:00',
-                '- US stocks (NYSE/Nasdaq): closed; opens Fri 2026-11-27 09:30 ET (in 23h 30m)',
+                '- US stocks (NYSE/Nasdaq): closed; opens Fri 2026-11-27 09:30 ET (Fri 2026-11-27 23:30 KST) (in 23h 30m)',
                 '- Korean stocks (KRX): closed; opens Fri 2026-11-27 09:00 KST (in 9h 0m)',
             ].join('\n')
         );
@@ -98,7 +98,7 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-28 02:30 KST (Saturday; ${WEEK_NOV_23})`,
                 '- UTC: Fri 2026-11-27 17:30 · ET: Fri 2026-11-27 12:30 · KST: Sat 2026-11-28 02:30',
-                '- US stocks (NYSE/Nasdaq): open; closes Fri 2026-11-27 13:00 ET (in 30m)',
+                '- US stocks (NYSE/Nasdaq): open; closes Fri 2026-11-27 13:00 ET (Sat 2026-11-28 03:00 KST) (in 30m)',
                 '- Korean stocks (KRX): closed; opens Mon 2026-11-30 09:00 KST (in 2d 6h)',
             ].join('\n')
         );
@@ -110,8 +110,28 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-28 03:30 KST (Saturday; ${WEEK_NOV_23})`,
                 '- UTC: Fri 2026-11-27 18:30 · ET: Fri 2026-11-27 13:30 · KST: Sat 2026-11-28 03:30',
-                '- US stocks (NYSE/Nasdaq): after-hours; opens Mon 2026-11-30 09:30 ET (in 2d 20h)',
+                '- US stocks (NYSE/Nasdaq): after-hours; opens Mon 2026-11-30 09:30 ET (Mon 2026-11-30 23:30 KST) (in 2d 20h)',
                 '- Korean stocks (KRX): closed; opens Mon 2026-11-30 09:00 KST (in 2d 5h)',
+            ].join('\n')
+        );
+    });
+
+    it('summer time: ET 09:30 is 22:30 KST (EDT), where winter is 23:30', () => {
+        expect(note('2026-07-15T12:00:00Z')).toContain(
+            '- US stocks (NYSE/Nasdaq): pre-market hours; opens Wed 2026-07-15 09:30 ET (Wed 2026-07-15 22:30 KST) (in 1h 30m)'
+        );
+    });
+
+    it('a user zone equal to the market zone prints the time once, the other market gets the conversion', () => {
+        expect(
+            note('2026-11-20T15:00:00Z', { timeZone: 'America/New_York' })
+        ).toBe(
+            [
+                '## Now',
+                `- User's local time: 2026-11-20 10:00 EST (Friday; ${WEEK_NOV_16})`,
+                '- UTC: Fri 2026-11-20 15:00 · ET: Fri 2026-11-20 10:00 · KST: Sat 2026-11-21 00:00',
+                '- US stocks (NYSE/Nasdaq): open; closes Fri 2026-11-20 16:00 ET (in 6h 0m)',
+                '- Korean stocks (KRX): closed; opens Mon 2026-11-23 09:00 KST (Sun 2026-11-22 19:00 EST) (in 2d 9h)',
             ].join('\n')
         );
     });
@@ -126,7 +146,7 @@ describe('buildAgentTurnContext — exact notes', () => {
                 '## Now',
                 `- User's local time: 2026-11-20 23:09 KST (Friday; ${WEEK_NOV_16})`,
                 '- UTC: Fri 2026-11-20 14:09 · ET: Fri 2026-11-20 09:09 · KST: Fri 2026-11-20 23:09',
-                '- US stocks (NYSE/Nasdaq): pre-market hours; opens Fri 2026-11-20 09:30 ET (in 21m)',
+                '- US stocks (NYSE/Nasdaq): pre-market hours; opens Fri 2026-11-20 09:30 ET (Fri 2026-11-20 23:30 KST) (in 21m)',
             ].join('\n')
         );
     });

@@ -98,7 +98,7 @@ describe('buildAgentSystemPrompt', () => {
         );
         // 11:00 ET on a Saturday: the clock window is closed, the next open is Monday.
         expect(context).toContain(
-            '- US stocks (NYSE/Nasdaq): closed; opens Mon 2026-09-14 09:30 ET (in 1d 22h)'
+            '- US stocks (NYSE/Nasdaq): closed; opens Mon 2026-09-14 09:30 ET (Mon 2026-09-14 22:30 KST) (in 1d 22h)'
         );
         // 시스템 프롬프트에는 시각이 없다 — 시계는 턴 노트가 유일한 출처다.
         expect(prompt).not.toContain('UTC: 2026-09-12');
@@ -2045,7 +2045,7 @@ describe('buildAgentSystemPrompt — computed facts, basis date, no offered look
 
     it('per-share amounts keep every digit, in every locale, before the currency add-on', () => {
         const sentence =
-            'Per-share amounts a company declares or reports (a dividend per share, EPS) are not prices: write every digit the tool gives, never rounded to the cent (0.4375 stays 0.4375, 1.0625 stays 1.0625).';
+            'Per-share amounts a company declares or reports (a dividend per share, EPS) are not prices: write every digit the tool gives, never rounded to the cent (0.4375 stays 0.4375, 1.0625 stays 1.0625); this covers only per-share cash amounts as reported (dividend per share, EPS actual or estimate), not indicator readings, ratios, percentages or changes, which keep their usual rounding.';
         expect(build('ko')).toContain(sentence);
         const en = build('en');
         expect(en).toContain(sentence);

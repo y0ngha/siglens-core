@@ -219,10 +219,10 @@ describe('runAgentTurn', () => {
             "User's local time: 2026-09-15 00:00 KST"
         );
         expect(a.messages.at(-1)!.content).toContain(
-            '- US stocks (NYSE/Nasdaq): open; closes Mon 2026-09-14 16:00 ET (in 5h 0m)'
+            '- US stocks (NYSE/Nasdaq): open; closes Mon 2026-09-14 16:00 ET (Tue 2026-09-15 05:00 KST) (in 5h 0m)'
         );
         expect(b.messages.at(-1)!.content).toContain(
-            '- US stocks (NYSE/Nasdaq): after-hours; opens Tue 2026-09-15 09:30 ET (in 15h 53m)'
+            '- US stocks (NYSE/Nasdaq): after-hours; opens Tue 2026-09-15 09:30 ET (Tue 2026-09-15 22:30 KST) (in 15h 53m)'
         );
     });
 

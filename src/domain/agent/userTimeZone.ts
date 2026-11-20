@@ -54,7 +54,11 @@ export function resolveAgentTimeZone(
         : DEFAULT_TIME_ZONE[locale];
 }
 
-function timeZoneLabel(date: Date, timeZone: string): string {
+/**
+ * @internal Short label of a zone at an instant (`KST`, `EST`, `PDT`, or the
+ * generic name when ICU has no abbreviation).
+ */
+export function timeZoneLabel(date: Date, timeZone: string): string {
     const known = KNOWN_LABELS[timeZone];
     if (known) return known;
     const name = (style: 'short' | 'shortGeneric'): string =>

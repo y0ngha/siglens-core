@@ -17,8 +17,11 @@ import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
  *   the overbought/oversold rule; budgets are now the measured size plus a
  *   small slack (system prompt 54,193, tool specs 63,891, longest
  *   description 7,002).
+ * - 2026-11-20 (A/B follow-up): the per-share exemption names what it covers
+ *   and the "## Now" pointer bans converting zones (system prompt 54,193 ->
+ *   54,452; tool specs unchanged).
  */
-const SYSTEM_PROMPT_CHAR_BUDGET = 54_500;
+const SYSTEM_PROMPT_CHAR_BUDGET = 54_750;
 const TOOL_SPECS_JSON_CHAR_BUDGET = 64_050;
 const TOOL_DESCRIPTION_MAX_CHARS = 7_150;
 const FLOOR_SLACK = 2_000;
