@@ -5,7 +5,11 @@ import {
     HURST_RANDOM_WALK,
     MACDV_OVERBOUGHT,
     REGRESSION_R2_SIGNIFICANT,
+    STOCHASTIC_OVERBOUGHT_LEVEL,
+    STOCHASTIC_OVERSOLD_LEVEL,
     VR_RANDOM_WALK,
+    WILLIAMS_R_OVERBOUGHT_LEVEL,
+    WILLIAMS_R_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
 import type {
     ChandelierResult,
@@ -46,14 +50,6 @@ const KELTNER_BAND_PROXIMITY_ATR = 0.5;
 
 /** VWAP: distance from VWAP at/above this many ATRs is notable (intraday only). */
 const VWAP_DISTANCE_ATR = 1;
-
-/** Williams %R overbought (>=) / oversold (<=) levels. */
-const WILLIAMS_R_OVERBOUGHT = -20;
-const WILLIAMS_R_OVERSOLD = -80;
-
-/** Stochastic %K overbought (>=) / oversold (<=) levels. */
-const STOCHASTIC_OVERBOUGHT = 80;
-const STOCHASTIC_OVERSOLD = 20;
 
 /** StochRSI overbought (>=) / oversold (<=) levels (0–1 scale). */
 const STOCH_RSI_OVERBOUGHT = 0.8;
@@ -219,7 +215,7 @@ const keltnerBandDistNotable = (ctx: SkillSelectionContext): boolean => {
 const williamsRLevelNotable = (ctx: SkillSelectionContext): boolean => {
     const wr = lastNumber(ctx.indicators.williamsR);
     if (!isFiniteNumber(wr)) return false;
-    return wr >= WILLIAMS_R_OVERBOUGHT || wr <= WILLIAMS_R_OVERSOLD;
+    return wr >= WILLIAMS_R_OVERBOUGHT_LEVEL || wr <= WILLIAMS_R_OVERSOLD_LEVEL;
 };
 
 const stochasticLevelNotable = (ctx: SkillSelectionContext): boolean => {
@@ -228,8 +224,8 @@ const stochasticLevelNotable = (ctx: SkillSelectionContext): boolean => {
     if (!st || !isFiniteNumber(st.percentK)) return false;
     return isOutsideBounds(
         st.percentK,
-        STOCHASTIC_OVERBOUGHT,
-        STOCHASTIC_OVERSOLD
+        STOCHASTIC_OVERBOUGHT_LEVEL,
+        STOCHASTIC_OVERSOLD_LEVEL
     );
 };
 

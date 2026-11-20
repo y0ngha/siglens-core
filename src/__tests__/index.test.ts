@@ -32,6 +32,7 @@ import {
     calculateMA,
     findMaCrosses,
     rsiZone,
+    classifyOscillatorZones,
     isCompanyEarningsEvent,
     pullbackEventCaveat,
     planEntryPrice,
@@ -174,6 +175,20 @@ describe('public API exports', () => {
         expect(rsiZone(70)).toBe('overbought');
         expect(rsiZone(37.5)).toBe('neutral');
         expect(rsiZone(30)).toBe('oversold');
+    });
+
+    it('exports classifyOscillatorZones so consumers share the oscillator zones', () => {
+        expect(typeof classifyOscillatorZones).toBe('function');
+        const view = classifyOscillatorZones({
+            rsi: 30,
+            stochasticK: 20,
+            williamsR: null,
+            cci: null,
+            mfi: null,
+        });
+        expect(view.zones.rsi).toBe(rsiZone(30));
+        expect(view.zones.stochastic).toBe('oversold');
+        expect(view.zones.williamsR).toBeNull();
     });
 
     it('exports calculateMA so consumers stop re-implementing it', () => {

@@ -46,6 +46,17 @@ export interface AgentMessage {
      * images. Adapters map them to their own image parts.
      */
     images?: readonly AgentImage[];
+    /**
+     * User messages only: the UTC instant this message was sent, as an ISO-8601
+     * string with milliseconds (`2026-11-20T04:12:33.000Z`), exactly as
+     * `runAgentTurn` returned it (`RunAgentTurnResult.turnAt`). The loop
+     * rebuilds the message's "## Now" note from it with the same builder as the
+     * live turn, so the replayed message matches what the provider saw and its
+     * prefix cache covers the history. A missing or malformed value replays the
+     * message without a note. Never forwarded to a provider: adapters see the
+     * composed `content` only.
+     */
+    turnAt?: string;
 }
 
 /** JSON Schema (draft-07 subset) accepted by every provider we ship. */

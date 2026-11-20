@@ -94,12 +94,16 @@ describe('buildAgentSystemPrompt', () => {
             etSessionStatus: 'open',
         });
         expect(context).toContain(
-            'UTC: 2026-09-12, 15:00 · ET: 2026-09-12, 11:00 · KST: 2026-09-13, 00:00'
+            'UTC: Sat 2026-09-12 15:00 · ET: Sat 2026-09-12 11:00 · KST: Sun 2026-09-13 00:00'
         );
-        expect(context).toContain('US regular session: open');
+        // 11:00 ET on a Saturday: the clock window is closed, the next open is Monday.
+        expect(context).toContain(
+            '- US stocks (NYSE/Nasdaq): closed; opens Mon 2026-09-14 09:30 ET (Mon 2026-09-14 22:30 KST) (in 1d 22h)'
+        );
         // 시스템 프롬프트에는 시각이 없다 — 시계는 턴 노트가 유일한 출처다.
         expect(prompt).not.toContain('UTC: 2026-09-12');
-        expect(prompt).not.toContain('US regular session: open');
+        expect(prompt).not.toContain('UTC: Sat 2026-09-12');
+        expect(prompt).not.toContain('US stocks (NYSE/Nasdaq): closed');
         expect(prompt).toContain('It is your only clock');
     });
 
@@ -551,7 +555,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-19.3');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-20.1');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -1736,7 +1740,7 @@ describe('buildAgentSystemPrompt company filings', () => {
         const prompt = build(null);
         expect(prompt).toContain('unless a routing row or a rule says so.');
         expect(prompt).toContain(
-            'except where a routing row tells you to make a second call after seeing the first result'
+            'Call again after seeing results only when a routing row says so'
         );
         expect(prompt).toContain(
             'call the union of all matching rows in one step, except where a row tells you to make a second call after seeing the first result.'
@@ -1879,9 +1883,12 @@ describe('buildAgentSystemPrompt wording rules', () => {
     });
 
     it('anchors the RSI zone to latest.rsiZone', () => {
-        expect(prompt).toContain('use latest.rsiZone');
-        expect(prompt).toContain('when present; otherwise treat an RSI');
-        expect(prompt).toContain('oversold, overbought, or "near" either');
+        expect(prompt).toContain(
+            'use latest.rsiZone for RSI (neutral between 30 and 70)'
+        );
+        expect(prompt).toContain(
+            'give no zone word to a reading whose computed zone is neutral'
+        );
     });
 });
 
@@ -2000,5 +2007,98 @@ describe('buildAgentSystemPrompt — 추정치 추이 라우팅', () => {
         ])
             expect(row).toContain(term);
         expect(row).toContain('the estimate trend');
+    });
+});
+
+describe('buildAgentSystemPrompt — computed facts, basis date, no offered lookups, turn note', () => {
+    const build = (
+        locale: 'ko' | 'en' = 'ko',
+        without: readonly string[] = []
+    ) =>
+        buildAgentSystemPrompt({
+            locale,
+            tools: AGENT_TOOL_SPECS.filter(t => !without.includes(t.name)),
+            guest: true,
+        });
+
+    it('overbought / oversold is triggered by the question or the answer, not by the result carrying a field', () => {
+        const p = build();
+        expect(p).toContain(
+            '- Overbought / oversold: applies when the question asks whether something is overbought or oversold, or when your answer is about to call any reading overbought, oversold or "near" either.'
+        );
+        expect(p).toContain(
+            'To answer the question itself, use the whole summary line, never RSI alone'
+        );
+        expect(p).toContain(
+            'at the Plain level its counts are enough and the names you give stay within the two or three indicators allowed there'
+        );
+        expect(p).toContain('latest.oscillatorZones or latest.rsiZone');
+        expect(p).not.toContain('- RSI zone:');
+        expect(p).not.toContain('carries latest.oscillatorSummary');
+    });
+
+    it('the oscillator rule leaves with get_bars_indicators', () => {
+        expect(build('ko', ['get_bars_indicators'])).not.toContain(
+            'latest.oscillatorSummary'
+        );
+    });
+
+    it('per-share amounts keep every digit, in every locale, before the currency add-on', () => {
+        const sentence =
+            'Per-share amounts a company declares or reports (a dividend per share, EPS) are not prices: write every digit the tool gives, never rounded to the cent (0.4375 stays 0.4375, 1.0625 stays 1.0625); this covers only per-share cash amounts as reported (dividend per share, EPS actual or estimate), not indicator readings, ratios, percentages or changes, which keep their usual rounding.';
+        expect(build('ko')).toContain(sentence);
+        const en = build('en');
+        expect(en).toContain(sentence);
+        expect(en.indexOf(sentence)).toBeLessThan(
+            en.indexOf('This applies to every price in every sentence')
+        );
+    });
+
+    it('the basis-date rule sits above the source line rule and gives no clause without an asOf', () => {
+        const p = build();
+        const basis = p.indexOf('- Basis date up front:');
+        const source = p.indexOf('- Cite the data source and its asOf time');
+        expect(basis).toBeGreaterThan(0);
+        expect(basis).toBeLessThan(source);
+        expect(p).toContain(
+            'taken from that tool result\'s asOf or fiscal period when it carries one (otherwise no basis clause, and never a date inferred from the "## Now" note)'
+        );
+        expect(p).toContain('- Cite the data source and its asOf time');
+        expect(p).toContain('Numbers: the last price and its change.');
+    });
+
+    it('a missing part is fetched or declared unavailable, never offered', () => {
+        const p = build();
+        expect(p).toContain(
+            '- Never offer a lookup in place of doing it ("원하시면 웹 검색으로 찾아볼게요" / "I can search for it if you like").'
+        );
+        expect(p).toContain(
+            'The follow-up marker line is for further questions, never for a missing part of this one.'
+        );
+        expect(p).toContain(
+            'unless a routing row or tool description says not to search for it: call that tool before you write; once you start writing the answer, finish it without calling more tools.'
+        );
+        expect(p).not.toContain(
+            'except where a routing row tells you to make a second call after seeing the first result;'
+        );
+    });
+
+    it('the Korean net-buying row keeps its no-search limit that the second-call rule defers to', () => {
+        expect(build()).toContain(
+            'never for a general 수급 or outlook/buy question'
+        );
+    });
+
+    it('the Now pointer says every message carries its own note and only the latest is the present', () => {
+        const p = build();
+        expect(p).toContain('Every user message starts with a "## Now" note');
+        expect(p).toContain('The note on the latest message is the present.');
+        expect(p).toContain(
+            "give a market's state and next open or close as written there, never from your own calendar arithmetic"
+        );
+        expect(p).toContain(
+            'Notes on earlier messages only date those messages.'
+        );
+        expect(p).not.toContain('whether the US regular session is open');
     });
 });

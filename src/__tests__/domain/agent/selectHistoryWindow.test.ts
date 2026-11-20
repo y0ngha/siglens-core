@@ -228,3 +228,173 @@ describe('selectHistoryWindow', () => {
         });
     });
 });
+
+describe('selectHistoryWindow — toolResultStride', () => {
+    const BASE = { turns: 8, toolResultTurns: 2, budgetTokens: 32_000 };
+    const fullHistory = (count: number): AgentMessage[] =>
+        Array.from({ length: count }, (_, i) => turn(i, true)).flat();
+
+    /** Verbatim tool results of one window, as the turn numbers that keep them. */
+    const verbatimTurns = (out: readonly AgentMessage[]): number[] =>
+        out
+            .filter(
+                m =>
+                    m.role === 'tool' &&
+                    !(JSON.parse(m.content) as { omitted?: boolean }).omitted
+            )
+            .map(m => Number(m.toolCallId?.slice(1)));
+
+    it('toolResultStride 2: 2 or 3 turns stay verbatim, and the boundary moves only at even turn counts', () => {
+        const firstVerbatim = Array.from({ length: 7 }, (_, k) => k + 2).map(
+            count => {
+                const out = selectHistoryWindow(fullHistory(count), {
+                    ...BASE,
+                    toolResultStride: 2,
+                });
+                const verbatim = verbatimTurns(out);
+                expect(verbatim.at(-1)).toBe(count - 1);
+                expect([2, 3]).toContain(verbatim.length);
+                return verbatim[0];
+            }
+        );
+        // counts 2..8: boundary = floor((count - 2) / 2) * 2
+        expect(firstVerbatim).toEqual([0, 0, 2, 2, 4, 4, 6]);
+    });
+
+    it("toolResultStride 1 keeps today's rolling boundary", () => {
+        const out = selectHistoryWindow(fullHistory(5), BASE);
+        expect(verbatimTurns(out)).toEqual([3, 4]);
+    });
+
+    it('a turn that already flipped to omitted never turns verbatim again as turns are added', () => {
+        const flipped = (count: number): number[] => {
+            const out = selectHistoryWindow(fullHistory(count), {
+                ...BASE,
+                toolResultStride: 2,
+            });
+            return out
+                .filter(
+                    m =>
+                        m.role === 'tool' &&
+                        (JSON.parse(m.content) as { omitted?: boolean }).omitted
+                )
+                .map(m => Number(m.toolCallId?.slice(1)));
+        };
+        // Turn 0 flips when the count reaches 4; each later count only adds to the set.
+        expect(flipped(3)).toEqual([]);
+        expect(flipped(4)).toEqual([0, 1]);
+        expect(flipped(5)).toEqual([0, 1]);
+        expect(flipped(6)).toEqual([0, 1, 2, 3]);
+    });
+
+    const bigTool = (i: number): AgentMessage[] => [
+        { role: 'user', content: `q${i}` },
+        {
+            role: 'assistant',
+            content: '',
+            toolCalls: [{ id: `c${i}`, name: 'get_quote', args: {} }],
+        },
+        {
+            role: 'tool',
+            content: JSON.stringify({
+                symbol: 'AAPL',
+                text: 'x'.repeat(2_900),
+            }),
+            toolCallId: `c${i}`,
+            toolName: 'get_quote',
+        },
+        { role: 'assistant', content: `a${i}` },
+    ];
+
+    it('under budget pressure the window falls back to exactly toolResultTurns verbatim turns', () => {
+        const history = Array.from({ length: 5 }, (_, i) => bigTool(i)).flat();
+        const roomy = selectHistoryWindow(history, {
+            ...BASE,
+            toolResultStride: 2,
+        });
+        expect(verbatimTurns(roomy)).toEqual([2, 3, 4]);
+        // Three verbatim results (~1000 tokens each) do not fit, two do.
+        const tight = selectHistoryWindow(history, {
+            ...BASE,
+            budgetTokens: 2_500,
+            toolResultStride: 2,
+        });
+        expect(verbatimTurns(tight)).toEqual([3, 4]);
+        expect(tight.filter(m => m.role === 'user')).toHaveLength(5);
+    });
+
+    describe('block drop with a window stride', () => {
+        /** ~970 tokens per turn whatever the tool-result shape. */
+        const bigText = (i: number): AgentMessage[] => [
+            { role: 'user', content: `q${i}` },
+            { role: 'assistant', content: 'x'.repeat(2_900) },
+        ];
+        const turnsOf = (count: number): AgentMessage[] =>
+            Array.from({ length: count }, (_, i) => bigText(i)).flat();
+        const windowed = {
+            turns: 4,
+            toolResultTurns: 2,
+            stride: 2,
+            toolResultStride: 2,
+        };
+        const firstQuestion = (
+            out: readonly AgentMessage[]
+        ): string | undefined => out.find(m => m.role === 'user')?.content;
+
+        it('drops whole stride blocks, so the head stays on a stride multiple', () => {
+            // Window head 6 (turns 6..9, ~3,900 tokens): one drop is needed and
+            // it removes a block of two (head 8), not a single turn.
+            const out = selectHistoryWindow(turnsOf(10), {
+                ...windowed,
+                budgetTokens: 3_500,
+            });
+            expect(firstQuestion(out)).toBe('q8');
+        });
+
+        it('a rolling window (stride 1) drops one turn at a time instead', () => {
+            const out = selectHistoryWindow(turnsOf(10), {
+                ...windowed,
+                stride: 1,
+                budgetTokens: 3_500,
+            });
+            expect(firstQuestion(out)).toBe('q7');
+        });
+
+        it('always keeps the last turn, even over budget', () => {
+            const out = selectHistoryWindow(turnsOf(10), {
+                ...windowed,
+                budgetTokens: 10,
+            });
+            expect(firstQuestion(out)).toBe('q9');
+            expect(out.filter(m => m.role === 'user')).toHaveLength(1);
+        });
+
+        it('an odd turn count still drops to the next stride multiple', () => {
+            // 11 turns, turns 4, stride 2: head 6, kept 6..10 (~4,850 tokens).
+            const out = selectHistoryWindow(turnsOf(11), {
+                ...windowed,
+                budgetTokens: 3_500,
+            });
+            expect(firstQuestion(out)).toBe('q8');
+        });
+    });
+
+    it.each([0, -3, 1.5])(
+        'stride and toolResultStride %s behave as 1',
+        value => {
+            const history = fullHistory(12);
+            const reference = selectHistoryWindow(history, {
+                ...BASE,
+                stride: 1,
+                toolResultStride: 1,
+            });
+            expect(
+                selectHistoryWindow(history, {
+                    ...BASE,
+                    stride: value,
+                    toolResultStride: value,
+                })
+            ).toEqual(reference);
+        }
+    );
+});

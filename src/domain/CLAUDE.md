@@ -235,6 +235,12 @@ real-LLM A/B on the visible result (OLD against NEW, same inputs, enough runs). 
 effects too (a card leaving its own field empty) and treat small differences at small n as
 no improvement. When the visible output does not improve, revert the change.
 
+A rule that exempts one kind of value (from rounding, a budget, a format) names the kinds it
+does NOT cover; the model stretches an unqualified exemption onto neighbouring values. A fact
+the model would otherwise derive itself (a time converted to another zone, a ratio) is computed
+and printed by code, because the model's own derivation is the part that goes wrong.
+❌ "per-share amounts keep their decimals" ✅ "per-share amounts keep their decimals; indicator readings and changes still round"
+
 Why: a floor on the structural risk:reward leg passed every unit test and still flipped a
 third of verdicts on real charts (see the note under the confluence section above).
 
@@ -256,6 +262,8 @@ computing derived values, so a recomputation from the rendered text matches.
   explicit carve-out in any style rule that could suppress it.
 - A rule split by condition (depth level, tool availability) keeps null and absence handling
   in every branch; otherwise the uncovered branch fills the gap with an unsupported guess.
+  A rule that quotes a field (a date "from the result's `asOf`") also states the absent case
+  ("otherwise no basis clause, never a date inferred elsewhere"), or the model invents one.
 - A closed-list tool's off-list branch forbids the substitute call explicitly, in both the
   tool description and its routing row ("never call it with a neighbouring entry as a
   stand-in"); "say no match" alone is read as permission to call the nearest entry.
@@ -389,7 +397,10 @@ consumer to add later. Check each condition against the tool description and the
 consumer returns today; if the field is not there yet, word the rule so it degrades safely
 when the field is absent, and name the consumer action in the `PUBLIC_API.md` row. A rule
 that holds at only one of the answer levels it governs (summary vs detail) is applied at
-all of them. A routing row or first-step rule is matched before any tool result exists, so a
+all of them. A rule is not triggered by the mere presence of a field every result carries
+("when the result carries `latest.oscillatorSummary`"): it would fire on every answer and
+override the level's figure budget; trigger it on the shape of the question or answer and
+state the budget in the rule. A routing row or first-step rule is matched before any tool result exists, so a
 condition that reads a tool result (a session flag, a found/degraded field) says to call that
 tool first and decide in a later step; it never gates a first-step parallel call on a fact
 that does not exist yet. The same holds for an exclusion or boundary between two routes

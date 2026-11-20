@@ -15,12 +15,17 @@ import type {
     RunAgentTurnParams,
 } from '@/application/agent/types';
 import type {
+    AgentMessage,
     AgentProviderResult,
     CallAgentProviderOptions,
 } from '@/domain/ports/agentProvider';
 import type { CounterStore } from '@/domain/ports/counterStore';
 import { CounterStoreUnavailableError } from '@/domain/ports/counterStore';
-import { AGENT_PROMPT_VERSION } from '@/domain/agent/buildAgentSystemPrompt';
+import {
+    AGENT_PROMPT_VERSION,
+    buildAgentTurnContext,
+    composeAgentUserMessage,
+} from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_IMAGES_PER_MESSAGE_MAX } from '@/domain/agent/attachedImages';
 
 const USAGE = {
@@ -214,10 +219,10 @@ describe('runAgentTurn', () => {
             "User's local time: 2026-09-15 00:00 KST"
         );
         expect(a.messages.at(-1)!.content).toContain(
-            'US regular session: open'
+            '- US stocks (NYSE/Nasdaq): open; closes Mon 2026-09-14 16:00 ET (Tue 2026-09-15 05:00 KST) (in 5h 0m)'
         );
         expect(b.messages.at(-1)!.content).toContain(
-            'US regular session: closed'
+            '- US stocks (NYSE/Nasdaq): after-hours; opens Tue 2026-09-15 09:30 ET (Tue 2026-09-15 22:30 KST) (in 15h 53m)'
         );
     });
 
@@ -901,7 +906,9 @@ describe('runAgentTurn', () => {
         expect(p.calls[0]!.messages.at(-1)!.content).toContain(
             "User's local time: 2026-"
         );
-        expect(p.calls[0]!.messages.at(-1)!.content).toMatch(/ P[DS]T\n/);
+        expect(p.calls[0]!.messages.at(-1)!.content).toMatch(
+            / P[DS]T \(\w+day; this week /
+        );
     });
 
     it('실행 결과가 순환 참조/BigInt면 직렬화 실패를 unserializable_result로 돌려준다', async () => {
@@ -1117,7 +1124,11 @@ describe('runAgentTurn', () => {
         const d = deps(p);
         // `free` so the turn is actually counted and the refund is observable.
         const r = await runAgentTurn(params({ tier: 'free' }), d);
-        expect(r).toEqual({ ok: false, error: 'rate_limited' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'rate_limited',
+            turnAt: expect.any(String),
+        });
         expect(d.counters.turns.count).toBe(0);
     });
 
@@ -1131,7 +1142,11 @@ describe('runAgentTurn', () => {
             params({ tier: 'pro', model: 'claude-sonnet-5-5' }),
             d
         );
-        expect(r).toEqual({ ok: false, error: 'rate_limited' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'rate_limited',
+            turnAt: expect.any(String),
+        });
         expect(d.counters.premiumTurns.count).toBe(0);
         expect(d.counters.turns.count).toBe(0);
     });
@@ -1156,7 +1171,12 @@ describe('runAgentTurn', () => {
             params({ tier: 'free', signal: controller.signal }),
             d
         );
-        expect(r).toEqual({ ok: false, error: 'aborted', partialText: '부분' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'aborted',
+            partialText: '부분',
+            turnAt: expect.any(String),
+        });
         expect(d.counters.turns.count).toBe(1);
     });
 
@@ -1185,6 +1205,7 @@ describe('runAgentTurn', () => {
             ok: false,
             error: 'aborted',
             partialText: '확인 중',
+            turnAt: expect.any(String),
         });
         expect(p.call).toHaveBeenCalledTimes(1);
         expect(d.counters.turns.count).toBe(1);
@@ -1203,7 +1224,11 @@ describe('runAgentTurn', () => {
         const pending = runAgentTurn(params({ tier: 'free' }), d);
         await vi.advanceTimersByTimeAsync(600_001);
         const r = await pending;
-        expect(r).toEqual({ ok: false, error: 'deadline' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'deadline',
+            turnAt: expect.any(String),
+        });
         expect(providerSignal?.aborted).toBe(true);
         expect(d.counters.turns.count).toBe(1);
     });
@@ -1235,7 +1260,11 @@ describe('runAgentTurn', () => {
             params({ tier: 'free', signal: controller.signal }),
             d
         );
-        expect(r).toEqual({ ok: false, error: 'aborted' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'aborted',
+            turnAt: expect.any(String),
+        });
         expect(p.call).toHaveBeenCalledTimes(1);
         expect(d.counters.turns.count).toBe(1);
     });
@@ -1255,7 +1284,11 @@ describe('runAgentTurn', () => {
         };
         const d = deps(p);
         const r = await runAgentTurn(params({ signal: controller.signal }), d);
-        expect(r).toEqual({ ok: false, error: 'aborted' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'aborted',
+            turnAt: expect.any(String),
+        });
         await vi.waitFor(() => expect(lateEmitted).toBe(true));
         expect(d.events).toEqual([]);
     });
@@ -1281,7 +1314,11 @@ describe('runAgentTurn', () => {
             return ok;
         };
         const r = await runAgentTurn(params({ signal: controller.signal }), d);
-        expect(r).toEqual({ ok: false, error: 'aborted' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'aborted',
+            turnAt: expect.any(String),
+        });
         expect(d.executeTool).not.toHaveBeenCalled();
         expect(d.counters.webSearchUser.count).toBe(0);
         expect(d.events.some(e => e.type === 'tool_start')).toBe(false);
@@ -1294,7 +1331,11 @@ describe('runAgentTurn', () => {
         );
         const d = deps(p);
         const r = await runAgentTurn(params({ tier: 'free' }), d);
-        expect(r).toEqual({ ok: false, error: 'server_error' });
+        expect(r).toEqual({
+            ok: false,
+            error: 'server_error',
+            turnAt: expect.any(String),
+        });
         expect(d.counters.turns.count).toBe(0);
     });
 
@@ -1484,5 +1525,324 @@ describe('runAgentTurn — 첨부 이미지', () => {
             deps(p)
         );
         expect(p.calls[0]!.toolChoice).toBe('required');
+    });
+});
+
+describe('runAgentTurn — turn note persistence and prefix stability', () => {
+    /** One member turn: a tool call, then the answer. */
+    const toolThenAnswer = (): AgentProviderResult[] => [
+        {
+            text: '',
+            toolCalls: [quoteCall],
+            stopReason: 'tool_use',
+            usage: USAGE,
+        },
+        { text: '답', toolCalls: [], stopReason: 'end', usage: USAGE },
+    ];
+    const answerOnly = (): AgentProviderResult[] => [
+        { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+    ];
+
+    /** Unwraps a lookup that must succeed, instead of a `!` assertion. */
+    function must<T>(value: T | undefined): T {
+        if (value === undefined) throw new Error('expected a value');
+        return value;
+    }
+
+    /** The only provider call of a single-call turn. */
+    const onlyCall = (p: { calls: CallAgentProviderOptions[] }) =>
+        must(p.calls.at(-1));
+
+    interface Request {
+        /** Turn the request belongs to (1-based). */
+        turn: number;
+        system: string;
+        tools: unknown;
+        messages: AgentMessage[];
+    }
+    interface Simulated {
+        requests: Request[];
+        turnAts: string[];
+        rows: AgentMessage[];
+    }
+
+    /**
+     * Runs `turnCount` member turns, storing history exactly as a consumer
+     * does: the user row with the returned `turnAt`, then the
+     * intermediate rows, then the assistant.
+     */
+    function simulate(
+        turnCount: number,
+        paramOverrides: (
+            turn: number
+        ) => Partial<RunAgentTurnParams> = () => ({})
+    ): Promise<Simulated> {
+        const turns = Array.from({ length: turnCount }, (_, i) => i + 1);
+        return turns.reduce<Promise<Simulated>>(
+            async (previous, turn) => {
+                const state = await previous;
+                const p = scriptedProvider(toolThenAnswer());
+                const userMessage = `질문 ${turn}`;
+                const r = await runAgentTurn(
+                    params({
+                        history: state.rows,
+                        userMessage,
+                        now: new Date(Date.UTC(2026, 8, 12, 14, 30 + turn * 7)),
+                        ...paramOverrides(turn),
+                    }),
+                    deps(p)
+                );
+                if (!r.ok || r.turnAt === undefined)
+                    throw new Error('expected ok with a turn instant');
+                return {
+                    requests: [
+                        ...state.requests,
+                        ...p.calls.map(c => ({
+                            turn,
+                            system: c.system,
+                            tools: c.tools,
+                            messages: c.messages,
+                        })),
+                    ],
+                    turnAts: [...state.turnAts, r.turnAt],
+                    rows: [
+                        ...state.rows,
+                        {
+                            role: 'user' as const,
+                            content: userMessage,
+                            turnAt: r.turnAt,
+                        },
+                        ...r.intermediate,
+                        r.assistant,
+                    ],
+                };
+            },
+            Promise.resolve({ requests: [], turnAts: [], rows: [] })
+        );
+    }
+
+    const firstOfTurn = (requests: readonly Request[], turn: number): Request =>
+        must(requests.find(r => r.turn === turn));
+    const lastOfTurn = (requests: readonly Request[], turn: number): Request =>
+        must(requests.filter(r => r.turn === turn).at(-1));
+
+    const startsWith = (
+        whole: readonly AgentMessage[],
+        prefix: readonly AgentMessage[]
+    ): boolean =>
+        prefix.length <= whole.length &&
+        prefix.every((m, i) => JSON.stringify(m) === JSON.stringify(whole[i]));
+
+    it("turn N+1 extends turn N's last request, except at the turns where a tool result flips to omitted", async () => {
+        const { requests } = await simulate(9);
+        const extendsPrevious = (turn: number): boolean =>
+            startsWith(
+                firstOfTurn(requests, turn).messages,
+                lastOfTurn(requests, turn - 1).messages
+            );
+
+        [2, 3, 4, 6, 8].forEach(turn =>
+            expect(extendsPrevious(turn)).toBe(true)
+        );
+        [5, 7, 9].forEach(turn => expect(extendsPrevious(turn)).toBe(false));
+        const first = firstOfTurn(requests, 1);
+        Array.from({ length: 8 }, (_, i) => i + 2).forEach(turn => {
+            expect(firstOfTurn(requests, turn).system).toBe(first.system);
+            expect(firstOfTurn(requests, turn).tools).toEqual(first.tools);
+        });
+    });
+
+    /** A mid-minute instant with milliseconds: the note's lead ("in 22m") reads them. */
+    const AT = new Date('2026-11-20T14:08:41.250Z');
+    const FIRST = '엔비디아 어때?';
+    const replayHistory = (turnAt: string): AgentMessage[] => [
+        { role: 'user', content: FIRST, turnAt },
+        { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+    ];
+    const firstMessageSent = (p: { calls: CallAgentProviderOptions[] }) =>
+        must(onlyCall(p).messages.at(0)).content;
+    const liveMessageSent = (p: { calls: CallAgentProviderOptions[] }) =>
+        must(onlyCall(p).messages.at(-1)).content;
+
+    it('a history message with turnAt = T replays byte-identical to the live message sent at T', async () => {
+        const live = scriptedProvider(answerOnly());
+        const liveResult = await runAgentTurn(
+            params({ userMessage: FIRST, now: AT }),
+            deps(live)
+        );
+        if (!liveResult.ok) throw new Error('expected ok');
+        const later = scriptedProvider(answerOnly());
+        await runAgentTurn(
+            params({
+                history: replayHistory(must(liveResult.turnAt)),
+                now: new Date('2026-11-21T03:00:00.000Z'),
+            }),
+            deps(later)
+        );
+        expect(firstMessageSent(later)).toBe(liveMessageSent(live));
+        expect(firstMessageSent(later)).toContain('(in 22m)');
+    });
+
+    it('turnAt round-trips through toISOString at millisecond precision', async () => {
+        const p = scriptedProvider(answerOnly());
+        const r = await runAgentTurn(params({ now: AT }), deps(p));
+        if (!r.ok) throw new Error('expected ok');
+        expect(r.turnAt).toBe('2026-11-20T14:08:41.250Z');
+        expect(new Date(must(r.turnAt)).getTime()).toBe(AT.getTime());
+    });
+
+    it('a different time zone on the later turn changes only that message note (one cache miss)', async () => {
+        const live = scriptedProvider(answerOnly());
+        await runAgentTurn(params({ userMessage: FIRST, now: AT }), deps(live));
+        const later = scriptedProvider(answerOnly());
+        await runAgentTurn(
+            params({
+                history: replayHistory(AT.toISOString()),
+                timeZone: 'America/Los_Angeles',
+            }),
+            deps(later)
+        );
+        const replayed = firstMessageSent(later);
+        expect(replayed).not.toBe(liveMessageSent(live));
+        expect(replayed).toBe(
+            composeAgentUserMessage(
+                buildAgentTurnContext({
+                    locale: 'ko',
+                    now: AT,
+                    timeZone: 'America/Los_Angeles',
+                }),
+                FIRST
+            )
+        );
+        expect(onlyCall(later).messages.slice(1, 2)).toEqual([
+            { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+        ]);
+    });
+
+    it.each([
+        ['', 'empty'],
+        ['garbage', 'not a date'],
+        ['2026-11-20', 'date only'],
+        ['2026-11-20T14:08:41Z', 'no milliseconds'],
+        ['2026-13-45T00:00:00.000Z', 'impossible date'],
+    ])(
+        'an invalid turnAt (%s: %s) replays the message without a note',
+        async value => {
+            const p = scriptedProvider(answerOnly());
+            await runAgentTurn(
+                params({ history: replayHistory(value) }),
+                deps(p)
+            );
+            expect(onlyCall(p).messages.slice(0, 1)).toEqual([
+                { role: 'user', content: FIRST },
+            ]);
+        }
+    );
+
+    it('never hands a provider a turnAt key', async () => {
+        const { requests } = await simulate(4);
+        const keys = requests.flatMap(r => r.messages.map(m => 'turnAt' in m));
+        expect(keys.length).toBeGreaterThan(0);
+        expect(keys.every(has => !has)).toBe(true);
+    });
+
+    it('history without turnAt is sent as stored', async () => {
+        const history: AgentMessage[] = [
+            { role: 'user', content: '엔비디아 어때?' },
+            { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+        ];
+        const p = scriptedProvider(answerOnly());
+        await runAgentTurn(params({ history }), deps(p));
+        expect(onlyCall(p).messages.slice(0, -1)).toEqual(history);
+    });
+
+    it('strips turnAt from assistant and tool messages without adding a note or touching content', async () => {
+        const history: AgentMessage[] = [
+            { role: 'user', content: FIRST },
+            {
+                role: 'assistant',
+                content: '',
+                toolCalls: [quoteCall],
+                turnAt: AT.toISOString(),
+            },
+            {
+                role: 'tool',
+                content: '{"price":1}',
+                toolCallId: quoteCall.id,
+                toolName: quoteCall.name,
+                turnAt: AT.toISOString(),
+            },
+            { role: 'assistant', content: '답', turnAt: AT.toISOString() },
+        ];
+        const p = scriptedProvider(answerOnly());
+        await runAgentTurn(params({ history }), deps(p));
+        const sent = onlyCall(p).messages;
+        expect(sent.slice(0, 4)).toEqual([
+            { role: 'user', content: FIRST },
+            { role: 'assistant', content: '', toolCalls: [quoteCall] },
+            {
+                role: 'tool',
+                content: '{"price":1}',
+                toolCallId: quoteCall.id,
+                toolName: quoteCall.name,
+            },
+            { role: 'assistant', content: '답' },
+        ]);
+        expect(sent.some(m => 'turnAt' in m)).toBe(false);
+    });
+
+    it('returns the turn instant on success and on a provider failure, never on a gate refusal', async () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const ok = await runAgentTurn(
+            params({ now: AT }),
+            deps(scriptedProvider(answerOnly()))
+        );
+        expect(ok).toMatchObject({ ok: true, turnAt: AT.toISOString() });
+
+        const failed = await runAgentTurn(
+            params({ tier: 'free', now: AT }),
+            deps(
+                failingProvider(Object.assign(new Error('rl'), { status: 429 }))
+            )
+        );
+        expect(failed).toMatchObject({
+            ok: false,
+            error: 'rate_limited',
+            turnAt: AT.toISOString(),
+        });
+
+        const gated = deps(scriptedProvider([]));
+        gated.counters.turns = memoryCounter(0);
+        const refused = await runAgentTurn(params({ tier: 'free' }), gated);
+        expect(refused).toEqual({ ok: false, error: 'turn_limit' });
+        expect('turnAt' in refused).toBe(false);
+    });
+
+    it('passes krSession into the note and keeps the system prompt independent of it', async () => {
+        const krSession = {
+            kind: 'scheduled' as const,
+            timeZone: 'Asia/Seoul',
+            openMinute: 540,
+            closeMinute: 930,
+            weekendDays: [0, 6],
+        };
+        const withKr = scriptedProvider(answerOnly());
+        const without = scriptedProvider(answerOnly());
+        await runAgentTurn(params({ krSession }), deps(withKr));
+        await runAgentTurn(params(), deps(without));
+        expect(must(onlyCall(withKr).messages.at(-1)).content).toContain(
+            '- Korean stocks (KRX): closed; opens Mon 2026-09-14 09:00 KST'
+        );
+        expect(must(onlyCall(without).messages.at(-1)).content).not.toContain(
+            'KRX'
+        );
+        expect(onlyCall(withKr).system).toBe(onlyCall(without).system);
+    });
+
+    it('the system prompt is byte-identical for any now', async () => {
+        const { requests } = await simulate(3, turn => ({
+            now: new Date(Date.UTC(2026, 8, 12 + turn * 9, turn * 5)),
+        }));
+        expect(new Set(requests.map(r => r.system)).size).toBe(1);
     });
 });

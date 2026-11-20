@@ -33,7 +33,6 @@ import {
 } from '@/domain/ports/counterStore';
 import { isPremiumModel } from '@/domain/tier';
 import type { NormalizedUsage } from '@/domain/types';
-import { getEtSessionStatus } from '@/domain/utils';
 import { classifyProviderError } from '@/application/shared/providerError';
 import { PREMIUM_MODEL_USAGE_ACTION } from '@/application/shared/usageActions';
 import {
@@ -60,6 +59,12 @@ const HISTORY_WINDOW = {
     // Drop old turns 4 at a time instead of 1 per turn, so the window's head —
     // and with it the cached prefix — holds still for 4 turns at a stretch.
     stride: 4,
+    // Tool results flip to `omitted` 2 turns at a time instead of 1 per turn:
+    // each flip changes bytes mid-history and ends the cached prefix there.
+    // 2 (not 4) keeps heavy turns inside the budget. The boundary moves at
+    // turn counts 4, 6, 8, 10…, the window head at 12, 16…: the prefix breaks
+    // once per `toolResultStride` turns (the flip turns), by design.
+    toolResultStride: 2,
 } as const;
 /** Measured medians surfaced to the UI as a progress hint. */
 const FRESH_ANALYSIS_ESTIMATED_SECONDS: Record<FreshAnalysisKind, number> = {
@@ -224,6 +229,40 @@ function withoutImages(message: AgentMessage): AgentMessage {
         : { ...rest, content: `${rest.content}\n${marker}` };
 }
 
+/** What `Date.prototype.toISOString` writes: UTC, `T`, milliseconds, `Z`. */
+const TURN_AT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/** The instant a stored `turnAt` names, or `null` when it is malformed. */
+function parseTurnAt(turnAt: string | undefined): Date | null {
+    if (turnAt === undefined || !TURN_AT_RE.test(turnAt)) return null;
+    const at = new Date(turnAt);
+    return Number.isNaN(at.getTime()) ? null : at;
+}
+
+/**
+ * A stored user message that carries a `turnAt` is sent as it was on its own
+ * turn: its note is rebuilt with the live builder at that instant (and the
+ * current request's zone, locale and `krSession`), then composed with the
+ * user's words. The field is dropped: a provider only ever sees the composed
+ * `content`. A missing or malformed `turnAt` replays the message without a
+ * note. Messages without the field are returned as the same object, so
+ * history passes through untouched.
+ */
+function withTurnNote(
+    message: AgentMessage,
+    noteAt: (at: Date) => string
+): AgentMessage {
+    if (!('turnAt' in message)) return message;
+    const { turnAt, ...rest } = message;
+    const at = message.role === 'user' ? parseTurnAt(turnAt) : null;
+    return at === null
+        ? rest
+        : {
+              ...rest,
+              content: composeAgentUserMessage(noteAt(at), rest.content),
+          };
+}
+
 /** Per-turn budget: caps from `AGENT_TURN_CAPS`, all pure and local to one turn. */
 class TurnBudget {
     private toolCalls = 0;
@@ -356,22 +395,41 @@ export async function runAgentTurn(
     // Prefix-cache layout (DeepSeek caches the longest byte-identical request
     // prefix): system prompt → tool defs → history are stable across turns;
     // everything that changes per turn (the clock, the session status) rides
-    // on the latest user message only. The consumer persists the plain
-    // `userMessage`, so next turn this message is history without the note.
+    // on the latest user message only. The consumer persists the turn's
+    // instant (`result.turnAt`) with the message and sends it back in
+    // history, where `withTurnNote` rebuilds the note from it with the same
+    // builder, so the message replays with the same bytes. The note is a pure
+    // function of (instant, time zone, locale, krSession). Known exceptions to
+    // the byte-prefix guarantee: image turns (the attachment marker is
+    // appended on replay), the flip turns (a tool result changes to `omitted`
+    // every `toolResultStride` turns), and a rebuilt note that differs from
+    // the original because the user's zone or locale or the passed session
+    // spec changed between turns, or a core version changed the note format
+    // (each costs one cache miss, never an error).
     const system = buildAgentSystemPrompt({
         locale: params.locale,
         tools,
         portfolioSymbols: params.portfolioSymbols,
         guest: tier === 'free',
     });
-    const turnContext = buildAgentTurnContext({
-        locale: params.locale,
-        now,
-        timeZone,
-        etSessionStatus: getEtSessionStatus(now),
-    });
+    const noteAt = (at: Date): string =>
+        buildAgentTurnContext({
+            locale: params.locale,
+            now: at,
+            timeZone,
+            krSession: params.krSession,
+        });
+    const turnNote = noteAt(now);
+    // Millisecond precision matters: the note's "in 21m" lead reads the
+    // instant's milliseconds, so a rebuild from this string is byte-identical.
+    const turnAt = now.toISOString();
+    // Earlier user messages are re-sent WITH the note they were sent with
+    // (rebuilt from their `turnAt`), so they stay byte-identical to the
+    // previous request.
     const historyWindow = selectHistoryWindow(
-        params.history,
+        params.history.some(m => 'turnAt' in m)
+            ? params.history.map(m => withTurnNote(m, noteAt))
+            : params.history,
         HISTORY_WINDOW
     ).map(withoutImages);
     const userImages = (params.userImages ?? [])
@@ -381,7 +439,7 @@ export async function runAgentTurn(
         ...historyWindow,
         {
             role: 'user',
-            content: composeAgentUserMessage(turnContext, params.userMessage),
+            content: composeAgentUserMessage(turnNote, params.userMessage),
             ...(userImages.length > 0 ? { images: userImages } : {}),
         },
     ];
@@ -413,6 +471,7 @@ export async function runAgentTurn(
     const failure = (error: AgentErrorCode): RunAgentTurnResult => ({
         ok: false,
         error,
+        turnAt,
         ...(partialText !== '' ? { partialText } : {}),
     });
     /** Caller abort wins over the deadline when both have fired. */
@@ -705,6 +764,7 @@ export async function runAgentTurn(
                     remaining,
                     promptVersion: AGENT_PROMPT_VERSION,
                     toolsUsed,
+                    turnAt,
                 };
             }
 

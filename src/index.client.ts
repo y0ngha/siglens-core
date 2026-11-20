@@ -472,6 +472,13 @@ export {
 } from './domain/indicators/constants';
 export { rsiZone } from './domain/indicators/rsiZone';
 export type { RsiZone } from './domain/indicators/rsiZone';
+export { classifyOscillatorZones } from './domain/indicators/oscillatorZones';
+export type {
+    OscillatorKey,
+    OscillatorReadings,
+    OscillatorZone,
+    OscillatorZonesView,
+} from './domain/indicators/oscillatorZones';
 
 // Domain ports + infrastructure type-only interfaces are safe for browser consumers.
 export type { CacheProvider } from './domain/ports/cache';

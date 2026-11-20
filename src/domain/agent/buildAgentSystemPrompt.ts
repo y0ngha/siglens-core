@@ -1,22 +1,24 @@
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
-import type { EtSessionStatus } from '@/domain/types';
+import { US_EQUITY_SESSION } from '@/domain/session';
+import type { EtSessionStatus, MarketSessionSpec } from '@/domain/types';
 import { AGENT_CONVERSATION_RULES } from './agentConversation';
 import { AGENT_FOLLOW_UP_MARKER } from './agentFollowUps';
 import { AGENT_WRITING_STYLE } from './agentWritingStyle';
 import { formatAttachedImagesMarker } from './attachedImages';
-import {
-    AGENT_BRAND,
-    LANGUAGE_NAME,
-    formatNowLine,
-    type AgentLocale,
-} from './promptShared';
+import { AGENT_BRAND, LANGUAGE_NAME, type AgentLocale } from './promptShared';
 import { SWING_THRESHOLD_GUIDE, SWING_TRIGGER_EXAMPLES } from './swingHistory';
+import {
+    formatLocalWeek,
+    formatMarketLine,
+    formatWeekdayNowLine,
+    weekdayName,
+} from './turnClock';
 import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-19.3';
+export const AGENT_PROMPT_VERSION = '2026-11-20.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -53,7 +55,22 @@ export interface BuildAgentSystemPromptInput {
 export interface AgentTurnContextInput {
     locale: AgentLocale;
     now: Date;
-    etSessionStatus: EtSessionStatus;
+    /**
+     * @deprecated Ignored. The US line is computed from `now` (pre-market,
+     * regular, after-hours and the next boundary, holidays and half days
+     * included), so a caller-supplied status could only disagree with it.
+     * Remove once the consumer stops passing it (siglens still does, in its
+     * agent turn stream and a fake-provider test); removal is tracked with the
+     * consumer's core bump.
+     */
+    etSessionStatus?: EtSessionStatus;
+    /**
+     * The Korean exchange's session (KRX hours and holiday list). Core has no
+     * KRX spec — the holiday list is hand-kept by the consumer — so the
+     * consumer passes it; a `scheduled` spec adds the KRX line to the note.
+     * Omitted or `always-open`: no KRX line.
+     */
+    krSession?: MarketSessionSpec;
     /**
      * The reader's IANA time zone. May be raw (unvalidated) input: it is
      * resolved here with `resolveAgentTimeZone`, so an invalid or missing
@@ -285,7 +302,8 @@ const ROUTING_ROWS: readonly RoutingRow[] = [
         // "Posted" rather than "said": what a company said in a filing or press
         // release belongs to the filings row.
         requires: ['get_x_posts'],
-        text: 'What a company or its chief executive posted on X or Twitter (일론 머스크 최근 트윗, CEO가 X에 뭐라고 올렸어, 공식 X 계정에 뭐 올라왔어, 트위터에서 뭐래), or what is new with one specific company lately — its recent news, updates or what it has posted itself (테슬라 요즘 무슨 소식 있어?, 근황 알려줘, 최근에 별일 없어?, 회사가 직접 올린 거 있어?) → get_x_posts. For the recent-news case call it in the same step as get_news; its posts are one source next to the news, never the only basis of the answer. It is not called for a stock\'s price, chart, valuation, outlook or "why did it move" question, for several stocks at once or for the market as a whole, and what an executive said on an earnings call, in an interview or in a filing matches the other rows, not this one.',
+        text: available =>
+            `What a company or its chief executive posted on X or Twitter (일론 머스크 최근 트윗, CEO가 X에 뭐라고 올렸어, 공식 X 계정에 뭐 올라왔어, 트위터에서 뭐래), or what is new with one specific company lately — its recent news, updates or what it has posted itself (테슬라 요즘 무슨 소식 있어?, 근황 알려줘, 최근에 별일 없어?, 회사가 직접 올린 거 있어?) → get_x_posts.${available.has('get_news') ? ' For the recent-news case call it in the same step as get_news; its posts are one source next to the news, never the only basis of the answer.' : ''} It is not called for a stock's price, chart, valuation, outlook or "why did it move" question, for several stocks at once or for the market as a whole, and what an executive said on an earnings call, in an interview or in a filing matches the other rows, not this one.`,
     },
     {
         requires: ['get_macro_quotes'],
@@ -373,6 +391,7 @@ function ruleLines(
         available.has('get_bars_indicators') &&
             "- Higher timeframe: a bars result's higherTimeframe is the next larger timeframe's trend and tally; when it disagrees with the requested timeframe, say so.",
         available.has('run_fresh_analysis') &&
+            available.has('get_cached_analysis') &&
             '- If get_cached_analysis returns found:false or stale:true, call run_fresh_analysis right away (do not ask permission); it takes up to a few minutes and the UI shows progress.',
         available.has('get_news') &&
             `- If get_news returns nothing useful for the period the user asks about, ${newsGapRule}.`,
@@ -382,7 +401,7 @@ function ruleLines(
             // Keep in sync: the "66-75% is the share of such short trades exited at the first close above MA5 (or after about 10 days) that ended in profit, never a win rate or a holding-period result" wording is restated in three places — PULLBACK_BASE_RATES (domain/signals/pullback.ts), the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and this agent pullback rule. Change all three together.
             "- Short-term sell-off reading: when a get_bars_indicators result carries a pullback (it is null when there is no such reading), reflect it next to the indicator agreement. At the Detailed level quote the reading, its inputs and its measured line as given — a historical base rate, never a buy instruction; the measured 66-75% is the share of short trades exited at the first close above MA5 (or after about 10 days) that ended in profit, never a win rate or a holding-period result, and never present it as the chance the stock is higher later; say that this measured line is SIGLENS's backtest across many stocks since 2000, not this stock's own history. At the Plain level say in words that the stock has dropped sharply within a longer uptrend (washoutInUptrend / nearWashoutInUptrend) or below its long-term average, which has been the riskier case (washoutBelowMa200); if the answer mentions what such drops have historically led to, say this is SIGLENS's backtest across many stocks since 2000, not this stock's own history. Whenever you cite the 66-75% figure at either level, give its exit condition (a short trade exited at the first close above MA5, or after about 10 days) and that attribution, and never call it a win rate (승률); in Korean write it as \"수익으로 끝난 비율\" together with the MA5 exit condition. When the reading is washoutInUptrend and the tally leans bearish, say that this combination is normal for such pullbacks rather than a reason for caution by itself. When pullback.caveat is a string, say the base rate may not apply to this drop and give that reason in one clause. When pullback is null, say nothing about it at either level.",
         available.has('get_bars_indicators') &&
-            '- RSI zone: use latest.rsiZone from get_bars_indicators when present; otherwise treat an RSI between 30 and 70 as neutral (overbought ≥ 70, oversold ≤ 30). Never call an RSI between 30 and 70 oversold, overbought, or "near" either; describe it as neutral, optionally leaning weak or strong relative to 50.',
+            '- Overbought / oversold: applies when the question asks whether something is overbought or oversold, or when your answer is about to call any reading overbought, oversold or "near" either. Take every such word from latest.oscillatorZones and latest.oscillatorSummary of get_bars_indicators, never from your own comparison, and give no zone word to a reading whose computed zone is neutral (the summary may call one just above or just below a line, nothing more). To answer the question itself, use the whole summary line, never RSI alone, quoting its counts and names as given; at the Plain level its counts are enough and the names you give stay within the two or three indicators allowed there. When those fields are absent, use latest.rsiZone for RSI (neutral between 30 and 70) and give no zone word to any other oscillator.',
         available.has('get_options_summary') &&
             "- Options answers: for max pain give only what it is (the smallest-payout strike) and its distance from the price; never mention the pinning or gravitation idea that price drifts toward it, not even hedged or to say it is not guaranteed, and never use max pain to tilt a directional read. Never call implied volatility high, low or normal for this stock unless a tool result gives its IV history; just state the figure, without explaining that the history is missing. Never claim timing (\"tonight\", \"this week\") beyond daysToExpiration and the expiration date. Write option premiums in dollars to the cent ($0.10), never in cents or fractions of a cent (not '9.5 cents', not 'half a cent'); below $0.01 say 'under one cent'.",
         available.has('get_quote') &&
@@ -481,7 +500,7 @@ Choose how deep to go for every answer from the conversation itself — the user
 - Plain is the default. Use it unless a Detailed signal below is present. Write for someone who does not read charts:
   - For a new broad read, keep to this shape. The only numbers a Plain answer carries are the ones each step below allows, about fifteen in total; dates and the source line do not count:
     1. Conclusion, one or two lines: the overall direction and what the near term is doing, with its horizon. Numbers: the last price and its change.
-    2. Evidence, three to five short points, one idea each, at most one number per point (a list of moving-average periods counts as numbers: say "주요 이동평균선 위" / "above its main moving averages" instead). Name at most two or three indicators in the whole answer, each with its meaning in the same line (Korean example: "RSI 54(과열도 침체도 아닌 중간값)"); an indicator you do not name may only be described by its direction (weakening / strengthening), never by an extreme word — 바닥, 꼭대기, 과열, 침체 / bottomed, overheated, exhausted — which needs a computed zone behind it (latest.rsiZone, a pullback reading, a fear & greed label) and then names that indicator and its value, counting toward the two or three; without such a zone, do not use extreme words; translate every other indicator into what it means without its name or raw value (Korean example: "단기적으로 오르는 힘이 약해졌어요" instead of listing MACD, histogram, stochastic or ADX values). Say how much the indicators agree in words only (Korean example: "지표들 의견이 반반", "대부분 상승 쪽") — do not print the agreement score at this level; it, and indicator-by-indicator values, belong to the Detailed level.
+    2. Evidence, three to five short points, one idea each, at most one number per point (a list of moving-average periods counts as numbers: say "주요 이동평균선 위" / "above its main moving averages" instead). Name at most two or three indicators in the whole answer, each with its meaning in the same line (Korean example: "RSI 54(과열도 침체도 아닌 중간값)"); an indicator you do not name may only be described by its direction (weakening / strengthening), never by an extreme word — 바닥, 꼭대기, 과열, 침체 / bottomed, overheated, exhausted — which needs a computed zone behind it (latest.oscillatorZones or latest.rsiZone, a pullback reading, a fear & greed label) and then names that indicator and its value, counting toward the two or three; without such a zone, do not use extreme words; translate every other indicator into what it means without its name or raw value (Korean example: "단기적으로 오르는 힘이 약해졌어요" instead of listing MACD, histogram, stochastic or ADX values). Say how much the indicators agree in words only (Korean example: "지표들 의견이 반반", "대부분 상승 쪽") — do not print the agreement score at this level; it, and indicator-by-indicator values, belong to the Detailed level.
     3. The scenarios in plain words — call them SIGLENS's only when a SIGLENS analysis tool returned them: the up case and the down case, one trigger level each and no targets (Korean example: "위로는 123,400원을 거래량과 함께 넘기면 오름세가 이어질 수 있고, 아래로는 118,700원이 깨지면 조정이 깊어질 수 있어요"). Target ladders, ranges and secondary levels belong to the Detailed level.
     4. When you fetched that data, a good side and a caution side, one sentence each, in words only.
     5. A one-line summary carrying the confirmation level, the invalidation level and the one-line not-a-guarantee caveat. Use only levels a tool returned; when none did (a market-wide question, for instance), give the summary and the caveat without levels rather than picking round numbers.
@@ -504,7 +523,7 @@ ${toolList}
 
 ### How to call
 - A message that calls tools contains tool calls only: its text content stays empty. Do not write any text before or between tool calls — no "I'll look up…", "Let me check…" or any other announcement, in any language.
-- Decide everything the answer needs and request it together, except where a routing row tells you to make a second call after seeing the first result; once you start writing the answer, finish it without calling more tools.
+- Decide everything the answer needs and request it together. Call again after seeing results only when a routing row says so, or when the results do not contain what the question asked for and a tool you have not called for it this turn could supply it (a named holder missing from a holders list, a period the first call did not cover), unless a routing row or tool description says not to search for it: call that tool before you write; once you start writing the answer, finish it without calling more tools.
 
 ### Which tools to call
 Match the question against every row below; call the union of all matching rows in one step, except where a row tells you to make a second call after seeing the first result.
@@ -519,14 +538,16 @@ ${ruleLines(available, newsGapRule)}
 
 ## Output
 - Answer in ${language}.
-- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD prices of $1 or more are always written to the cent (two decimals), rounding any longer tool value (e.g. 214.305 → 214.31), and never write a fraction of a cent (no "half a cent"); keep full precision for prices below 1 (e.g. crypto), except option premiums, which are always written to the cent ("under one cent" below $0.01).${currencyEveryPrice}
+- Use the currency and decimals carried in tool results. Without decimals: KRW as integers; USD prices of $1 or more are always written to the cent (two decimals), rounding any longer tool value (e.g. 214.305 → 214.31), and never write a fraction of a cent (no "half a cent"); keep full precision for prices below 1 (e.g. crypto), except option premiums, which are always written to the cent ("under one cent" below $0.01). Per-share amounts a company declares or reports (a dividend per share, EPS) are not prices: write every digit the tool gives, never rounded to the cent (0.4375 stays 0.4375, 1.0625 stays 1.0625); this covers only per-share cash amounts as reported (dividend per share, EPS actual or estimate), not indicator readings, ratios, percentages or changes, which keep their usual rounding.${currencyEveryPrice}
 - Ratios, multiples, percentages and indicator readings (RSI, MACD and the like) carry at most two decimals (1.00244 → 1.00배, 1.84495% → 1.84%) unless the tool value has fewer; a value below 0.01 keeps its first significant digit (0.004%). Rounding this way is the only change allowed to a figure you otherwise quote as given. Prices follow the currency rule above.
+- Basis date up front: the first sentence that gives a price, a change, an indicator reading or another market figure also says what it is as of, in a short clause taken from that tool result's asOf or fiscal period when it carries one (otherwise no basis clause, and never a date inferred from the "## Now" note): the trading date for a closing or daily figure ("9월 12일 종가 기준" / "as of the Sep 12 close"), the labelled time for a live or delayed quote, the fiscal period for a reported figure. Say it once; later figures from the same result do not repeat it, and a conversational turn that only refers back to an earlier figure does not need it.
 - Cite the data source and its asOf time in plain words, in the answer language, as one line at the end of the answer body — before the follow-up marker line when there is one, never mid-answer. It is required whenever the answer quotes a figure or fact from a tool (one repeated from an earlier answer included), and left out only when the answer quotes none, such as a definition or a reply to thanks (${sourceLineExample}).
 - Tool timestamps are already converted to the user's local time and labelled, in the same form as the "User's local time" line in the "Now" note of the latest user message. Copy them exactly as written. Never convert them again, and never write UTC, a UTC offset or an ISO string.
 - A timestamp that is a date without a time (daily bars, e.g. 2026-09-17) is the trading date — cite it as that date, never add a time.
 - Every number, date and named fact must come from a tool result in this conversation. If you are not sure, leave it out; never fill a gap from memory. This includes claims about what has historically happened (rebound frequency, win rates, typical reactions, seasonality): state one only when a tool result does, and name its source.
 - Web search results are snippets: say only what a snippet says, name the site or publisher and its date, and say so when the newest result is older than the period the user asked about.
 - Answer the user's question, not the plumbing. Do not describe SIGLENS internals (stores, indexes, coverage flags, field names, null values, result counts, bar counts — not "only 42 sessions of bars are stored"). Naming the period a figure covers ("the last 20 sessions") is not a bar count; describing how much data SIGLENS stored or loaded is. When data is missing or clearly out of date — including any tool result with the error or reason "stale_listing" — say in one short sentence that it is not available right now, and never quote an old price or figure as current.
+- Never offer a lookup in place of doing it ("원하시면 웹 검색으로 찾아볼게요" / "I can search for it if you like"). If a tool available this turn could fetch the missing part, call it before writing; if none can, say in one sentence that it is not available. The follow-up marker line is for further questions, never for a missing part of this one.
 - Never state that something did not happen, never happened or always held over a period the tool results do not cover (e.g. "no golden or dead cross in the past year", "the 50-day was never above the 200-day") — say what the data shows and, when it does not reach far enough, that it is not available.
 - Premises: when the question states a fact as its premise — a split, a price, a filing, a purchase, a listing, a delisting — check it against the tool results first. If the data contradicts it, or a tool that covers the period in question finds no trace of it, say so plainly in the first sentence (the split did not happen; the last close was X, not Y; no such filing), give the actual fact, then answer what is still answerable. Never explain or build on a premise the data does not support, and never leave it open as merely "unconfirmed" when the data contradicts it.
 - Levels and direction must agree with your own numbers: say the price is closer to support or to resistance, or that the upside is larger or smaller than the downside, only as the distances from the last price to the levels you name show; give one number per role (at the Plain level one trigger level per scenario, and the summary line repeats those as the confirmation and invalidation levels; a Detailed ladder lists distinct levels, each with its own role — never two different numbers for the same role). Describe recent price action only as the daily bars show it.
@@ -553,7 +574,7 @@ ${
 }
 
 ## Now
-- The latest user message starts with a "${TURN_CONTEXT_HEADING}" note written by SIGLENS, not by the user: the user's local time, the current UTC, ET and KST time, and whether the US regular session is open. It is your only clock — use it for "today", "now", "this week" and market-hours questions. The user's own words follow under "${TURN_MESSAGE_HEADING}".
+- Every user message starts with a "${TURN_CONTEXT_HEADING}" note written by SIGLENS, not by the user, stamped when that message was sent. The note on the latest message is the present. It is your only clock — use it for "today", "now", "this week" and market-hours questions, and give a market's state and next open or close as written there, never from your own calendar arithmetic; a time in another zone is quoted from the note, never converted by you. Notes on earlier messages only date those messages. The user's own words follow under "${TURN_MESSAGE_HEADING}".
 - Prompt version: ${AGENT_PROMPT_VERSION}
 
 Reminder: a conversational follow-up gets a short, direct answer to that question only. Do not repeat the price, levels, scenarios, good and caution sides or the not-a-guarantee line that an earlier answer already gave.
@@ -563,32 +584,61 @@ Reminder: when you call tools, send only the tool calls — no text in that mess
 
 /**
  * The per-turn note the agent reads its clock from: the user's local time, the
- * UTC·ET·KST line and the US session status, prepended to the latest user
+ * UTC·ET·KST line and each market's session state with its next boundary, prepended to the latest user
  * message by {@link composeAgentUserMessage}.
  *
  * Lives outside the system prompt on purpose (see
  * {@link buildAgentSystemPrompt}): only the newest message changes per turn,
  * so the system prompt, tool definitions and earlier history stay a
- * byte-identical prefix that DeepSeek's context cache can reuse.
+ * byte-identical prefix that DeepSeek's context cache can reuse. The note is a
+ * pure function of `now`, the resolved time zone, the locale (only for the
+ * default zone) and `krSession`. Exceptions: image turns (the attachment
+ * marker is appended on replay), the flip turns, where an older tool result
+ * changes to `omitted` (every `toolResultStride` turns), and a rebuilt
+ * historical note that differs from the original because the zone, locale or
+ * session spec changed between turns or a core version changed the format
+ * (one cache miss each, never an error).
  *
- * @param input - Locale (for the default zone), time, ET session status and
- *   the reader's time zone.
+ * @param input - Locale (for the default zone), time, optional KRX session spec
+ *   and the reader's time zone.
  * @returns The note, starting with the `## Now` heading.
  */
 export function buildAgentTurnContext(input: AgentTurnContextInput): string {
     const timeZone = resolveAgentTimeZone(input.timeZone, input.locale);
-    return `${TURN_CONTEXT_HEADING}
-- User's local time: ${formatAgentTimestamp(input.now, timeZone)}
-- ${formatNowLine(input.now)}
-- US regular session: ${input.etSessionStatus}`;
+    const { now, krSession } = input;
+    const lines = [
+        `- User's local time: ${formatAgentTimestamp(now, timeZone)} (${weekdayName(now, timeZone)}; this week ${formatLocalWeek(now, timeZone)})`,
+        `- ${formatWeekdayNowLine(now)}`,
+        formatMarketLine({
+            label: 'US stocks (NYSE/Nasdaq)',
+            zoneLabel: 'ET',
+            now,
+            spec: US_EQUITY_SESSION,
+            extendedHours: true,
+            userTimeZone: timeZone,
+        }),
+        ...(krSession?.kind === 'scheduled'
+            ? [
+                  formatMarketLine({
+                      label: 'Korean stocks (KRX)',
+                      zoneLabel: 'KST',
+                      now,
+                      spec: krSession,
+                      extendedHours: false,
+                      userTimeZone: timeZone,
+                  }),
+              ]
+            : []),
+    ];
+    return [TURN_CONTEXT_HEADING, ...lines].join('\n');
 }
 
 /**
  * The latest user message as sent to the model: the turn-context note, then
- * the user's own words. Only the request copy carries the note — the consumer
- * persists the plain `userMessage`, so when this message becomes history on
- * the next turn it is the plain text, and the cached prefix stays intact up
- * to it.
+ * the user's own words. The consumer persists the plain `userMessage` together
+ * with the turn's instant (`RunAgentTurnResult.turnAt`); `runAgentTurn`
+ * rebuilds the note from it and composes them again when the message becomes
+ * history, so the replayed bytes match.
  *
  * @param context - Output of {@link buildAgentTurnContext}.
  * @param userMessage - The user's text, verbatim.

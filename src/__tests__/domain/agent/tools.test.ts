@@ -951,8 +951,11 @@ describe('tool description wording', () => {
         expect(d).toContain('contract counts, never prices');
     });
 
-    it('get_bars_indicators mentions latest.rsiZone', () => {
-        expect(description('get_bars_indicators')).toContain('latest.rsiZone');
+    it('get_bars_indicators mentions the oscillator zone fields and latest.rsiZone', () => {
+        const d = description('get_bars_indicators');
+        expect(d).toContain('latest.rsiZone');
+        expect(d).toContain('latest.oscillatorZones');
+        expect(d).toContain('latest.oscillatorSummary');
     });
 });
 
