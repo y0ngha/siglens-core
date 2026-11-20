@@ -563,6 +563,106 @@ describe('normalizeCandlePatternSummary', () => {
     });
 });
 
+describe('normalizeActionRecommendation — reconciled targets read from the cache', () => {
+    const levels = (takeProfitPrices?: unknown) => ({
+        stopLoss: 95,
+        ...(takeProfitPrices === undefined ? {} : { takeProfitPrices }),
+        exit: '청산',
+        riskReward: '손익비',
+        reason: '사유',
+    });
+    const normalize = (reconciledLevels?: Record<string, unknown>) =>
+        normalizeActionRecommendation({
+            positionAnalysis: 'x',
+            entry: '',
+            exit: '',
+            riskReward: '',
+            ...(reconciledLevels === undefined ? {} : { reconciledLevels }),
+        });
+
+    it('sorts an old unsorted entry ascending', () => {
+        expect(
+            normalize(levels([110, 105]))?.reconciledLevels?.takeProfitPrices
+        ).toEqual([105, 110]);
+    });
+
+    it('removes duplicates from an old entry', () => {
+        expect(
+            normalize(levels([105, 105, 110]))?.reconciledLevels
+                ?.takeProfitPrices
+        ).toEqual([105, 110]);
+    });
+
+    it('returns an already ascending, unique entry unchanged', () => {
+        const stored = levels([105, 110]);
+        expect(normalize(stored)?.reconciledLevels).toEqual({
+            ...stored,
+            takeProfitPrices: [105, 110],
+        });
+    });
+
+    it('keeps an absent array absent and an empty one empty', () => {
+        expect(
+            normalize(levels())?.reconciledLevels?.takeProfitPrices
+        ).toBeUndefined();
+        expect(
+            normalize(levels([]))?.reconciledLevels?.takeProfitPrices
+        ).toEqual([]);
+    });
+
+    it('leaves an entry without reconciledLevels, and the model targets, untouched', () => {
+        const withoutLevels = normalizeActionRecommendation({
+            positionAnalysis: 'x',
+            entry: '',
+            exit: '',
+            riskReward: '',
+            takeProfitPrices: [110, 105, 105],
+        });
+        expect(withoutLevels?.reconciledLevels).toBeUndefined();
+        expect(withoutLevels?.takeProfitPrices).toEqual([110, 105, 105]);
+    });
+});
+
+describe('normalizeActionRecommendation — rejected-stop marker', () => {
+    const withLevels = (reconciledLevels: Record<string, unknown>) =>
+        normalizeActionRecommendation({
+            positionAnalysis: 'x',
+            entry: '',
+            exit: '',
+            riskReward: '',
+            reconciledLevels,
+        });
+
+    it('keeps stopLossRejected through a cache round trip', () => {
+        expect(
+            withLevels({
+                exit: '',
+                riskReward: '',
+                reason: 'r',
+                stopLossRejected: true,
+            })?.reconciledLevels
+        ).toMatchObject({
+            exit: '',
+            riskReward: '',
+            reason: 'r',
+            stopLossRejected: true,
+        });
+    });
+
+    it('omits the key when the marker is absent or not true, so older shapes stay byte-identical', () => {
+        const absent = withLevels({ exit: '', riskReward: '', reason: 'r' });
+        const falsy = withLevels({
+            exit: '',
+            riskReward: '',
+            reason: 'r',
+            stopLossRejected: false,
+        });
+
+        expect(absent?.reconciledLevels).not.toHaveProperty('stopLossRejected');
+        expect(falsy?.reconciledLevels).not.toHaveProperty('stopLossRejected');
+    });
+});
+
 describe('normalizeActionRecommendation', () => {
     it('유효한 ActionRecommendation을 반환한다', () => {
         const result = normalizeActionRecommendation({

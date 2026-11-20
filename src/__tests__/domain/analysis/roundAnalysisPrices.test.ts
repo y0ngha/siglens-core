@@ -60,6 +60,35 @@ const response = (): AnalysisResponse => ({
 });
 
 describe('roundAnalysisPrices', () => {
+    it('keeps the rejected-stop marker and leaves an absent reconciled stop absent', () => {
+        const base = response();
+        const out = roundAnalysisPrices(
+            {
+                ...base,
+                actionRecommendation: {
+                    ...base.actionRecommendation,
+                    positionAnalysis: '',
+                    entry: '',
+                    exit: '',
+                    riskReward: '',
+                    reconciledLevels: {
+                        exit: '',
+                        riskReward: '',
+                        reason: '',
+                        stopLossRejected: true,
+                    },
+                },
+            },
+            'KRW'
+        );
+        expect(out.actionRecommendation?.reconciledLevels).toEqual({
+            exit: '',
+            riskReward: '',
+            reason: '',
+            stopLossRejected: true,
+        });
+    });
+
     it('rounds every quoted price of a KRW analysis to its KRX tick', () => {
         const out = roundAnalysisPrices(response(), 'KRW');
         expect(out.keyLevels).toEqual({

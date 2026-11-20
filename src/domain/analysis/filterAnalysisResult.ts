@@ -102,6 +102,7 @@ function filterReconciledLevels(
         exit: levels.exit,
         riskReward: levels.riskReward,
         reason: levels.reason,
+        ...(levels.stopLossRejected === true ? { stopLossRejected: true } : {}),
     };
 }
 

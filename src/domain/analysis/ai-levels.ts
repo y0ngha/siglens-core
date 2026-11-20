@@ -1,5 +1,6 @@
 import {
     buildPlanCheck,
+    effectiveStopLoss,
     entryZoneBottom,
     entryZoneTop,
     nearestTargetAbove,
@@ -366,26 +367,39 @@ export function buildBullishRiskRewardText(
  * 목표가는 값을 만들어 채우지 않고 기준을 벗어난 것만 제외하므로, 목표가 쪽 문장은
  * "계산했습니다"가 아니라 "제외했습니다"다.
  */
-function buildReconcileReason(
-    slWas: boolean,
-    aiSlMissing: boolean,
-    zoneDropped: boolean,
-    capDropped: boolean
-): string {
-    const stopPart = !slWas
-        ? []
-        : aiSlMissing
-          ? ['AI가 손절가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.']
-          : ['AI가 제시한 손절가가 내부 기준을 벗어나 보정했습니다.'];
+function buildReconcileReason(parts: {
+    slWas: boolean;
+    aiSlMissing: boolean;
+    slRejected: boolean;
+    zoneDropped: boolean;
+    capDropped: boolean;
+    duplicatesRemoved: boolean;
+    reordered: boolean;
+}): string {
+    const stopPart = parts.slRejected
+        ? [
+              'AI가 제시한 손절가가 진입 구간 아래가 아니고 대체할 ATR 기준도 없어 제외했습니다. 손절가는 없는 것으로 봅니다.',
+          ]
+        : !parts.slWas
+          ? []
+          : parts.aiSlMissing
+            ? ['AI가 손절가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.']
+            : ['AI가 제시한 손절가가 내부 기준을 벗어나 보정했습니다.'];
     return [
         ...stopPart,
-        ...(zoneDropped
+        ...(parts.zoneDropped
             ? ['AI가 제시한 목표가 중 진입 구간 위가 아닌 값은 제외했습니다.']
             : []),
-        ...(capDropped
+        ...(parts.capDropped
             ? [
                   'AI가 제시한 첫 번째 목표가가 ATR 기준 상한을 넘어 제외했습니다.',
               ]
+            : []),
+        ...(parts.duplicatesRemoved
+            ? ['AI가 제시한 목표가 중 중복된 값은 하나만 남겼습니다.']
+            : []),
+        ...(parts.reordered
+            ? ['AI가 제시한 목표가를 가까운 순서(오름차순)로 정렬했습니다.']
             : []),
     ].join(' ');
 }
@@ -442,20 +456,36 @@ export function reconcileBullishActionRecommendation(
         (tp, i) => aboveZone(tp) && !(i === 0 && capDropped)
     );
     const zoneDropped = aiTargets.some(tp => !aboveZone(tp));
-    const tpDropped = zoneDropped || capDropped;
+    // The reconciled list is always strictly ascending and without duplicates, whether or
+    // not a target was dropped: every reader (plan check, risk:reward, the chart lines)
+    // treats the first element as the nearest one.
+    const uniqueTargets = [...new Set(keptTargets)];
+    const sortedTargets = [...uniqueTargets].sort((a, b) => a - b);
+    const duplicatesRemoved = uniqueTargets.length < keptTargets.length;
+    const reordered = sortedTargets.some((tp, i) => tp !== uniqueTargets[i]);
+    const tpChanged =
+        zoneDropped || capDropped || duplicatesRemoved || reordered;
 
     const slWasReconciled =
         slResolved.source === 'fallback' && slResolved.value !== undefined;
+    // A stop was written but is unusable, and there is no ATR to derive a replacement
+    // from. Core never invents a level, so the plan is left with no stop and says so.
+    const slRejected =
+        rec.stopLoss !== undefined && slResolved.source === 'missing';
 
-    if (!slWasReconciled && !tpDropped) {
+    if (!slWasReconciled && !slRejected && !tpChanged) {
         return { recommendation: rec, wasReconciled: false, changes: [] };
     }
 
-    const reconciledTpArr: readonly number[] | undefined = tpDropped
-        ? [...keptTargets].sort((a, b) => a - b)
+    const reconciledTpArr: readonly number[] | undefined = tpChanged
+        ? sortedTargets
         : rec.takeProfitPrices;
 
-    const reconciledSl = slWasReconciled ? slResolved.value : rec.stopLoss;
+    const reconciledSl = slWasReconciled
+        ? slResolved.value
+        : slRejected
+          ? undefined
+          : rec.stopLoss;
 
     const aiSlMissing = rec.stopLoss === undefined;
 
@@ -475,18 +505,27 @@ export function reconcileBullishActionRecommendation(
             reconciledTpArr,
             locale
         ),
-        reason: buildReconcileReason(
-            slWasReconciled,
+        reason: buildReconcileReason({
+            slWas: slWasReconciled,
             aiSlMissing,
+            slRejected,
             zoneDropped,
-            capDropped
-        ),
+            capDropped,
+            duplicatesRemoved,
+            reordered,
+        }),
+        ...(slRejected ? { stopLossRejected: true as const } : {}),
     };
 
     const changes: readonly string[] = [
         ...(slWasReconciled
             ? [
                   `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency, krxTick)} (fallback)`,
+              ]
+            : []),
+        ...(slRejected
+            ? [
+                  `stopLoss: ${rec.stopLoss} rejected (not below the entry zone, no usable ATR for a fallback)`,
               ]
             : []),
         ...(zoneDropped
@@ -498,6 +537,12 @@ export function reconcileBullishActionRecommendation(
             ? [
                   `takeProfitPrices[0]: ${firstTarget} dropped (beyond the ATR cap)`,
               ]
+            : []),
+        ...(duplicatesRemoved
+            ? ['takeProfitPrices: duplicate targets removed']
+            : []),
+        ...(reordered
+            ? ['takeProfitPrices: reordered ascending (nearest first)']
             : []),
     ];
 
@@ -717,8 +762,7 @@ export function postProcessAnalysisWithReconcile(
     // `entryPrice` (the same rule `riskRewardFrom` uses for
     // `planCheck.riskRewardAtEntry`), which keeps this line and
     // `planCheck.riskRewardAtEntry` from ever disagreeing, on either path.
-    const rrStopLoss =
-        recommendation.reconciledLevels?.stopLoss ?? recommendation.stopLoss;
+    const rrStopLoss = effectiveStopLoss(recommendation);
     const rrTargets =
         recommendation.reconciledLevels?.takeProfitPrices ??
         recommendation.takeProfitPrices;
