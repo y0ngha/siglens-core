@@ -1756,6 +1756,41 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
         expect(onlyCall(p).messages.slice(0, -1)).toEqual(history);
     });
 
+    it('strips turnAt from assistant and tool messages without adding a note or touching content', async () => {
+        const history: AgentMessage[] = [
+            { role: 'user', content: FIRST },
+            {
+                role: 'assistant',
+                content: '',
+                toolCalls: [quoteCall],
+                turnAt: AT.toISOString(),
+            },
+            {
+                role: 'tool',
+                content: '{"price":1}',
+                toolCallId: quoteCall.id,
+                toolName: quoteCall.name,
+                turnAt: AT.toISOString(),
+            },
+            { role: 'assistant', content: '답', turnAt: AT.toISOString() },
+        ];
+        const p = scriptedProvider(answerOnly());
+        await runAgentTurn(params({ history }), deps(p));
+        const sent = onlyCall(p).messages;
+        expect(sent.slice(0, 4)).toEqual([
+            { role: 'user', content: FIRST },
+            { role: 'assistant', content: '', toolCalls: [quoteCall] },
+            {
+                role: 'tool',
+                content: '{"price":1}',
+                toolCallId: quoteCall.id,
+                toolName: quoteCall.name,
+            },
+            { role: 'assistant', content: '답' },
+        ]);
+        expect(sent.some(m => 'turnAt' in m)).toBe(false);
+    });
+
     it('returns the turn instant on success and on a provider failure, never on a gate refusal', async () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
         const ok = await runAgentTurn(

@@ -6,6 +6,8 @@ import type {
     Signal,
 } from '@/domain/types';
 import {
+    MFI_OVERBOUGHT_LEVEL,
+    MFI_OVERSOLD_LEVEL,
     PCTB_OVERBOUGHT,
     PCTB_OVERSOLD,
     RSI_OVERBOUGHT_LEVEL,
@@ -27,8 +29,6 @@ import {
     GAP_MIN_ATR_MULT,
     GOLDEN_CROSS_FAST_PERIOD,
     GOLDEN_CROSS_SLOW_PERIOD,
-    MFI_OVERBOUGHT_LEVEL,
-    MFI_OVERSOLD_LEVEL,
     SQUEEZE_MOMENTUM_ZERO_CROSS,
 } from '@/domain/signals/constants';
 

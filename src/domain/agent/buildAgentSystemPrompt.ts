@@ -59,6 +59,9 @@ export interface AgentTurnContextInput {
      * @deprecated Ignored. The US line is computed from `now` (pre-market,
      * regular, after-hours and the next boundary, holidays and half days
      * included), so a caller-supplied status could only disagree with it.
+     * Remove once the consumer stops passing it (siglens still does, in its
+     * agent turn stream and a fake-provider test); removal is tracked with the
+     * consumer's core bump.
      */
     etSessionStatus?: EtSessionStatus;
     /**

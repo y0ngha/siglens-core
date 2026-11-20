@@ -1,6 +1,8 @@
 import {
     CCI_OVERBOUGHT_LEVEL,
     CCI_OVERSOLD_LEVEL,
+    MFI_OVERBOUGHT_LEVEL,
+    MFI_OVERSOLD_LEVEL,
     RSI_OVERBOUGHT_LEVEL,
     RSI_OVERSOLD_LEVEL,
     STOCHASTIC_OVERBOUGHT_LEVEL,
@@ -9,10 +11,6 @@ import {
     WILLIAMS_R_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
 import type { RsiZone } from '@/domain/indicators/rsiZone';
-import {
-    MFI_OVERBOUGHT_LEVEL,
-    MFI_OVERSOLD_LEVEL,
-} from '@/domain/signals/constants';
 
 /** Zone of one oscillator reading; the same three values as {@link RsiZone}. */
 export type OscillatorZone = RsiZone;
