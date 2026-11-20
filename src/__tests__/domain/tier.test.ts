@@ -318,8 +318,8 @@ describe('tier', () => {
                 'gpt-5.6-sol',
                 'claude-opus-4-8',
                 'claude-opus-5',
-                'claude-fable-5-1',
-                'gpt-6-astra',
+                'claude-fable-5-2',
+                'gpt-6.2-astra',
             ] as const) {
                 expect(
                     isModelAllowed('member', model, restrictedConfig),
@@ -336,7 +336,7 @@ describe('tier', () => {
             for (const model of [
                 'gpt-5.6-sol',
                 'claude-opus-5',
-                'gpt-6-astra',
+                'gpt-6.2-astra',
             ] as const) {
                 expect(
                     isModelAllowed('free', model, restrictedConfig),
@@ -452,10 +452,13 @@ describe('tier', () => {
                 'claude-opus-4-8',
                 'claude-opus-5',
                 'claude-opus-5-5',
-                'claude-fable-5-1',
-                'gpt-6-astra',
-                'gpt-6.1-sol',
+                'claude-fable-5-2',
+                'gpt-6.2-astra',
+                'gpt-6.2-sol',
                 'gemini-4-argon',
+                'gemini-4-carbon',
+                'gemini-4-neon',
+                'gemini-4-hydrogen',
             ] as const) {
                 expect(getModelAccess(model), model).toBe('byok');
             }
@@ -566,8 +569,8 @@ describe('tier', () => {
                 'gpt-5.6-sol',
                 'claude-opus-4-8',
                 'claude-opus-5',
-                'claude-fable-5-1',
-                'gpt-6-astra',
+                'claude-fable-5-2',
+                'gpt-6.2-astra',
             ] as const) {
                 expect(requiresByokKey('free', model), model).toBe(true);
                 expect(requiresByokKey('member', model), model).toBe(true);

@@ -4,6 +4,7 @@ import {
     MAX_TOKENS_CODE,
     callClaude,
 } from '@/infrastructure/ai/providers/anthropic';
+import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import type { ClaudeModelId } from '@/domain/analysis/modelSpecs';
 
 const mockFinalMessage = vi.hoisted(() => vi.fn());
@@ -20,67 +21,76 @@ vi.mock('@anthropic-ai/sdk', () => ({
 }));
 
 // MODEL_SPECS를 mock해 이 파일이 프로덕션 등급 배치 변경에 흔들리지 않게 한다.
+// 예외: `claude-fable-5-2` 행은 실제 레지스트리 값을 그대로 통과시켜, 그 행의
+// 요청 형태를 프로덕션 스펙으로 고정한다.
 // 형태는 실제 스펙과 동일해야 한다 — 옛 `effort`/`thinkingBudget` 평면 필드를
 // 남겨두면 어댑터가 읽는 `reasoning`이 undefined가 되어 조용히 어긋난다.
-vi.mock('@/domain/analysis/modelSpecs', () => ({
-    MODEL_SPECS: {
-        // 추론 기본 ON(byok 등급 상당) — thinking이 실제로 나가는 경로.
-        'claude-opus-5': {
-            provider: 'claude',
-            thinkingApi: 'adaptive',
-            apiModelId: 'claude-opus-5',
-            maxOutputTokens: 128_000,
-            reasoning: {
-                off: { mode: 'disabled' },
-                on: { mode: 'adaptive', effort: 'medium' },
-                default: 'on',
+vi.mock('@/domain/analysis/modelSpecs', async importOriginal => {
+    const actual =
+        await importOriginal<typeof import('@/domain/analysis/modelSpecs')>();
+    return {
+        MODEL_SPECS: {
+            // 실제 레지스트리 행을 그대로 쓴다 — 신규 행의 요청 형태를 mock이 아니라
+            // 프로덕션 스펙으로 고정하기 위해서다.
+            'claude-fable-5-2': actual.MODEL_SPECS['claude-fable-5-2'],
+            // 추론 기본 ON(byok 등급 상당) — thinking이 실제로 나가는 경로.
+            'claude-opus-5': {
+                provider: 'claude',
+                thinkingApi: 'adaptive',
+                apiModelId: 'claude-opus-5',
+                maxOutputTokens: 128_000,
+                reasoning: {
+                    off: { mode: 'disabled' },
+                    on: { mode: 'adaptive', effort: 'medium' },
+                    default: 'on',
+                },
+            },
+            // 추론 기본 OFF(member 등급 상당).
+            'claude-sonnet-5-5': {
+                provider: 'claude',
+                thinkingApi: 'adaptive',
+                apiModelId: 'claude-sonnet-5-5',
+                maxOutputTokens: 64_000,
+                reasoning: {
+                    // 실제 스펙과 같다 — `disabled`는 400이라 between_tools를 쓴다.
+                    off: { mode: 'between_tools' },
+                    on: { mode: 'adaptive', effort: 'medium' },
+                    default: 'off',
+                },
+            },
+            // budget API + 토글 가능(budget > 0) — 프로덕션 스펙에는 아직 이런 행이
+            // 없어서, 이 mock이 없으면 어댑터의 `budget_tokens > 0` 분기가 어떤
+            // 테스트에서도 실행되지 않는다.
+            'claude-opus-4-8': {
+                provider: 'claude',
+                thinkingApi: 'budget',
+                apiModelId: 'claude-opus-4-8',
+                maxOutputTokens: 128_000,
+                temperature: 0,
+                reasoning: {
+                    off: { budgetTokens: 0 },
+                    on: { budgetTokens: 8_192 },
+                    default: 'off',
+                },
+            },
+            // budget API + 토글 불가 — mock 전용 합성 id(프로덕션 레지스트리에는 이런 행이 없다).
+            // 실제 id를 빌려 쓰면 그 모델이 thinking을 안 보낸다고 읽히므로 합성 id를 쓴다.
+            'claude-budget-only-mock': {
+                provider: 'claude',
+                thinkingApi: 'budget',
+                apiModelId: 'claude-budget-only-mock',
+                maxOutputTokens: 8_192,
+                temperature: 0,
+                reasoning: {
+                    off: { budgetTokens: 0 },
+                    on: { budgetTokens: 0 },
+                    default: 'off',
+                    toggleable: false,
+                },
             },
         },
-        // 추론 기본 OFF(member 등급 상당).
-        'claude-sonnet-5-5': {
-            provider: 'claude',
-            thinkingApi: 'adaptive',
-            apiModelId: 'claude-sonnet-5-5',
-            maxOutputTokens: 64_000,
-            reasoning: {
-                // 실제 스펙과 같다 — `disabled`는 400이라 between_tools를 쓴다.
-                off: { mode: 'between_tools' },
-                on: { mode: 'adaptive', effort: 'medium' },
-                default: 'off',
-            },
-        },
-        // budget API + 토글 가능(budget > 0) — 프로덕션 스펙에는 아직 이런 행이
-        // 없어서, 이 mock이 없으면 어댑터의 `budget_tokens > 0` 분기가 어떤
-        // 테스트에서도 실행되지 않는다.
-        'claude-opus-4-8': {
-            provider: 'claude',
-            thinkingApi: 'budget',
-            apiModelId: 'claude-opus-4-8',
-            maxOutputTokens: 128_000,
-            temperature: 0,
-            reasoning: {
-                off: { budgetTokens: 0 },
-                on: { budgetTokens: 8_192 },
-                default: 'off',
-            },
-        },
-        // budget API + 토글 불가 — mock 전용 합성 id(프로덕션 레지스트리에는 이런 행이 없다).
-        // 실제 id를 빌려 쓰면 그 모델이 thinking을 안 보낸다고 읽히므로 합성 id를 쓴다.
-        'claude-budget-only-mock': {
-            provider: 'claude',
-            thinkingApi: 'budget',
-            apiModelId: 'claude-budget-only-mock',
-            maxOutputTokens: 8_192,
-            temperature: 0,
-            reasoning: {
-                off: { budgetTokens: 0 },
-                on: { budgetTokens: 0 },
-                default: 'off',
-                toggleable: false,
-            },
-        },
-    },
-}));
+    };
+});
 
 vi.mock('@/domain/analysis/systemPrompt', () => ({
     AI_SYSTEM_PROMPT: 'system prompt',
@@ -267,6 +277,48 @@ describe('callClaude', () => {
 
         const call = mockStream.mock.calls[0][0];
         expect(call.tool_choice).toEqual({ type: 'auto' });
+    });
+
+    describe.each([
+        ['off state', 'off' as const, 'low'],
+        ['default (on) state', undefined, 'high'],
+    ])('claude-fable-5-2 %s', (_label, state, effort) => {
+        it('sends adaptive thinking at the spec effort with auto tool_choice and no sampling', async () => {
+            mockStream.mockReturnValueOnce(
+                makeStream({
+                    stop_reason: 'tool_use',
+                    content: [
+                        {
+                            type: 'tool_use',
+                            id: 't1',
+                            name: 'structured_analysis',
+                            input: { a: 1 },
+                        },
+                    ],
+                })
+            );
+            const spec = MODEL_SPECS['claude-fable-5-2'];
+
+            await callClaude('prompt', {
+                model: 'claude-fable-5-2',
+                apiKey: 'key',
+                ...(state === 'off' ? { reasoning: spec.reasoning.off } : {}),
+                responseSchema: { type: 'object' },
+            });
+
+            const call = mockStream.mock.lastCall?.[0];
+            expect(call.model).toBe('claude-fable-5-2');
+            expect(call.thinking).toStrictEqual({
+                type: 'adaptive',
+                display: 'omitted',
+            });
+            expect(call.output_config).toStrictEqual({ effort });
+            expect(call.tool_choice).toEqual({ type: 'auto' });
+            expect(call.max_tokens).toBe(spec.maxOutputTokens);
+            expect(call).not.toHaveProperty('temperature');
+            expect(call).not.toHaveProperty('top_p');
+            expect(call).not.toHaveProperty('top_k');
+        });
     });
 
     it('omits thinking config when model does not support thinking (budget-only mock)', async () => {

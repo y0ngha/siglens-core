@@ -16,6 +16,17 @@ describe('getProviderForModel', () => {
             expect(getProviderForModel('gpt-6-luna')).toBe('openai');
         });
 
+        it.each([
+            ['claude-fable-5-2', 'anthropic'],
+            ['gpt-6.2-sol', 'openai'],
+            ['gpt-6.2-astra', 'openai'],
+            ['gemini-4-carbon', 'google'],
+            ['gemini-4-neon', 'google'],
+            ['gemini-4-hydrogen', 'google'],
+        ] as const)('returns the provider for new id %s', (model, provider) => {
+            expect(getProviderForModel(model)).toBe(provider);
+        });
+
         it('returns deepseek for deepseek-v4.1-flash', () => {
             expect(getProviderForModel('deepseek-v4.1-flash')).toBe('deepseek');
         });
@@ -39,6 +50,17 @@ describe('getProviderForModel', () => {
                 'openai'
             );
         });
+
+        it.each([
+            ['claude-fable-5-1', 'anthropic'],
+            ['gpt-6-astra', 'openai'],
+            ['gpt-6.1-sol', 'openai'],
+        ] as const)(
+            'still resolves retired id %s by prefix',
+            (model, provider) => {
+                expect(getProviderForModel(model as ModelId)).toBe(provider);
+            }
+        );
 
         it('returns deepseek for unknown deepseek-prefixed model', () => {
             expect(getProviderForModel('deepseek-foo' as ModelId)).toBe(

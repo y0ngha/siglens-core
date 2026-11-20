@@ -28,6 +28,7 @@ import {
     DEEPSEEK_FALLBACK_MODEL,
 } from '@/application/analysis/callAnalysisAi';
 import { UserApiKeyMissingError } from '@/application/byok/errors';
+import type { ActiveModelId } from '@/domain/types';
 import * as serverKeysModule from '@/infrastructure/ai/serverKeys';
 import { callClaudeWithRetry } from '@/infrastructure/ai/retry/anthropicRetry';
 import { callDeepSeekWithRetry } from '@/infrastructure/ai/retry/deepseekRetry';
@@ -903,4 +904,31 @@ describe('callAnalysisAi — keyPolicy', () => {
             );
         });
     });
+});
+
+describe('callAnalysisAi — id not in the registry', () => {
+    // A retired or otherwise unknown id arrives type-erased from stored data.
+    const RETIRED = 'gpt-6.1-sol' as ActiveModelId;
+
+    it.each([
+        ['tier (default policy)', undefined, 'server-key-not-needed'],
+        ['byok-only', 'byok-only' as const, 'user-key'],
+    ])(
+        'throws a descriptive error naming the id under %s, before any provider call',
+        async (_label, keyPolicy, userApiKey) => {
+            await expect(
+                callAnalysisAi({
+                    prompt: 'p',
+                    model: RETIRED,
+                    tier: 'pro',
+                    userApiKey,
+                    keyPolicy,
+                })
+            ).rejects.toThrow(/Unknown model: gpt-6\.1-sol/);
+            expect(callChatGPTWithRetry).not.toHaveBeenCalled();
+            expect(callClaudeWithRetry).not.toHaveBeenCalled();
+            expect(callGeminiWithRetry).not.toHaveBeenCalled();
+            expect(callDeepSeekWithRetry).not.toHaveBeenCalled();
+        }
+    );
 });

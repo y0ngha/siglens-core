@@ -26,6 +26,7 @@ import {
     type GeminiModelSpec,
     type ModelSpec,
 } from '@/domain/types';
+import { getModelAccess, TIER_CONFIG } from '@/domain/tier';
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 /** Every model the registry is expected to hold, in access-class order. */
@@ -47,10 +48,13 @@ const ALL_MODELS: readonly ActiveModelId[] = [
     'claude-opus-4-8',
     'claude-opus-5',
     'claude-opus-5-5',
-    'claude-fable-5-1',
-    'gpt-6-astra',
-    'gpt-6.1-sol',
+    'claude-fable-5-2',
+    'gpt-6.2-astra',
+    'gpt-6.2-sol',
     'gemini-4-argon',
+    'gemini-4-carbon',
+    'gemini-4-neon',
+    'gemini-4-hydrogen',
 ];
 
 /**
@@ -74,6 +78,10 @@ const REMOVED_MODEL_IDS: readonly string[] = [
     'gpt-5.6-luna',
     'claude-sonnet-5',
     'gpt-5.6-terra',
+    // 2026-11 replacement by same-line successors.
+    'claude-fable-5-1',
+    'gpt-6-astra',
+    'gpt-6.1-sol',
 ];
 
 describe('MODEL_SPECS', () => {
@@ -140,7 +148,7 @@ describe('MODEL_SPECS', () => {
             'claude-opus-4-8',
             'claude-opus-5',
             'claude-opus-5-5',
-            'claude-fable-5-1',
+            'claude-fable-5-2',
         ] as const) {
             expect(MODEL_SPECS[model].thinkingApi, model).toBe('adaptive');
         }
@@ -192,10 +200,13 @@ describe('supportsHardOff', () => {
         'gemini-3.8-flash',
         'gemini-3.1-pro-preview',
         'claude-opus-5-5',
-        'claude-fable-5-1',
-        'gpt-6-astra',
-        'gpt-6.1-sol',
+        'claude-fable-5-2',
+        'gpt-6.2-astra',
+        'gpt-6.2-sol',
         'gemini-4-argon',
+        'gemini-4-carbon',
+        'gemini-4-neon',
+        'gemini-4-hydrogen',
     ];
 
     it('reports false for exactly the models that cannot disable reasoning', () => {
@@ -217,6 +228,9 @@ describe('supportsHardOff', () => {
             'gemini-3.8-flash',
             'gemini-3.1-pro-preview',
             'gemini-4-argon',
+            'gemini-4-carbon',
+            'gemini-4-neon',
+            'gemini-4-hydrogen',
         ] as const) {
             expect(MODEL_SPECS[model].reasoning.off.level, model).toBe('low');
         }
@@ -324,7 +338,7 @@ describe('getProvider', () => {
     it('routes Claude models to the claude provider', () => {
         expect(getProvider('claude-haiku-5-5')).toBe('claude');
         expect(getProvider('claude-sonnet-5-5')).toBe('claude');
-        expect(getProvider('claude-fable-5-1')).toBe('claude');
+        expect(getProvider('claude-fable-5-2')).toBe('claude');
     });
 
     it('routes Gemini models to the gemini provider', () => {
@@ -334,7 +348,7 @@ describe('getProvider', () => {
 
     it('routes GPT models to the chatgpt provider', () => {
         expect(getProvider('gpt-6-luna')).toBe('chatgpt');
-        expect(getProvider('gpt-6-astra')).toBe('chatgpt');
+        expect(getProvider('gpt-6.2-astra')).toBe('chatgpt');
     });
 
     it('routes DeepSeek models to the deepseek provider', () => {
@@ -486,12 +500,9 @@ describe('2026-10 roster rows (verified live 2026-10-15)', () => {
         expect(isReasoningToggleable('claude-haiku-5-5')).toBe(true);
     });
 
-    it('floors gemini-4-argon at low and gpt-6.1-sol at low (neither accepts the lower value)', () => {
+    it('floors gemini-4-argon at low (it does not accept the lower value)', () => {
         expect(MODEL_SPECS['gemini-4-argon'].reasoning.off).toEqual({
             level: 'low',
-        });
-        expect(MODEL_SPECS['gpt-6.1-sol'].reasoning.off).toEqual({
-            effort: 'low',
         });
     });
 
@@ -500,6 +511,83 @@ describe('2026-10 roster rows (verified live 2026-10-15)', () => {
             expect(MODEL_SPECS[model].reasoning.off, model).toEqual({
                 effort: 'none',
             });
+        }
+    });
+});
+
+describe('2026-11 roster rows (per vendor docs, not yet measured)', () => {
+    it('keeps fable 5.2 on adaptive low as its floor, default on', () => {
+        const spec = MODEL_SPECS['claude-fable-5-2'];
+        expect(spec.reasoning.off).toEqual({ mode: 'adaptive', effort: 'low' });
+        expect(spec.reasoning.on).toEqual({ mode: 'adaptive', effort: 'high' });
+        expect(spec.reasoning.default).toBe('on');
+        expect(supportsHardOff('claude-fable-5-2')).toBe(false);
+    });
+
+    it('floors the GPT-6.2 rows at low and sends the system prompt as a developer message', () => {
+        for (const model of ['gpt-6.2-sol', 'gpt-6.2-astra'] as const) {
+            const spec = MODEL_SPECS[model];
+            expect(spec.reasoning.off, model).toEqual({ effort: 'low' });
+            expect(spec.reasoning.on, model).toEqual({ effort: 'high' });
+            expect(spec.reasoning.default, model).toBe('on');
+            expect(supportsHardOff(model), model).toBe(false);
+            expect(spec.systemPlacement, model).toBe('developer_message');
+        }
+    });
+
+    it('floors the Gemini 4 rows at low (minimal is documented as unsupported)', () => {
+        for (const model of [
+            'gemini-4-carbon',
+            'gemini-4-neon',
+            'gemini-4-hydrogen',
+        ] as const) {
+            const spec = MODEL_SPECS[model];
+            expect(spec.reasoning.off, model).toEqual({ level: 'low' });
+            expect(spec.reasoning.on, model).toEqual({ level: 'high' });
+            expect(spec.reasoning.default, model).toBe('on');
+            expect(supportsHardOff(model), model).toBe(false);
+            expect(spec.maxOutputTokens, model).toBe(65_536);
+        }
+    });
+
+    it('sets systemPlacement on no other ChatGPT row', () => {
+        const specs: readonly ModelSpec[] = Object.values(MODEL_SPECS);
+        const withPlacement = specs
+            .filter(
+                (spec): spec is ChatGPTModelSpec => spec.provider === 'chatgpt'
+            )
+            .filter(spec => spec.systemPlacement !== undefined)
+            .map(spec => spec.apiModelId);
+        expect(withPlacement.toSorted()).toEqual([
+            'gpt-6.2-astra',
+            'gpt-6.2-sol',
+        ]);
+    });
+
+    it('places exactly the six new ids in byok and the retired ids nowhere', () => {
+        const NEW_IDS = [
+            'claude-fable-5-2',
+            'gpt-6.2-sol',
+            'gpt-6.2-astra',
+            'gemini-4-carbon',
+            'gemini-4-neon',
+            'gemini-4-hydrogen',
+        ] as const;
+        const RETIRED_IDS = [
+            'claude-fable-5-1',
+            'gpt-6.1-sol',
+            'gpt-6-astra',
+        ] as const;
+        for (const model of NEW_IDS) {
+            expect(getModelAccess(model), model).toBe('byok');
+            expect(TIER_CONFIG.models.free, model).not.toContain(model);
+            expect(TIER_CONFIG.models.member, model).not.toContain(model);
+        }
+        for (const model of RETIRED_IDS) {
+            expect(Object.keys(MODEL_SPECS), model).not.toContain(model);
+            for (const tier of ['free', 'member', 'pro'] as const) {
+                expect(TIER_CONFIG.models[tier], model).not.toContain(model);
+            }
         }
     });
 });

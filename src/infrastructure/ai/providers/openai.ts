@@ -95,13 +95,29 @@ export async function callChatGPT(
         throw new Error(`[ChatGPT] Unknown model: ${model}`);
     }
     // ChatGPT's automatic prompt caching keys on an identical byte-for-byte
-    // prefix formed by `instructions` (system, design C) + this `prompt`.
+    // prefix. By default that prefix is `instructions` (system, design C) +
+    // this `prompt`. From GPT-6.2 on, OpenAI appends `instructions` after
+    // `input`, outside the cacheable prefix, and bills them uncached on every
+    // request, so rows with `systemPlacement: 'developer_message'` send the
+    // same system text as the first `input` item (role `developer`) instead,
+    // which keeps it inside the prefix. The text is identical either way.
+    const system = options.system ?? AI_SYSTEM_PROMPT;
+    const systemRequest =
+        spec.systemPlacement === 'developer_message'
+            ? {
+                  input: [
+                      { role: 'developer' as const, content: system },
+                      { role: 'user' as const, content: prompt },
+                  ],
+              }
+            : { instructions: system, input: prompt };
 
     // 스펙이 OFF/ON 두 상태를 모두 들고 있으므로, 호출자가 준 설정이 없으면
     // 기본 상태를 해석한다. GPT는 "추론 없음"을 effort 값(`'none'`)으로
     // 표현하므로 별도의 non-reasoning 분기가 필요 없다 — 단, 모든 모델이
-    // `'none'`을 받는 건 아니다(`gpt-6-astra`는 400). 모델별 최저값은 스펙의
-    // `reasoning.off`에 기록돼 있다.
+    // `'none'`을 받는 건 아니다. 벤더 문서 기준(2026-11-21 KST 열람, 미실측)으로
+    // `gpt-6.2-astra`와 `gpt-6.2-sol`은 Responses API에서 `'none'`을 거부한다.
+    // 모델별 최저값은 스펙의 `reasoning.off`에 기록돼 있다.
     const useEffort = (
         options.reasoning ?? resolveReasoningConfig(spec.reasoning, undefined)
     ).effort;
@@ -120,8 +136,7 @@ export async function callChatGPT(
         const response = await client.responses.create(
             {
                 model: spec.apiModelId,
-                instructions: options.system ?? AI_SYSTEM_PROMPT,
-                input: prompt,
+                ...systemRequest,
                 max_output_tokens: spec.maxOutputTokens,
                 text: {
                     format:

@@ -4,6 +4,7 @@ import {
     MAX_TOKENS_CODE,
     callGemini,
 } from '@/infrastructure/ai/providers/gemini';
+import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import type { GeminiModelId } from '@/domain/analysis/modelSpecs';
 
 const mockGenerateContent = vi.hoisted(() => vi.fn());
@@ -315,6 +316,60 @@ describe('callGemini thinkingConfig', () => {
         await callGemini('prompt', { model: MODEL, apiKey: 'key' });
 
         expect(sentThinkingConfig()).not.toHaveProperty('thinkingBudget');
+    });
+});
+
+// Gemini 4 rows (per vendor docs read 2026-11-21, not yet measured): the
+// default state is `high`, the off state floors at `low` because `minimal` is
+// documented as unsupported on Gemini 4.
+describe.each([
+    'gemini-4-carbon',
+    'gemini-4-neon',
+    'gemini-4-hydrogen',
+] as const)('callGemini request shape — %s', model => {
+    beforeEach(() => {
+        mockGenerateContent.mockClear();
+    });
+
+    /** The request the adapter put on the wire for the most recent call. */
+    function lastSentRequest(): {
+        model: string;
+        config: {
+            thinkingConfig: Record<string, unknown>;
+            maxOutputTokens: number;
+        };
+    } {
+        const last = mockGenerateContent.mock.lastCall;
+        if (last === undefined) throw new Error('call was not made');
+        return last[0];
+    }
+
+    it('sends thinkingLevel HIGH by default and never a budget', async () => {
+        mockGenerateContent.mockResolvedValueOnce(SUCCESS);
+
+        await callGemini('prompt', { model, apiKey: 'key' });
+
+        const request = lastSentRequest();
+        expect(request.model).toBe(model);
+        expect(request.config.thinkingConfig.thinkingLevel).toBe('HIGH');
+        expect(request.config.thinkingConfig).not.toHaveProperty(
+            'thinkingBudget'
+        );
+        expect(request.config.maxOutputTokens).toBe(65_536);
+    });
+
+    it('resolves the off state to LOW, never MINIMAL', async () => {
+        mockGenerateContent.mockResolvedValueOnce(SUCCESS);
+
+        await callGemini('prompt', {
+            model,
+            apiKey: 'key',
+            thinkingLevel: MODEL_SPECS[model].reasoning.off.level,
+        });
+
+        expect(lastSentRequest().config.thinkingConfig.thinkingLevel).toBe(
+            'LOW'
+        );
     });
 });
 
