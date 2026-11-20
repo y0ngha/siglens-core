@@ -235,7 +235,8 @@ every step. Track state in one pass instead.
 ```
 
 Also prefer `.find()`/`.some()` over a `for…of` loop whose only purpose is an early
-return.
+return. `splice` used as a disguised `push` is the same loop in another form: use plain
+`push` with the justification above.
 
 <a id="CP-6"></a>
 #### CP-6 — Name complex anonymous expressions
@@ -790,7 +791,8 @@ only the ones labelled "example").
 
 Delete or rewrite placeholders (`expect(true).toBe(true)`, a lone `toBeDefined()`).
 Do not wrap assertions in `if (row)`: assert the row exists, then its value. A loop that
-may `continue` asserts a count showing it checked something. An absence assertion on a
+may `continue`, or a `forEach` over a possibly empty set, asserts a count showing it
+checked something; a type-only test with a placeholder assertion is deleted. An absence assertion on a
 filtered or matched row set (`rows.every(r => !r.includes(x))`, `not.toContain` on a
 match) first asserts the set is non-empty; an empty set passes it vacuously. Cover both signs or
 directions of a rule, and mutation-check wiring tests so they fail when the wiring is
@@ -1266,6 +1268,12 @@ invalidation, qualification or threshold rule changes.
 `PUBLIC_API.md` restates the surface in several places: the export inventory and itemized
 counts or lists ("16 models", "N exports"). A new export or a removed entry updates all of
 them; grep the old count and list.
+
+A doc sentence about a guarantee ("every tool refuses", "the gate checks X") names the
+mechanism that really enforces it and holds for every path; verify it against the code.
+When a review names a pattern, sweep the whole change for it with grep (including tests and
+helpers), not only the cited lines: a fix that stops at the named lines leaves the same
+violation elsewhere in the diff.
 
 <a id="DS-6"></a>
 #### DS-6 — No process residue in code
