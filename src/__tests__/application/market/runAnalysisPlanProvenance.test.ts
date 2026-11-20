@@ -284,6 +284,33 @@ describe('runAnalysis plan provenance warning', () => {
         ).toHaveLength(1);
     });
 
+    it('logs nothing and leaks no unhandled rejection when the producer generation rejects', async () => {
+        mockCallAnalysisAi.mockImplementation(
+            () =>
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error('provider down')), 25)
+                )
+        );
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const unhandled = vi.fn();
+        process.on('unhandledRejection', unhandled);
+
+        const settled = await Promise.allSettled([run(), run()]);
+        await new Promise(resolve => setTimeout(resolve, 10));
+        process.off('unhandledRejection', unhandled);
+
+        expect(settled.map(result => result.status)).toEqual([
+            'rejected',
+            'rejected',
+        ]);
+        expect(
+            warn.mock.calls.filter(
+                ([message]) => message === PLAN_PROVENANCE_WARNING_LOG
+            )
+        ).toEqual([]);
+        expect(unhandled).not.toHaveBeenCalled();
+    });
+
     it('checks the analysis as the model wrote it, before KRX tick rounding', async () => {
         mockCallAnalysisAi.mockResolvedValue(
             modelReply({
