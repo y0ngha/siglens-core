@@ -51,7 +51,10 @@ export const SL_FALLBACK_ATR_MULTIPLIER = 1.5;
  *
  * @deprecated No longer used by reconcile: a target that fails validation is dropped,
  * never replaced by an invented level. Kept only because the consumer's backtest
- * scripts still import it; remove once they stop.
+ * scripts (`siglens/scripts/backtests/generate-backtest.ts` and `flash-lite-ab.ts`)
+ * import `resolveBullishTakeProfit`. Remove all three symbols (`resolveBullishTakeProfit`,
+ * `deriveFallbackTakeProfit`, `TP_FALLBACK_ATR_MULTIPLIER`) after the consumer bump that
+ * drops those imports.
  */
 export const TP_FALLBACK_ATR_MULTIPLIER = 2.0;
 
@@ -120,7 +123,10 @@ export function deriveFallbackStopLoss(
  *
  * @deprecated No longer used by reconcile: a target that fails validation is dropped,
  * never replaced by an invented level. Kept only because the consumer's backtest
- * scripts still import it; remove once they stop.
+ * scripts (`siglens/scripts/backtests/generate-backtest.ts` and `flash-lite-ab.ts`)
+ * import `resolveBullishTakeProfit`. Remove all three symbols (`resolveBullishTakeProfit`,
+ * `deriveFallbackTakeProfit`, `TP_FALLBACK_ATR_MULTIPLIER`) after the consumer bump that
+ * drops those imports.
  */
 export function deriveFallbackTakeProfit(
     entryPrice: number,
@@ -158,7 +164,10 @@ export function resolveBullishStopLoss(
  *
  * @deprecated No longer used by reconcile: a target that fails validation is dropped,
  * never replaced by an invented level. Kept only because the consumer's backtest
- * scripts still import it; remove once they stop.
+ * scripts (`siglens/scripts/backtests/generate-backtest.ts` and `flash-lite-ab.ts`)
+ * import `resolveBullishTakeProfit`. Remove all three symbols (`resolveBullishTakeProfit`,
+ * `deriveFallbackTakeProfit`, `TP_FALLBACK_ATR_MULTIPLIER`) after the consumer bump that
+ * drops those imports.
  */
 export function resolveBullishTakeProfit(
     aiValue: number | undefined,
@@ -419,8 +428,11 @@ export function reconcileBullishActionRecommendation(
     // as a "1:0.0" risk:reward. The ATR cap keeps its original scope, the FIRST target
     // only: a far later target is a deliberate stretch goal, not an error.
     const aiTargets = rec.takeProfitPrices ?? [];
+    // `entryHigh` is the zone's top, or `entryPrice` itself when the zone has no usable
+    // element; the larger of the two is the bar a target must clear.
+    const zoneCeiling = Math.max(entryHigh, entryPrice);
     const aboveZone = (tp: number): boolean =>
-        Number.isFinite(tp) && tp > 0 && tp > entryHigh && tp > entryPrice;
+        Number.isFinite(tp) && tp > 0 && tp > zoneCeiling;
     const firstTarget = aiTargets[0];
     const capDropped =
         firstTarget !== undefined &&

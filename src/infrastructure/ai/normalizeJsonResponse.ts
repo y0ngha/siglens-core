@@ -104,6 +104,12 @@ const REGEX_SPECIALS = /[.*+?^${}()|[\]\\]/g;
  * Whether `text` holds `key` in key position: the quoted name followed by optional
  * whitespace and `:`. A schema key name appearing as a string VALUE (or an array
  * item) in the discarded tail is not a lost key.
+ *
+ * Remaining limitation: this is a text pattern, not a tokenizer. An escaped `\"key\":`
+ * inside a string value does not match (the backslash breaks the quote pair), but a tail
+ * that begins in the middle of a string can still show `"key":` in what only looks like key
+ * position. The cost of that false positive is one regeneration, so a stricter scan is not
+ * worth it.
  */
 function hasKey(text: string, key: string): boolean {
     const quoted = JSON.stringify(key).replace(REGEX_SPECIALS, '\\$&');
