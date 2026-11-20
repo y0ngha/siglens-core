@@ -21,7 +21,11 @@ import type {
 } from '@/domain/ports/agentProvider';
 import type { CounterStore } from '@/domain/ports/counterStore';
 import { CounterStoreUnavailableError } from '@/domain/ports/counterStore';
-import { AGENT_PROMPT_VERSION } from '@/domain/agent/buildAgentSystemPrompt';
+import {
+    AGENT_PROMPT_VERSION,
+    buildAgentTurnContext,
+    composeAgentUserMessage,
+} from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_IMAGES_PER_MESSAGE_MAX } from '@/domain/agent/attachedImages';
 
 const USAGE = {
@@ -1123,7 +1127,7 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({
             ok: false,
             error: 'rate_limited',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(d.counters.turns.count).toBe(0);
     });
@@ -1141,7 +1145,7 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({
             ok: false,
             error: 'rate_limited',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(d.counters.premiumTurns.count).toBe(0);
         expect(d.counters.turns.count).toBe(0);
@@ -1171,7 +1175,7 @@ describe('runAgentTurn', () => {
             ok: false,
             error: 'aborted',
             partialText: '부분',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(d.counters.turns.count).toBe(1);
     });
@@ -1201,7 +1205,7 @@ describe('runAgentTurn', () => {
             ok: false,
             error: 'aborted',
             partialText: '확인 중',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(p.call).toHaveBeenCalledTimes(1);
         expect(d.counters.turns.count).toBe(1);
@@ -1223,7 +1227,7 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({
             ok: false,
             error: 'deadline',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(providerSignal?.aborted).toBe(true);
         expect(d.counters.turns.count).toBe(1);
@@ -1259,7 +1263,7 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({
             ok: false,
             error: 'aborted',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(p.call).toHaveBeenCalledTimes(1);
         expect(d.counters.turns.count).toBe(1);
@@ -1283,7 +1287,7 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({
             ok: false,
             error: 'aborted',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         await vi.waitFor(() => expect(lateEmitted).toBe(true));
         expect(d.events).toEqual([]);
@@ -1313,7 +1317,7 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({
             ok: false,
             error: 'aborted',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(d.executeTool).not.toHaveBeenCalled();
         expect(d.counters.webSearchUser.count).toBe(0);
@@ -1330,7 +1334,7 @@ describe('runAgentTurn', () => {
         expect(r).toEqual({
             ok: false,
             error: 'server_error',
-            turnContext: expect.any(String),
+            turnAt: expect.any(String),
         });
         expect(d.counters.turns.count).toBe(0);
     });
@@ -1558,13 +1562,13 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
     }
     interface Simulated {
         requests: Request[];
-        notes: string[];
+        turnAts: string[];
         rows: AgentMessage[];
     }
 
     /**
      * Runs `turnCount` member turns, storing history exactly as a consumer
-     * does: the user row with the returned `turnContext`, then the
+     * does: the user row with the returned `turnAt`, then the
      * intermediate rows, then the assistant.
      */
     function simulate(
@@ -1588,8 +1592,8 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
                     }),
                     deps(p)
                 );
-                if (!r.ok || r.turnContext === undefined)
-                    throw new Error('expected ok with a note');
+                if (!r.ok || r.turnAt === undefined)
+                    throw new Error('expected ok with a turn instant');
                 return {
                     requests: [
                         ...state.requests,
@@ -1600,20 +1604,20 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
                             messages: c.messages,
                         })),
                     ],
-                    notes: [...state.notes, r.turnContext],
+                    turnAts: [...state.turnAts, r.turnAt],
                     rows: [
                         ...state.rows,
                         {
                             role: 'user' as const,
                             content: userMessage,
-                            turnContext: r.turnContext,
+                            turnAt: r.turnAt,
                         },
                         ...r.intermediate,
                         r.assistant,
                     ],
                 };
             },
-            Promise.resolve({ requests: [], notes: [], rows: [] })
+            Promise.resolve({ requests: [], turnAts: [], rows: [] })
         );
     }
 
@@ -1648,24 +1652,101 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
         });
     });
 
-    it('re-attaches each stored note, so the replayed message is byte-identical to the one sent', async () => {
-        const { requests, notes } = await simulate(3);
-        const sent = must(lastOfTurn(requests, 1).messages.at(0)).content;
-        expect(sent).toBe(`${must(notes.at(0))}\n\n## Message\n질문 1`);
-        const replayed = must(firstOfTurn(requests, 2).messages.at(0));
-        expect(replayed.content).toBe(sent);
+    /** A mid-minute instant with milliseconds: the note's lead ("in 22m") reads them. */
+    const AT = new Date('2026-11-20T14:08:41.250Z');
+    const FIRST = '엔비디아 어때?';
+    const replayHistory = (turnAt: string): AgentMessage[] => [
+        { role: 'user', content: FIRST, turnAt },
+        { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+    ];
+    const firstMessageSent = (p: { calls: CallAgentProviderOptions[] }) =>
+        must(onlyCall(p).messages.at(0)).content;
+    const liveMessageSent = (p: { calls: CallAgentProviderOptions[] }) =>
+        must(onlyCall(p).messages.at(-1)).content;
+
+    it('a history message with turnAt = T replays byte-identical to the live message sent at T', async () => {
+        const live = scriptedProvider(answerOnly());
+        const liveResult = await runAgentTurn(
+            params({ userMessage: FIRST, now: AT }),
+            deps(live)
+        );
+        if (!liveResult.ok) throw new Error('expected ok');
+        const later = scriptedProvider(answerOnly());
+        await runAgentTurn(
+            params({
+                history: replayHistory(must(liveResult.turnAt)),
+                now: new Date('2026-11-21T03:00:00.000Z'),
+            }),
+            deps(later)
+        );
+        expect(firstMessageSent(later)).toBe(liveMessageSent(live));
+        expect(firstMessageSent(later)).toContain('(in 22m)');
     });
 
-    it('never hands a provider a turnContext key', async () => {
-        const { requests } = await simulate(4);
-        const keys = requests.flatMap(r =>
-            r.messages.map(m => 'turnContext' in m)
+    it('turnAt round-trips through toISOString at millisecond precision', async () => {
+        const p = scriptedProvider(answerOnly());
+        const r = await runAgentTurn(params({ now: AT }), deps(p));
+        if (!r.ok) throw new Error('expected ok');
+        expect(r.turnAt).toBe('2026-11-20T14:08:41.250Z');
+        expect(new Date(must(r.turnAt)).getTime()).toBe(AT.getTime());
+    });
+
+    it('a different time zone on the later turn changes only that message note (one cache miss)', async () => {
+        const live = scriptedProvider(answerOnly());
+        await runAgentTurn(params({ userMessage: FIRST, now: AT }), deps(live));
+        const later = scriptedProvider(answerOnly());
+        await runAgentTurn(
+            params({
+                history: replayHistory(AT.toISOString()),
+                timeZone: 'America/Los_Angeles',
+            }),
+            deps(later)
         );
+        const replayed = firstMessageSent(later);
+        expect(replayed).not.toBe(liveMessageSent(live));
+        expect(replayed).toBe(
+            composeAgentUserMessage(
+                buildAgentTurnContext({
+                    locale: 'ko',
+                    now: AT,
+                    timeZone: 'America/Los_Angeles',
+                }),
+                FIRST
+            )
+        );
+        expect(onlyCall(later).messages.slice(1, 2)).toEqual([
+            { role: 'assistant', content: 'RSI 54로 중립입니다.' },
+        ]);
+    });
+
+    it.each([
+        ['', 'empty'],
+        ['garbage', 'not a date'],
+        ['2026-11-20', 'date only'],
+        ['2026-11-20T14:08:41Z', 'no milliseconds'],
+        ['2026-13-45T00:00:00.000Z', 'impossible date'],
+    ])(
+        'an invalid turnAt (%s: %s) replays the message without a note',
+        async value => {
+            const p = scriptedProvider(answerOnly());
+            await runAgentTurn(
+                params({ history: replayHistory(value) }),
+                deps(p)
+            );
+            expect(onlyCall(p).messages.slice(0, 1)).toEqual([
+                { role: 'user', content: FIRST },
+            ]);
+        }
+    );
+
+    it('never hands a provider a turnAt key', async () => {
+        const { requests } = await simulate(4);
+        const keys = requests.flatMap(r => r.messages.map(m => 'turnAt' in m));
         expect(keys.length).toBeGreaterThan(0);
         expect(keys.every(has => !has)).toBe(true);
     });
 
-    it('history without turnContext is sent as stored', async () => {
+    it('history without turnAt is sent as stored', async () => {
         const history: AgentMessage[] = [
             { role: 'user', content: '엔비디아 어때?' },
             { role: 'assistant', content: 'RSI 54로 중립입니다.' },
@@ -1675,50 +1756,31 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
         expect(onlyCall(p).messages.slice(0, -1)).toEqual(history);
     });
 
-    it('an empty stored turnContext is dropped without touching the content', async () => {
-        const p = scriptedProvider(answerOnly());
-        await runAgentTurn(
-            params({
-                history: [
-                    {
-                        role: 'user',
-                        content: '엔비디아 어때?',
-                        turnContext: '',
-                    },
-                    { role: 'assistant', content: '중립입니다.' },
-                ],
-            }),
-            deps(p)
-        );
-        expect(onlyCall(p).messages.slice(0, 1)).toEqual([
-            { role: 'user', content: '엔비디아 어때?' },
-        ]);
-    });
-
-    it('returns the note on success and on a provider failure, never on a gate refusal', async () => {
+    it('returns the turn instant on success and on a provider failure, never on a gate refusal', async () => {
         vi.spyOn(console, 'warn').mockImplementation(() => {});
-        const okProvider = scriptedProvider(answerOnly());
-        const ok = await runAgentTurn(params(), deps(okProvider));
-        if (!ok.ok) throw new Error('expected ok');
-        const sentLast = must(onlyCall(okProvider).messages.at(-1)).content;
-        expect(sentLast.startsWith(`${ok.turnContext}\n\n## Message`)).toBe(
-            true
+        const ok = await runAgentTurn(
+            params({ now: AT }),
+            deps(scriptedProvider(answerOnly()))
         );
+        expect(ok).toMatchObject({ ok: true, turnAt: AT.toISOString() });
 
         const failed = await runAgentTurn(
-            params({ tier: 'free' }),
+            params({ tier: 'free', now: AT }),
             deps(
                 failingProvider(Object.assign(new Error('rl'), { status: 429 }))
             )
         );
-        expect(failed).toMatchObject({ ok: false, error: 'rate_limited' });
-        expect(failed.ok === false && failed.turnContext).toContain('## Now');
+        expect(failed).toMatchObject({
+            ok: false,
+            error: 'rate_limited',
+            turnAt: AT.toISOString(),
+        });
 
         const gated = deps(scriptedProvider([]));
         gated.counters.turns = memoryCounter(0);
         const refused = await runAgentTurn(params({ tier: 'free' }), gated);
         expect(refused).toEqual({ ok: false, error: 'turn_limit' });
-        expect('turnContext' in refused).toBe(false);
+        expect('turnAt' in refused).toBe(false);
     });
 
     it('passes krSession into the note and keeps the system prompt independent of it', async () => {

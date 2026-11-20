@@ -587,10 +587,14 @@ Reminder: when you call tools, send only the tool calls — no text in that mess
  * Lives outside the system prompt on purpose (see
  * {@link buildAgentSystemPrompt}): only the newest message changes per turn,
  * so the system prompt, tool definitions and earlier history stay a
- * byte-identical prefix that DeepSeek's context cache can reuse. Exceptions:
- * image turns (the attachment marker is appended on replay) and the flip
- * turns, where an older tool result changes to `omitted` (every
- * `toolResultStride` turns).
+ * byte-identical prefix that DeepSeek's context cache can reuse. The note is a
+ * pure function of `now`, the resolved time zone, the locale (only for the
+ * default zone) and `krSession`. Exceptions: image turns (the attachment
+ * marker is appended on replay), the flip turns, where an older tool result
+ * changes to `omitted` (every `toolResultStride` turns), and a rebuilt
+ * historical note that differs from the original because the zone, locale or
+ * session spec changed between turns or a core version changed the format
+ * (one cache miss each, never an error).
  *
  * @param input - Locale (for the default zone), time, optional KRX session spec
  *   and the reader's time zone.
@@ -627,8 +631,9 @@ export function buildAgentTurnContext(input: AgentTurnContextInput): string {
 /**
  * The latest user message as sent to the model: the turn-context note, then
  * the user's own words. The consumer persists the plain `userMessage` together
- * with the note (`RunAgentTurnResult.turnContext`); `runAgentTurn` composes
- * them again when the message becomes history, so the replayed bytes match.
+ * with the turn's instant (`RunAgentTurnResult.turnAt`); `runAgentTurn`
+ * rebuilds the note from it and composes them again when the message becomes
+ * history, so the replayed bytes match.
  *
  * @param context - Output of {@link buildAgentTurnContext}.
  * @param userMessage - The user's text, verbatim.

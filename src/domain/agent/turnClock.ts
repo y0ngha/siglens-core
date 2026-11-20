@@ -102,7 +102,8 @@ export interface MarketLineInput {
     /** Zone label printed after the boundary clock, e.g. `ET`. */
     zoneLabel: string;
     now: Date;
-    spec: ScheduledSpec;
+    /** An `always-open` spec prints `open` alone: there is no boundary to name. */
+    spec: MarketSessionSpec;
     /**
      * `true` only for the US line: names pre-market and after-hours clock
      * windows on a trading day. The labels name windows of the clock only;
@@ -147,6 +148,7 @@ function closedState(
  */
 export function formatMarketLine(input: MarketLineInput): string {
     const { label, zoneLabel, now, spec, extendedHours } = input;
+    if (spec.kind === 'always-open') return `- ${label}: open`;
     const open = getSessionStatus(spec, now) === 'open';
     const state = open ? 'open' : closedState(spec, now, extendedHours);
     const boundary = open ? 'close' : 'open';

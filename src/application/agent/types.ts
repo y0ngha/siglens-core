@@ -172,12 +172,12 @@ export type RunAgentTurnResult =
           /** Names of tools that executed successfully during the turn, in call order. */
           toolsUsed: string[];
           /**
-           * The exact "## Now" note this turn's user message was sent with.
-           * Persist it on the user message (`AgentMessage.turnContext`) so the
-           * next turn replays the same bytes and the provider's prefix cache
-           * keeps hitting.
+           * The instant (`toISOString()`, UTC, millisecond precision) this
+           * turn's "## Now" note was built from. Persist it with the user
+           * message (`AgentMessage.turnAt`); the next turn rebuilds the same
+           * note from it, so the provider's prefix cache keeps hitting.
            */
-          turnContext?: string;
+          turnAt?: string;
       }
     | {
           /** Discriminant: the turn was refused, stopped, or failed. */
@@ -187,10 +187,9 @@ export type RunAgentTurnResult =
           /** Text streamed before the failure, when any was produced. */
           partialText?: string;
           /**
-           * The note the message was sent with, when the prompt was built
-           * (persist it like the `ok` variant's). Absent when the turn was
-           * refused before that: `turn_limit`, `premium_turn_limit` and
-           * `server_busy` at the gate.
+           * The turn's instant (persist it like the `ok` variant's). Absent
+           * when the turn was refused before the prompt was built:
+           * `turn_limit`, `premium_turn_limit` and `server_busy` at the gate.
            */
-          turnContext?: string;
+          turnAt?: string;
       };

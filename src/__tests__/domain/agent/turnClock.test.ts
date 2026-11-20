@@ -223,6 +223,18 @@ describe('formatMarketLine — session windows', () => {
         );
     });
 
+    it('an always-open spec prints open alone', () => {
+        expect(
+            formatMarketLine({
+                label: 'Crypto',
+                zoneLabel: 'UTC',
+                now: new Date('2026-11-20T14:09:00Z'),
+                spec: { kind: 'always-open' },
+                extendedHours: false,
+            })
+        ).toBe('- Crypto: open');
+    });
+
     it('prints the state alone when the spec has no trading day', () => {
         expect(
             formatMarketLine({
