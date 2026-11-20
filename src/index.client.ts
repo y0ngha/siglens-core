@@ -804,3 +804,28 @@ export type {
     TierGateErrorResult,
     TierTimeframeAccessError,
 } from './application/market/types';
+
+export type {
+    AnalysisOutcomeLabels,
+    ForwardReturnLabel,
+    LevelOutcome,
+    LevelOutcomeEntry,
+    LevelOutcomeLabel,
+    LevelPlaceboLabel,
+    LevelSide,
+    LevelSkipReason,
+    OutcomeAnchor,
+    OutcomeAnchorSource,
+    OutcomeBarTuple,
+    OutcomeLevelRole,
+    OutcomeSubject,
+    OutcomeWindow,
+    OutcomeWindowResult,
+    PatternOutcome,
+    PatternOutcomeLabel,
+    PlanApproach,
+    PlanOutcome,
+    PlanOutcomeLabel,
+    PlanReason,
+    ScenarioTargetLabel,
+} from './domain/outcomes/types';
