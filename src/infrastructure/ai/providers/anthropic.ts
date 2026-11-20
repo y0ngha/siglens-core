@@ -145,8 +145,11 @@ export async function callClaude(
     //   항상 이 `auto` 경로를 탄다.
     // - haiku-5-5는 `disabled`에서 forced를 받는다.
     //
-    // 미실측(벤더 문서 기준, 2026-11-21 열람): fable-5-2도 forced tool_choice를 거부하고
-    // thinking을 끌 수 없다고 적혀 있다. off가 adaptive라 opus-5-5와 같은 `auto` 경로를 탄다.
+    // fable-5-2는 Messages API(`/v1/messages`, 스트리밍)에서 adaptive thinking
+    // effort `low`/`high`와 `tool_choice: auto`를 2026-11-21 02:57 KST에 실측했다
+    // (HTTP 200, `stop_reason: tool_use`, 스키마에 맞는 tool input). forced tool_choice
+    // 거부와 thinking 비활성(`disabled`) 거부는 벤더 문서 기준이며 보내 보지 않았다.
+    // off가 adaptive라 opus-5-5와 같은 `auto` 경로를 탄다.
     const thinkingActive =
         adaptiveConfig !== undefined
             ? adaptiveConfig.mode !== 'disabled'

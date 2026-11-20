@@ -319,9 +319,10 @@ describe('callGemini thinkingConfig', () => {
     });
 });
 
-// Gemini 4 rows (per vendor docs read 2026-11-21, not yet measured): the
-// default state is `high`, the off state floors at `low` because `minimal` is
-// documented as unsupported on Gemini 4.
+// Gemini 4 rows (`low`/`high` measured on `models.generateContent`, 2026-11-21
+// 02:55 KST): the default state is `high`, the off state floors at `low`
+// because `minimal` is documented as unsupported on Gemini 4 (per vendor docs,
+// not sent).
 describe.each([
     'gemini-4-carbon',
     'gemini-4-neon',

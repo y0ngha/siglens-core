@@ -128,6 +128,92 @@ describe('extractOpenAIUsage', () => {
         });
     });
 
+    it('reads cache_write_tokens into cacheWriteTokens and keeps it out of promptTokens', () => {
+        expect(
+            extractOpenAIUsage({
+                input_tokens: 3672,
+                input_tokens_details: {
+                    cache_write_tokens: 3669,
+                    cached_tokens: 0,
+                },
+                output_tokens: 40,
+            })
+        ).toEqual({
+            promptTokens: 3,
+            cachedTokens: 0,
+            cacheWriteTokens: 3669,
+            outputTokens: 40,
+        });
+    });
+
+    it('reads a cache hit with cache_write_tokens 0 as a pure cache read', () => {
+        expect(
+            extractOpenAIUsage({
+                input_tokens: 3672,
+                input_tokens_details: {
+                    cache_write_tokens: 0,
+                    cached_tokens: 3669,
+                },
+                output_tokens: 40,
+            })
+        ).toEqual({
+            promptTokens: 3,
+            cachedTokens: 3669,
+            cacheWriteTokens: 0,
+            outputTokens: 40,
+        });
+    });
+
+    it('treats an absent cache_write_tokens as zero', () => {
+        expect(
+            extractOpenAIUsage({
+                input_tokens: 100,
+                input_tokens_details: { cached_tokens: 40 },
+            })
+        ).toEqual({
+            promptTokens: 60,
+            cachedTokens: 40,
+            cacheWriteTokens: 0,
+            outputTokens: 0,
+        });
+    });
+
+    it('subtracts both cached_tokens and cache_write_tokens from promptTokens', () => {
+        expect(
+            extractOpenAIUsage({
+                input_tokens: 100,
+                input_tokens_details: {
+                    cached_tokens: 40,
+                    cache_write_tokens: 30,
+                },
+                output_tokens: 5,
+            })
+        ).toEqual({
+            promptTokens: 30,
+            cachedTokens: 40,
+            cacheWriteTokens: 30,
+            outputTokens: 5,
+        });
+    });
+
+    it('floors promptTokens at 0 when cached plus cache-write exceeds input', () => {
+        expect(
+            extractOpenAIUsage({
+                input_tokens: 100,
+                input_tokens_details: {
+                    cached_tokens: 80,
+                    cache_write_tokens: 50,
+                },
+                output_tokens: 5,
+            })
+        ).toEqual({
+            promptTokens: 0,
+            cachedTokens: 80,
+            cacheWriteTokens: 50,
+            outputTokens: 5,
+        });
+    });
+
     it('treats a missing input_tokens_details as zero cached tokens', () => {
         const result = extractOpenAIUsage({
             input_tokens: 500,

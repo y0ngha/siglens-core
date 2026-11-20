@@ -201,6 +201,14 @@ free-tier analysis gating부터 `timeframes`/`infoDepth`는 `member`와 `pro`가
 | `gpt-6.1-sol` | `gpt-6.2-sol` |
 | `gpt-6-astra` | `gpt-6.2-astra` |
 
+후속 id 여섯 행(`claude-fable-5-2`, `gpt-6.2-sol`, `gpt-6.2-astra`, `gemini-4-carbon`, `gemini-4-neon`, `gemini-4-hydrogen`)의 실측 범위는 벤더별로 다음과 같다.
+
+- Gemini 4 세 모델: `models.generateContent`(v1beta)에서 2026-11-21 02:55 KST에 `thinkingConfig.thinkingLevel` LOW·HIGH, `responseJsonSchema`, `seed`를 실측했다.
+- GPT-6.2 두 모델: Responses API(`/v1/responses`)에서 2026-11-21 02:57 KST에 `reasoning.effort` `low`·`high`, strict `json_schema`, `developer` 메시지 배치를 실측했고, `gpt-6.2-sol`에서는 같은 접두사 반복 호출의 캐시 적중도 관찰했다.
+- Claude Fable 5.2: Messages API(`/v1/messages`, 스트리밍)에서 2026-11-21 02:57 KST에 adaptive thinking `low`·`high`와 `tool_choice: auto`를 실측했다.
+
+Gemini `minimal`, GPT `effort: 'none'`, Claude의 `disabled` thinking과 forced `tool_choice`는 보내 보지 않았고, 거부된다는 서술은 벤더 문서 기준이다.
+
 ---
 
 ## 인디케이터 상수
@@ -1567,7 +1575,7 @@ display:
   - Claude: 보내지 않는다. API 버전 2026-10-21(`@anthropic-ai/sdk` 1.x)은 `temperature`·`top_p`·`top_k`를
     기본값이라도 400으로 거부한다. budget 스펙의 `temperature`는 타입 호환용으로만 남아 있다(`@deprecated`).
   - Gemini: 보내지 않는다. 3.6 Flash부터 Google 기본값으로 고정됐다.
-  - ChatGPT: 보내지 않는다(reasoning 모델). system 프롬프트는 `instructions`로 보내고, `systemPlacement: 'developer_message'`인 행(GPT-6.2)은 `input` 맨 앞의 `developer` 메시지로 보낸다. 어느 쪽이든 system 텍스트의 바이트는 같다.
+  - ChatGPT: 보내지 않는다(reasoning 모델). system 프롬프트는 `instructions`로 보내고, `systemPlacement: 'developer_message'`인 행(GPT-6.2)은 `input` 맨 앞의 `developer` 메시지로 보낸다. 어느 쪽이든 system 텍스트의 바이트는 같다. `gpt-6.2-sol`·`gpt-6.2-astra`의 `low`/`high` effort와 `developer` 메시지 경로, `gpt-6.2-sol`의 같은 접두사 반복 호출 캐시 적중(입력 3,672토큰 중 3,669 읽음)은 `/v1/responses`에서 2026-11-21 02:57 KST에 실측했다. `effort: 'none'` 거부는 벤더 문서 기준이며 보내 보지 않았다.
   - DeepSeek: 추론 OFF일 때만 `temperature`를 보낸다(추론 ON이면 API가 무시한다).
 - 동일 입력 → 동일 프롬프트 문자열을 보장한다.
   `buildAnalysisPrompt`는 입력 `skills` 배열의 순서와 무관하게 byte-identical 결과를 반환해야 한다.

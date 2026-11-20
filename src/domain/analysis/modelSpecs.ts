@@ -282,9 +282,14 @@ export const MODEL_SPECS = {
         apiModelId: 'claude-fable-5-2',
         maxOutputTokens: 128_000,
         reasoning: {
-            // Per vendor docs read 2026-11-21, not yet measured: Fable thinks
-            // unconditionally (`{type:'disabled'}` and `budget_tokens` are
-            // 400), so the floor is adaptive thinking at `low`.
+            // Measured live 2026-11-21 02:57 KST on the Messages API
+            // (`/v1/messages`, streamed): adaptive thinking at effort `low` and
+            // `high` with `tool_choice: auto` returned HTTP 200,
+            // `stop_reason: tool_use` and schema-valid tool input, with no
+            // data-retention 400 on the key used. Still per vendor docs, not
+            // sent: Fable thinks unconditionally (`{type:'disabled'}`,
+            // `budget_tokens` and a forced `tool_choice` are 400), so the floor
+            // is adaptive thinking at `low`.
             off: { mode: 'adaptive', effort: 'low' },
             on: { mode: 'adaptive', effort: 'high' },
             default: 'on',
@@ -295,9 +300,13 @@ export const MODEL_SPECS = {
         provider: 'chatgpt',
         apiModelId: 'gpt-6.2-astra',
         maxOutputTokens: 128_000,
-        // Per vendor docs read 2026-11-21, not yet measured: the API rejects
-        // `effort: 'none'`; low, medium, high, xhigh and max are listed. The
-        // default effort is not stated, so effort is always sent explicitly.
+        // Measured live 2026-11-21 02:57 KST on the Responses API
+        // (`/v1/responses`): `effort` `low` and `high` returned
+        // `status: completed` with strict `json_schema` output, with the
+        // system text as a leading `developer` input item. Still per vendor
+        // docs, not sent: the API rejects `effort: 'none'`, and low, medium,
+        // high, xhigh and max are listed. The default effort is not stated in
+        // the docs, so effort is always sent explicitly.
         systemPlacement: 'developer_message',
         reasoning: {
             off: { effort: 'low' },
@@ -310,8 +319,11 @@ export const MODEL_SPECS = {
         provider: 'chatgpt',
         apiModelId: 'gpt-6.2-sol',
         maxOutputTokens: 128_000,
-        // Per vendor docs read 2026-11-21, not yet measured: same effort
-        // surface as `gpt-6.2-astra` (`none` rejected, floor `low`).
+        // Measured live 2026-11-21 02:57 KST on the Responses API
+        // (`/v1/responses`): same result as `gpt-6.2-astra` for `low` and
+        // `high` and the `developer` message, and repeat calls with the same
+        // prefix read 3,669 of 3,672 input tokens from the cache. Still per
+        // vendor docs, not sent: `none` is rejected, so the floor is `low`.
         systemPlacement: 'developer_message',
         reasoning: {
             off: { effort: 'low' },
@@ -333,11 +345,13 @@ export const MODEL_SPECS = {
             hardOff: false,
         },
     },
-    // Gemini 4 Carbon, Neon and Hydrogen (per vendor docs read 2026-11-21, not
-    // yet measured): `minimal` is documented as unsupported, so the floor is
-    // `low`. The docs only show the Interactions API; that `generateContent`
-    // with `thinkingLevel` / `responseJsonSchema` / `seed` is accepted is
-    // assumed from `gemini-4-argon`.
+    // Gemini 4 Carbon, Neon and Hydrogen. Measured live 2026-11-21 02:55 KST
+    // on `models.generateContent` (v1beta): `thinkingConfig.thinkingLevel`
+    // `low` and `high`, `responseJsonSchema` and `seed` were accepted
+    // (HTTP 200, finishReason STOP, schema-valid JSON). Neon and Hydrogen spent
+    // thought tokens at `low` (126 and 80 on a trivial prompt); Carbon
+    // reported none at `low` on that prompt. `minimal` was not sent: that it is
+    // unsupported is still per vendor docs, so the floor is `low`.
     'gemini-4-carbon': {
         provider: 'gemini',
         apiModelId: 'gemini-4-carbon',

@@ -515,7 +515,7 @@ describe('2026-10 roster rows (verified live 2026-10-15)', () => {
     });
 });
 
-describe('2026-11 roster rows (per vendor docs, not yet measured)', () => {
+describe('2026-11 roster rows (floors per vendor docs, not sent; low/high measured 2026-11-21 KST)', () => {
     it('keeps fable 5.2 on adaptive low as its floor, default on', () => {
         const spec = MODEL_SPECS['claude-fable-5-2'];
         expect(spec.reasoning.off).toEqual({ mode: 'adaptive', effort: 'low' });

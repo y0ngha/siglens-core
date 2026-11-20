@@ -367,8 +367,8 @@ function lastSentBody(): Record<string, unknown> {
 }
 
 // GPT-6.2 rows send the system prompt as a leading `developer` input message
-// (per vendor docs read 2026-11-21, not yet measured) so it stays inside the
-// cacheable prefix; every other row keeps top-level `instructions`.
+// (`low`/`high` and this placement measured on `/v1/responses`, 2026-11-21
+// 02:57 KST) so it stays inside the cacheable prefix; every other row keeps top-level `instructions`.
 describe.each(['gpt-6.2-sol', 'gpt-6.2-astra'] as const)(
     'callChatGPT request shape — %s',
     model => {
