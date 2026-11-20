@@ -19,7 +19,10 @@ import { usMarketCloseMinute } from '@/domain/marketCalendar';
  * single source of truth for the ET session boundaries across this module
  * and `utils.ts`.
  */
-export const US_EQUITY_SESSION: MarketSessionSpec = {
+export const US_EQUITY_SESSION: Extract<
+    MarketSessionSpec,
+    { kind: 'scheduled' }
+> = {
     kind: 'scheduled',
     timeZone: 'America/New_York',
     openMinute: MARKET_OPEN_HOUR * 60 + MARKET_OPEN_MINUTE,

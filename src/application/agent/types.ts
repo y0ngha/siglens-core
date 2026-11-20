@@ -7,7 +7,12 @@ import type {
 } from '@/domain/ports/agentProvider';
 import type { CounterStore } from '@/domain/ports/counterStore';
 import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
-import type { ModelId, NormalizedUsage, Tier } from '@/domain/types';
+import type {
+    MarketSessionSpec,
+    ModelId,
+    NormalizedUsage,
+    Tier,
+} from '@/domain/types';
 import type { ProviderErrorCode } from '@/application/shared/providerError';
 import type { AgentGlobalLimits } from '@/application/agent/limits';
 
@@ -44,6 +49,12 @@ export interface RunAgentTurnParams {
     availableTools: ReadonlySet<string>;
     /** Symbols the user holds, for the system prompt. */
     portfolioSymbols?: readonly string[];
+    /**
+     * The Korean exchange's session spec (hours and holiday list), for the KRX
+     * line of the turn note. Core carries no KRX calendar, so the consumer
+     * passes it; omitted, the note has no KRX line.
+     */
+    krSession?: MarketSessionSpec;
     /** Injectable clock for tests; defaults to `new Date()`. */
     now?: Date;
     /**
@@ -160,6 +171,13 @@ export type RunAgentTurnResult =
           promptVersion: string;
           /** Names of tools that executed successfully during the turn, in call order. */
           toolsUsed: string[];
+          /**
+           * The exact "## Now" note this turn's user message was sent with.
+           * Persist it on the user message (`AgentMessage.turnContext`) so the
+           * next turn replays the same bytes and the provider's prefix cache
+           * keeps hitting.
+           */
+          turnContext?: string;
       }
     | {
           /** Discriminant: the turn was refused, stopped, or failed. */
@@ -168,4 +186,11 @@ export type RunAgentTurnResult =
           error: AgentErrorCode;
           /** Text streamed before the failure, when any was produced. */
           partialText?: string;
+          /**
+           * The note the message was sent with, when the prompt was built
+           * (persist it like the `ok` variant's). Absent when the turn was
+           * refused before that: `turn_limit`, `premium_turn_limit` and
+           * `server_busy` at the gate.
+           */
+          turnContext?: string;
       };

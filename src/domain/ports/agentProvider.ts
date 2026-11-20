@@ -46,6 +46,15 @@ export interface AgentMessage {
      * images. Adapters map them to their own image parts.
      */
     images?: readonly AgentImage[];
+    /**
+     * User messages only: the "## Now" note this message was sent with, as
+     * returned by `runAgentTurn` (`RunAgentTurnResult.turnContext`). The loop
+     * re-attaches it to the message when it builds the request, so the message
+     * is byte-identical to the one the provider saw on its own turn and the
+     * provider's prefix cache covers the history. Never forwarded to a
+     * provider: adapters see the composed `content` only.
+     */
+    turnContext?: string;
 }
 
 /** JSON Schema (draft-07 subset) accepted by every provider we ship. */

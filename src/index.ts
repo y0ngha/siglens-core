@@ -195,6 +195,13 @@ export { findMaCrosses } from './domain/indicators/maCrosses';
 export type { MaCross, MaCrossScan } from './domain/indicators/maCrosses';
 export { rsiZone } from './domain/indicators/rsiZone';
 export type { RsiZone } from './domain/indicators/rsiZone';
+export { classifyOscillatorZones } from './domain/indicators/oscillatorZones';
+export type {
+    OscillatorKey,
+    OscillatorReadings,
+    OscillatorZone,
+    OscillatorZonesView,
+} from './domain/indicators/oscillatorZones';
 
 // Prompt builders
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';

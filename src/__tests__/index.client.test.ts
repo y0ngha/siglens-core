@@ -82,6 +82,16 @@ describe('browser public API exports', () => {
         expect(typeof clientApi.classifyMaStack).toBe('function');
         expect(typeof clientApi.rsiZone).toBe('function');
         expect(clientApi.rsiZone(37.5)).toBe('neutral');
+        expect(typeof clientApi.classifyOscillatorZones).toBe('function');
+        expect(
+            clientApi.classifyOscillatorZones({
+                rsi: 37.5,
+                stochasticK: null,
+                williamsR: null,
+                cci: null,
+                mfi: null,
+            }).zones.rsi
+        ).toBe('neutral');
         expect(clientApi.STRATEGY_KIND_SOURCE_REF).toEqual({
             divergence: 'kind:divergence',
             fibonacci: 'kind:fibonacci',

@@ -149,6 +149,17 @@ Two checks that feed one decision (a status, a verdict) read the same value from
 source. If the prompt prints a level, the status logic uses that printed level, not a
 second derivation of it (a sloped line for one check, the flat figure for another).
 
+A rule about one kind of value is applied where the value is built, not by blanking the
+input at one call site; otherwise every other caller misses it. A predicate written for one
+element is not reused as a filter over the whole list: that silently widens the rule.
+A "current value" line reads the latest element and prints `N/A` when it is null, never a
+walk-back helper that shows an older reading as the current one.
+
+```typescript
+// ❌ collectLevels({ ...indicators, vwap: [] })   // one caller blanks the input
+// ✅ collectLevels(indicators, timeframe)          // the builder decides
+```
+
 <a id="CP-2"></a>
 #### CP-2 — Compute a value once
 
@@ -187,7 +198,9 @@ Remove code whose removal cannot change behavior:
 - files, types and exports orphaned by a refactor (a `types.ts` with no consumers, an
   `export` on a helper only its own file uses). When you remove the last consumer, remove
   the leftovers in the same change. Re-exports of internals are covered by
-  `PUBLIC_API.md#API-2`.
+  `PUBLIC_API.md#API-2`. A public export a consumer may still import cannot be deleted
+  before a release: mark it `@deprecated` with the reason and the removal condition
+  instead of leaving it as a silent dead export.
 
 <a id="CP-5"></a>
 #### CP-5 — When a loop with push is right, and when it is not

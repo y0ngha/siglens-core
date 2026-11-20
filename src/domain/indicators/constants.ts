@@ -87,6 +87,10 @@ export const CCI_OVERBOUGHT_LEVEL = 100;
 export const CCI_OVERSOLD_LEVEL = -100;
 export const CCI_ZERO_LEVEL = 0;
 
+/** Williams %R overbought (>=) / oversold (<=) levels. */
+export const WILLIAMS_R_OVERBOUGHT_LEVEL = -20;
+export const WILLIAMS_R_OVERSOLD_LEVEL = -80;
+
 export const MA_DEFAULT_PERIODS = [5, 20, 60, 120, 200] as const;
 export const EMA_DEFAULT_PERIODS = [9, 20, 21, 60] as const;
 
