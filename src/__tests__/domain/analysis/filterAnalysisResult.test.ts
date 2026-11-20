@@ -400,6 +400,36 @@ describe('filterAnalysisResult', () => {
         ).not.toHaveProperty('takeProfitPrices');
     });
 
+    it('carries the rejected-stop marker through the tier filter', () => {
+        const filtered = filterAnalysisResult(
+            makeAnalysisResponse({
+                actionRecommendation: {
+                    positionAnalysis: '현재 위치',
+                    entry: '진입 전략',
+                    exit: '청산 전략',
+                    riskReward: '손익비',
+                    stopLoss: 112,
+                    reconciledLevels: {
+                        exit: '보정 청산',
+                        riskReward: '',
+                        reason: '보정 사유',
+                        stopLossRejected: true,
+                    },
+                },
+            }),
+            'pro',
+            restrictedConfig
+        );
+        const result = expectFilteredResult(filtered);
+
+        expect(result.actionRecommendation?.reconciledLevels).toEqual({
+            exit: '보정 청산',
+            riskReward: '',
+            reason: '보정 사유',
+            stopLossRejected: true,
+        });
+    });
+
     it('uses null action recommendation when the source analysis has no recommendation', () => {
         const filtered = filterAnalysisResult(
             makeAnalysisResponse({ actionRecommendation: undefined }),

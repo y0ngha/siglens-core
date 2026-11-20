@@ -1,0 +1,194 @@
+{
+    "QQQ-2026-07-22-175c8b7ae643": {
+        "class": "salvage",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 17,
+                "keyPrices": 5
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0133
+    },
+    "AAPL-2025-02-24-07b50eafa33c": {
+        "class": "reversed_entry",
+        "provenance": {
+            "checked": {
+                "plan": 5,
+                "other": 17,
+                "keyPrices": 0
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0362
+    },
+    "AMZN-2025-06-16-9826209b3170": {
+        "class": "stop_not_below_zone",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 19,
+                "keyPrices": 5
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0402
+    },
+    "AVGO-2025-10-01-57bb87ba8534": {
+        "class": "stop_not_below_zone",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 18,
+                "keyPrices": 0
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0207
+    },
+    "GOOGL-2024-12-06-a54094cdaf31": {
+        "class": "target_not_above_zone",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 18,
+                "keyPrices": 3
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0538
+    },
+    "META-2025-01-08-97ea327ceee4": {
+        "class": "target_not_above_zone",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 19,
+                "keyPrices": 0
+            },
+            "plan": [
+                {
+                    "field": "entryPrices",
+                    "value": 620
+                }
+            ],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0149
+    },
+    "MSFT-2025-01-15-fd9f2498ce0c": {
+        "class": "ungrounded_plan_price",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 13,
+                "keyPrices": 0
+            },
+            "plan": [
+                {
+                    "field": "entryPrices",
+                    "value": 430
+                },
+                {
+                    "field": "entryPrices",
+                    "value": 431
+                }
+            ],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0239
+    },
+    "NVDA-2024-11-21-69e1932fea3c": {
+        "class": "ungrounded_plan_price",
+        "provenance": {
+            "checked": {
+                "plan": 7,
+                "other": 17,
+                "keyPrices": 2
+            },
+            "plan": [
+                {
+                    "field": "takeProfitPrices",
+                    "value": 159.77
+                }
+            ],
+            "other": [
+                {
+                    "field": "priceTargets",
+                    "value": 159.765
+                }
+            ],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0559
+    },
+    "SPY-2024-11-19-a60be02e1293": {
+        "class": "clean",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 23,
+                "keyPrices": 0
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.016
+    },
+    "TSLA-2024-11-20-9a3ec7c6f8b7": {
+        "class": "clean",
+        "provenance": {
+            "checked": {
+                "plan": 6,
+                "other": 14,
+                "keyPrices": 0
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0105
+    },
+    "AAPL-2025-02-19-21fa41a262fc": {
+        "class": "clean",
+        "provenance": {
+            "checked": {
+                "plan": 8,
+                "other": 20,
+                "keyPrices": 0
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0376
+    },
+    "AAPL-2025-02-21-635246be2622": {
+        "class": "clean",
+        "provenance": {
+            "checked": {
+                "plan": 7,
+                "other": 19,
+                "keyPrices": 2
+            },
+            "plan": [],
+            "other": [],
+            "keyPrices": []
+        },
+        "falseGroundingRate": 0.0377
+    }
+}

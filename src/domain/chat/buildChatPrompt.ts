@@ -10,6 +10,7 @@ import {
 } from '@/domain/analysis/promptFormat';
 import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import { planEntryPrice } from '@/domain/analysis/ai-levels';
+import { effectiveStopLoss } from '@/domain/analysis/planCheck';
 import type {
     ActionRecommendation,
     AnalysisResponse,
@@ -181,13 +182,13 @@ function formatStructuredPlan(
     // `buildPlanCheck` applies internally, so
     // this block and its own `planCheck` ratios below never disagree about
     // which stop/targets are actually in play.
-    const effectiveStopLoss = rec.reconciledLevels?.stopLoss ?? rec.stopLoss;
+    const stopLoss = effectiveStopLoss(rec);
     const effectiveTakeProfitPrices =
         rec.reconciledLevels?.takeProfitPrices ?? rec.takeProfitPrices;
     const stopText =
-        effectiveStopLoss === undefined
+        stopLoss === undefined
             ? 'N/A'
-            : `${formatQuotedPrice(effectiveStopLoss, quoting)}${formatDistanceFromBase(effectiveStopLoss, entryRef, 'entry')}`;
+            : `${formatQuotedPrice(stopLoss, quoting)}${formatDistanceFromBase(stopLoss, entryRef, 'entry')}`;
     const targetsText =
         (effectiveTakeProfitPrices ?? []).length > 0
             ? effectiveTakeProfitPrices!

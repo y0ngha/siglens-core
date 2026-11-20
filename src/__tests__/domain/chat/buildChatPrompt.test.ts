@@ -1013,6 +1013,29 @@ describe('buildChatPrompt — analysis-time price, computed distances, structure
         );
     });
 
+    it('prints no stop for a plan whose stop was rejected, not the rejected value', () => {
+        const rejected: AnalysisResponse = {
+            ...analysisWithPlan,
+            actionRecommendation: {
+                ...analysisWithPlan.actionRecommendation,
+                positionAnalysis: '현재가 위치',
+                entry: '',
+                exit: '',
+                riskReward: '',
+                stopLoss: 123.45,
+                reconciledLevels: {
+                    exit: '',
+                    riskReward: '',
+                    reason: 'r',
+                    stopLossRejected: true,
+                },
+            },
+        };
+        const result = buildChatPrompt('AAPL', '1Day', rejected, [], 'q');
+        expect(result.systemPrompt).toContain('- Stop: N/A');
+        expect(result.systemPrompt).not.toContain('123.45');
+    });
+
     it('renders the "distances and ratios are computed" rule', () => {
         const result = buildChatPrompt(
             'AAPL',

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as responseSchemaExports from '@/domain/analysis/responseSchemas';
 import {
     NEWS_CARD_RESPONSE_SCHEMA,
     NEWS_RESPONSE_SCHEMA,
@@ -213,42 +214,106 @@ const ENTRY_RECOMMENDATION_VALUES = Object.keys({
     avoid: true,
 } satisfies Record<EntryRecommendation, true>).toSorted();
 
-describe('responseSchemas — strict-mode invariants', () => {
-    const all = [
-        {
-            name: 'NEWS_CARD_RESPONSE_SCHEMA',
-            schema: NEWS_CARD_RESPONSE_SCHEMA,
-        },
-        { name: 'NEWS_RESPONSE_SCHEMA', schema: NEWS_RESPONSE_SCHEMA },
-        {
-            name: 'FUNDAMENTAL_RESPONSE_SCHEMA',
-            schema: FUNDAMENTAL_RESPONSE_SCHEMA,
-        },
-        { name: 'OVERALL_RESPONSE_SCHEMA', schema: OVERALL_RESPONSE_SCHEMA },
-        {
-            name: 'OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA',
-            schema: OVERALL_WITH_INVESTOR_FLOWS_RESPONSE_SCHEMA,
-        },
-        {
-            name: 'INVESTOR_FLOWS_RESPONSE_SCHEMA',
-            schema: INVESTOR_FLOWS_RESPONSE_SCHEMA,
-        },
-        { name: 'OPTIONS_RESPONSE_SCHEMA', schema: OPTIONS_RESPONSE_SCHEMA },
-        {
-            name: 'TECHNICAL_RESPONSE_SCHEMA',
-            schema: TECHNICAL_RESPONSE_SCHEMA,
-        },
-    ] satisfies { name: string; schema: ResponseJsonSchema }[];
+/**
+ * Every schema the module exports, discovered by name — a schema added later is covered
+ * without anyone remembering to list it (an earlier hand-written list of eight missed two
+ * of the ten).
+ */
+const EXPORTED_SCHEMAS = Object.entries(responseSchemaExports)
+    .filter(([name]) => name.endsWith('_RESPONSE_SCHEMA'))
+    .map(([name, schema]) => ({ name, schema: schema as ResponseJsonSchema }));
 
-    it.each(all)(
-        '$name: lists every property in required and forbids additionalProperties',
+/** Child schemas of a node: property values, array items and combinator branches. */
+const childSchemas = (
+    node: Record<string, unknown>
+): Record<string, unknown>[] =>
+    [
+        ...Object.values((node.properties ?? {}) as Record<string, unknown>),
+        node.items,
+        ...((node.anyOf ?? []) as unknown[]),
+        ...((node.oneOf ?? []) as unknown[]),
+        ...((node.allOf ?? []) as unknown[]),
+    ].filter(
+        (child): child is Record<string, unknown> =>
+            typeof child === 'object' && child !== null
+    );
+
+/**
+ * Strict-mode violations anywhere under `node`, as `path: problem` strings. Every object
+ * schema (the root, nested objects, array items) must list each property in `required`
+ * and forbid additional properties.
+ */
+const strictModeProblems = (
+    node: Record<string, unknown>,
+    path: string
+): string[] => {
+    const properties = node.properties as Record<string, unknown> | undefined;
+    const own =
+        properties === undefined
+            ? []
+            : [
+                  ...(node.additionalProperties === false
+                      ? []
+                      : [`${path}: additionalProperties is not false`]),
+                  ...(JSON.stringify(
+                      [...((node.required ?? []) as string[])].toSorted()
+                  ) === JSON.stringify(Object.keys(properties).toSorted())
+                      ? []
+                      : [`${path}: required does not list every property`]),
+              ];
+    return [
+        ...own,
+        ...childSchemas(node).flatMap((child, i) =>
+            strictModeProblems(child, `${path}/${i}`)
+        ),
+    ];
+};
+
+describe('responseSchemas — strict-mode invariants', () => {
+    it('discovers the schemas by export name, including the two a hand list once missed', () => {
+        const names = EXPORTED_SCHEMAS.map(({ name }) => name);
+        expect(names).toContain('FINANCIALS_RESPONSE_SCHEMA');
+        expect(names).toContain('CONGRESS_RESPONSE_SCHEMA');
+        expect(names.length).toBeGreaterThanOrEqual(10);
+    });
+
+    it.each(EXPORTED_SCHEMAS)(
+        '$name: every object level lists every property in required and forbids additionalProperties',
         ({ schema }) => {
             expect(schema.type).toBe('object');
-            expect(schema.additionalProperties).toBe(false);
-            // Strict mode: required must enumerate exactly the property keys.
-            expect(sortedRequired(schema)).toEqual(propertyKeys(schema));
+            expect(
+                strictModeProblems(
+                    schema as unknown as Record<string, unknown>,
+                    '#'
+                )
+            ).toEqual([]);
         }
     );
+
+    it('sees a violation nested inside an array item (the walker is not vacuous)', () => {
+        const leaky = {
+            type: 'object',
+            additionalProperties: false,
+            required: ['rows'],
+            properties: {
+                rows: {
+                    type: 'array',
+                    items: {
+                        type: 'object',
+                        additionalProperties: false,
+                        required: ['a'],
+                        properties: {
+                            a: { type: 'string' },
+                            b: { type: 'string' },
+                        },
+                    },
+                },
+            },
+        };
+        expect(strictModeProblems(leaky, '#')).toEqual([
+            '#/0/0: required does not list every property',
+        ]);
+    });
 });
 
 describe('NEWS_CARD_RESPONSE_SCHEMA drift guard', () => {

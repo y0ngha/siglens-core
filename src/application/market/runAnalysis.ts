@@ -9,6 +9,7 @@ import {
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { isEmptyAnalysis } from '@/application/market/peekAnalysisCache';
+import { postProcessRawAnalysis } from '@/application/market/postProcessRawAnalysis';
 import {
     buildTimeframeNotAllowedError,
     type RunAnalysisResult,
@@ -21,24 +22,21 @@ import {
     checkAnalysisUsageAllowed,
     recordAnalysisUsageSafely,
 } from '@/application/usage';
-import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import { computeRiskLevel } from '@/domain/analysis/riskLevel';
 import {
-    enrichAnalysisWithConfidence,
     isFallbackAnalysis,
     normalizeCachedAnalysisResponse,
 } from '@/domain/analysis/confidence';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
 import { marketEventHorizonMs } from '@/domain/analysis/marketEvents';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
-import { normalizeIdList } from '@/domain/analysis/normalize';
-import { asObject } from '@/domain/analysis/normalizePrimitives';
-import { roundAnalysisPrices } from '@/domain/analysis/roundAnalysisPrices';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
+import { priceQuoting } from '@/domain/analysis/promptFormat';
+import { checkPriceProvenance } from '@/domain/analysis/priceProvenance';
 import { TECHNICAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import {
@@ -46,7 +44,6 @@ import {
     fearGreedInputs,
 } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
-import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
 import type { CacheProvider } from '@/domain/ports/cache';
 import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type {
@@ -168,6 +165,55 @@ function toCachedResult(
     }
     const filtered = filterAnalysisResult(normalized, tier, tierConfig);
     return { status: 'cached', ...filtered };
+}
+
+/**
+ * @internal Log marker of the provenance warning: a plan price the model wrote that no
+ * number of the dynamic prompt grounds. Consumers may alarm or count on the literal
+ * string; renaming it silently kills that. The line carries counts and field names only,
+ * never prompt text, prices or user data.
+ */
+export const PLAN_PROVENANCE_WARNING_LOG =
+    '[PlanProvenance] ungrounded plan price';
+
+/**
+ * Warns when the post-processed plan holds a price the prompt never printed (the prompt
+ * forbids every price that is not in the data). Observation only: the analysis is
+ * returned unchanged, and a failure of the check itself is swallowed so it can never
+ * fail a generation that already succeeded.
+ */
+function warnUngroundedPlanPrices(input: {
+    symbol: string;
+    timeframe: Timeframe;
+    promptDynamic: string;
+    result: AnalysisResponse;
+    priceDecimals: number;
+}): void {
+    const { symbol, timeframe, promptDynamic, result, priceDecimals } = input;
+    try {
+        const { plan, keyPrices, checked } = checkPriceProvenance({
+            promptDynamic,
+            result,
+            priceDecimals,
+        });
+        if (plan.length === 0) return;
+        console.warn(PLAN_PROVENANCE_WARNING_LOG, {
+            symbol,
+            timeframe,
+            checked: checked.plan,
+            ungrounded: plan.length,
+            // The key-price class is named when it also has findings, but never counted in
+            // the plan figures above.
+            fields: [
+                ...new Set([
+                    ...plan.map(finding => finding.field),
+                    ...keyPrices.map(finding => finding.field),
+                ]),
+            ],
+        });
+    } catch (error) {
+        console.error('[PlanProvenance] check failed:', error);
+    }
 }
 
 /**
@@ -511,10 +557,13 @@ async function runAnalysisImpl(
     // 기본 로케일(ko)에서는 빈 문자열이라 프롬프트 바이트가 예전과 같다.
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
+    // True only in the caller whose generation factory ran (the dedupe winner).
+    let generatedHere = false;
     const raw = await dedupeGeneration(
         cache,
         cacheKey,
         () => {
+            generatedHere = true;
             // Fired INSIDE the dedup factory, not before it. Every concurrent
             // caller that misses the same cache key builds its own prompt, but
             // `dedupeGeneration` runs only the first one's factory (in this
@@ -563,44 +612,35 @@ async function runAnalysisImpl(
 
     // Inline post-processing. No job queue involved.
     const rawResult = JSON.parse(raw) as unknown;
-    const enriched = enrichAnalysisWithConfidence(rawResult, skills);
-    // Resolved against `enriched`, before post-processing: the pattern
-    // targets `postProcessAnalysisWithReconcile` appends are derived from
-    // `geometry`, which `alignPatternGeometry` first replaces with the
-    // geometry of the overlay the card actually draws. Post-processing only
-    // touches `keyPrices`/`actionRecommendation` — none of the ids, names,
-    // `detected` or candidate ids resolution reads — so resolving earlier
-    // yields the same overlays.
-    const resolvedOverlays = resolveChartOverlays(
-        overlayCandidates,
-        enriched,
-        normalizeIdList(asObject(rawResult)?.trendlineIds),
-        skills
-    );
-    // KRX prices are rounded to their tick on both sides of post-processing:
-    // before, so the plan check and the risk:reward line read the levels the
-    // card will show; after, for the measured pattern targets
-    // post-processing appends (`roundAnalysisPrices`).
-    const reconciled = roundAnalysisPrices(
-        postProcessAnalysisWithReconcile(
-            roundAnalysisPrices(
-                alignPatternGeometry(
-                    enriched,
-                    resolvedOverlays.chartOverlays,
-                    patternGeometries
-                ),
-                options.currency,
-                options.krxTickTable
-            ),
+    const { reconciled, resolvedOverlays, modelOutput } =
+        postProcessRawAnalysis({
+            rawResult,
+            skills,
+            overlayCandidates,
+            patternGeometries,
             lastClose,
             atr,
-            options.currency,
+            currency: options.currency,
             locale,
-            options.krxTickTable
-        ),
-        options.currency,
-        options.krxTickTable
-    );
+            krxTickTable: options.krxTickTable,
+        });
+    // Once per generation: `dedupeGeneration` hands the winner's reply to every concurrent
+    // caller, and each one post-processes it, so only the caller whose factory actually ran
+    // reports it.
+    if (generatedHere) {
+        warnUngroundedPlanPrices({
+            symbol,
+            timeframe,
+            promptDynamic: dynamic,
+            result: modelOutput,
+            priceDecimals: priceQuoting(
+                lastClose,
+                options.currency,
+                options.assetClass,
+                options.krxTickTable
+            ).dp,
+        });
+    }
     if (overlayBuildFailures.length > 0) {
         console.warn('[ChartOverlays] candidate builder failed', {
             symbol,

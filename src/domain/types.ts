@@ -1685,6 +1685,14 @@ export interface ReconciledActionLevels {
     readonly riskReward: string;
     /** One-sentence reason for the reconciliation, suitable for a tooltip. */
     readonly reason: string;
+    /**
+     * `true` when the model's `stopLoss` was rejected and core had nothing to replace it with:
+     * it is not below the entry zone's low edge and there is no usable ATR to derive a fallback
+     * from (core never invents a level). `stopLoss` above is then absent, `exit` names no stop
+     * and `riskReward` is `''`, so a consumer must treat the plan as having **no stop** and must
+     * not fall back to `ActionRecommendation.stopLoss` (the rejected value). Absent otherwise.
+     */
+    readonly stopLossRejected?: true;
 }
 
 /**

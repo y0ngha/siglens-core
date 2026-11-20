@@ -155,6 +155,11 @@ element is not reused as a filter over the whole list: that silently widens the 
 A "current value" line reads the latest element and prints `N/A` when it is null, never a
 walk-back helper that shows an older reading as the current one.
 
+A constant shared by two modules is defined in the lower-level one and imported by the
+higher one (`signals` imports from `indicators`, never the reverse); check the import
+direction before reusing a constant. When a helper is documented as the single source of a
+selection rule, every other site calls it instead of keeping a second copy of the rule.
+
 ```typescript
 // ❌ collectLevels({ ...indicators, vwap: [] })   // one caller blanks the input
 // ✅ collectLevels(indicators, timeframe)          // the builder decides
@@ -703,6 +708,11 @@ When a return type becomes nullable (`T[]` → `(T | null)[]`), add a null case.
 field or indicator gets at least one `it()` asserting it. Mocks and fixtures are updated
 with the interface; a fixture that no longer matches the type is a test of something that
 does not exist.
+
+A real-data fixture sample is selected for coverage, not taken as the first matches in
+sorted order: one per group (ticker, market, class) first, then fill, with the selection
+rule written next to the fixtures. A sample dominated by one group does not exercise the
+variety it claims.
 
 <a id="TE-2"></a>
 #### TE-2 — Hooks live inside `describe`

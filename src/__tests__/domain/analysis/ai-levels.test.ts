@@ -951,7 +951,7 @@ describe('postProcessAnalysisWithReconcile', () => {
             ).toBe(entryPrice - bigAtr * SL_FALLBACK_ATR_MULTIPLIER);
             expect(
                 result.actionRecommendation?.reconciledLevels?.takeProfitPrices
-            ).toEqual([150, 105]); // AI 원본 그대로 — 버그는 이 배열이 아니라 어느 원소를 읽느냐에 있었다
+            ).toEqual([105, 150]); // 항상 오름차순(가까운 목표가 먼저) — 읽는 쪽이 [0]을 가장 가까운 목표가로 믿어도 된다
 
             const riskReward =
                 result.actionRecommendation?.reconciledLevels?.riskReward ?? '';
@@ -1575,5 +1575,206 @@ describe('buildBullishExitText 서브달러 정밀도', () => {
         const text = buildBullishExitText(100, 95, [110], 'USD', 'share');
         expect(text).toContain('$110.00');
         expect(text).toContain('$95.00');
+    });
+});
+
+describe('reconcileBullishActionRecommendation — normalized targets', () => {
+    const zoneRec: ActionRecommendation = {
+        ...baseRec,
+        entryPrices: [98, 102],
+        stopLoss: 88.2,
+        takeProfitPrices: [105, 110],
+    };
+    const reconcile = (
+        overrides: Partial<ActionRecommendation>,
+        atrValue = 5
+    ) =>
+        reconcileBullishActionRecommendation(
+            { ...zoneRec, ...overrides },
+            entryPrice,
+            atrValue,
+            'USD'
+        );
+
+    it('sorts descending targets ascending and says so', () => {
+        const result = reconcile({ takeProfitPrices: [110, 105] });
+
+        expect(result.wasReconciled).toBe(true);
+        expect(
+            result.recommendation.reconciledLevels?.takeProfitPrices
+        ).toEqual([105, 110]);
+        expect(result.recommendation.reconciledLevels?.reason).toContain(
+            '오름차순'
+        );
+        expect(result.changes).toContain(
+            'takeProfitPrices: reordered ascending (nearest first)'
+        );
+        expect(result.recommendation.takeProfitPrices).toEqual([110, 105]);
+    });
+
+    it('removes a duplicated target and says so', () => {
+        const result = reconcile({ takeProfitPrices: [105, 105, 110] });
+
+        expect(
+            result.recommendation.reconciledLevels?.takeProfitPrices
+        ).toEqual([105, 110]);
+        expect(result.recommendation.reconciledLevels?.reason).toContain(
+            '중복'
+        );
+        expect(result.recommendation.reconciledLevels?.reason).not.toContain(
+            '오름차순'
+        );
+        expect(result.changes).toContain(
+            'takeProfitPrices: duplicate targets removed'
+        );
+    });
+
+    it('does not touch targets that are already ascending and unique', () => {
+        const result = reconcile({ takeProfitPrices: [105, 110] });
+
+        expect(result.wasReconciled).toBe(false);
+        expect(result.recommendation.reconciledLevels).toBeUndefined();
+    });
+
+    it('reports a drop and a reorder together', () => {
+        const result = reconcile({ takeProfitPrices: [110, 100, 105] });
+
+        expect(
+            result.recommendation.reconciledLevels?.takeProfitPrices
+        ).toEqual([105, 110]);
+        expect(result.recommendation.reconciledLevels?.reason).toContain(
+            '진입 구간 위가 아닌'
+        );
+        expect(result.recommendation.reconciledLevels?.reason).toContain(
+            '오름차순'
+        );
+    });
+
+    it('still drops a first target beyond the ATR cap, then sorts what is left', () => {
+        // ATR 2: the model's first target (130) is far past the cap; 110 then 105 remain.
+        const result = reconcile({ takeProfitPrices: [130, 110, 105] }, 2);
+
+        expect(
+            result.recommendation.reconciledLevels?.takeProfitPrices
+        ).toEqual([105, 110]);
+        expect(result.changes).toContain(
+            'takeProfitPrices[0]: 130 dropped (beyond the ATR cap)'
+        );
+    });
+
+    it('lets the reconciled risk:reward read the nearest target', () => {
+        const result = reconcile({
+            takeProfitPrices: [150, 105],
+            stopLoss: 200,
+        });
+
+        expect(
+            result.recommendation.reconciledLevels?.takeProfitPrices
+        ).toEqual([105, 150]);
+        expect(result.recommendation.reconciledLevels?.riskReward).toContain(
+            '+5.0%'
+        );
+    });
+});
+
+describe('reconcileBullishActionRecommendation — stop with no replacement', () => {
+    const rejectedInput: ActionRecommendation = {
+        ...baseRec,
+        entryPrices: [98, 102],
+        stopLoss: 112.2,
+        takeProfitPrices: [107.1, 112.2],
+    };
+
+    it('rejects an unusable stop when there is no ATR, marks it and invents nothing', () => {
+        const result = reconcileBullishActionRecommendation(
+            rejectedInput,
+            entryPrice,
+            undefined,
+            'USD'
+        );
+
+        const levels = result.recommendation.reconciledLevels;
+        expect(result.wasReconciled).toBe(true);
+        expect(levels?.stopLossRejected).toBe(true);
+        expect(levels?.stopLoss).toBeUndefined();
+        expect(levels?.exit).not.toContain('손절');
+        expect(levels?.riskReward).toBe('');
+        expect(levels?.reason).toContain('손절가');
+        expect(levels?.reason).toContain('제외');
+        expect(result.changes).toContain(
+            'stopLoss: 112.2 rejected (not below the entry zone, no usable ATR for a fallback)'
+        );
+        // The model's own fields are never rewritten.
+        expect(result.recommendation.stopLoss).toBe(112.2);
+    });
+
+    it('keeps reconciling the targets next to a rejected stop', () => {
+        const result = reconcileBullishActionRecommendation(
+            rejectedInput,
+            entryPrice,
+            undefined,
+            'USD'
+        );
+
+        expect(
+            result.recommendation.reconciledLevels?.takeProfitPrices
+        ).toEqual([107.1, 112.2]);
+        expect(result.recommendation.reconciledLevels?.exit).toContain('목표');
+    });
+
+    it('does not mark a plan that never had a stop', () => {
+        const result = reconcileBullishActionRecommendation(
+            { ...rejectedInput, stopLoss: undefined },
+            entryPrice,
+            undefined,
+            'USD'
+        );
+
+        expect(result.wasReconciled).toBe(false);
+        expect(result.recommendation.reconciledLevels).toBeUndefined();
+    });
+
+    it('prefers the ATR fallback over a rejection when one can be derived', () => {
+        const result = reconcileBullishActionRecommendation(
+            rejectedInput,
+            entryPrice,
+            atr,
+            'USD'
+        );
+
+        expect(result.recommendation.reconciledLevels?.stopLossRejected).toBe(
+            undefined
+        );
+        expect(result.recommendation.reconciledLevels?.stopLoss).toBeLessThan(
+            98
+        );
+    });
+
+    it('leaves the plan check without a stop and without a risk:reward ratio', () => {
+        const response = {
+            summary: '',
+            trend: 'bullish',
+            indicatorResults: [],
+            riskLevel: 'low',
+            keyLevels: { support: [], resistance: [] },
+            priceTargets: { bullish: null, bearish: null },
+            patternSummaries: [],
+            strategyResults: [],
+            candlePatterns: [],
+            trendlines: [],
+            actionRecommendation: { ...rejectedInput, riskReward: '모델 산문' },
+        } satisfies AnalysisResponse;
+
+        const rec = postProcessAnalysisWithReconcile(
+            response,
+            entryPrice,
+            undefined
+        ).actionRecommendation;
+
+        expect(rec?.reconciledLevels?.stopLossRejected).toBe(true);
+        expect(rec?.planCheck?.belowStopLoss).toBe(false);
+        expect(rec?.planCheck?.riskRewardAtEntry).toBeNull();
+        expect(rec?.planCheck?.riskRewardAtCurrent).toBeNull();
+        expect(rec?.riskReward).toBe('모델 산문');
     });
 });

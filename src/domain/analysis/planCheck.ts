@@ -33,6 +33,30 @@ import type {
  */
 export const ENTRY_ZONE_TOLERANCE = 0.01;
 
+/**
+ * @internal
+ *
+ * The stop a plan is actually read with: the reconciled one where core wrote it, else the
+ * model's. `reconciledLevels.stopLossRejected` means the model's stop was refused and no
+ * replacement exists, so there is **no** stop — falling back to `rec.stopLoss` would put the
+ * rejected value back.
+ *
+ * The one rule every reader of the plan's stop shares. Its callers: `buildPlanCheck`
+ * (here), the risk:reward line in `postProcessAnalysisWithReconcile` (`ai-levels.ts`),
+ * `buildChatPrompt` and `checkPlanInvariants`. The value is returned as stored: a
+ * reconciled stop that is present but unusable (non-finite, `<= 0`) is not skipped in
+ * favour of the model's, so a reader that must judge usability (the invariants' `finite`
+ * rule) does so on exactly the value the plan check measured against.
+ */
+export function effectiveStopLoss(
+    rec: ActionRecommendation
+): number | undefined {
+    const levels = rec.reconciledLevels;
+    return levels?.stopLossRejected === true
+        ? undefined
+        : (levels?.stopLoss ?? rec.stopLoss);
+}
+
 function finitePositive(n: number | undefined): n is number {
     return typeof n === 'number' && Number.isFinite(n) && n > 0;
 }
@@ -202,7 +226,7 @@ export function buildPlanCheck(
     // would measure against a level the domain already rejected: an AI stop of 200 under
     // a 100 entry would report `belowStopLoss` for a chart trading at 100, and suppress
     // the ratio entirely — in exactly the case a computed ratio is most needed.
-    const proposedStop = rec.reconciledLevels?.stopLoss ?? rec.stopLoss;
+    const proposedStop = effectiveStopLoss(rec);
     const targets =
         rec.reconciledLevels?.takeProfitPrices ?? rec.takeProfitPrices;
 

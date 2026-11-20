@@ -318,6 +318,21 @@ export function normalizeTrendline(v: unknown): Trendline | null {
 
 // --- ActionRecommendation ---
 
+/**
+ * Ascending and without duplicates; `undefined` stays `undefined`. Reconciliation now always
+ * writes `reconciledLevels.takeProfitPrices` this way, but an analysis cached before that
+ * can hold the model's order (descending, repeated). Doing it on read makes the guarantee
+ * true for every analysis a consumer receives; an array that already is sorted and unique
+ * comes out equal, so nothing else about an old entry changes and no cache key moves.
+ */
+function ascendingUnique(
+    values: readonly number[] | undefined
+): number[] | undefined {
+    return values === undefined
+        ? undefined
+        : [...new Set(values)].sort((a, b) => a - b);
+}
+
 function normalizeReconciledActionLevels(
     raw: unknown
 ): ReconciledActionLevels | undefined {
@@ -326,10 +341,15 @@ function normalizeReconciledActionLevels(
 
     return {
         stopLoss: asNumber(o.stopLoss),
-        takeProfitPrices: normalizeNumberArray(o.takeProfitPrices),
+        takeProfitPrices: ascendingUnique(
+            normalizeNumberArray(o.takeProfitPrices)
+        ),
         exit: asString(o.exit),
         riskReward: asString(o.riskReward),
         reason: asString(o.reason),
+        // Omitted rather than `false`: the marker is additive, so shapes without it
+        // (every analysis cached before it existed) stay byte-identical.
+        ...(o.stopLossRejected === true ? { stopLossRejected: true } : {}),
     };
 }
 

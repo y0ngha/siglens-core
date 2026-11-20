@@ -287,7 +287,7 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 **플랜 점검 (2)** — siglens `get_cached_analysis` 에이전트 툴이 분석 당시 플랜을 **지금 가격** 기준으로 다시 재는 데(`sinceAnalysis.planNow`) 쓴다 — 분석 파이프라인과 같은 진입 기준가·같은 계산.
 | Symbol | Source |
 |---|---|
-| `buildPlanCheck(rec, currentPrice, entryPrice)` — 플랜(보정값 우선) 대비 `currentPrice`의 손익비(진입 기준/현재 기준)·진입 구간 이탈·손절 이탈을 결정적으로 계산. `currentPrice`가 유한 양수가 아니면 `null`. | `domain/analysis/planCheck.ts` |
+| `buildPlanCheck(rec, currentPrice, entryPrice)` — 플랜(보정값 우선) 대비 `currentPrice`의 손익비(진입 기준/현재 기준)·진입 구간 이탈·손절 이탈을 결정적으로 계산. `currentPrice`가 유한 양수가 아니면 `null`. `reconciledLevels.stopLossRejected === true`(모델의 손절가가 진입 구간 아래가 아니고 대체할 ATR 기준도 없어 core가 제외함)이면 손절이 없는 플랜으로 계산한다 — 소비자도 `[reconciledLevels.stopLoss, stopLoss]`로 폴백하지 말고 이 표식이 있으면 모델의 `stopLoss`를 건너뛴다. `reconciledLevels.takeProfitPrices`는 항상 오름차순·중복 없음이다(새로 생성한 분석은 보정 단계가, 이전에 캐시된 분석은 캐시 읽기 정규화(`normalizeCachedAnalysisResponse`)가 정렬·중복 제거한다. 이미 정렬된 항목은 그대로이고 캐시 키는 바뀌지 않는다). | `domain/analysis/planCheck.ts` |
 | `planEntryPrice(rec, fallback)` — 분석 파이프라인이 쓰는 진입 기준가(유한 양수 `entryPrices`의 평균, 없으면 `fallback`). `buildPlanCheck`의 `entryPrice` 인자로 넘긴다. | `domain/analysis/ai-levels.ts` |
 
 **마켓 레퍼런스 (Market Reference) (1)**

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     buildPlanCheck,
+    effectiveStopLoss,
     entryZoneTop,
     exceedsEntryZone,
     ENTRY_ZONE_TOLERANCE,
@@ -297,5 +298,60 @@ describe('buildPlanCheck', () => {
             riskRewardAtEntry: null,
             riskRewardAtCurrent: null,
         });
+    });
+});
+
+describe('effectiveStopLoss', () => {
+    const levels = { exit: '', riskReward: '', reason: '' };
+
+    it('is the model stop when nothing was reconciled', () => {
+        expect(effectiveStopLoss(rec({ stopLoss: 95 }))).toBe(95);
+    });
+
+    it('prefers the reconciled stop', () => {
+        expect(
+            effectiveStopLoss(
+                rec({
+                    stopLoss: 120,
+                    reconciledLevels: { ...levels, stopLoss: 94 },
+                })
+            )
+        ).toBe(94);
+    });
+
+    it('is the model stop when the reconciled levels carry none', () => {
+        expect(
+            effectiveStopLoss(
+                rec({ stopLoss: 95, reconciledLevels: { ...levels } })
+            )
+        ).toBe(95);
+    });
+
+    it('is no stop at all when the model stop was rejected', () => {
+        expect(
+            effectiveStopLoss(
+                rec({
+                    stopLoss: 112,
+                    reconciledLevels: { ...levels, stopLossRejected: true },
+                })
+            )
+        ).toBeUndefined();
+    });
+
+    it('lets buildPlanCheck report no stop and no ratio for a rejected stop', () => {
+        const check = buildPlanCheck(
+            rec({
+                entryPrices: [98, 102],
+                stopLoss: 112,
+                takeProfitPrices: [107],
+                reconciledLevels: { ...levels, stopLossRejected: true },
+            }),
+            100,
+            100
+        );
+
+        expect(check?.belowStopLoss).toBe(false);
+        expect(check?.riskRewardAtEntry).toBeNull();
+        expect(check?.riskRewardAtCurrent).toBeNull();
     });
 });
