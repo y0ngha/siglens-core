@@ -1377,3 +1377,41 @@ export type {
     RunOverallAnalysisOptions,
 } from './application/overall/types';
 export type { SubmitOptionsAnalysisSubmitted } from './application/options/types';
+
+// Outcome labels (server-only; the labeller runs in a cron job, never in a browser):
+// the functions and the two version constants are exported from this entrypoint only,
+// their parameter and return types from both (API-1, API-3).
+export { buildOutcomeWindow } from './domain/outcomes/buildOutcomeWindow';
+export { computeForwardReturns } from './domain/outcomes/computeForwardReturns';
+export { extractOutcomeSubject } from './domain/outcomes/extractOutcomeSubject';
+export { labelAnalysisOutcome } from './domain/outcomes/labelAnalysisOutcome';
+export { labelLevelOutcome } from './domain/outcomes/labelLevelOutcome';
+export { outcomeEarliestLabelTime } from './domain/outcomes/outcomeEarliestLabelTime';
+export {
+    OUTCOME_LABEL_VERSION,
+    OUTCOME_SUBJECT_VERSION,
+} from './domain/outcomes/constants';
+export type {
+    AnalysisOutcomeLabels,
+    ForwardReturnLabel,
+    LevelOutcome,
+    LevelOutcomeEntry,
+    LevelOutcomeLabel,
+    LevelPlaceboLabel,
+    LevelSide,
+    LevelSkipReason,
+    OutcomeAnchor,
+    OutcomeAnchorSource,
+    OutcomeBarTuple,
+    OutcomeLevelRole,
+    OutcomeSubject,
+    OutcomeWindow,
+    OutcomeWindowResult,
+    PatternOutcome,
+    PatternOutcomeLabel,
+    PlanApproach,
+    PlanOutcome,
+    PlanOutcomeLabel,
+    PlanReason,
+    ScenarioTargetLabel,
+} from './domain/outcomes/types';

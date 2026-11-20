@@ -553,6 +553,7 @@ Also exempted: `domain/indicators/marketFearGreed/types.ts` and
 `domain/indicators/cryptoFearGreed/types.ts` — index-specific input/factor/snapshot types
 kept beside their module; all public ones are re-exported from `domain/types.ts`.
 `domain/investorFlows/types.ts` (investor flows / 수급: snapshot, scorecard, squeeze-score and AI-response types, 60+) follows the same rule and is re-exported from `domain/types.ts`.
+`domain/outcomes/types.ts` (outcome labeller: subject, window, label and internal helper-shape types, 30+) follows the same rule and is re-exported from `domain/types.ts`; the internal shapes stay `@internal`.
 
 ```typescript
 // ✅ domain/options/types.ts defines OptionsContract, OptionsChain, ...

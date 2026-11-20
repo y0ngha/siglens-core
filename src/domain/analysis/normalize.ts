@@ -35,8 +35,14 @@ import {
     compact,
 } from './normalizePrimitives';
 
-const VALID_TRENDS: readonly Trend[] = ['bullish', 'bearish', 'neutral'];
-const VALID_RISK_LEVELS: readonly RiskLevel[] = ['low', 'medium', 'high'];
+/** @internal Closed value sets of the stored enums, shared with readers of stored analyses. */
+export const VALID_TRENDS: readonly Trend[] = ['bullish', 'bearish', 'neutral'];
+/** @internal */
+export const VALID_RISK_LEVELS: readonly RiskLevel[] = [
+    'low',
+    'medium',
+    'high',
+];
 const VALID_TRENDLINE_DIRECTIONS: readonly TrendlineDirection[] = [
     'ascending',
     'descending',
@@ -46,7 +52,8 @@ const VALID_SIGNAL_STRENGTHS: readonly SignalStrength[] = [
     'moderate',
     'weak',
 ];
-const VALID_ENTRY_RECOMMENDATIONS: readonly EntryRecommendation[] = [
+/** @internal */
+export const VALID_ENTRY_RECOMMENDATIONS: readonly EntryRecommendation[] = [
     'enter',
     'wait',
     'avoid',
