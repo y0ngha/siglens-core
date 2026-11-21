@@ -36,6 +36,9 @@ two checkouts.
 | `engineEvalCandles.ts`, `engineEvalPatterns.ts` | The candle and chart-pattern passes (pure). |
 | `engineEvalCompute.ts`, `engineEvalStats.ts`, `engineEvalTypes.ts` | Pools, bootstrap, seeded randomness and the pre-registered constants. |
 | `engineEvalCompare.ts` | Before/after comparison of two evaluation runs (G2). |
+| `analysisFieldsEval.ts` | Analysis-fields evaluation CLI (WP-15): `trend`, `skills` and `plan` modes, gates T1-T5, P1-P6, S1-S3, S5, S6. |
+| `analysisFieldsEvalCompute.ts`, `analysisFieldsEvalPlan.ts`, `analysisFieldsEvalSkills.ts`, `analysisFieldsEvalTypes.ts` | The pure parts per mode and the pre-registered constants. |
+| `analysisFieldsEvalRender.ts` | Renders the technical prompt of a case for both tiers through `runAnalysis` without a model call (the `skills` mode). |
 
 ## The set
 
@@ -126,7 +129,9 @@ DEEPSEEK_API_KEY=... npx tsx scripts/replay/run.ts --set <set-dir> --out <run-di
   --skills <app checkout>/skills --subset variance --repeat 3 --execute --approved-calls <planned>
 ```
 
-Options: `--subset variance`, `--repeat N`, `--limit N` (the N cases with the smallest
+Options: `--tier free|member` (default `member`; the tier the analyses run as, part of the
+run identity so a resumed run must use the same tier), `--subset variance`, `--repeat N`,
+`--limit N` (the N cases with the smallest
 sha256 of the case id, so two arms given the same limit run the same spread of cases),
 `--concurrency 4`, `--keep-raw` (gzipped request body and response text per call),
 `--retry-errors` (redo calls that failed).
@@ -330,3 +335,88 @@ from the bars so a narrowed run resamples the same weeks).
 The WP-17 thresholds are the instrument's own copy (`engineEvalTypes.ts`), deliberately
 independent of the arm under test; everything the engine defines (the 500-bar window, the
 detection window, the pivot reversal multiple) is read from core and recorded in `run.json`.
+
+## Analysis-fields evaluation (`trend`, `skills`, `plan`)
+
+Deterministic measurement of the fields a consumer reads as conclusions: `trend`, the plan
+state with its stop and `entryRecommendation`, and the skills a tier's prompt carries. It
+makes no model call and needs no network. The rules, thresholds and gates are the
+pre-registered ones of WP-15 (`analysisFieldsEvalTypes.ts`); every definition is recomputed
+here from OHLC and from the fields a stored result carries, and the stored field under test is
+only ever what is compared with, never the reference. The one thing read from core is
+the calendar lookback of a daily analysis (730 days). A replay prompt sees the bars of that
+lookback, 485 to 506 daily bars (the stored provider ignores the bar-count limit and cuts by
+date), so the rules at a labelled bar are computed on those bars, not on the last 500.
+
+```bash
+# trend: all days from bar 300 for a set, and a run's stored trend against the rule
+npx tsx scripts/replay/analysisFieldsEval.ts --mode trend --set <set-dir> --run <run-dir> --out <dir>
+# trend on stored daily decisions (a decisions.csv with date, ticker, kind, trend) and their bars
+npx tsx scripts/replay/analysisFieldsEval.ts --mode trend --bars <bars-dir> --labels <decisions.csv> --out <dir>
+# skills: render every case for free and member (no model call) and read the skills off the prompt
+npx tsx scripts/replay/analysisFieldsEval.ts --mode skills --set <set-dir> --skills <app>/skills --out <dir> [--limit N]
+# plan: distributions and the independent recomputation of the state; --before pairs two runs
+npx tsx scripts/replay/analysisFieldsEval.ts --mode plan --set <set-dir> --run <run-dir> --out <dir> [--before <run-dir>]
+```
+
+Outputs (outside the repository, like every writer here): `run.json` (core sha, dirty-diff
+hash, inputs including the sha256 of a `--labels` file, constants), `summary.json` (`summary` and `gates`) and `rows.jsonl` (one line per
+located label, per plan or per rendered prompt).
+
+- **`trend`.** The shipped rule R4 (EMA20 move over 20 bars in ATR(14), 2 dp, at least 1.00,
+  and the close beyond EMA20) and two references, R1 (the audit's 3-line rule) and R3 (the
+  percent rule of `classifyTrend`). For every day from bar 300: label distribution,
+  day-to-day change, hard flips, prior-10-day sign match. Against stored labels (a run's
+  `trend`, one row per case; or `--labels`): agreement, opposites and the confusion table
+  per regime and market, and the day-to-day change of the stored label and of each rule on
+  consecutive labelled bars (at most 5 bars apart, so it needs labels made nearly every
+  session; a run's cases give none). For a run: `plumbing` (stored `trend`, and `trendBasis`
+  when present, against the rule) and the summary-words check (T5).
+- **`skills`.** Both tiers of every case through `runAnalysis` with `fetch` replaced by a
+  function that throws and the call aborted at the prompt hook. A skill "reaches the
+  prompt" when its `### <name> ` heading is in the text. Per tier: skills per prompt, by group,
+  always-on coverage, stable and dynamic size, distinct stable prefixes. Order for S2 is the
+  order of appearance in the member prompt. With `--run <free after> --before <free before>`
+  (and `--member-run <member run>`): S5 (failure and missing-plan rates, median uncached input
+  tokens, median latency) and S6 (level overlap with member within 0.25 ATR, paired).
+- **`plan`.** For each result: the state table of WP-15 §3.3 recomputed from the stored zone,
+  effective stop and targets and the Wilder ATR of the analysed bar, the verdict it implies
+  (`in_zone` enter, `above_zone`/`below_zone` wait, `no_setup` avoid), the stop that
+  WP-15 §3.2 prescribes (the model's stop when it lies in `[mid - 5 ATR, low - 1 ATR]`, else the
+  highest support printed under a `Support (below):` heading of the stored prompt in that
+  band, `at price` entries excluded, else `low - 1.5 ATR` quoted, to the KRX tick for Korean
+  listings) and its basis, with the zone mid as the mean of the entry prices; a stop that
+  differs, or is absent although the zone and the ATR are usable, is a P1 violation. The
+  comparison with a stored `planState` when there is one covers position, reason, ATR, stop
+  distance, distance beyond the zone and stop basis. Distributions: position, reason, stop basis, stop and target distances in ATR,
+  verdict by position, where the close sits against the zone by stored verdict (`closeVsZoneByVerdict`
+  uses the state table's 1% tolerance on both sides; `closeVsZoneByVerdictSection1` keeps the
+  figure WP-15 §1 measured, with no tolerance below the zone, so a baseline reproduces the
+  design's 420 / 277 / 104), the volatility grade
+  against the next 10 sessions, outcomes by position from `labels.jsonl` (a `no_setup` plan is
+  relabelled as `wait`). Distributions use the headline rows when `labels.jsonl` exists
+  (`planAllResults` has every result; P1 and P3 always read every result with a plan, P2 the
+  headline rows); `p7Sample` lists 10 case ids per position by smallest
+  sha256 for the manual read of P7.
+
+Gates are always computed and printed with their value and threshold. A gate is `pass: null`
+when the input cannot decide it (T1 without `--run`, P4 to P6 without `--before`, S5 and S6
+without a run pair, P1 without a `--before` run with labels to baseline the plan invariants).
+`--gate all` (every gate of the mode) or `--gate T1,T2` selects the gates that decide the exit
+code: **2** when a selected gate fails or cannot be computed (a selected id the input did not
+produce counts as not computable; it is not a pass), 0 otherwise, **1** on an error. Without
+`--gate` nothing decides the exit code, and the run prints a notice saying so (a baseline on
+`main` is expected to fail some gates). `--gate` also makes stored label dates with no
+bar fail the run unless `--allow-skipped-cases`. Fail-closed refusals (exit 1): an output path
+inside the repository, a set hash mismatch, a run whose `run.json` names other bars, a
+result of a case not in the set, a run that does not cover its subset, limit and repeat, two
+runs compared case by case that differ in set, tier, model, subset, limit or repeat, labels of a
+symbol without bars, a result whose analysed bar is not in the set, and an empty measurement
+(no measurable day, no stored label, no plan, no rendered prompt). `--noise-pp <n>` is the
+run-to-run noise floor in percentage points added to the 1 pp margin of P6 and S5 (read it
+off `report.ts --noise`).
+
+Headline numbers use one row per case (repeat 1) and, for plans, the rows a report counts
+(`labels.jsonl` headline). The `T1` "every B day" part of the design (the shipped function
+against the rule on every day) is a unit test of the PR that ships the function; the
+instrument checks the results a run returned.
