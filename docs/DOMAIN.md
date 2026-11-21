@@ -1576,7 +1576,19 @@ display:
     기본값이라도 400으로 거부한다. budget 스펙의 `temperature`는 타입 호환용으로만 남아 있다(`@deprecated`).
   - Gemini: 보내지 않는다. 3.6 Flash부터 Google 기본값으로 고정됐다.
   - ChatGPT: 보내지 않는다(reasoning 모델). system 프롬프트는 `instructions`로 보내고, `systemPlacement: 'developer_message'`인 행(GPT-6.2)은 `input` 맨 앞의 `developer` 메시지로 보낸다. 어느 쪽이든 system 텍스트의 바이트는 같다. `gpt-6.2-sol`·`gpt-6.2-astra`의 `low`/`high` effort와 `developer` 메시지 경로, `gpt-6.2-sol`의 같은 접두사 반복 호출 캐시 적중(입력 3,672토큰 중 3,669 읽음)은 `/v1/responses`에서 2026-11-21 02:57 KST에 실측했다. `effort: 'none'` 거부는 벤더 문서 기준이며 보내 보지 않았다.
-  - DeepSeek: 추론 OFF일 때만 `temperature`를 보낸다(추론 ON이면 API가 무시한다).
+  - DeepSeek: 추론 OFF일 때만 `temperature`를 보낸다(추론 ON이면 API가 무시한다). `/chat/completions`와
+    스키마 호출의 `/responses` 두 경로 모두 해당한다(`/responses`는 이전에 보내지 않아 제공자 기본값 1로
+    샘플링했다). 제공자 문서상 `/responses`는 `temperature`(0~2)를 지원하고 지원하지 않는 파라미터는 조용히
+    무시한다. `seed`는 문서에 없고 SDK의 Responses 파라미터에도 없어 보내지 않는다.
+  - DeepSeek 재시도: 클라이언트는 `maxRetries: 0`이라 재시도 층은 `withRetry` 하나다. 요청 수는 attempt당
+    1회이고, `withRetry`의 `maxAttempts`와 누적 delay 상한이 정한다(분석 30초 상한이면 5xx·연결 오류는 3회,
+    429는 최대 5회). `withRetry`는 429/5xx와 SDK가 재시도하던 408/409·연결 오류·타임아웃을 받는다.
+    동작 변화: 연결 오류·타임아웃은 SDK 재시도(약 1.5초) 뒤 원 오류 그대로 Gemini 폴백으로 갔지만, 이제
+    5초/10초 backoff로 재시도하고 소진되면 `AI_SERVER_UNSTABLE`로 올라와 폴백 대상이 된다(408/409도 새로
+    폴백 대상). 폴백 시작 전 최악 지연은 약 31초에서 약 45초(연결 타임아웃 10초 기준)로 늘고, 429의
+    `retry-after` 헤더는 더 이상 따르지 않으며(SDK가 따랐다), 5xx는 요청 9회에서 3회로 줄어든다.
+    ChatGPT·Claude 클라이언트는 아직 SDK 재시도를 유지한다(기본 분류기가 연결 오류를 받지 못해서이며,
+    맞추는 것은 별도 변경이다).
 - 동일 입력 → 동일 프롬프트 문자열을 보장한다.
   `buildAnalysisPrompt`는 입력 `skills` 배열의 순서와 무관하게 byte-identical 결과를 반환해야 한다.
   → active skills를 `skill.name` 기준 `localeCompare` 정렬한 뒤 type별 그룹화.

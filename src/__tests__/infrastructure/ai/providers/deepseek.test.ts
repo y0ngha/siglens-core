@@ -142,6 +142,9 @@ describe('callDeepSeek', () => {
         expect(mockedOpenAI).toHaveBeenCalledWith({
             apiKey: 'key-for-baseurl-assertion',
             baseURL: 'https://api.deepseek.com',
+            // withRetry가 유일한 재시도 층이다 — SDK 기본 재시도(2회)가 겹치면 한 번의
+            // 생성이 최대 15번의 HTTP 요청이 된다.
+            maxRetries: 0,
         });
     });
 
@@ -461,6 +464,84 @@ describe('callDeepSeek', () => {
                     responseSchema: {},
                 })
             ).rejects.toMatchObject({ retryable: true });
+        });
+
+        describe('temperature (결정성)', () => {
+            const SCHEMA = { type: 'object' };
+
+            it('추론 OFF면 temperature: 0을 싣고 seed는 싣지 않는다', async () => {
+                mockResponsesCreate.mockClear();
+                mockResponsesCreate.mockResolvedValueOnce(
+                    responsesStream('ok')
+                );
+
+                await callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: SCHEMA,
+                });
+
+                expect(mockResponsesCreate).toHaveBeenCalledTimes(1);
+                const body = mockResponsesCreate.mock.lastCall?.[0];
+                expect(body.temperature).toBe(0);
+                expect('seed' in body).toBe(false);
+            });
+
+            it('추론 ON이면 temperature를 싣지 않는다', async () => {
+                mockResponsesCreate.mockClear();
+                mockResponsesCreate.mockResolvedValueOnce(
+                    responsesStream('ok')
+                );
+
+                await callDeepSeek('prompt', {
+                    model: PRO_MODEL,
+                    apiKey: 'key',
+                    responseSchema: SCHEMA,
+                    reasoning: { thinking: true },
+                });
+
+                expect(mockResponsesCreate).toHaveBeenCalledTimes(1);
+                const body = mockResponsesCreate.mock.lastCall?.[0];
+                expect('temperature' in body).toBe(false);
+                expect(body.reasoning).toEqual({ effort: 'high' });
+            });
+        });
+
+        it('SDK 연결 오류는 retryable로 표시해 withRetry가 받게 한다', async () => {
+            class FakeConnectionError extends Error {}
+            const sdk = (await import('openai')) as unknown as {
+                default: { APIConnectionError?: unknown };
+            };
+            sdk.default.APIConnectionError = FakeConnectionError;
+            const error = new FakeConnectionError('Connection error.');
+            mockResponsesCreate.mockRejectedValueOnce(error);
+
+            try {
+                await expect(
+                    callDeepSeek('prompt', {
+                        model: FLASH_MODEL,
+                        apiKey: 'key',
+                        responseSchema: {},
+                    })
+                ).rejects.toMatchObject({ retryable: true });
+                // 같은 객체에 표시한다(원인 chain 보존).
+                expect(error).toHaveProperty('retryable', true);
+            } finally {
+                sdk.default.APIConnectionError = undefined;
+            }
+        });
+
+        it('연결 오류가 아닌 오류에는 retryable을 붙이지 않는다', async () => {
+            const error = new Error('boom');
+            mockResponsesCreate.mockRejectedValueOnce(error);
+
+            await expect(
+                callDeepSeek('prompt', {
+                    model: FLASH_MODEL,
+                    apiKey: 'key',
+                    responseSchema: {},
+                })
+            ).rejects.not.toHaveProperty('retryable');
         });
 
         it('종료 이벤트 없이 스트림이 끝나면 완료로 치지 않는다', async () => {

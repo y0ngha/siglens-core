@@ -48,7 +48,9 @@
 | `openai.ts` | OpenAI (`openai`) | `callChatGPT` |
 | `deepseek.ts` | DeepSeek (OpenAI 호환 API, `openai` SDK) | `callDeepSeek` |
 
-각 provider는 `infrastructure/ai/retry/`의 `withRetry` 래퍼를 거쳐 호출되고,
+각 provider는 `infrastructure/ai/retry/`의 `withRetry` 래퍼를 거쳐 호출된다. DeepSeek 클라이언트는
+SDK 자체 재시도를 끄고(`maxRetries: 0`) `withRetry`를 유일한 재시도 층으로 쓴다(ChatGPT·Claude
+클라이언트는 기본 분류기가 연결 오류를 받지 못해 SDK 재시도를 유지하며, 맞추는 것은 별도 변경이다). 그리고
 `infrastructure/ai/usage.ts`가 응답의 토큰 사용량을 정규화해 로그로 남긴다.
 `infrastructure/ai/extractJsonWithRepair.ts` / `normalizeJsonResponse.ts`는 LLM 응답
 JSON을 복구·정규화한다.
