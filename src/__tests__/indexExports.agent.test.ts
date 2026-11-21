@@ -10,8 +10,19 @@ import {
     splitAgentFollowUps,
     SWING_MIN_PCT,
     computeSwingHistory,
+    AGENT_PRICE_STATS_DEFAULT_PERIOD,
+    AGENT_PRICE_STATS_MAX_DATES,
+    AGENT_PRICE_STATS_MAX_SUBJECTS,
+    AGENT_PRICE_STATS_PERIODS,
+    PRICE_STATS_NOTE_TEMPLATES,
     alignNewsWithPriceMoves,
     buildLevelLadder,
+    calendarPeriodChange,
+    closeOnOrBefore,
+    computePriceStats,
+    isIsoDate,
+    minusCalendarMonths,
+    priceStatsEarliestDate,
     readPutCallRatio,
     tallyEarningsReactions,
 } from '@/index';
@@ -42,6 +53,29 @@ describe('index — agent exports', () => {
             expect(typeof fn).toBe('function');
             expect(name in clientApi).toBe(false);
         });
+    });
+
+    // 서버 진입점 전용이다: 기간 통계는 도구 실행기(서버)만 계산하고 브라우저 번들은 쓰지 않는다.
+    it('기간 통계 함수·상수를 서버 진입점으로만 내보낸다', () => {
+        const fns = {
+            calendarPeriodChange,
+            closeOnOrBefore,
+            computePriceStats,
+            isIsoDate,
+            minusCalendarMonths,
+            priceStatsEarliestDate,
+        };
+        Object.entries(fns).forEach(([name, fn]) => {
+            expect(typeof fn).toBe('function');
+            expect(name in clientApi).toBe(false);
+        });
+        expect(AGENT_PRICE_STATS_PERIODS).toContain('ytd');
+        expect(AGENT_PRICE_STATS_DEFAULT_PERIOD).toBe('1y');
+        expect(AGENT_PRICE_STATS_MAX_SUBJECTS).toBe(3);
+        expect(AGENT_PRICE_STATS_MAX_DATES).toBe(5);
+        expect(typeof PRICE_STATS_NOTE_TEMPLATES.historyStart).toBe('function');
+        expect('AGENT_PRICE_STATS_PERIODS' in clientApi).toBe(false);
+        expect('PRICE_STATS_NOTE_TEMPLATES' in clientApi).toBe(false);
     });
 
     it('findUngroundedNumbers를 값으로 내보낸다', () => {
