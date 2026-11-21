@@ -113,6 +113,12 @@ describe('public API exports', () => {
         ]);
     });
 
+    it('exports the new-signal and extreme-zone-entry rules from package entrypoint', () => {
+        // siglens' alert mail reads both instead of re-implementing the rules (API-1: also on index.client).
+        expect(typeof coreApi.detectNewConfirmedSignals).toBe('function');
+        expect(typeof coreApi.findExtremeZoneEntryOn).toBe('function');
+    });
+
     it('exports the indicator-confluence rule from package entrypoint', () => {
         // Consumers (trader, backtests) must drive the same rule from one place —
         // a second implementation is how the two silently drift apart.

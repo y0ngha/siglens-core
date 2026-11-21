@@ -1731,6 +1731,7 @@ display:
 - `confirmed.ts` — 32 detectors: bullish/bearish pairs over RSI, MA cross, MACD, Bollinger (band touch, %B), Supertrend, Parabolic SAR, Ichimoku, CCI, DMI, CMF, MFI, Keltner, squeeze momentum, plus the price-structure pairs `new_52w_high`/`new_52w_low` (close past every high/low in `[last − 365d, last)`, only when the window's first bar is ≥ 358 days old) and `gap_up`/`gap_down` (last bar's range clears the previous bar's by ≥ 0.25 × ATR(14), or by any amount when ATR is unavailable). The four price-structure types are excluded from the `evaluateConfluence` tally (not measured as votes).
 - `anticipation.ts` — 8 detectors: RSI regular divergence (bullish/bearish), MACD histogram convergence (bullish/bearish), Bollinger squeeze (bullish/bearish), Support/Resistance proximity (bullish/bearish)
 - `index.ts` — `detectSignals(bars, indicators)` aggregator
+- `newSignals.ts` — `detectNewConfirmedSignals(bars)`: confirmed signals that begin on the last bar (confirmed in `detectSignals` on `bars` and of a `type` not confirmed on `bars.slice(0, -1)`). The episode-start rule a once-per-session recorder applies, from the bars alone. A cross still inside `CROSS_LOOKBACK_BARS` since an earlier bar, a state signal that keeps holding and any `expected`-phase signal are not returned; one that ended and restarted on the last bar is. Fewer than 2 bars → `[]`.
 
 ### Key Constants (`domain/signals/constants.ts`)
 

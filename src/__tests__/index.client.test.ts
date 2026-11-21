@@ -125,6 +125,11 @@ describe('browser public API exports', () => {
         void overall;
     });
 
+    it('exports the new-signal and extreme-zone-entry rules for browser consumers', () => {
+        expect(typeof clientApi.detectNewConfirmedSignals).toBe('function');
+        expect(typeof clientApi.findExtremeZoneEntryOn).toBe('function');
+    });
+
     it('does not export server-only runtime entrypoints', () => {
         expect('FileSkillsLoader' in clientApi).toBe(false);
         expect('createSkillsProvider' in clientApi).toBe(false);

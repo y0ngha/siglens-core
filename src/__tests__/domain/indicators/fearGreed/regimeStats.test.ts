@@ -6,9 +6,11 @@ import {
     EXTREME_ZONE_FORWARD_HORIZONS,
     EXTREME_ZONE_MIN_SAMPLE,
     EXTREME_ZONE_REENTRY_GAP,
+    findExtremeZoneEntryOn,
     summarizeExtremeZoneEpisodes,
     summarizeExtremeZoneOutcomes,
 } from '@/domain/indicators/fearGreed/regimeStats';
+import { scoreToLabel } from '@/domain/indicators/fearGreed/composition';
 import type {
     FearGreedLabel,
     FearGreedReading,
@@ -597,5 +599,279 @@ describe('summarizeExtremeZoneEpisodes', () => {
         expect(episodes.map(e => e.episodes.length)).toEqual(
             episodes.map(e => e.entryCount)
         );
+    });
+});
+
+describe('findExtremeZoneEntryOn', () => {
+    const run = (label: FearGreedLabel | null, n: number) =>
+        Array.from({ length: n }, () => label);
+
+    describe('구간 진입 세션이면', () => {
+        it('구간·날짜·점수·직전 라벨을 담은 진입을 반환한다', () => {
+            const history = historyOf(['NEUTRAL', 'FEAR', 'EXTREME_FEAR']);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(2))).toEqual({
+                zone: 'EXTREME_FEAR',
+                date: dateAt(2),
+                score: 10,
+                previousLabel: 'FEAR',
+            });
+        });
+
+        it('탐욕 쪽 진입도 반환한다', () => {
+            const history = historyOf(['GREED', 'EXTREME_GREED']);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(1))).toEqual({
+                zone: 'EXTREME_GREED',
+                date: dateAt(1),
+                score: 85,
+                previousLabel: 'GREED',
+            });
+        });
+    });
+
+    describe('진입이 아닌 세션이면 null이다', () => {
+        it('구간에 머무르는 둘째 날 이후', () => {
+            const history = historyOf([
+                'NEUTRAL',
+                'EXTREME_FEAR',
+                'EXTREME_FEAR',
+                'EXTREME_FEAR',
+            ]);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(1))).not.toBeNull();
+            expect(findExtremeZoneEntryOn(history, dateAt(2))).toBeNull();
+            expect(findExtremeZoneEntryOn(history, dateAt(3))).toBeNull();
+        });
+
+        it('극단 구간이 아닌 라벨', () => {
+            const history = historyOf(['NEUTRAL', 'FEAR', 'GREED']);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(1))).toBeNull();
+            expect(findExtremeZoneEntryOn(history, dateAt(2))).toBeNull();
+        });
+
+        it('히스토리에 없는 날짜', () => {
+            const history = historyOf(['NEUTRAL', 'EXTREME_FEAR']);
+
+            expect(findExtremeZoneEntryOn(history, '2025-01-01')).toBeNull();
+            expect(findExtremeZoneEntryOn([], dateAt(0))).toBeNull();
+        });
+
+        it('같은 날짜가 두 번 나오면 모호하므로 null이다(첫 일치를 고르지 않는다)', () => {
+            const history = historyOf(['NEUTRAL', 'EXTREME_FEAR']);
+            const duplicated = [...history, { ...history[1] }];
+
+            expect(findExtremeZoneEntryOn(history, dateAt(1))).not.toBeNull();
+            expect(findExtremeZoneEntryOn(duplicated, dateAt(1))).toBeNull();
+        });
+
+        it('직전 세션 라벨이 null이면(워밍업 공백) 진입이 아니다', () => {
+            const history = historyOf([null, 'EXTREME_GREED']);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(1))).toBeNull();
+        });
+
+        it('히스토리 첫 세션(직전 세션이 없다)', () => {
+            const history = historyOf(['EXTREME_FEAR', 'NEUTRAL']);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(0))).toBeNull();
+        });
+
+        it('워밍업 공백(label: null) 바로 뒤 첫 라벨 세션', () => {
+            const history = historyOf([null, null, 'EXTREME_FEAR', 'NEUTRAL']);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(2))).toBeNull();
+        });
+    });
+
+    describe('재진입 간격 경계', () => {
+        // 마지막 구간 세션이 인덱스 1이면, 인덱스 r에서의 재진입은
+        // r - 1 > reentryGap 일 때만 새 진입이다. 기본값 20이면 r = 22부터.
+        it('간격이 정확히 reentryGap이면 같은 국면이라 null이다', () => {
+            const history = historyOf([
+                'NEUTRAL',
+                'EXTREME_FEAR',
+                ...run('NEUTRAL', EXTREME_ZONE_REENTRY_GAP - 1),
+                'EXTREME_FEAR',
+            ]);
+            const last = history.length - 1;
+
+            expect(last - 1).toBe(EXTREME_ZONE_REENTRY_GAP);
+            expect(findExtremeZoneEntryOn(history, dateAt(last))).toBeNull();
+        });
+
+        it('간격이 reentryGap + 1이면 새 진입이다', () => {
+            const history = historyOf([
+                'NEUTRAL',
+                'EXTREME_FEAR',
+                ...run('NEUTRAL', EXTREME_ZONE_REENTRY_GAP),
+                'EXTREME_FEAR',
+            ]);
+            const last = history.length - 1;
+
+            expect(last - 1).toBe(EXTREME_ZONE_REENTRY_GAP + 1);
+            expect(findExtremeZoneEntryOn(history, dateAt(last))).toEqual({
+                zone: 'EXTREME_FEAR',
+                date: dateAt(last),
+                score: 10,
+                previousLabel: 'NEUTRAL',
+            });
+        });
+
+        it('options.reentryGap을 따른다(간격 3: 3 이하면 같은 국면)', () => {
+            const history = historyOf([
+                'NEUTRAL',
+                'EXTREME_FEAR',
+                'NEUTRAL',
+                'NEUTRAL',
+                'EXTREME_FEAR',
+            ]);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(4))).toBeNull();
+            expect(
+                findExtremeZoneEntryOn(history, dateAt(4), { reentryGap: 3 })
+            ).toBeNull();
+            expect(
+                findExtremeZoneEntryOn(history, dateAt(4), { reentryGap: 2 })
+            ).not.toBeNull();
+            expect(
+                findExtremeZoneEntryOn(history, dateAt(4), { reentryGap: 0 })
+            ).not.toBeNull();
+        });
+
+        it('잘못된 reentryGap은 기본값으로 되돌린다', () => {
+            const history = historyOf([
+                'NEUTRAL',
+                'EXTREME_FEAR',
+                'NEUTRAL',
+                'EXTREME_FEAR',
+            ]);
+
+            [-1, 1.5, Number.NaN].forEach(reentryGap => {
+                expect(
+                    findExtremeZoneEntryOn(history, dateAt(3), { reentryGap })
+                ).toBeNull();
+            });
+        });
+
+        it('다른 구간의 방문은 간격에 영향을 주지 않는다', () => {
+            const history = historyOf([
+                'NEUTRAL',
+                'EXTREME_FEAR',
+                'EXTREME_GREED',
+                'EXTREME_FEAR',
+            ]);
+
+            expect(findExtremeZoneEntryOn(history, dateAt(2))).not.toBeNull();
+            expect(findExtremeZoneEntryOn(history, dateAt(3))).toBeNull();
+        });
+    });
+
+    describe('25 / 75 경계(scoreToLabel로 만든 라벨)', () => {
+        function historyFromScores(scores: number[]): FearGreedReading[] {
+            return scores.map((score, i) => ({
+                date: dateAt(i),
+                score,
+                label: scoreToLabel(score),
+            }));
+        }
+
+        it('25점은 극단 공포가 아니라 진입이 아니다, 24.99점은 진입이다', () => {
+            const at25 = historyFromScores([50, 25]);
+            const below = historyFromScores([50, 24.99]);
+
+            expect(findExtremeZoneEntryOn(at25, dateAt(1))).toBeNull();
+            expect(findExtremeZoneEntryOn(below, dateAt(1))).toEqual({
+                zone: 'EXTREME_FEAR',
+                date: dateAt(1),
+                score: 24.99,
+                previousLabel: 'NEUTRAL',
+            });
+        });
+
+        it('75점은 극단 탐욕 진입이고, 74.99점은 진입이 아니다', () => {
+            const at75 = historyFromScores([60, 75]);
+            const below = historyFromScores([60, 74.99]);
+
+            expect(findExtremeZoneEntryOn(at75, dateAt(1))).toEqual({
+                zone: 'EXTREME_GREED',
+                date: dateAt(1),
+                score: 75,
+                previousLabel: 'GREED',
+            });
+            expect(findExtremeZoneEntryOn(below, dateAt(1))).toBeNull();
+        });
+    });
+
+    describe('비정상 입력은 fail-closed다', () => {
+        it('진입 세션의 점수가 null이면 null이다', () => {
+            const history: FearGreedReading[] = [
+                { date: dateAt(0), score: 50, label: 'NEUTRAL' },
+                { date: dateAt(1), score: null, label: 'EXTREME_FEAR' },
+            ];
+
+            expect(findExtremeZoneEntryOn(history, dateAt(1))).toBeNull();
+        });
+
+        it.each([Number.NaN, Number.POSITIVE_INFINITY])(
+            '진입 세션의 점수가 %s이면 null이다',
+            score => {
+                const history: FearGreedReading[] = [
+                    { date: dateAt(0), score: 50, label: 'NEUTRAL' },
+                    { date: dateAt(1), score, label: 'EXTREME_FEAR' },
+                ];
+
+                expect(findExtremeZoneEntryOn(history, dateAt(1))).toBeNull();
+            }
+        );
+
+        it('입력 히스토리를 변경하지 않는다', () => {
+            const history = historyOf(['NEUTRAL', 'EXTREME_FEAR']);
+            const snapshot = JSON.stringify(history);
+
+            findExtremeZoneEntryOn(history, dateAt(1));
+
+            expect(JSON.stringify(history)).toBe(snapshot);
+        });
+    });
+
+    describe('summarizeExtremeZoneEpisodes와의 일치', () => {
+        it('긴 합성 히스토리에서 모든 episode.startDate는 진입이고 다른 날짜는 진입이 아니다', () => {
+            // 결정적 의사 난수로 5개 라벨을 섞고, 워밍업 공백도 끼워 넣는다.
+            const labels: (FearGreedLabel | null)[] = Array.from(
+                { length: 600 },
+                (_, i) => {
+                    if (i < 3 || (i >= 300 && i < 303)) return null;
+                    const r = (i * 7919 + (i % 13) * 104729) % 100;
+                    if (r < 8) return 'EXTREME_FEAR';
+                    if (r < 25) return 'FEAR';
+                    if (r < 70) return 'NEUTRAL';
+                    if (r < 92) return 'GREED';
+                    return 'EXTREME_GREED';
+                }
+            );
+            const history = historyOf(labels);
+
+            [undefined, 0, 5, EXTREME_ZONE_REENTRY_GAP].forEach(reentryGap => {
+                const options = { reentryGap };
+                const starts = new Set(
+                    summarizeExtremeZoneEpisodes(history, options).flatMap(
+                        summary => summary.episodes.map(e => e.startDate)
+                    )
+                );
+                const entryDates = history
+                    .map(point => point.date)
+                    .filter(
+                        date =>
+                            findExtremeZoneEntryOn(history, date, options) !==
+                            null
+                    );
+
+                expect(starts.size).toBeGreaterThan(5);
+                expect(new Set(entryDates)).toEqual(starts);
+                expect(entryDates.length).toBe(starts.size);
+            });
+        });
     });
 });

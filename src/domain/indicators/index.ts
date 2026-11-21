@@ -86,6 +86,7 @@ export {
     EXTREME_ZONE_REENTRY_GAP,
     FEAR_GREED_LABEL_CUTOFFS,
     fearGreedInputs,
+    findExtremeZoneEntryOn,
     scoreToLabel,
     POC_WINDOW_DEFAULT,
     summarizeExtremeZoneEpisodes,
