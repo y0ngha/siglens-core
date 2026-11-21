@@ -631,12 +631,48 @@ describe('AGENT_TOOL_SPECS', () => {
     describe('get_investor_flows', () => {
         const spec = findToolSpec('get_investor_flows');
 
-        it('is a cached, symbol-only tool', () => {
+        it('is a cached tool: symbol required, optional holder, no extra keys', () => {
             expect(spec?.costClass).toBe('cached');
             expect(spec?.inputSchema.required).toEqual(['symbol']);
             expect(Object.keys(spec?.inputSchema.properties ?? {})).toEqual([
                 'symbol',
+                'holder',
             ]);
+            expect(spec?.inputSchema.additionalProperties).toBe(false);
+        });
+
+        it('describes holderLookup, its statuses and the 13F put/call reading', () => {
+            const d = spec?.description ?? '';
+            expect(d).toContain('and, with `holder`, one named institution');
+            expect(d).toContain('`holderLookup` (only when holder is passed)');
+            expect(d).toContain('never print the status value itself');
+            for (const status of [
+                'found',
+                'not_holding',
+                'not_determinable',
+                'no_filing_for_period',
+                'no_matching_filer',
+                'too_many_matches',
+                'no_13f_period',
+                'not_us_stock',
+            ]) {
+                expect(d).toContain(status);
+            }
+            expect(d).toContain(
+                'never web-search a stake holderLookup answered'
+            );
+            expect(d).toContain('carries `reading`');
+            expect(d).toContain(
+                '{query, period, status, matches[{filerName, shares, valueUsd, prevShares, rankByShares}], matchedFilers, note}'
+            );
+            expect(d).toContain('(do not call again for each name)');
+            const holder = spec?.inputSchema.properties?.holder as
+                { type: string; description: string } | undefined;
+            expect(holder?.type).toBe('string');
+            expect(holder?.description).toContain(
+                'as it files 13F with the SEC'
+            );
+            expect(holder?.description).toContain('translate a Korean name');
         });
 
         it.each([
@@ -877,9 +913,11 @@ describe('AGENT_TOOL_SPECS', () => {
         expect(cachedAnalysis).toContain('priceNow');
         expect(cachedAnalysis).toContain('movePct');
         expect(cachedAnalysis).toContain('levelsBroken');
-        expect(cachedAnalysis).toContain('nearestSupport');
-        expect(cachedAnalysis).toContain('nearestResistance');
-        expect(cachedAnalysis).toContain('planNow may be null');
+        expect(cachedAnalysis).toContain('levelLadder');
+        expect(cachedAnalysis).toContain('`closer`');
+        expect(cachedAnalysis).toContain('planNow (may be null)');
+        expect(cachedAnalysis).not.toContain('nearestSupport');
+        expect(cachedAnalysis).not.toContain('nearestResistance');
 
         const options = findToolSpec('get_options_summary')?.description;
         expect(options).toContain('daysToExpiration');
@@ -949,6 +987,41 @@ describe('tool description wording', () => {
         expect(d).toContain('smallest total payout to option holders');
         expect(d).toContain('put OI ÷ call OI (0.58 = 0.58 puts per call)');
         expect(d).toContain('contract counts, never prices');
+    });
+
+    it('get_options_summary routes the put/call side through putCallReading', () => {
+        const d = description('get_options_summary');
+        expect(d).toContain('`metrics.putCallReading`');
+        expect(d).toContain('never from the ratio yourself');
+    });
+
+    it('get_fundamentals tells the model to quote the earnings tally, not count', () => {
+        const d = description('get_fundamentals');
+        expect(d).toContain('`earningsReactionTally`');
+        expect(d).toContain('never count the list yourself');
+        expect(d).toContain(
+            '({measured, up, down, flat, largestRise, largestFall, medianAbsMovePct, summary})'
+        );
+        expect(d).toContain('say "M of measured"');
+    });
+
+    it('get_news describes session, priceMoves, itemsTrimmed and the 30/14-day since defaults', () => {
+        const d = description('get_news');
+        expect(d).toContain('`session`');
+        expect(d).toContain('`priceMoves`');
+        expect(d).toContain('`moreHeadlines`');
+        expect(d).toContain(
+            '`itemsTrimmed` = how many of the oldest items were dropped'
+        );
+        const since = findToolSpec('get_news')?.inputSchema.properties
+            ?.since as { description: string } | undefined;
+        expect(since?.description).toContain(
+            'the first day of the period the question asks about'
+        );
+        expect(since?.description).toContain('30 days before the date');
+        expect(since?.description).toContain('the last 30 days for a symbol');
+        expect(since?.description).toContain('14 days for a category');
+        expect(since?.description).toContain('at most 30 days back');
     });
 
     it('get_bars_indicators mentions the oscillator zone fields and latest.rsiZone', () => {

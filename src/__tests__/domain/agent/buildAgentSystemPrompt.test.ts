@@ -555,7 +555,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-20.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-21.1');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -1110,7 +1110,7 @@ describe('buildAgentSystemPrompt', () => {
         );
         expect(prompt).toContain('say so plainly in the first sentence');
         expect(prompt).toContain(
-            'Levels and direction must agree with your own numbers'
+            'Levels and direction must agree with computed distances'
         );
         expect(prompt).toContain(
             'call it "the last 20 sessions", not "1 month"'
@@ -2100,5 +2100,71 @@ describe('buildAgentSystemPrompt — computed facts, basis date, no offered look
             'Notes on earlier messages only date those messages.'
         );
         expect(p).not.toContain('whether the US regular session is open');
+    });
+});
+
+describe('buildAgentSystemPrompt computed-fact rules (WP-08)', () => {
+    const build = (without: readonly string[] = []): string =>
+        buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(t => !without.includes(t.name)),
+        });
+    const rowOf = (prompt: string, needle: string): string =>
+        prompt.split('\n').find(l => l.includes(needle)) ?? '';
+
+    it('the level rule places levels by the ladder and drops the nearest-pair wording', () => {
+        const p = build();
+        expect(p).toContain(
+            'the nearest resistance is its first above rung and the nearest support its first below rung, whatever the analysis called that level'
+        );
+        expect(p).toContain(
+            'say which is closer only as its closer field says'
+        );
+        expect(p).toContain('Without a ladder, say the price is closer');
+        expect(p).toContain('Either way, give one number per role');
+        expect(p).toContain('a breakout or breakdown trigger price you name');
+        expect(p).toContain('never two different numbers for the same role');
+        expect(p).not.toContain('nearestSupport');
+        expect(p).not.toContain('nearestResistance');
+    });
+
+    it('the re-call rule counts a second get_investor_flows call with holder', () => {
+        const p = build();
+        expect(p).toContain(
+            'a tool call you have not made this turn could supply it (get_investor_flows with holder for a named holder missing from the holders list'
+        );
+        expect(p).not.toContain('a tool you have not called for it this turn');
+        const noFlows = build(['get_investor_flows']);
+        expect(noFlows).toContain(
+            'a tool call you have not made this turn could supply it (a period the first call did not cover)'
+        );
+    });
+
+    it('the investor-flows row asks for holder in the first call', () => {
+        const row = rowOf(build(), '→ get_investor_flows.');
+        expect(row).toContain('pass holder in the first call');
+        expect(row).toContain('블랙록은 몇 주 갖고 있어?');
+        expect(row).toContain('그 펀드가 몇 주 갖고 있어?');
+    });
+
+    it('the news row asks for since, and the bars pairing only when bars exist', () => {
+        const row = rowOf(build(), '→ get_news.');
+        expect(row).toContain('Pass since as the start of the period');
+        expect(row).toContain('also call get_bars_indicators in the same step');
+        const noBars = rowOf(build(['get_bars_indicators']), '→ get_news.');
+        expect(noBars).toContain('Pass since as the start of the period');
+        expect(noBars).not.toContain('get_bars_indicators');
+    });
+
+    it('the news-causality bullet appears only with get_news', () => {
+        expect(build()).toContain(
+            "- Explaining a move with news: tie a completed session's move only to headlines whose session is that date or an earlier date in the window"
+        );
+        expect(build()).toContain(
+            "it can bear on today's move in progress, never on an earlier session's move"
+        );
+        expect(build(['get_news'])).not.toContain(
+            'Explaining a move with news'
+        );
     });
 });

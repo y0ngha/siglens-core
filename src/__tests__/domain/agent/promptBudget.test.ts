@@ -20,10 +20,20 @@ import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
  * - 2026-11-20 (A/B follow-up): the per-share exemption names what it covers
  *   and the "## Now" pointer bans converting zones (system prompt 54,193 ->
  *   54,452; tool specs unchanged).
+ * - 2026-11-21 (WP-08 core-2): computed-fact fields (earnings tally, put/call
+ *   reading, level ladder, news session and priceMoves) and the `holder`
+ *   lookup are described, the level rule is rewritten and a news-causality
+ *   rule is added (system prompt 54,452 -> 55,576 chars; tool specs
+ *   63,891 -> 65,879 chars of JSON; longest description stays
+ *   `get_fundamentals`, 6,941 -> 7,127, still under its 7,150 limit).
+ * - 2026-11-21 (WP-08 review round 1): clearer news-causality, ladder and
+ *   holder wording (system prompt 55,576 -> 55,861; tool specs 65,879 ->
+ *   66,046; longest description `get_fundamentals` 7,127 -> 7,191, so its
+ *   limit goes 7,150 -> 7,500 and the tool specs budget 66,000 -> 66,500).
  */
-const SYSTEM_PROMPT_CHAR_BUDGET = 54_750;
-const TOOL_SPECS_JSON_CHAR_BUDGET = 64_050;
-const TOOL_DESCRIPTION_MAX_CHARS = 7_150;
+const SYSTEM_PROMPT_CHAR_BUDGET = 56_000;
+const TOOL_SPECS_JSON_CHAR_BUDGET = 66_500;
+const TOOL_DESCRIPTION_MAX_CHARS = 7_500;
 const FLOOR_SLACK = 2_000;
 
 const guestPrompt = (
