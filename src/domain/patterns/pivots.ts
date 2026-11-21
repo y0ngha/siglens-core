@@ -93,15 +93,24 @@ function effectiveAtrSeries(
  *   reuses the previous bar's value — only bars up to it decide its pivot.
  * A series with no usable value at all confirms nothing.
  *
- * **One pivot per bar (`opts.onePivotPerBar`).** A wide bar can confirm the
- * extreme it set itself (its high is a full reversal above its own new low);
- * the opposite swing then starts on the NEXT bar, so that same bar's other
- * end is never also a pivot. Without it the same bar could be a swing high
- * and a swing low at once (about 40% of real-chart pattern pivots were such
- * pairs). An outside reversal bar keeps the larger swing instead
- * ({@link outsideReversal}). The chart-pattern screener and qualifier set
- * the option; the Elliott and trendline overlay builders keep the original
- * zigzag their gates were measured on.
+ * **One pivot per bar (`opts.onePivotPerBar`).** Two rules, both for the
+ * chart-pattern screener and qualifier (the Elliott and trendline overlay
+ * builders keep the original zigzag their gates were measured on):
+ * - A reversal measured on the bar that set the running extreme counts only
+ *   the part the bar proves. A daily bar does not say whether its high or its
+ *   low printed first, so reading `runningHigh − bar.low` on the bar that made
+ *   the high let a wide bar confirm its own extreme (about one pivot in five),
+ *   often when the bar opened in its far half and the extreme came second.
+ *   The close follows the extreme, so on that bar the reversal is
+ *   `runningHigh − bar.close` (mirror: `bar.close − runningLow`). Otherwise
+ *   the next bar confirms it with its own far end, or replaces it when it
+ *   exceeds the extreme. The seed step uses the same rule. An extreme set on
+ *   an EARLIER bar is confirmed by this bar's far end as in the original.
+ * - After a bar confirmed its own extreme (the close proved it), the opposite
+ *   swing starts on the NEXT bar, so that bar's other end is never also a
+ *   pivot. Without it the same bar could be a swing high and a swing low at
+ *   once (about 40% of real-chart pattern pivots were such pairs). An outside
+ *   reversal bar keeps the larger swing instead ({@link outsideReversal}).
  *
  * The very first extreme (before any direction is established) is used only
  * to seed the initial swing direction and is never itself emitted as a pivot
@@ -156,6 +165,7 @@ export function extractPivots(
             : effectiveAtrSeries(atr, bars.length);
     const atrAt = (i: number): number | null => perBar[i];
     const pivots: PivotPoint[] = [];
+    const onePerBar = opts?.onePivotPerBar === true;
 
     let runningHigh = bars[0].high;
     let runningHighIndex = 0;
@@ -165,7 +175,7 @@ export function extractPivots(
 
     for (let i = 1; i < bars.length; i++) {
         const bar = bars[i];
-        if (opts?.onePivotPerBar === true && direction !== null) {
+        if (onePerBar && direction !== null) {
             const outside = outsideReversal(
                 bar,
                 direction,
@@ -211,8 +221,18 @@ export function extractPivots(
         const atrValue = atrAt(i);
         if (atrValue === null) continue;
         const threshold = PIVOT_REVERSAL_ATR_MULT * atrValue;
-        const highReversed = runningHigh - bar.low >= threshold;
-        const lowReversed = bar.high - runningLow >= threshold;
+        // With `onePivotPerBar`, an extreme set on THIS bar is confirmed only
+        // by what the bar proves: its close (the open-to-close order is
+        // unknown, so the far end of the range may have printed first). An
+        // extreme from an earlier bar is confirmed by this bar's far end.
+        const highReversed =
+            (onePerBar && runningHighIndex === i
+                ? runningHigh - bar.close
+                : runningHigh - bar.low) >= threshold;
+        const lowReversed =
+            (onePerBar && runningLowIndex === i
+                ? bar.close - runningLow
+                : bar.high - runningLow) >= threshold;
 
         if (direction === null) {
             // Seed the initial direction without emitting a pivot for the
@@ -236,8 +256,7 @@ export function extractPivots(
                 direction = 'down';
                 // A bar that confirmed its own high starts the down leg on
                 // the next bar (see JSDoc: one pivot per bar).
-                const selfConfirmed =
-                    opts?.onePivotPerBar === true && runningHighIndex === i;
+                const selfConfirmed = onePerBar && runningHighIndex === i;
                 runningLow = selfConfirmed ? Infinity : bar.low;
                 runningLowIndex = selfConfirmed ? -1 : i;
             }
@@ -248,8 +267,7 @@ export function extractPivots(
                 kind: 'low',
             });
             direction = 'up';
-            const selfConfirmed =
-                opts?.onePivotPerBar === true && runningLowIndex === i;
+            const selfConfirmed = onePerBar && runningLowIndex === i;
             runningHigh = selfConfirmed ? -Infinity : bar.high;
             runningHighIndex = selfConfirmed ? -1 : i;
         }

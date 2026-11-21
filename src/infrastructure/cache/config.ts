@@ -1096,6 +1096,10 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * (`after a decline of 2.4 ATR over the 10 bars before it`), under the header
  * `## Detected Candle Patterns (computed)`, and the `## Recent Bar Data` row
  * labels follow the same context. Bytes change for every technical prompt.
+ * Chart-pattern pivots no longer confirm on the bar that set the extreme
+ * unless that bar's close proves the reversal (a daily bar does not say whether
+ * its high or its low printed first), so qualified patterns, the candidate
+ * lines and the drawn overlays shift with the pivots they are built on.
  *
  * @internal
  */

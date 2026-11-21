@@ -7,7 +7,7 @@ import {
     overlayKindOfId,
 } from '@/domain/overlays/constants';
 import { chartFixture } from '@/__tests__/domain/patterns/fixtures/chartFixture';
-import cupOutsideBarRimFile from '@/__tests__/domain/patterns/fixtures/charts/daily-cup-outside-bar-rim.json';
+import cupStaircaseFile from '@/__tests__/domain/patterns/fixtures/charts/daily-cup-staircase.json';
 import crashThenClimbFile from '@/__tests__/domain/patterns/fixtures/charts/daily-crash-then-climb-and-pennant.json';
 import hourlyOscillationFile from '@/__tests__/domain/patterns/fixtures/charts/hourly-level-oscillation-b.json';
 import { buildDivergenceCandidates } from '@/domain/overlays/divergenceCandidates';
@@ -19,7 +19,7 @@ import { buildDivergenceCandidates } from '@/domain/overlays/divergenceCandidate
  */
 describe('OVERLAY_ID_PREFIX', () => {
     const offered = [
-        cupOutsideBarRimFile,
+        cupStaircaseFile,
         crashThenClimbFile,
         hourlyOscillationFile,
     ]

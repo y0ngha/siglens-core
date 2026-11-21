@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ChartPatternId } from '@/domain/types';
+import type { Bar, ChartPatternId } from '@/domain/types';
 import {
     invariantViolations,
     runPipeline,
@@ -7,6 +7,7 @@ import {
     statusOf,
 } from '@/__tests__/domain/patterns/scenarios/harness';
 import { calculateATR } from '@/domain/indicators/atr';
+import { extractPivots } from '@/domain/patterns/pivots';
 import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
 import { lineValueAt } from '@/domain/patterns/boundaryLines';
 import { CONVERGING_MAX_WIDTH_RATIO } from '@/domain/patterns/constants';
@@ -37,6 +38,7 @@ const hsBelowNeckline = chartFixture(hsBelowNecklineFile);
 
 /** The fixtures' price scale (see `chartFixture`). */
 const SCALE = 1.37;
+const DAY = 86_400;
 
 const drawn = (c: ChartFixture): ChartPatternId[] =>
     runProductionPipeline(c.bars, c.timeframe).qualified.map(q => q.id);
@@ -120,15 +122,59 @@ describe('a flag keeps its label while it forms', () => {
     });
 });
 
+/**
+ * The fixture ends on a handle low (bar 497, 247.71) that bar 500's lower low
+ * (242.49 = 177.00 before scaling) supersedes, and no later bar rallies far
+ * enough to confirm it: with a pivot confirmed only by what its bar proves,
+ * the fixture alone qualifies no cup. `cupOutsideBarRimWithRally` appends the
+ * bars the live chart would have printed next: a rally bar that confirms bar
+ * 500's low, then an optional close.
+ */
+const confirmingBar = (last: Bar): Bar => ({
+    time: last.time + DAY,
+    open: 244,
+    high: 270,
+    low: 243,
+    close: 268,
+    volume: 0,
+});
+const closeAt = (prev: Bar, close: number): Bar => ({
+    time: prev.time + DAY,
+    open: 266,
+    high: 266,
+    low: close - 1,
+    close,
+    volume: 0,
+});
+const cupOutsideBarRimWithRally = (nextClose?: number): Bar[] => {
+    const rally = confirmingBar(cupOutsideBarRim.bars.at(-1) as Bar);
+    return [
+        ...cupOutsideBarRim.bars,
+        rally,
+        ...(nextClose === undefined ? [] : [closeAt(rally, nextClose)]),
+    ];
+};
+
+describe('a pivot is confirmed by what its bar proves (C10a)', () => {
+    it('the unmodified cup fixture is screened but not qualified, and bar 497 is not a pivot', () => {
+        const c = cupOutsideBarRim;
+        const run = runProductionPipeline(c.bars, c.timeframe);
+        const pivots = extractPivots(c.bars, calculateATR(c.bars), {
+            onePivotPerBar: true,
+        });
+        expect(run.loose).toContain('cup_and_handle');
+        expect(run.qualified.map(q => q.id)).not.toContain('cup_and_handle');
+        expect(pivots.map(p => p.index)).not.toContain(497);
+    });
+});
+
 describe('an outside reversal bar keeps the swing it takes out', () => {
     // The left-rim bar also made a new low inside a pullback; it takes out
     // the swing high before it, so it is the swing high and the pullback's
     // earlier low is the swing low.
-    // One bar short of the fixture's end: its last bar closes under the
-    // handle low and fails the cup (see the next block).
     it('the daily cup keeps that bar as its left rim (222.35 / 208.33 before scaling)', () => {
         const run = runProductionPipeline(
-            cupOutsideBarRim.bars.slice(0, -1),
+            cupOutsideBarRimWithRally(),
             cupOutsideBarRim.timeframe
         );
         const cup = run.qualified.find(q => q.id === 'cup_and_handle');
@@ -141,27 +187,30 @@ describe('an outside reversal bar keeps the swing it takes out', () => {
 
 describe('a pattern whose last close is already past its invalidation level is not offered', () => {
     // 2026-10-08 A/B: this cup was listed and drawn as `forming` with the
-    // last close (178.45 before scaling) under its handle low (180.81), the
-    // printed invalidation level — 0.22 ATR under, inside the 0.25 ATR slack
-    // the spent check used to allow.
+    // last close under its handle low, the printed invalidation level —
+    // inside the slack the spent check used to allow. Close 240 is 0.15 ATR
+    // under the 242.49 handle low (ATR 16.8), inside the old 0.25 ATR slack.
     const c = cupOutsideBarRim;
-    const cupOf = (bars: typeof c.bars) =>
-        runProductionPipeline(bars, c.timeframe);
+    const cupOf = (nextClose: number) =>
+        runProductionPipeline(
+            cupOutsideBarRimWithRally(nextClose),
+            c.timeframe
+        );
 
-    it('one bar earlier (last close above the handle low) the cup is listed as forming', () => {
-        const run = cupOf(c.bars.slice(0, -1));
+    it('with the last close above the handle low (245 vs 242.49) the cup is listed as forming', () => {
+        const run = cupOf(245);
         const cup = run.qualified.find(q => q.id === 'cup_and_handle');
         if (cup === undefined) throw new Error('no cup');
         const g = computeCandidateGeometry(cup, run.bars, run.atr);
         if (g === null || g.direction !== 'up') throw new Error('not up');
-        expect(g.invalidationLevel).toBeCloseTo(180.81 * SCALE, 3);
+        expect(g.invalidationLevel).toBeCloseTo(177 * SCALE, 3);
         expect(statusOf(run, 'cup_and_handle')).toBe('forming');
     });
 
-    it('on the last bar the cup is neither listed nor drawn, and no other card or overlay breaks an invariant', () => {
-        const run = cupOf(c.bars);
-        const last = c.bars[c.bars.length - 1].close;
-        expect(last).toBeLessThan(180.81 * SCALE);
+    it('on the last bar (close 240 under the handle low) the cup is neither listed nor drawn, and no other card or overlay breaks an invariant', () => {
+        const run = cupOf(240);
+        const last = run.bars[run.bars.length - 1].close;
+        expect(last).toBeLessThan(177 * SCALE);
         expect(run.qualified.map(q => q.id)).not.toContain('cup_and_handle');
         expect(run.overlays.some(o => o.id.includes('cup_and_handle'))).toBe(
             false
