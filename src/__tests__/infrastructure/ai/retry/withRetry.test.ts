@@ -605,3 +605,42 @@ describe('withRetry — cumulative-delay cap (W1)', () => {
         });
     });
 });
+
+describe('withRetry — classify 옵션', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    it('주어진 분류기로 재시도 여부를 정한다 (기본 분류기는 408을 재시도하지 않는다)', async () => {
+        const fn = vi
+            .fn()
+            .mockRejectedValueOnce({ status: 408 })
+            .mockResolvedValue('ok');
+        const classify = (e: unknown): 'server_error' | 'none' =>
+            (e as { status?: number }).status === 408 ? 'server_error' : 'none';
+
+        const pending = withRetry(fn, {
+            maxAttempts: 3,
+            baseDelayMs: 1000,
+            classify,
+        });
+        await vi.advanceTimersByTimeAsync(10_000);
+
+        await expect(pending).resolves.toBe('ok');
+        expect(fn).toHaveBeenCalledTimes(2);
+    });
+
+    it('classify가 없으면 classifyError를 쓴다', async () => {
+        const fn = vi.fn().mockRejectedValue({ status: 408 });
+
+        await expect(
+            withRetry(fn, { maxAttempts: 3, baseDelayMs: 1000 })
+        ).rejects.toEqual({ status: 408 });
+        expect(fn).toHaveBeenCalledTimes(1);
+    });
+});

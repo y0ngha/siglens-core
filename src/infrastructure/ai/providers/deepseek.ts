@@ -78,10 +78,38 @@ async function getClient(apiKey: string): Promise<OpenAI> {
     if (clientCache === undefined) {
         const { default: OpenAIClient } = await loadOpenAI();
         clientCache ??= createClientCache<OpenAI>(
-            key => new OpenAIClient({ apiKey: key, baseURL: DEEPSEEK_BASE_URL })
+            key =>
+                new OpenAIClient({
+                    apiKey: key,
+                    baseURL: DEEPSEEK_BASE_URL,
+                    // 이 클라이언트만 SDK 재시도를 끈다(ChatGPT·Claude 클라이언트는 아직
+                    // SDK 재시도를 유지한다 — 그쪽 기본 분류기가 연결 오류를 받지 못해서이며,
+                    // 맞추는 것은 별도 변경이다). 재시도는 `callDeepSeekWithRetry`의 `withRetry`
+                    // 한 층만 맡는다. SDK 기본값(2회)이 그 아래에 겹치면 한 번의 생성이
+                    // 최대 5 x 3 = 15번의 HTTP 요청이 되고, 호출자의 시간 예산·누적 delay
+                    // 계산도 SDK 내부 대기를 보지 못한다. SDK가 재시도하던 연결 오류와
+                    // 408/409는 `withRetry` 쪽에서 같은 조건으로 받는다
+                    // (`isRetryableConnectionError`, `classifyDeepSeekError`).
+                    maxRetries: 0,
+                })
         );
     }
     return clientCache.get(apiKey);
+}
+
+/**
+ * SDK의 연결 오류(`APIConnectionError`, 타임아웃 포함)인지. status가 없어
+ * `classifyError`가 `none`으로 분류하므로, SDK 재시도를 끈 대신 `retryable`을 붙여
+ * `withRetry`가 받게 한다. 호출자 abort(`APIUserAbortError`)는 해당하지 않는다.
+ */
+async function isRetryableConnectionError(error: unknown): Promise<boolean> {
+    const { default: OpenAIClient } = await loadOpenAI();
+    const ConnectionError = OpenAIClient.APIConnectionError as
+        (new (...args: never[]) => Error) | undefined;
+    return (
+        typeof ConnectionError === 'function' &&
+        error instanceof ConnectionError
+    );
 }
 
 export interface DeepSeekCallOptions {
@@ -158,6 +186,9 @@ async function callDeepSeekResponses(
     // SDK 타입을 그대로 쓴다. body가 `unknown`이면 `text.format` 키 오타 같은 것이
     // 컴파일에서 안 걸리고, 이벤트를 손으로 타이핑하면 아래 incomplete/failed 분기가
     // 타입에서 보이지 않는다 — 실제로 첫 구현이 그래서 절단 감지를 빠뜨렸다.
+    //
+    // `temperature`는 추론 OFF일 때만 싣는다(ON이면 API가 무시한다). `seed`는 싣지
+    // 않는다 — SDK의 Responses 파라미터에 그 필드가 없다.
     const stream = await client.responses.create(
         {
             model: spec.apiModelId,
@@ -172,6 +203,7 @@ async function callDeepSeekResponses(
                 },
             },
             reasoning: { effort: reasoningEffort(useThinking) },
+            ...(!useThinking && { temperature: spec.temperature }),
             stream: true,
         },
         { signal }
@@ -477,7 +509,14 @@ export async function callDeepSeek(
             { retryable: true }
         );
     } catch (error) {
-        if (!stalled) throw error;
+        if (!stalled) {
+            // maxRetries: 0이므로 SDK가 더는 재시도하지 않는 연결 오류를 여기서
+            // `withRetry`가 받는 재시도 대상으로 표시한다.
+            if (await isRetryableConnectionError(error)) {
+                throw Object.assign(error as Error, { retryable: true });
+            }
+            throw error;
+        }
         console.warn('[DeepSeek] Stalled: no stream activity, aborting', {
             model,
             silenceMs: DEEPSEEK_STALL_TIMEOUT_MS,

@@ -2625,12 +2625,15 @@ export interface ChatGPTModelSpec extends BaseModelSpec {
 }
 
 /**
- * DeepSeek V4.1 model on the OpenAI-compatible chat/completions API.
+ * DeepSeek V4.1 model, called on `/chat/completions` (no schema) or on the
+ * Responses API `/responses` (when a response schema is given).
  *
- * DeepSeek V4.1 models toggle reasoning via a `thinking` switch rather than a
- * numeric budget or an effort level, so the boolean {@link DeepSeekModelSpec.thinking}
- * flag drives the SDK request. Both thinking and non-thinking modes accept a
- * sampling `temperature`; the SDK caller applies it in non-thinking mode.
+ * DeepSeek V4.1 models toggle reasoning via a boolean rather than a numeric
+ * budget or an effort level; {@link DeepSeekModelSpec.reasoning} holds the
+ * off/on states. The resolved `thinking` flag maps to
+ * `thinking: { type: 'disabled' | 'enabled' }` on `/chat/completions` and to
+ * `reasoning.effort: 'none' | 'high'` on `/responses`. `temperature` is sent
+ * only with thinking off, on both endpoints.
  */
 export interface DeepSeekModelSpec extends BaseModelSpec {
     /** Provider that hosts the model (drives SDK selection). */
@@ -2642,9 +2645,11 @@ export interface DeepSeekModelSpec extends BaseModelSpec {
      */
     reasoning: ReasoningModes<DeepSeekReasoningConfig>;
     /**
-     * Sampling temperature. The SDK caller applies it ONLY in non-thinking mode;
+     * Sampling temperature. The SDK caller applies it ONLY in non-thinking mode,
+     * on both `/chat/completions` and the schema path (`/responses`);
      * DeepSeek ignores temperature when reasoning is enabled, so callers must
      * gate on the resolved {@link DeepSeekReasoningConfig.thinking} value.
+     * `seed` is never sent.
      */
     temperature: number;
 }

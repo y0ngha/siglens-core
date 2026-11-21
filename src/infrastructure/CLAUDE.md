@@ -284,6 +284,31 @@ declaration. Redis adapters get their client from `lazyRedisClient` (`infrastruc
 and await it inside the same `try` that handles Redis errors. `yarn verify:dist` loads each
 package entry with every optional peer blocked, so a top-level import fails CI.
 
+<a id="INF-12"></a>
+#### INF-12 — Check the provider's API reference before adding a compatibility fallback
+
+Read the provider's current API reference before adding a retry-without-parameter or
+disable-a-feature fallback: when the vendor documents the parameter as supported, or documents
+ignoring unsupported ones, the fallback only adds risk. A fallback that changes behaviour
+process-wide (for example disabling a parameter for every model) triggers on a precise signal
+(a structured error code or field, never a substring of the message text) and states why the
+vendor's documented behaviour does not already cover the case.
+
+```typescript
+// ❌ if (error.status === 400 && error.message.includes('temperature')) disableTemperatureForAll();
+// ✅ no fallback for a documented parameter; or key it on error.code with a comment on the gap
+```
+
+<a id="INF-13"></a>
+#### INF-13 — Before removing a retry layer, tabulate what it retried
+
+When turning off one retry layer (for example the SDK's own `maxRetries`) so another
+(`withRetry`) is the only one, list what the removed layer retried (statuses, error classes
+such as connection errors and timeouts, headers such as `retry-after`) against what the
+remaining layer classifies, and add the gaps. Document every observable change: latency to the
+fallback, the error code surfaced, fallback eligibility. State request-count bounds as the
+product of every layer on the path, not the app constant alone.
+
 ## Testing
 
 - Coverage target: **90% branch coverage** (required).

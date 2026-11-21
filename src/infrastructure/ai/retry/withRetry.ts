@@ -141,6 +141,8 @@ export async function withRetry<T>(
         baseDelayMs: number;
         abortIfCumulativeDelayReachesMs?: number;
         wallClockBudgetMs?: number;
+        /** provider별 분류기. 미지정 시 {@link classifyError}. */
+        classify?: (error: unknown) => ErrorKind;
     }
 ): Promise<T> {
     const {
@@ -148,6 +150,7 @@ export async function withRetry<T>(
         baseDelayMs,
         abortIfCumulativeDelayReachesMs,
         wallClockBudgetMs,
+        classify = classifyError,
     } = options;
     const delayLimit =
         abortIfCumulativeDelayReachesMs ?? RETRY_ALLOWABLE_TIME_MS;
@@ -161,7 +164,7 @@ export async function withRetry<T>(
             return await fn();
         } catch (error) {
             const attemptMs = Date.now() - attemptStartedAt;
-            const kind = classifyError(error);
+            const kind = classify(error);
 
             if (kind === 'none' || attempt === maxAttempts) {
                 if (kind !== 'none') {
@@ -191,7 +194,9 @@ export async function withRetry<T>(
                 break;
             }
 
-            const label = kind === 'rate_limit' ? '429' : '5xx';
+            const status = (error as { status?: unknown } | null)?.status;
+            const label =
+                typeof status === 'number' ? `${kind} ${status}` : kind;
             console.warn(
                 `[Retry] Attempt ${attempt}/${maxAttempts} failed (${label}). Retrying in ${delay}ms...`,
                 error
