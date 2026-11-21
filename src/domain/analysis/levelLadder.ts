@@ -127,7 +127,9 @@ function toRung(group: PriceGroup, referencePrice: number): LevelRung {
 /**
  * Which side's nearest rung is closer. The printed (rounded) distances decide; when they
  * print the same, the unrounded gaps break the tie, and only an exact tie is `'equal'`.
- * That keeps two sub-cent rungs on opposite sides from reading as equally close.
+ * That keeps two sub-cent rungs on opposite sides from reading as equally close. The raw
+ * gaps are compared exactly (no epsilon): a floating-point difference between gaps that
+ * print the same picks a side, which is acceptable because the printed distances agree.
  */
 function closerSide(
     above: readonly LevelRung[],

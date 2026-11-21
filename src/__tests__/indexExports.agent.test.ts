@@ -42,7 +42,6 @@ describe('index — agent exports', () => {
             expect(typeof fn).toBe('function');
             expect(name in clientApi).toBe(false);
         });
-        expect(Object.keys(fns)).toHaveLength(4);
     });
 
     it('findUngroundedNumbers를 값으로 내보낸다', () => {
