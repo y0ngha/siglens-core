@@ -128,6 +128,8 @@ describe('browser public API exports', () => {
     it('exports the new-signal and extreme-zone-entry rules for browser consumers', () => {
         expect(typeof clientApi.detectNewConfirmedSignals).toBe('function');
         expect(typeof clientApi.findExtremeZoneEntryOn).toBe('function');
+        expect(typeof clientApi.confirmedSignalTimeline).toBe('function');
+        expect(clientApi.SIGNAL_SCAN_DAILY_LOOKBACK_DAYS).toBe(400);
     });
 
     it('does not export server-only runtime entrypoints', () => {

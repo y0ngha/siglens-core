@@ -17,7 +17,8 @@ const FIFTEEN_MIN_BUCKET = 15;
 const MIN_BARS_FOR_PERCENT_CHANGE = 2;
 const PERCENT_FACTOR = 100;
 
-const LOOKBACK_DAYS_BY_TIMEFRAME: Record<DashboardTimeframe, number> = {
+/** @internal Read by `signals/timeline.ts` so the scan window has one source. */
+export const LOOKBACK_DAYS_BY_TIMEFRAME: Record<DashboardTimeframe, number> = {
     // 일봉: 약 1.5년치 (지표 워밍업 + SMC 룩백 여유)
     '1Day': 400,
     // 시봉: 약 5주치 (squeeze lookback 120봉 + 트레이딩 시간 고려)
