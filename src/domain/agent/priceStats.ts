@@ -65,7 +65,7 @@ export interface PriceStatsRequest {
 export interface PriceStatsSubjectInput {
     /** The name the result prints: `AAPL`, `005930.KS`, `kospi`. */
     readonly label: string;
-    /** Completed sessions ascending by date, exchange-local dates, finite prices above zero. */
+    /** Completed sessions, exchange-local dates, as loaded: rows with an invalid date or a price that is not finite and above zero are dropped here and named in notes. */
     readonly closes: readonly MarketDailyClose[];
     /** Calendar id (`us`, `kr`, `crypto`); two different ids make a correlation a cross-market one. */
     readonly market: string;

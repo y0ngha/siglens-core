@@ -9,6 +9,16 @@ import {
 } from '@/domain/agent/swingHistory';
 import { buildAgentSystemPrompt } from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_HISTORY_INDICES } from '@/domain/agent/indexHistoryStats';
+import {
+    AGENT_PRICE_STATS_DEFAULT_PERIOD,
+    AGENT_PRICE_STATS_MAX_DATES,
+    AGENT_PRICE_STATS_MAX_SUBJECTS,
+    AGENT_PRICE_STATS_PERIODS,
+    PRICE_STATS_CAGR_ABOVE_DAYS,
+    PRICE_STATS_NOTE_TEMPLATES,
+    computePriceStats,
+    type PriceStatsSubjectInput,
+} from '@/domain/agent/priceStats';
 import { AGENT_THEME_IDS, AGENT_THEMES } from '@/domain/agent/themes';
 import {
     AGENT_BARS_TIMEFRAMES,
@@ -33,9 +43,9 @@ import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
 import { validateArgs } from '@/domain/agent/validateArgs';
 
 describe('AGENT_TOOL_SPECS', () => {
-    it('23개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
-        expect(AGENT_TOOL_SPECS).toHaveLength(23);
-        expect(new Set(AGENT_TOOL_NAMES).size).toBe(23);
+    it('24개 툴, 이름 유일, 스키마는 additionalProperties:false', () => {
+        expect(AGENT_TOOL_SPECS).toHaveLength(24);
+        expect(new Set(AGENT_TOOL_NAMES).size).toBe(24);
         for (const spec of AGENT_TOOL_SPECS) {
             expect(spec.inputSchema.additionalProperties).toBe(false);
             expect(spec.description.length).toBeGreaterThan(20);
@@ -67,6 +77,7 @@ describe('AGENT_TOOL_SPECS', () => {
             get_theme_snapshot: { theme: 'quantum' },
             get_index_history_stats: { index: 'sp500' },
             get_swing_history: { symbol: 'QQQ', minSwingPct: 10 },
+            get_price_stats: { symbols: ['AAPL', 'MSFT'], period: 'ytd' },
             get_congress_trades: { symbol: 'AAPL' },
             get_investor_flows: { symbol: 'AAPL' },
             get_guide: { query: '이중바닥' },
@@ -474,6 +485,225 @@ describe('AGENT_TOOL_SPECS', () => {
         // Deprecated and no longer filled: never named to the model.
         expect(d).not.toContain('pastLongerThanNow');
         expect(d).not.toContain('stillRunning');
+    });
+
+    it('get_price_stats는 인자가 모두 선택이고 기간·지수는 상수 enum, year는 범위 있는 정수다', () => {
+        const spec = findToolSpec('get_price_stats');
+        if (spec === undefined) throw new Error('missing spec');
+        expect(spec.costClass).toBe('cached');
+        expect(spec.inputSchema.required).toBeUndefined();
+        expect(Object.keys(spec.inputSchema.properties).sort()).toEqual([
+            'dates',
+            'from',
+            'index',
+            'period',
+            'symbols',
+            'to',
+            'year',
+        ]);
+        expect(spec.inputSchema.properties.period?.enum).toEqual([
+            ...AGENT_PRICE_STATS_PERIODS,
+        ]);
+        expect(spec.inputSchema.properties.index?.enum).toEqual([
+            ...AGENT_HISTORY_INDICES,
+        ]);
+        expect(spec.inputSchema.properties.period?.description).toContain(
+            '1년 전보다) uses 1m, 3m, 6m or 1y here, never from; for 1m, 3m and 1y, when no session is in progress, the figure then equals the calendarChange of get_bars_indicators (while one is, calendarChange runs to the live price), so name the dates'
+        );
+        expect(spec.inputSchema.properties.period?.description).toContain(
+            `default ${AGENT_PRICE_STATS_DEFAULT_PERIOD}`
+        );
+        expect(spec.inputSchema.properties.symbols?.description).toContain(
+            `1 to ${AGENT_PRICE_STATS_MAX_SUBJECTS}`
+        );
+        expect(spec.inputSchema.properties.dates?.description).toContain(
+            `Up to ${AGENT_PRICE_STATS_MAX_DATES}`
+        );
+        const ok = (args: Record<string, unknown>) =>
+            validateArgs(spec.inputSchema, args).ok;
+        expect(ok({})).toBe(true);
+        expect(ok({ symbols: ['AAPL'], period: 'ytd' })).toBe(true);
+        expect(ok({ symbols: ['AAPL'], period: 'week' })).toBe(false);
+        expect(ok({ index: 'kospi', period: '10y' })).toBe(true);
+        expect(ok({ index: 'dow' })).toBe(false);
+        expect(ok({ year: 1971 })).toBe(true);
+        expect(ok({ year: 2100 })).toBe(true);
+        expect(ok({ year: 1970 })).toBe(false);
+        expect(ok({ year: 2101 })).toBe(false);
+        expect(ok({ year: 2022.5 })).toBe(false);
+        expect(ok({ from: '2026-03-02', to: '2026-06-30' })).toBe(true);
+        expect(ok({ dates: ['2026-07-03'] })).toBe(true);
+        expect(ok({ dates: 'x' })).toBe(false);
+        expect(ok({ metrics: ['cagr'] })).toBe(false);
+    });
+
+    it('get_price_stats 설명은 창 규칙·결과 필드·상태·notes·재계산 금지를 담고 상수에서 숫자를 읽는다', () => {
+        const d = findToolSpec('get_price_stats')?.description ?? '';
+        for (const term of [
+            'price only: split-adjusted, dividends not included',
+            `up to ${AGENT_PRICE_STATS_MAX_SUBJECTS} subjects at once`,
+            `${AGENT_PRICE_STATS_PERIODS.join(', ')}; default ${AGENT_PRICE_STATS_DEFAULT_PERIOD}`,
+            '`from` beats `year` beats `period`',
+            'It starts at the close of the last session on or before its start date',
+            "ytd and a calendar year: the previous year's last close",
+            '1m: the same date a month before the last session',
+            'baseDate, baseClose, endDate, endClose, sessions, calendarDays',
+            `given only for a window longer than ${PRICE_STATS_CAGR_ABOVE_DAYS} calendar days, so null for ytd, a calendar year and any period of a year or less`,
+            'highestClose and lowestClose',
+            'fromHighestClosePct',
+            'recoveredDate: the first close back at or above that peak up to endDate, null when there is none',
+            'measured from baseClose on',
+            'null when no close fell below an earlier one',
+            'previous_session: no session that day, the close is from the last session before it',
+            "before_history: SIGLENS's history starts later",
+            'after_last_close: the data has no close for that date yet, which is not the same as no session',
+            'unusable_price or no_price_data: no close is available',
+            'Only `dates` (no window argument) returns just those closes',
+            'one entry per pair',
+            'null with too few shared sessions or when one series is flat',
+            'follow them',
+            'never recompute a return, an annual rate, a drawdown or a correlation yourself',
+            'for the intraday 52-week high or low use get_bars_indicators when it is available',
+            "When get_bars_indicators is available and no session is in progress, the 1-, 3- and 12-month returns equal its calendarChange; while one is, calendarChange runs to the live price and these end at the last completed close, so name each figure's dates.",
+            'found false with error stale_listing (with lastTradeDate): that listing has not traded recently',
+            'never present its old closes as current',
+            'for max or a start before the history, from baseDate on',
+            'or the fall rounds to 0.00%',
+            "(a calendar year: that year's last session; with `to`: the last session on or before it)",
+            'describe a coefficient by its strength and sign only (e.g. weak, moderate or strong positive), never as a share of days moving together, and never give a reason for it or a forecast',
+            'found false: no price history for that subject',
+            'reason provider_failed: it could not be loaded, say so',
+            'Error invalid_args names the argument to fix',
+        ])
+            expect(d).toContain(term);
+        // The exchange-local date is the executor's input, never a model argument.
+        expect(d).not.toContain('today');
+    });
+
+    it('get_price_stats 설명이 부르는 notes는 결과 모듈의 문구 목록에 있는 상태·기준만 말한다', () => {
+        const d = findToolSpec('get_price_stats')?.description ?? '';
+        const statuses = [
+            'exact',
+            'previous_session',
+            'before_history',
+            'after_last_close',
+            'unusable_price',
+            'no_price_data',
+        ];
+        for (const status of statuses) expect(d).toContain(status);
+        // Every status the note texts name is one the description defines.
+        const noteTexts = [
+            PRICE_STATS_NOTE_TEMPLATES.datesPreviousSession('X', ['a']),
+            PRICE_STATS_NOTE_TEMPLATES.datesBeforeHistory('X', ['a'], 'b'),
+            PRICE_STATS_NOTE_TEMPLATES.datesAfterLastClose('X', ['a'], 'b'),
+            PRICE_STATS_NOTE_TEMPLATES.datesNoPriceData('X', ['a']),
+            PRICE_STATS_NOTE_TEMPLATES.datesUnusablePrice('X', ['a']),
+        ];
+        for (const text of noteTexts)
+            expect(statuses.some(status => text.includes(status))).toBe(true);
+    });
+
+    it('get_price_stats 설명이 인용하는 필드와 결과가 내는 필드는 서로 일치한다', () => {
+        const DAY_MS = 86_400_000;
+        const start = Date.UTC(2025, 0, 1);
+        const days = Array.from(
+            { length: 640 },
+            (_, i) => new Date(start + i * DAY_MS)
+        ).filter(d => d.getUTCDay() !== 0 && d.getUTCDay() !== 6);
+        // Two different waves on a rising trend: a drawdown, a window over a
+        // year (cagrPct non-null) and returns that are not perfectly aligned.
+        const subject = (
+            label: string,
+            wave: number
+        ): PriceStatsSubjectInput => ({
+            label,
+            closes: days.map((d, i) => ({
+                date: d.toISOString().slice(0, 10),
+                close: 100 + 20 * Math.sin(i / wave) + i / 10,
+            })),
+            market: 'us',
+            alwaysOpen: false,
+            sessionInProgress: false,
+            today: '2026-09-30',
+        });
+        const result = computePriceStats(
+            [subject('AAA', 9), subject('BBB', 13)],
+            {
+                window: { kind: 'period', period: 'max' },
+                // A Saturday inside the history: a previous_session close and a note.
+                dates: ['2025-03-01'],
+                ignored: [],
+            }
+        );
+        const keysOf = (value: unknown): string[] =>
+            Array.isArray(value)
+                ? value.flatMap(keysOf)
+                : typeof value === 'object' && value !== null
+                  ? Object.entries(value).flatMap(([k, v]) => [k, ...keysOf(v)])
+                  : [];
+        const emitted = new Set(keysOf(result));
+        const d = findToolSpec('get_price_stats')?.description ?? '';
+        const quoted = [
+            'asOf',
+            'window',
+            'subjects',
+            'correlation',
+            'notes',
+            'subject',
+            'baseDate',
+            'baseClose',
+            'endDate',
+            'endClose',
+            'sessions',
+            'calendarDays',
+            'returnPct',
+            'cagrPct',
+            'highestClose',
+            'lowestClose',
+            'date',
+            'close',
+            'fromHighestClosePct',
+            'maxDrawdown',
+            'pct',
+            'peakDate',
+            'peakClose',
+            'troughDate',
+            'troughClose',
+            'recoveredDate',
+            'closes',
+            'requestedDate',
+            'status',
+            'summary',
+            'daily',
+            'weekly',
+            'coefficient',
+            'observations',
+            'from',
+            'to',
+        ];
+        // (a) every field the description quotes is emitted by this fixture.
+        expect(quoted.filter(name => !emitted.has(name))).toEqual([]);
+        // (b) every field the result emits is described, except the keys
+        // listed here on purpose. `kind`/`period`/`year` echo the request
+        // (the `window` of the result is "the request as understood"); the
+        // model passes those arguments, so they need no field description.
+        const NOT_DESCRIBED = new Set(['kind', 'period']);
+        const undescribed = [...emitted].filter(
+            name => !NOT_DESCRIBED.has(name) && !d.includes(name)
+        );
+        expect(undescribed).toEqual([]);
+        // The description names each quoted field too (a rename must reach it).
+        expect(quoted.filter(name => !d.includes(name))).toEqual([]);
+    });
+
+    it('get_bars_indicators 설명은 1·3·12개월 밖의 기간을 get_price_stats로 넘기고 그 트리거는 그대로 둔다', () => {
+        const d = findToolSpec('get_bars_indicators')?.description ?? '';
+        expect(d).toContain(
+            "quote it with its baseDate for '1개월/3개월/1년/작년 이맘때' questions (for any other period, a calendar year or since a date use get_price_stats when it is available);"
+        );
+        expect(
+            d.split('use get_price_stats when it is available')
+        ).toHaveLength(2);
     });
 
     describe('new tool output contracts', () => {

@@ -30,9 +30,13 @@ import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
  *   holder wording (system prompt 55,576 -> 55,861; tool specs 65,879 ->
  *   66,046; longest description `get_fundamentals` 7,127 -> 7,191, so its
  *   limit goes 7,150 -> 7,500 and the tool specs budget 66,000 -> 66,500).
+ * - 2026-11-21 (WP-09 core-2): the `get_price_stats` tool, its routing row
+ *   with the swings and index tails, the chart and index mirror sentences, the
+ *   guest-line clause and the computed-figures field list (system prompt
+ *   55,861 -> 57,798 chars; tool specs 66,104 -> 71,615 chars of JSON; longest description `get_bars_indicators` 7,002 -> 7,262, above `get_fundamentals` 7,191).
  */
-const SYSTEM_PROMPT_CHAR_BUDGET = 56_000;
-const TOOL_SPECS_JSON_CHAR_BUDGET = 66_500;
+const SYSTEM_PROMPT_CHAR_BUDGET = 58_000;
+const TOOL_SPECS_JSON_CHAR_BUDGET = 72_000;
 const TOOL_DESCRIPTION_MAX_CHARS = 7_500;
 const FLOOR_SLACK = 2_000;
 
