@@ -456,17 +456,29 @@ const CANDLE_PATTERNS_HEADER = '## Detected Candle Patterns (computed)';
  * edge over matched random dates on daily bars (SIGLENS's own measurement), so the
  * prompt says descriptive.
  */
-const CANDLE_PATTERNS_DEFINITION = [
-    `Candle formations of the most recent bars, computed from the bars above. Hammer, hanging man, inverted hammer, shooting star, dragonfly and gravestone doji, belt holds and every multi-candle pattern are printed only after the prior move their definition requires (at least ${CANDLE_PRIOR_TREND_MIN_ATR.toFixed(1)} ATR over the ${CANDLE_PRIOR_TREND_BARS} bars before the pattern's first bar), and the line states that move.`,
-    "Descriptive only: on daily bars, candle labels showed no forward edge over matched random dates in SIGLENS's own measurement.",
-].join(' ');
+const CANDLE_PATTERNS_DEFINITION = `Candle formations of the most recent bars, computed from the bars above. Hammer, hanging man, inverted hammer, shooting star, dragonfly and gravestone doji, belt holds and every multi-candle pattern are printed only after the prior move their definition requires (at least ${CANDLE_PRIOR_TREND_MIN_ATR.toFixed(1)} ATR over the ${CANDLE_PRIOR_TREND_BARS} bars before the pattern's first bar), and the line states that move.`;
+
+/**
+ * The measurement behind the reliability line covered daily bars of stocks and
+ * ETFs (US and KR). Other timeframes and crypto were not measured, so the
+ * claim is not printed for them (DOM-12): only the definition is.
+ */
+const CANDLE_PATTERNS_RELIABILITY =
+    "Descriptive only: on daily bars, candle labels showed no forward edge over matched random dates in SIGLENS's own measurement.";
+
+const isCandleReliabilityMeasured = (
+    timeframe: Timeframe,
+    assetClass: AssetClass
+): boolean => timeframe === '1Day' && assetClass === 'equity';
 
 const formatRecentBarsSection = (
     bars: Bar[],
     recentBarsCount: number,
     candleEntries: CandlePatternEntry[],
     quoting: PriceQuoting,
-    atrSeries: readonly (number | null)[]
+    atrSeries: readonly (number | null)[],
+    timeframe: Timeframe,
+    assetClass: AssetClass
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -495,7 +507,9 @@ const formatRecentBarsSection = (
         ...(patternEntries.length > 0
             ? [
                   CANDLE_PATTERNS_HEADER,
-                  CANDLE_PATTERNS_DEFINITION,
+                  isCandleReliabilityMeasured(timeframe, assetClass)
+                      ? `${CANDLE_PATTERNS_DEFINITION} ${CANDLE_PATTERNS_RELIABILITY}`
+                      : CANDLE_PATTERNS_DEFINITION,
                   ...patternEntries.map(formatPatternEntry),
               ]
             : []),
@@ -2772,7 +2786,9 @@ export function buildAnalysisPrompt(
             config.recentBarsCount,
             candleEntries,
             quoting,
-            indicators.atr
+            indicators.atr,
+            timeframe,
+            assetClass
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),

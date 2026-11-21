@@ -77,6 +77,7 @@ import {
     TEST_BAR_INTERVAL,
 } from '@/__tests__/fixtures/candle';
 import type {
+    AssetClass,
     Bar,
     FearGreedSnapshot,
     IndicatorResult,
@@ -87,6 +88,7 @@ import type {
     SkillUsageRole,
     SMCResult,
     SqueezeMomentumResult,
+    Timeframe,
 } from '@/domain/types';
 import type { PriceQuoting } from '@/domain/analysis/promptFormat';
 import { US_EQUITY_SESSION } from '@/domain/session';
@@ -2498,13 +2500,20 @@ describe('prompt', () => {
             ...makeTrendLead('advance', bars[0].open + gap),
             ...bars,
         ];
-        const buildWith = (bars: Bar[]): string =>
+        const buildWith = (
+            bars: Bar[],
+            timeframe: Timeframe = '1Day',
+            assetClass: AssetClass = 'equity'
+        ): string =>
             buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
                 bars,
                 makeIndicators(),
-                []
+                [],
+                timeframe,
+                undefined,
+                assetClass
             );
         /** `## Detected Candle Patterns` 섹션 본문(다음 `## ` 제목 전까지). */
         const patternSection = (prompt: string): string =>
@@ -2657,6 +2666,38 @@ describe('prompt', () => {
             expect(section).toContain(
                 "Descriptive only: on daily bars, candle labels showed no forward edge over matched random dates in SIGLENS's own measurement."
             );
+        });
+
+        describe('신뢰도 문장은 측정한 범위에만 붙는다', () => {
+            const RELIABILITY = 'Descriptive only: on daily bars';
+            const bars = afterDecline([hammerBar()], LEAD_GAP);
+
+            it('일봉 주식·ETF에는 정의와 함께 붙는다', () => {
+                expect(
+                    patternSection(buildWith(bars, '1Day', 'equity'))
+                ).toContain(RELIABILITY);
+            });
+
+            it.each(['5Min', '15Min', '30Min', '1Hour', '4Hour'] as const)(
+                '%s 봉에는 정의만 붙고 신뢰도 문장은 없다',
+                timeframe => {
+                    const section = patternSection(buildWith(bars, timeframe));
+                    expect(section).toContain(
+                        'Candle formations of the most recent bars'
+                    );
+                    expect(section).not.toContain('Descriptive only');
+                }
+            );
+
+            it('암호화폐 일봉(측정하지 않음)에는 정의만 붙는다', () => {
+                const section = patternSection(
+                    buildWith(bars, '1Day', 'crypto')
+                );
+                expect(section).toContain(
+                    'Candle formations of the most recent bars'
+                );
+                expect(section).not.toContain('Descriptive only');
+            });
         });
 
         it('감지된 패턴이 없으면 섹션이 없다', () => {

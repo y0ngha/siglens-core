@@ -994,8 +994,9 @@ detectCandlePatternEntries(bars: Bar[], options?: { atr?: readonly (number | nul
 - 프롬프트 `## Recent Bar Data` 행의 라벨은 행마다 같은 맥락 판정을 쓴다(꼭대기에서 `[망치형]`이 찍히지
   않는다). `## Detected Candle Patterns (computed)`의 줄은 맥락으로 이름 붙은 패턴에 근거를 덧붙인다:
   `... [trend: bullish] (after a decline of 2.4 ATR over the 10 bars before it)`. 모양만으로 정해지는
-  패턴(마루보주 등)에는 붙이지 않는다. 머리말은 정의(문턱 상수에서 만든다)와 "Descriptive only: on daily bars, candle
-  labels showed no forward edge over matched random dates in SIGLENS's own measurement."를 말한다.
+  패턴(마루보주 등)에는 붙이지 않는다. 머리말은 정의(문턱 상수에서 만든다)를 말하고, 측정한 범위(일봉 주식·ETF, `1Day` + `equity`)에서만
+  "Descriptive only: on daily bars, candle labels showed no forward edge over matched random dates in
+  SIGLENS's own measurement."를 덧붙인다. 분봉·시간봉과 암호화폐는 측정하지 않았으므로 정의만 나간다.
   `collectDetectedCandleNames`(스킬 게이팅)는 그대로이고, 감지가 줄면 주입되는 캔들 가이드도 준다.
 
 ### 다봉 > 단봉 우선순위
