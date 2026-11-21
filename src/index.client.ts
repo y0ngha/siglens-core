@@ -645,6 +645,7 @@ export type {
     SignalPhase,
     ConfirmedSignalType,
     ExpectedSignalType,
+    TrendBasis,
     TrendState,
     Trend,
     RiskLevel,

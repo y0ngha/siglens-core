@@ -1251,7 +1251,8 @@ interface ActionRecommendation {
 
 interface AnalysisResponse {
     summary: string;
-    trend: Trend;
+    trend: Trend;                   // 계산값: EMA20의 20봉 변화(ATR 단위)와 종가 위치로 결정. 측정 불가일 때만 모델 값 유지
+    trendBasis?: TrendBasis;        // trend를 결정한 근거 { slopeAtr, lookbackBars, emaPeriod }. 측정 불가·이전 캐시에는 없음
     indicatorResults: IndicatorGuideResult[]; // indicator_guide skill 기반 신호 (indicatorName별 그룹핑) — "보조지표" 섹션에 렌더링
     riskLevel: RiskLevel;
     keyLevels: KeyLevels;
@@ -1278,7 +1279,7 @@ interface AnalysisResponse {
 `lockedInfoDepth`를 보고 잠금 표시를 렌더링할 수 있다. 기본 매핑은 다음과 같다.
 
 ```
-direction       → trend
+direction       → trend, trendBasis
 summary         → summary
 partial_detail  → indicatorResults, riskLevel, keyLevels, candlePatterns
 full_detail     → patternSummaries, strategyResults, trendlines,
@@ -1299,6 +1300,14 @@ confidence      → patternSummaries[].confidenceWeight,
 indicatorResults[]  indicator_guide skill의 시그널 결과
                     indicatorName으로 그룹핑 (예: "RSI Signal Guide")
                     → consumer가 "보조지표" 섹션으로 렌더링하도록 의도됨
+
+trend               계산값(모델의 선택이 아님). `computeAnalysisTrend`: EMA20이 최근 20봉 동안 ATR(14)의
+                    1배 이상 오르고 종가가 EMA20 위면 bullish, 1배 이상 내리고 종가가 EMA20 아래면
+                    bearish, 그 외 neutral. 기울기(ATR 단위)는 소수 둘째 자리로 반올림한 값으로 판정하고
+                    프롬프트에도 그 값을 싣는다. 경계는 기울기에 포함, 종가에는 불포함. 정의는 대시보드의
+                    `classifyTrend`(EMA20 20봉 기울기 3%)와 같은 EMA·같은 기간이고 기울기만 퍼센트 대신 ATR이다
+                    (리플레이 세트 일봉 300번째 봉부터 전 일자에서 92.9% 같은 라벨). `classifyTrend`는 그대로 둔다.
+                    봉이 40개(EMA20 기간 + 룩백) 미만이거나 ATR이 없거나 0 이하·비유한이거나 종가가 양수가 아니거나 지표 배열이 봉과 맞지 않으면 측정 불가라 모델의 값이 남고 `trendBasis`는 없다.
 
 strategyResults[]   strategy skill의 분석 결과
                     strategyName으로 식별 (예: "엘리어트 파동")

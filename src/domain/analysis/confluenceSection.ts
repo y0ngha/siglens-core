@@ -2,6 +2,7 @@ import {
     eventCategoryLabel,
     isCompanyEarningsEvent,
 } from '@/domain/analysis/earningsEvents';
+import { ANALYSIS_TREND_MIN_BARS } from '@/domain/analysis/analysisTrend';
 import { structuralRiskReward } from '@/domain/analysis/planCheck';
 import {
     AT_PRICE_BAR_RANGE_FRACTION,
@@ -10,6 +11,7 @@ import {
 import {
     formatNullableNumber,
     formatQuotedPrice,
+    formatSignedNumber,
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
@@ -28,7 +30,13 @@ import {
     type PullbackReading,
     type PullbackSnapshot,
 } from '@/domain/signals/pullback';
+import {
+    TREND_EMA_PERIOD,
+    TREND_SLOPE_LOOKBACK,
+    TREND_SLOPE_MIN_ATR,
+} from '@/domain/signals/constants';
 import type {
+    AnalysisTrendReading,
     Bar,
     MarketEvent,
     MarketReference,
@@ -514,6 +522,42 @@ function formatRiskReward(
     ];
 }
 
+const TREND_HEADER = '### Trend (computed)';
+
+/**
+ * The computed trend as a prompt block (WP-15 C13). The numbers printed are the ones the
+ * label was decided on, so recomputing the label from the text gives the same label.
+ * Present on every timeframe: the rule is in ATR units and carries no measured claim.
+ *
+ * `reading === null` is the unmeasurable case: the block says so and hands the judgement
+ * back to the model, because an unmeasurable input (short history, no usable ATR or close)
+ * is not evidence of "neutral".
+ */
+function formatTrendBlock(
+    reading: AnalysisTrendReading | null,
+    barCount: number,
+    quoting: PriceQuoting
+): string[] {
+    if (reading === null) {
+        return [
+            TREND_HEADER,
+            `Not measurable: the rule needs at least ${ANALYSIS_TREND_MIN_BARS} bars (EMA${TREND_EMA_PERIOD} ${TREND_SLOPE_LOOKBACK} bars back), a positive ATR(${ATR_DEFAULT_PERIOD}) and a positive close; received ${barCount} bars. Judge the top-level trend yourself.`,
+        ];
+    }
+    const closeVsEma =
+        reading.close > reading.emaLast
+            ? 'above'
+            : reading.close < reading.emaLast
+              ? 'below'
+              : 'equal to';
+    const min = formatNullableNumber(TREND_SLOPE_MIN_ATR, 0);
+    return [
+        TREND_HEADER,
+        `Trend: ${reading.trend}. EMA${TREND_EMA_PERIOD} moved ${formatSignedNumber(reading.slopeAtr)} ATR(${ATR_DEFAULT_PERIOD}) over the last ${TREND_SLOPE_LOOKBACK} bars (from ${formatQuotedPrice(reading.emaFrom, quoting)} to ${formatQuotedPrice(reading.emaLast, quoting)}) and the close ${formatQuotedPrice(reading.close, quoting)} is ${closeVsEma} EMA${TREND_EMA_PERIOD}.`,
+        `Rule: bullish when EMA${TREND_EMA_PERIOD} rose by at least ${min} ATR(${ATR_DEFAULT_PERIOD}) over the last ${TREND_SLOPE_LOOKBACK} bars and the close is above EMA${TREND_EMA_PERIOD}; bearish when it fell by at least ${min} ATR(${ATR_DEFAULT_PERIOD}) and the close is below EMA${TREND_EMA_PERIOD}; otherwise neutral. Copy this value into the top-level "trend" field and state this trend in summary, in the response language's own word for it (do not print the English label there). A longer-term picture that differs (for example a close under MA200) is context for the prose, not a different trend.`,
+    ];
+}
+
 /**
  * @internal
  *
@@ -523,6 +567,10 @@ function formatRiskReward(
  * When the bar history is too short for the detector catalogue to be complete, the section
  * says so explicitly instead of vanishing — a silently absent section reads to the model
  * as "no confluence", which is a different and stronger claim than "not measurable".
+ *
+ * `trend` is `buildAnalysisPrompt`'s one computation of the trend reading: a reading prints
+ * the `### Trend (computed)` block and `null` prints its "not measurable" form. It is required
+ * on purpose: a caller that omitted it would silently leave the model's own trend unframed.
  */
 export function formatDeterministicMetricsSection(
     bars: readonly Bar[],
@@ -530,7 +578,8 @@ export function formatDeterministicMetricsSection(
     reference: MarketReference,
     quoting: PriceQuoting = { dp: 2, krxTick: null },
     events: readonly MarketEvent[] = [],
-    earningsDates?: readonly string[]
+    earningsDates: readonly string[] | undefined,
+    trend: AnalysisTrendReading | null
 ): string {
     const { min, expectedWeight } = CONFLUENCE_PARAMS_BY_TIMEFRAME[timeframe];
     // `exitMin` is deliberately not raised alongside `min` on the daily chart. Raising the
@@ -567,6 +616,7 @@ export function formatDeterministicMetricsSection(
     return [
         DETERMINISTIC_METRICS_HEADER,
         'Computed from the same bars given to you. These are arithmetic facts about this chart — cite them, do not recompute or override them.',
+        ...formatTrendBlock(trend, bars.length, quoting),
         ...confluence,
         ...pullback,
         ...riskReward,

@@ -25,6 +25,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternScreenFailure: null,
         patternArbitration: { kept: [], dropped: [] },
         patternGeometries: new Map(),
+        trend: null,
     })),
 }));
 vi.mock('@/domain/analysis/priceProvenance', async importOriginal => {

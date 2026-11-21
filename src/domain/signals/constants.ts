@@ -46,6 +46,13 @@ export const TREND_SLOPE_LOOKBACK = 20;
 export const TREND_SLOPE_THRESHOLD = 0.03;
 /** @internal EMA period used for trend slope evaluation. */
 export const TREND_EMA_PERIOD = 20;
+/**
+ * @internal Minimum EMA slope over `TREND_SLOPE_LOOKBACK` bars, in ATR(14) units, for the
+ * analysis trend (`computeAnalysisTrend`) to leave `neutral`. The scale-free counterpart
+ * of `TREND_SLOPE_THRESHOLD`; 1.0 was chosen because it reproduces the percent rule on
+ * daily bars, not by agreement with any model label.
+ */
+export const TREND_SLOPE_MIN_ATR = 1.0;
 
 // Golden/Death cross periods: slow period (50) is not in MA_DEFAULT_PERIODS
 /** @internal Fast MA period for golden/death cross detection. */

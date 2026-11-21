@@ -1036,6 +1036,34 @@ export type SignalStrength = 'strong' | 'moderate' | 'weak';
 export type Trend = 'bullish' | 'bearish' | 'neutral';
 
 /**
+ * What the computed analysis trend was decided on: the EMA slope in ATR units, and the
+ * constants it was measured with. Stored next to `AnalysisResponse.trend` so a consumer
+ * can show the basis (a tooltip) instead of re-deriving it.
+ */
+export interface TrendBasis {
+    /** (EMA[last] − EMA[last − lookbackBars]) / ATR(14)[last], rounded to 2 decimals. */
+    slopeAtr: number;
+    /** Bars between the two EMA values compared. */
+    lookbackBars: number;
+    /** Period of the EMA that was compared. */
+    emaPeriod: number;
+}
+
+/**
+ * @internal
+ * The computed analysis trend with the numbers the prompt prints, so the text and the
+ * label can never disagree (see `computeAnalysisTrend`).
+ */
+export interface AnalysisTrendReading {
+    readonly trend: Trend;
+    /** (EMA[last] − EMA[last − lookback]) / ATR(14)[last], rounded to 2 dp; the label is decided on this rounded value. */
+    readonly slopeAtr: number;
+    readonly emaLast: number;
+    readonly emaFrom: number;
+    readonly close: number;
+}
+
+/**
  * Single-bar candle pattern label. See {@link detectCandlePattern}.
  */
 export type CandlePattern =
@@ -1857,8 +1885,15 @@ export interface AnalysisDataAsOf {
 export interface AnalysisResponse {
     /** Korean multi-topic summary; topics separated by `\n`. */
     summary: string;
-    /** Overall directional bias. */
+    /**
+     * Overall directional bias. Computed, not the model's pick: EMA20's 20-bar move in
+     * ATR(14) and the close against EMA20 (see {@link TrendBasis}); the model's value stays
+     * only when that cannot be measured (too little history, no usable ATR or close, misaligned
+     * series; `trendBasis` absent).
+     */
     trend: Trend;
+    /** What `trend` was computed from. Absent when it was not measurable and on entries cached before the field existed. */
+    trendBasis?: TrendBasis;
     /** Per-skill indicator guide interpretations. */
     indicatorResults: IndicatorGuideResult[];
     /** Risk classification. */
@@ -1896,6 +1931,8 @@ export interface FilteredAnalysisResponse {
     summary: string | null;
     /** Overall directional bias, or `null` when the direction fragment is locked. */
     trend: Trend | null;
+    /** What `trend` was computed from, or `null` when the direction fragment is locked. Absent when it was not measurable. */
+    trendBasis?: TrendBasis | null;
     /** Per-skill indicator guide interpretations. */
     indicatorResults: IndicatorGuideResult[] | null;
     /** Risk classification. */
@@ -2062,6 +2099,11 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      * In-process only: a `Map` serialises to `{}` with `JSON.stringify`, so do not put this on a cache entry or queue payload — convert to entries first.
      */
     patternGeometries: ReadonlyMap<string, PatternTargetGeometry | null>;
+    /**
+     * The computed trend this prompt printed in `### Trend (computed)`, or `null` when it could not be measured (the block says so).
+     * Returned so the caller overwrites the model's `trend` with the value the prompt stated, from one computation.
+     */
+    trend: AnalysisTrendReading | null;
 }
 
 /**
@@ -2109,6 +2151,7 @@ export interface AssembledPromptRecord {
 export interface RawAnalysisResponse {
     summary?: unknown;
     trend?: unknown;
+    trendBasis?: unknown;
     indicatorResults?: unknown;
     riskLevel?: unknown;
     keyLevels?: unknown;

@@ -630,3 +630,47 @@ describe('dataAsOf passthrough', () => {
         expect('dataAsOf' in result).toBe(false);
     });
 });
+
+describe('trendBasis tier gating', () => {
+    const trendBasis = { slopeAtr: -1.84, lookbackBars: 20, emaPeriod: 20 };
+
+    it('hands the basis to a tier that sees the direction', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse({ trendBasis }),
+            'free',
+            restrictedConfig
+        );
+
+        expect(
+            expectFilteredResult({ result, lockedInfoDepth: [] }).trend
+        ).toBe('bullish');
+        expect(result.trendBasis).toEqual(trendBasis);
+    });
+
+    it('withholds it (null, like trend) from a tier without the direction depth', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse({ trendBasis }),
+            'free',
+            {
+                ...restrictedConfig,
+                infoDepth: {
+                    ...restrictedConfig.infoDepth,
+                    free: ['summary'],
+                },
+            }
+        );
+
+        expect(result.trend).toBeNull();
+        expect(result.trendBasis).toBeNull();
+    });
+
+    it('omits the key entirely when the source analysis carries none (not measurable, or a pre-field cache entry)', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse(),
+            'free',
+            restrictedConfig
+        );
+
+        expect('trendBasis' in result).toBe(false);
+    });
+});

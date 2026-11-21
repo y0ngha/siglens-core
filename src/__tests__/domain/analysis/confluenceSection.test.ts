@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
     CONFLUENCE_PARAMS_BY_TIMEFRAME,
     DETERMINISTIC_METRICS_HEADER,
-    formatDeterministicMetricsSection,
+    formatDeterministicMetricsSection as formatSection,
     newsDrivenWashoutEvent,
     pullbackEventCaveat,
 } from '@/domain/analysis/confluenceSection';
@@ -18,6 +18,30 @@ import type {
 import type { PriceQuoting } from '@/domain/analysis/promptFormat';
 
 const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
+
+/**
+ * The section as these tests used it before the trend block existed: no computed trend
+ * (`null` prints its "not measurable" form). The trend block has its own tests in
+ * `analysisTrendPrompt.test.ts`.
+ */
+function formatDeterministicMetricsSection(
+    barSeries: readonly Bar[],
+    timeframe: Timeframe,
+    reference: MarketReference,
+    quoting?: PriceQuoting,
+    events?: readonly MarketEvent[],
+    earningsDates?: readonly string[]
+): string {
+    return formatSection(
+        barSeries,
+        timeframe,
+        reference,
+        quoting,
+        events,
+        earningsDates,
+        null
+    );
+}
 
 function bars(count: number, start = 100, step = 0.4): Bar[] {
     return Array.from({ length: count }, (_, i) => {
