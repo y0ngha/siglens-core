@@ -53,14 +53,21 @@ import {
 } from '@/domain/indicators/constants';
 import { isSessionVwapMeaningful } from '@/domain/indicators/vwap';
 import { detectCandlePattern } from '@/domain/analysis/candle';
+import {
+    CANDLE_PRIOR_TREND_BARS,
+    CANDLE_PRIOR_TREND_MIN_ATR,
+    candlePriorMove,
+} from '@/domain/analysis/candle-context';
 import { getCandlePatternLabel } from '@/domain/analysis/candle-labels';
 import {
     getMultiPatternTrend,
     getSinglePatternTrend,
 } from '@/domain/analysis/candle-trend';
 import {
+    candleEntryPriorMove,
     detectCandlePatternEntries,
     getDetectionBars,
+    resolveCandleAtr,
     selectLastCandlePatternEntries,
 } from '@/domain/analysis/candle-detection';
 import { selectSkills } from '@/domain/analysis/selectSkills';
@@ -74,6 +81,8 @@ import type {
     AssetClass,
     Bar,
     CandlePatternEntry,
+    CandlePriorMove,
+    CandlePriorTrend,
     CurrencyCode,
     FearGreedSnapshot,
     HorizonKey,
@@ -259,6 +268,8 @@ interface PromptCandlePatternEntry {
     patternType: CandlePatternEntry['patternType'];
     patternName: string;
     trend: Trend;
+    /** The move before the pattern's first bar, or `null` for a shape-only pattern (no basis clause). */
+    priorMove: CandlePriorMove | null;
 }
 
 // Brevity alias used across the prompt-line templates below.
@@ -365,16 +376,25 @@ const formatLongTermContext = (bars: Bar[], quoting: PriceQuoting): string => {
     ].join('\n');
 };
 
-const formatBarRow = (bar: Bar, quoting: PriceQuoting): string => {
+/**
+ * `prior` is the move before this very bar (`candlePriorMove(bars, index)`), so
+ * the row label agrees with the patterns list: a top never prints `[Hammer]`.
+ */
+const formatBarRow = (
+    bar: Bar,
+    quoting: PriceQuoting,
+    prior: CandlePriorTrend
+): string => {
     const px = (n: number): string => formatQuotedPrice(n, quoting);
     const datetime = formatBarDateTime(bar.time * MS_PER_SECOND);
-    const pattern = detectCandlePattern(bar);
+    const pattern = detectCandlePattern(bar, prior);
     return `[ts:${bar.time}] ${datetime} | O:${px(bar.open)} H:${px(bar.high)} L:${px(bar.low)} C:${px(bar.close)} V:${formatVolume(bar.volume)} [${getCandlePatternLabel(pattern)}]`;
 };
 
 const buildCandlePatternEntries = (
     bars: Bar[],
-    entries: CandlePatternEntry[]
+    entries: CandlePatternEntry[],
+    atr: readonly (number | null)[]
 ): PromptCandlePatternEntry[] => {
     const detectionBars = getDetectionBars(bars);
     const totalBars = detectionBars.length;
@@ -393,11 +413,23 @@ const buildCandlePatternEntries = (
                 entry.patternType === 'single'
                     ? getSinglePatternTrend(entry.singlePattern)
                     : getMultiPatternTrend(entry.multiPattern),
+            priorMove: candleEntryPriorMove(bars, entry, atr),
         }))
         .toSorted(
             (a: PromptCandlePatternEntry, b: PromptCandlePatternEntry) =>
                 b.barsAgo - a.barsAgo
         );
+};
+
+/**
+ * ` (after a decline of 2.4 ATR over the 10 bars before it)`: the basis of a
+ * context-gated pattern (DOM-13). Empty for a shape-only pattern.
+ */
+const formatPriorMoveBasis = (move: CandlePriorMove | null): string => {
+    if (move === null || move.moveAtr === null || move.trend === 'none')
+        return '';
+    const kind = move.trend === 'decline' ? 'a decline' : 'an advance';
+    return ` (after ${kind} of ${Math.abs(move.moveAtr).toFixed(1)} ATR over the ${CANDLE_PRIOR_TREND_BARS} bars before it)`;
 };
 
 /**
@@ -412,14 +444,29 @@ const formatPatternEntry = (entry: PromptCandlePatternEntry): string => {
         entry.barTime === null
             ? ''
             : ` · bar ${formatBarDateTime(entry.barTime * MS_PER_SECOND)}`;
-    return `- [${entry.barsAgo} bars ago${at}] ${entry.patternType === 'single' ? 'Single candle pattern' : 'Multi-candle pattern'}: ${entry.patternName} [trend: ${entry.trend}]`;
+    return `- [${entry.barsAgo} bars ago${at}] ${entry.patternType === 'single' ? 'Single candle pattern' : 'Multi-candle pattern'}: ${entry.patternName} [trend: ${entry.trend}]${formatPriorMoveBasis(entry.priorMove)}`;
 };
+
+const CANDLE_PATTERNS_HEADER = '## Detected Candle Patterns (computed)';
+
+/**
+ * Definition and reliability line under the candle-patterns header. Built from
+ * the detection constants so the text cannot drift from the engine (DOM-9).
+ * The second sentence is the measured claim: candle labels showed no forward
+ * edge over matched random dates on daily bars (SIGLENS's own measurement), so the
+ * prompt says descriptive.
+ */
+const CANDLE_PATTERNS_DEFINITION = [
+    `Candle formations of the most recent bars, computed from the bars above. Hammer, hanging man, inverted hammer, shooting star, dragonfly and gravestone doji, belt holds and every multi-candle pattern are printed only after the prior move their definition requires (at least ${CANDLE_PRIOR_TREND_MIN_ATR.toFixed(1)} ATR over the ${CANDLE_PRIOR_TREND_BARS} bars before the pattern's first bar), and the line states that move.`,
+    "Descriptive only: on daily bars, candle labels showed no forward edge over matched random dates in SIGLENS's own measurement.",
+].join(' ');
 
 const formatRecentBarsSection = (
     bars: Bar[],
     recentBarsCount: number,
     candleEntries: CandlePatternEntry[],
-    quoting: PriceQuoting
+    quoting: PriceQuoting,
+    atrSeries: readonly (number | null)[]
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -427,16 +474,28 @@ const formatRecentBarsSection = (
         return ['## Recent Bar Data', '- No data available'].join('\n');
     }
 
-    const patternEntries = buildCandlePatternEntries(bars, candleEntries);
+    const candleAtr = resolveCandleAtr(bars, atrSeries);
+    const firstRecentIndex = bars.length - recentBars.length;
+    const patternEntries = buildCandlePatternEntries(
+        bars,
+        candleEntries,
+        candleAtr
+    );
 
     return [
         `## Recent Bar Data (Last ${recentBars.length} bars)`,
         'Format: Date/Time(UTC) | O:Open H:High L:Low C:Close V:Volume [CandlePattern]',
-        ...recentBars.map(bar => formatBarRow(bar, quoting)),
+        ...recentBars.map((bar, i) =>
+            formatBarRow(
+                bar,
+                quoting,
+                candlePriorMove(bars, firstRecentIndex + i, candleAtr).trend
+            )
+        ),
         ...(patternEntries.length > 0
             ? [
-                  `## Detected Candle Patterns (Short-term Trend Signal)`,
-                  'These patterns represent the most recent candle formation and should be interpreted as short-term trend signals.',
+                  CANDLE_PATTERNS_HEADER,
+                  CANDLE_PATTERNS_DEFINITION,
                   ...patternEntries.map(formatPatternEntry),
               ]
             : []),
@@ -2518,7 +2577,9 @@ export function buildAnalysisPrompt(
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
     // detection pass runs a single time per prompt build.
-    const candleEntries = detectCandlePatternEntries(bars);
+    const candleEntries = detectCandlePatternEntries(bars, {
+        atr: indicators.atr,
+    });
 
     // Hoisted this early (ahead of `precision`, which also needs it further
     // down) so both this ATR read and the screener call below happen once.
@@ -2710,7 +2771,8 @@ export function buildAnalysisPrompt(
             bars,
             config.recentBarsCount,
             candleEntries,
-            quoting
+            quoting,
+            indicators.atr
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),

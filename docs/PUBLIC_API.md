@@ -268,7 +268,7 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 **캔들 패턴 (UI/프롬프트에서 사용) (7)**
 | Symbol | Source |
 |---|---|
-| `detectCandlePatternEntries` | `domain/analysis/candle-detection.ts` |
+| `detectCandlePatternEntries(bars, options?: { atr?: readonly (number \| null)[] })` — candle patterns inside the trailing 15-bar window, context-aware: hammer / hanging man and inverted hammer / shooting star are named by the 10-bar move before the bar (at least 1 ATR), not by body colour; dragonfly / gravestone doji and belt holds need that move; every multi-bar pattern needs the move its definition requires, a first-bar body of at least 0.25 ATR (two- and three-bar reversals) and, for tweezers, a confirming close. A pattern needs at least 15 bars before its first bar (the ATR(14) warm-up), so a short series returns fewer entries. `options.atr` is the ATR(14) series aligned with `bars`; it is used only when its length equals `bars.length`, otherwise the ATR is calculated from `bars`. Returns `CandlePatternEntry[]` in ascending `barIndex`. | `domain/analysis/candle-detection.ts` |
 | `getDetectionBars` | `domain/analysis/candle-detection.ts` |
 | `selectLastCandlePatternEntries` | `domain/analysis/candle-detection.ts` |
 | `getCandlePatternLabel` | `domain/analysis/candle-labels.ts` |

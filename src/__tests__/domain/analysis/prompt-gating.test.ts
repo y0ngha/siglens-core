@@ -178,8 +178,20 @@ describe('buildAnalysisPrompt gating (chart only)', () => {
     });
 
     it('candle-gated skill loads only when that candle is detected', () => {
-        // Construct a clear bullish engulfing as the last formation.
-        const base = makeBars(40, 100);
+        // Construct a clear bullish engulfing as the last formation, after a
+        // decline (a bullish engulfing needs the prior 10-bar move to be down).
+        const base = makeBars(40, 100).map((bar, i) => {
+            const close = 200 - 2 * i;
+            // The bar before the engulfing pair closes up (opens below its close) so
+            // the last four bars are not a bearish three-line strike (4 bars outrank 2).
+            return {
+                ...bar,
+                open: i === 37 ? close - 0.5 : close + 0.5,
+                high: close + 1,
+                low: close - 1,
+                close,
+            };
+        });
         const bars: Bar[] = [
             ...base.slice(0, 38),
             { ...base[38], open: 120, high: 121, low: 110, close: 111 },

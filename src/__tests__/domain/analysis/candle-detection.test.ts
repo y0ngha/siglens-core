@@ -6,6 +6,7 @@ import type {
 } from '@/domain/types';
 import {
     CANDLE_PATTERN_DETECTION_BARS,
+    candleEntryPriorMove,
     detectCandlePatternEntries,
     getDetectionBars,
     MULTI_CANDLE_PATTERN_BUFFER,
@@ -15,11 +16,24 @@ import {
     makeBar,
     makeEngulfingPair,
     makeHammerBar,
+    makeTrendLead,
+    TREND_LEAD_BARS,
 } from '@/__tests__/fixtures/candle';
+import {
+    CANDLE_PRIOR_TREND_BARS,
+    CANDLE_PRIOR_TREND_MIN_ATR,
+    candlePriorMove,
+} from '@/domain/analysis/candle-context';
+import { calculateATR } from '@/domain/indicators/atr';
+import { chartFixture } from '@/__tests__/domain/patterns/fixtures/chartFixture';
+import hangingManChart from '@/__tests__/fixtures/charts/candle-hanging-man-after-advance.json';
 import type { Bar } from '@/domain/types';
 
 describe('candle-detection', () => {
     describe('detectCandlePatternEntries', () => {
+        // 리드가 망치 봉 시가보다 낮게 끝나야 망치 봉이 직전 리드 봉을 감싸는 장악형이 되지 않는다.
+        const HAMMER_END_CLOSE = 90;
+
         describe('bars가 비어있을 때', () => {
             it('빈 배열을 반환한다', () => {
                 const result: CandlePatternEntry[] = detectCandlePatternEntries(
@@ -30,36 +44,61 @@ describe('candle-detection', () => {
         });
 
         describe('bars가 CANDLE_PATTERN_DETECTION_BARS보다 적을 때', () => {
-            it('가용한 bars에서 패턴을 감지한다', () => {
+            it('직전 움직임을 잴 봉이 없으면 맥락이 필요한 단봉은 감지하지 않는다', () => {
                 const bars: Bar[] = [makeHammerBar(0)];
-                const result: CandlePatternEntry[] =
-                    detectCandlePatternEntries(bars);
-                expect(result.length).toBeGreaterThanOrEqual(1);
-                expect(result[0].patternType).toBe('single');
-                expect(result[0].singlePattern).toBe('hammer');
+                expect(detectCandlePatternEntries(bars)).toEqual([]);
+            });
+
+            it('창보다 긴 bars라도 하락 리드 뒤라면 창 안의 hammer를 감지한다', () => {
+                const bars: Bar[] = [
+                    ...makeTrendLead('decline', HAMMER_END_CLOSE),
+                    makeHammerBar(0),
+                ];
+                const result = detectCandlePatternEntries(bars);
+                expect(result).toEqual([
+                    {
+                        barIndex: CANDLE_PATTERN_DETECTION_BARS - 1,
+                        patternType: 'single',
+                        singlePattern: 'hammer',
+                        multiPattern: null,
+                    },
+                ]);
             });
         });
 
         describe('단봉 패턴만 존재할 때', () => {
-            it('단봉 패턴 엔트리를 반환한다', () => {
-                const normalBars: Bar[] = Array.from(
-                    { length: CANDLE_PATTERN_DETECTION_BARS },
-                    (_, i) => makeBar(i)
-                );
-                // Replace last bar with a hammer
-                const bars: Bar[] = [
-                    ...normalBars.slice(0, -1),
-                    makeHammerBar(CANDLE_PATTERN_DETECTION_BARS - 1),
-                ];
-                const result: CandlePatternEntry[] =
-                    detectCandlePatternEntries(bars);
+            const lead = makeTrendLead('decline', HAMMER_END_CLOSE);
+            const lastIndex = CANDLE_PATTERN_DETECTION_BARS - 1;
 
-                const hammerEntry = result.find(
+            it('하락 뒤의 긴 아래꼬리 봉은 몸통 색과 무관하게 hammer 엔트리다', () => {
+                const bars: Bar[] = [...lead, makeHammerBar(0)];
+                const hammerEntry = detectCandlePatternEntries(bars).find(
                     e => e.singlePattern === 'hammer'
                 );
-                expect(hammerEntry).toBeDefined();
-                expect(hammerEntry?.patternType).toBe('single');
-                expect(hammerEntry?.multiPattern).toBeNull();
+                expect(hammerEntry).toEqual({
+                    barIndex: lastIndex,
+                    patternType: 'single',
+                    singlePattern: 'hammer',
+                    multiPattern: null,
+                });
+            });
+
+            it('상승 뒤의 같은 봉은 hanging_man 엔트리다', () => {
+                const bars: Bar[] = [
+                    ...makeTrendLead('advance', HAMMER_END_CLOSE),
+                    makeHammerBar(0),
+                ];
+                expect(
+                    detectCandlePatternEntries(bars).map(e => e.singlePattern)
+                ).toEqual(['hanging_man']);
+            });
+
+            it('직전 움직임이 없으면 같은 봉은 엔트리가 아니다', () => {
+                const bars: Bar[] = [
+                    ...makeTrendLead('none', HAMMER_END_CLOSE),
+                    makeHammerBar(0),
+                ];
+                expect(detectCandlePatternEntries(bars)).toEqual([]);
             });
         });
 
@@ -84,22 +123,20 @@ describe('candle-detection', () => {
         });
 
         describe('barIndex 정렬', () => {
-            it('barIndex 오름차순으로 정렬된다', () => {
-                const bars: Bar[] = Array.from(
-                    {
-                        length:
-                            CANDLE_PATTERN_DETECTION_BARS +
-                            MULTI_CANDLE_PATTERN_BUFFER,
-                    },
-                    (_, i) => makeHammerBar(i)
-                );
+            it('단봉과 다봉이 섞여도 barIndex 오름차순으로 정렬된다', () => {
+                const [bearish, bullish] = makeEngulfingPair(0);
+                const bars: Bar[] = [
+                    ...makeTrendLead('decline', bearish.open),
+                    bearish,
+                    bullish,
+                    makeBar(0, { open: 118, high: 119, low: 100, close: 119 }),
+                    makeHammerBar(0),
+                ];
                 const result: CandlePatternEntry[] =
                     detectCandlePatternEntries(bars);
                 const indices: number[] = result.map(e => e.barIndex);
-                const sortedIndices: number[] = [...indices].sort(
-                    (a, b) => a - b
-                );
-                expect(indices).toEqual(sortedIndices);
+                expect(indices.length).toBeGreaterThanOrEqual(2);
+                expect(indices).toEqual([...indices].sort((a, b) => a - b));
             });
         });
 
@@ -110,28 +147,24 @@ describe('candle-detection', () => {
         });
 
         describe('창 시작 부근의 5봉 패턴', () => {
-            it('버퍼 봉 4개와 창 첫 봉으로 이루어진 rising_three_methods를 barIndex 0에서 감지하고 그 봉의 단봉 라벨(bullish_belt_hold)은 억제한다', () => {
-                // extended index 0–3 = buffer, 4 = detection window start
-                const pattern: Bar[] = [
-                    makeBar(0, { open: 100, high: 111, low: 99, close: 110 }),
-                    makeBar(1, { open: 109, high: 110, low: 106, close: 107 }),
-                    makeBar(2, { open: 107, high: 108, low: 104, close: 105 }),
-                    makeBar(3, { open: 105, high: 106, low: 102, close: 103 }),
-                    makeBar(4, {
-                        open: 102.5,
-                        high: 116,
-                        low: 102,
-                        close: 115,
-                    }),
+            const pattern: Bar[] = [
+                makeBar(0, { open: 100, high: 111, low: 99, close: 110 }),
+                makeBar(1, { open: 109, high: 110, low: 106, close: 107 }),
+                makeBar(2, { open: 107, high: 108, low: 104, close: 105 }),
+                makeBar(3, { open: 105, high: 106, low: 102, close: 103 }),
+                makeBar(4, { open: 102.5, high: 116, low: 102, close: 115 }),
+            ];
+            const rest: Bar[] = Array.from(
+                { length: CANDLE_PATTERN_DETECTION_BARS - 1 },
+                (_, i) => makeBar(5 + i)
+            );
+
+            it('버퍼 봉 4개와 창 첫 봉으로 이루어진 rising_three_methods를 barIndex 0에서 감지하고 그 봉의 단봉 라벨(bearish_marubozu가 아닌 bullish_belt_hold 모양)은 억제한다', () => {
+                const bars = [
+                    ...makeTrendLead('advance', pattern[0].open),
+                    ...pattern,
+                    ...rest,
                 ];
-                const rest: Bar[] = Array.from(
-                    { length: CANDLE_PATTERN_DETECTION_BARS - 1 },
-                    (_, i) => makeHammerBar(5 + i)
-                );
-                const bars = [...pattern, ...rest];
-                expect(bars).toHaveLength(
-                    CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER
-                );
 
                 const result = detectCandlePatternEntries(bars);
 
@@ -147,6 +180,24 @@ describe('candle-detection', () => {
                     )
                 ).toEqual([]);
             });
+
+            it('패턴 첫 봉 앞에 움직임을 잴 봉이 15개 미만이면 감지하지 않는다', () => {
+                const bars = [
+                    ...makeTrendLead(
+                        'advance',
+                        pattern[0].open,
+                        CANDLE_PRIOR_TREND_BARS
+                    ),
+                    ...pattern,
+                    ...rest,
+                ];
+
+                expect(
+                    detectCandlePatternEntries(bars).filter(
+                        e => e.patternType === 'multi'
+                    )
+                ).toEqual([]);
+            });
         });
 
         describe('짧은 몸통 뒤의 stomach 모양', () => {
@@ -154,7 +205,7 @@ describe('candle-detection', () => {
                 // spinning top 두 개(제외 대상) 뒤에 bearish dragonfly doji와
                 // midpoint 위에서 시작하는 bullish belt hold. 느슨한 stomach
                 // 규칙은 이 쌍을 above_the_stomach로 묶어 두 단봉 라벨을 삼켰다.
-                const bars: Bar[] = [
+                const tail: Bar[] = [
                     makeBar(0, { open: 90, high: 92, low: 88, close: 90.5 }),
                     makeBar(1, { open: 94, high: 96, low: 92, close: 94.5 }),
                     makeBar(2, { open: 100.5, high: 101, low: 80, close: 100 }),
@@ -165,16 +216,26 @@ describe('candle-detection', () => {
                         close: 105.5,
                     }),
                 ];
+                // 도지의 큰 range가 ATR을 키우므로 가파른 리드(step 4)로 하락을 확실히 둔다
+                const lead = makeTrendLead(
+                    'decline',
+                    tail[0].open,
+                    TREND_LEAD_BARS,
+                    4
+                );
+                const bars = [...lead, ...tail];
+                const firstTail = bars.length - tail.length;
+                const windowStart = bars.length - CANDLE_PATTERN_DETECTION_BARS;
 
                 expect(detectCandlePatternEntries(bars)).toEqual([
                     {
-                        barIndex: 2,
+                        barIndex: firstTail + 2 - windowStart,
                         patternType: 'single',
                         singlePattern: 'dragonfly_doji',
                         multiPattern: null,
                     },
                     {
-                        barIndex: 3,
+                        barIndex: firstTail + 3 - windowStart,
                         patternType: 'single',
                         singlePattern: 'bullish_belt_hold',
                         multiPattern: null,
@@ -184,71 +245,58 @@ describe('candle-detection', () => {
         });
 
         describe('4봉 패턴의 관여 봉', () => {
-            it('three-line strike의 b1(단봉으로는 bullish_belt_hold)까지 4봉 모두를 단봉에서 제외한다', () => {
-                const normal: Bar[] = Array.from(
-                    { length: CANDLE_PATTERN_DETECTION_BARS - 4 },
-                    (_, i) => makeBar(i)
-                );
-                const start = normal.length;
-                // b1: 아래꼬리 없는 긴 양봉 → 단봉 bullish_belt_hold
-                // b2: b1 몸통 밖에서 시작 → three_white_soldiers 불성립
-                const strike: Bar[] = [
-                    makeBar(start, {
-                        open: 100,
-                        high: 106,
-                        low: 100,
-                        close: 105,
-                    }),
-                    makeBar(start + 1, {
-                        open: 105.5,
-                        high: 111,
-                        low: 104,
-                        close: 110,
-                    }),
-                    makeBar(start + 2, {
-                        open: 109,
-                        high: 116,
-                        low: 108,
-                        close: 115,
-                    }),
-                    makeBar(start + 3, {
-                        open: 116,
-                        high: 117,
-                        low: 97,
-                        close: 98,
-                    }),
-                ];
-                const result = detectCandlePatternEntries([
-                    ...normal,
+            const start = 0;
+            // b4: 몸통이 range의 90%인 음봉 마루보주라 혼자서는 단봉 엔트리가 된다
+            const strike: Bar[] = [
+                makeBar(start, { open: 100, high: 106, low: 99, close: 105 }),
+                makeBar(start + 1, {
+                    open: 104,
+                    high: 111,
+                    low: 103,
+                    close: 110,
+                }),
+                makeBar(start + 2, {
+                    open: 109,
+                    high: 116,
+                    low: 108,
+                    close: 115,
+                }),
+                makeBar(start + 3, {
+                    open: 116,
+                    high: 117,
+                    low: 97,
+                    close: 98,
+                }),
+            ];
+
+            it('three-line strike의 4봉 모두를 단봉에서 제외한다', () => {
+                const bars = [
+                    ...makeTrendLead('advance', strike[0].open),
                     ...strike,
-                ]);
+                ];
+                const result = detectCandlePatternEntries(bars);
                 const lastIndex = CANDLE_PATTERN_DETECTION_BARS - 1;
 
-                expect(result.find(e => e.barIndex === lastIndex)).toEqual({
-                    barIndex: lastIndex,
-                    patternType: 'multi',
-                    singlePattern: null,
-                    multiPattern: 'bullish_three_line_strike',
-                });
-                expect(
-                    result.filter(
-                        e => e.patternType === 'single' && e.barIndex >= start
-                    )
-                ).toEqual([]);
+                expect(result).toEqual([
+                    {
+                        barIndex: lastIndex,
+                        patternType: 'multi',
+                        singlePattern: null,
+                        multiPattern: 'bullish_three_line_strike',
+                    },
+                ]);
             });
         });
 
         describe('다봉 패턴 관련 모든 봉에서 단봉 패턴 제외', () => {
             it('다봉 패턴에 포함된 봉은 단봉 결과에서 제외된다', () => {
-                const totalLength =
-                    CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER;
-                const normalBars: Bar[] = Array.from(
-                    { length: totalLength - 2 },
-                    (_, i) => makeBar(i)
-                );
                 // Place a bullish engulfing pair at the end to guarantee multi-candle detection
-                const [bearish, bullish] = makeEngulfingPair(totalLength - 2);
-                const bars: Bar[] = [...normalBars, bearish, bullish];
+                const [bearish, bullish] = makeEngulfingPair(0);
+                const bars: Bar[] = [
+                    ...makeTrendLead('decline', bearish.open),
+                    bearish,
+                    bullish,
+                ];
 
                 const result: CandlePatternEntry[] =
                     detectCandlePatternEntries(bars);
@@ -269,6 +317,171 @@ describe('candle-detection', () => {
                 multiEntries.forEach(multi => {
                     expect(singleBarIndices.has(multi.barIndex)).toBe(false);
                 });
+            });
+        });
+
+        describe('맥락 규칙에 실패한 다봉 패턴', () => {
+            // 장악형 기하(음봉을 덮는 양봉)이면서 둘째 봉이 모양만으로 마루보주인 쌍
+            const prev = makeBar(0, {
+                open: 110,
+                high: 115,
+                low: 105,
+                close: 106,
+            });
+            const marubozu = makeBar(1, {
+                open: 104,
+                high: 120,
+                low: 104,
+                close: 120,
+            });
+
+            it('하락 뒤에는 bullish_engulfing이 되고 마루보주 단봉은 억제된다', () => {
+                const result = detectCandlePatternEntries([
+                    ...makeTrendLead('decline', prev.open),
+                    prev,
+                    marubozu,
+                ]);
+                expect(result).toEqual([
+                    {
+                        barIndex: CANDLE_PATTERN_DETECTION_BARS - 1,
+                        patternType: 'multi',
+                        singlePattern: null,
+                        multiPattern: 'bullish_engulfing',
+                    },
+                ]);
+            });
+
+            it('움직임이 없으면 다봉은 감지되지 않고 단봉 마루보주는 억제되지 않는다', () => {
+                const result = detectCandlePatternEntries([
+                    ...makeTrendLead('none', prev.open),
+                    prev,
+                    marubozu,
+                ]);
+                expect(result).toEqual([
+                    {
+                        barIndex: CANDLE_PATTERN_DETECTION_BARS - 1,
+                        patternType: 'single',
+                        singlePattern: 'bullish_marubozu',
+                        multiPattern: null,
+                    },
+                ]);
+            });
+        });
+
+        describe('options.atr', () => {
+            const hammerBars: Bar[] = [
+                ...makeTrendLead('decline', HAMMER_END_CLOSE),
+                makeHammerBar(0),
+            ];
+
+            it('bars와 길이가 같으면 그 ATR을 쓴다 (전부 null이면 움직임을 잴 수 없어 감지하지 않는다)', () => {
+                const atr = hammerBars.map(() => null);
+                expect(detectCandlePatternEntries(hammerBars, { atr })).toEqual(
+                    []
+                );
+            });
+
+            it('길이가 다르면 무시하고 bars에서 ATR을 계산한다', () => {
+                const atr = hammerBars.slice(1).map(() => null);
+                expect(
+                    detectCandlePatternEntries(hammerBars, { atr }).map(
+                        e => e.singlePattern
+                    )
+                ).toEqual(['hammer']);
+            });
+
+            it('옵션이 없으면 계산한 ATR과 같은 결과다', () => {
+                expect(
+                    detectCandlePatternEntries(hammerBars, {
+                        atr: calculateATR(hammerBars),
+                    })
+                ).toEqual(detectCandlePatternEntries(hammerBars));
+            });
+        });
+    });
+
+    describe('실제 차트: 상승 뒤 긴 아래꼬리 양봉', () => {
+        // 익명화한 실제 일봉 60개(가격 배율·2001 기준 시간). 마지막 봉은 양봉이고 아래꼬리가 길어
+        // 몸통 색으로 이름 붙이던 엔진은 hammer를 찍었지만, 직전에 크게 올랐으므로 교수형이다.
+        const { bars } = chartFixture(hangingManChart);
+        const lastBar = bars[bars.length - 1];
+        const lastIndex = CANDLE_PATTERN_DETECTION_BARS - 1;
+
+        it('마지막 봉은 양봉이고 아래꼬리가 몸통의 2배 이상이다', () => {
+            const body = lastBar.close - lastBar.open;
+            expect(body).toBeGreaterThan(0);
+            expect(lastBar.open - lastBar.low).toBeGreaterThanOrEqual(2 * body);
+        });
+
+        it('마지막 봉을 hammer가 아니라 hanging_man으로 감지한다', () => {
+            const entries = detectCandlePatternEntries(bars);
+            expect(entries.find(e => e.barIndex === lastIndex)).toEqual({
+                barIndex: lastIndex,
+                patternType: 'single',
+                singlePattern: 'hanging_man',
+                multiPattern: null,
+            });
+            expect(entries.map(e => e.singlePattern)).not.toContain('hammer');
+        });
+
+        it('그 봉 앞의 움직임은 상승이고 근거 크기가 문턱 이상이다', () => {
+            const entries = detectCandlePatternEntries(bars);
+            const [move] = entries
+                .filter(e => e.barIndex === lastIndex)
+                .map(e => candleEntryPriorMove(bars, e));
+            expect(move?.trend).toBe('advance');
+            expect(move?.moveAtr).toBeGreaterThanOrEqual(
+                CANDLE_PRIOR_TREND_MIN_ATR
+            );
+        });
+    });
+
+    describe('candleEntryPriorMove', () => {
+        const hammerBars: Bar[] = [
+            ...makeTrendLead('decline', 90),
+            makeHammerBar(0),
+        ];
+
+        it('맥락으로 이름 붙은 단봉은 그 봉 앞의 움직임을 반환한다', () => {
+            const [entry] = detectCandlePatternEntries(hammerBars);
+            const move = candleEntryPriorMove(hammerBars, entry);
+            expect(move?.trend).toBe('decline');
+            expect(move?.moveAtr).toBeLessThanOrEqual(
+                -CANDLE_PRIOR_TREND_MIN_ATR
+            );
+        });
+
+        it('모양만으로 정해지는 단봉(마루보주)은 null이다', () => {
+            const bars: Bar[] = [
+                ...makeTrendLead('decline', 90),
+                makeBar(0, { open: 100, high: 110, low: 100, close: 110 }),
+            ];
+            const [entry] = detectCandlePatternEntries(bars);
+            expect(entry.singlePattern).toBe('bullish_marubozu');
+            expect(candleEntryPriorMove(bars, entry)).toBeNull();
+        });
+
+        it('다봉은 첫 봉 앞의 움직임을 읽는다 (패턴 봉을 포함하지 않는다)', () => {
+            const [bearish, bullish] = makeEngulfingPair(0);
+            const bars: Bar[] = [
+                ...makeTrendLead('decline', bearish.open),
+                bearish,
+                bullish,
+            ];
+            const [entry] = detectCandlePatternEntries(bars);
+            const atr = calculateATR(bars);
+            const first = bars.length - 2;
+            expect(candleEntryPriorMove(bars, entry)).toEqual(
+                candlePriorMove(bars, first, atr)
+            );
+        });
+
+        it('ATR을 주면 bars와 길이가 같을 때 그 값을 쓴다', () => {
+            const [entry] = detectCandlePatternEntries(hammerBars);
+            const atr = hammerBars.map(() => null);
+            expect(candleEntryPriorMove(hammerBars, entry, atr)).toEqual({
+                trend: 'none',
+                moveAtr: null,
             });
         });
     });
