@@ -25,7 +25,6 @@
  * FileSkillsLoader reads `<cwd>/skills`, so the process changes directory to the parent of
  * `--skills` before core is imported; every path argument is resolved before that.
  */
-import { execFileSync } from 'node:child_process';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { gzipSync } from 'node:zlib';
@@ -37,10 +36,10 @@ import {
 } from './exchangeRecorder';
 import type { RecordedExchange } from './exchangeRecorder';
 import {
-    REPO_ROOT,
     acquireLock,
     assertOutsideRepo,
     fileExists,
+    gitOutput,
     readJson,
     sha256Hex,
     writeFileAtomic,
@@ -721,12 +720,6 @@ async function executeApproved(
 }
 
 // ─── Wiring to core (not exercised by tests: it calls the real provider) ──────
-function gitOutput(args: readonly string[]): string {
-    return execFileSync('git', [...args], {
-        cwd: REPO_ROOT,
-        encoding: 'utf-8',
-    }).trim();
-}
 
 export interface SkillsLoad {
     skills: readonly unknown[];
