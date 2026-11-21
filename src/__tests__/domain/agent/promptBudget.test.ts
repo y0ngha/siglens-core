@@ -34,10 +34,27 @@ import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
  *   with the swings and index tails, the chart and index mirror sentences, the
  *   guest-line clause and the computed-figures field list (system prompt
  *   55,861 -> 57,798 chars; tool specs 66,104 -> 71,615 chars of JSON; longest description `get_bars_indicators` 7,002 -> 7,262, above `get_fundamentals` 7,191).
+ * - 2026-11-21 (WP-09 core-3): the null-handling clauses of
+ *   `get_bars_indicators` and `get_fundamentals` moved into result notes
+ *   (`resultNotes.ts`) and the system prompt gained one `notes` rule (system
+ *   prompt 57,798 -> 57,990 chars; tool specs 71,741 -> 69,870 chars of JSON;
+ *   `get_bars_indicators` 7,262 -> 6,671, `get_fundamentals` 7,191 -> 5,911, so
+ *   the longest description is now `get_bars_indicators` at 6,671 and its limit
+ *   goes 7,500 -> 7,000; the tool specs budget goes 72,000 -> 70,000).
+ * - 2026-11-21 (WP-09 core-3 review round 1): the notes rule now says when to follow a
+ *   note (question-conditioned) and the pullback clause names the short-history
+ *   case, so the system prompt budget goes 58,000 -> 58,500. The owner prefers
+ *   raising a budget to cutting routing text. Measured after the fixes: ko guest
+ *   58,218, en guest 58,727; tool specs 69,987. Both budgets get one 500-char step
+ *   of headroom (system 59,000, tool specs 70,500) so the next small edit is a
+ *   deliberate budget decision, not a forced trim.
+ * - 2026-11-21 (WP-09 core-3 review round 2): the pullback clause names `range.bars`,
+ *   the daily-only note and the notes rule were reworded; measured ko guest 58,297,
+ *   en guest 58,806, tool specs 70,017, `get_bars_indicators` 6,818 (budgets unchanged).
  */
-const SYSTEM_PROMPT_CHAR_BUDGET = 58_000;
-const TOOL_SPECS_JSON_CHAR_BUDGET = 72_000;
-const TOOL_DESCRIPTION_MAX_CHARS = 7_500;
+const SYSTEM_PROMPT_CHAR_BUDGET = 59_000;
+const TOOL_SPECS_JSON_CHAR_BUDGET = 70_500;
+const TOOL_DESCRIPTION_MAX_CHARS = 7_000;
 const FLOOR_SLACK = 2_000;
 
 const guestPrompt = (

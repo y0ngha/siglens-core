@@ -580,6 +580,11 @@ export type {
     PriceStatsWindow,
     PriceStatsWindowRequest,
 } from './domain/agent/priceStats';
+// Server entry only: the executors of get_bars_indicators and get_fundamentals attach these note texts; the browser never builds a tool result.
+export {
+    BARS_RESULT_NOTES,
+    FUNDAMENTALS_RESULT_NOTES,
+} from './domain/agent/resultNotes';
 // Server entry only: the interpretive-fact helpers run in agent tool executors, never in a browser bundle.
 export { tallyEarningsReactions } from './domain/agent/earningsReactionTally';
 export type {

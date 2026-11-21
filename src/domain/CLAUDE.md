@@ -340,6 +340,17 @@ computing derived values, so a recomputation from the rendered text matches.
   ❌ trigger: "what did the CEO say"          // answerable from filings/news
   ✅ trigger: "what did the CEO post on X"    // names the billed venue
   ```
+- A result note (text attached when a field is null) is conditioned on the question, and the
+  system rule says a note about a field the answer does not need is no reason to mention it,
+  search or call a tool; notes attach on null, not on relevance, so an unconditioned "follow
+  the notes" makes every note fire on every result. Notes about the window or dates behind a
+  quoted figure always apply.
+- Moving a clause from a tool description into a note is validated per clause by a live case
+  that triggers it; a clause whose case regresses is restored in the description while the
+  note stays. Re-read every other restatement of the same field's rule for a contradiction.
+- Routing text for a tool that overlaps an existing tool's window names the argument for each
+  common phrasing ("this time last year" maps to `period`, not `from`), so both tools print
+  the same figure.
 - Any change to rendered bytes also bumps the cache version
   (`src/infrastructure/CLAUDE.md#INF-4`).
 
@@ -451,6 +462,12 @@ negative) covers every sign branch the data allows, including the base crossing 
 change that grows the loss; a pair of counters (up/down) is mapped field by field to its
 meaning, never left as prose the model must pair up. Otherwise the model improvises the branch
 the rule skipped, and a "higher" figure on a negative base gets read as good news.
+
+A note or description condition names only fields the executor sees in the result (such as
+`range.bars`), never a count or cause it cannot observe ("too little history to rank", loaded
+bars versus the rows returned). Where the cause is unknown the wording is cause-free, and a
+condition that touches a field another rule already governs (an unconfirmed earnings date:
+search versus do not search) is checked against that rule so the two agree.
 
 ```typescript
 // ❌ 'A positive change means estimates rose.'   // on negative EPS, or across zero?
