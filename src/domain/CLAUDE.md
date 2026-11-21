@@ -284,6 +284,14 @@ computing derived values, so a recomputation from the rendered text matches.
   rules that cannot both hold.
 - Keep internal-only signals (resemblance hints, scoring artifacts) out of the prompt
   instead of instructing the model not to mention them; listed text gets narrated.
+- A tool that returns enum status codes has its description say to describe each in words
+  and never print the code; a description that lists the codes and says "say the status"
+  gets the raw code quoted to the user.
+  ❌ "report the status (no_13f_period)" ✅ "say there is no 13F period yet; never print the status code"
+- A rule that restricts which evidence may explain an outcome (news for a move) is checked
+  against the most common question form, today's in-progress move, not only historical ones.
+- A general guard in a prompt rule is its own sentence ("Either way, ..."), not a clause
+  joined by a semicolon to one branch, which scopes it to that branch.
 - When content is split into stable and dynamic halves, each half reads on its own (a moved
   bullet list keeps a heading).
 - A rule that enumerates markers or values the renderer emits is built from the renderer's
