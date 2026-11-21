@@ -240,6 +240,17 @@ export interface ExtremeZoneEpisodeOptions {
     reentryGap?: number;
 }
 
+/** A move into an extreme zone on one session. Descriptive only — not a forecast. */
+export interface ExtremeZoneEntry {
+    zone: ExtremeFearGreedZone;
+    /** ISO date of the entry session (equals the requested date). */
+    date: string;
+    /** Score on the entry session. Always finite. */
+    score: number;
+    /** Label of the session before the entry (never null: an entry needs a labelled predecessor). */
+    previousLabel: FearGreedLabel;
+}
+
 /** Same-session gap between an instrument score and the market score. */
 export interface FearGreedScoreGap {
     /** ISO date both scores describe. */

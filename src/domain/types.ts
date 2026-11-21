@@ -429,6 +429,7 @@ export type {
     FearGreedLabelTransition,
     ExtremeFearGreedZone,
     ForwardChangeStat,
+    ExtremeZoneEntry,
     ExtremeZoneEpisode,
     ExtremeZoneEpisodeOptions,
     ExtremeZoneEpisodeSummary,

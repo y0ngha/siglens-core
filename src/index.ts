@@ -140,6 +140,7 @@ export {
     EXTREME_ZONE_REENTRY_GAP,
     FEAR_GREED_LABEL_CUTOFFS,
     fearGreedInputs,
+    findExtremeZoneEntryOn,
     MARKET_FEAR_GREED_FACTOR_KEYS,
     MARKET_FEAR_GREED_SERIES_KEYS,
     POC_WINDOW_DEFAULT,
@@ -149,6 +150,7 @@ export {
 } from './domain/indicators';
 export { FEAR_GREED_LOOKBACK_DAYS } from './domain/constants/market';
 export { classifyTrend, detectSignals } from './domain/signals';
+export { detectNewConfirmedSignals } from './domain/signals/newSignals';
 export {
     confluenceFamilyWeight,
     CONFLUENCE_EXIT_MIN,
@@ -1003,6 +1005,7 @@ export type {
     FearGreedSnapshot,
     FearGreedWarning,
     ExtremeFearGreedZone,
+    ExtremeZoneEntry,
     ExtremeZoneEpisode,
     ExtremeZoneEpisodeOptions,
     ExtremeZoneEpisodeSummary,

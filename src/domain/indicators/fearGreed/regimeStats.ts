@@ -3,6 +3,7 @@ import type {
     ExtremeFearGreedZone,
     ExtremeZoneEpisode,
     ExtremeZoneEpisodeOptions,
+    ExtremeZoneEntry,
     ExtremeZoneEpisodeSummary,
     ExtremeZoneOutcome,
     ExtremeZoneOutcomeOptions,
@@ -325,6 +326,59 @@ export function summarizeExtremeZoneEpisodes(
             episodes: episodes.slice().reverse(),
         };
     });
+}
+
+/**
+ * The zone entry that starts an episode on `date`, using exactly the entry rule
+ * of {@link summarizeExtremeZoneEpisodes} (one shared `zoneEntryIndices`): a move
+ * from a different labelled session; a return within `reentryGap` sessions of
+ * the zone's last session is the same episode and is not an entry.
+ *
+ * Returns `null` when `date` is not in the history or appears more than once
+ * (ambiguous), the session carries no
+ * entry (not in an extreme zone, continuing a stay, a quick return, or the
+ * first labelled session after a warm-up gap), or its score is not finite.
+ * Only the entry session itself matches: a stay that began earlier yields
+ * `null` on every later date.
+ *
+ * Descriptive only — a recorded fact about a past session, not a forecast.
+ *
+ * @param history - Score history in chronological order.
+ * @param date - ISO `YYYY-MM-DD` session date to test.
+ * @param options - Optional `reentryGap`; a value that is not a whole number ≥ 0
+ *   falls back to the default (20).
+ * @returns The entry, or `null`.
+ */
+export function findExtremeZoneEntryOn(
+    history: readonly FearGreedReading[],
+    date: string,
+    options: ExtremeZoneEpisodeOptions = {}
+): ExtremeZoneEntry | null {
+    const matches = history.flatMap((p, i) => (p.date === date ? [i] : []));
+    // A date that appears twice is ambiguous (which row is "the" session?), so
+    // it fails closed instead of picking the first match.
+    if (matches.length !== 1) return null;
+    const index = matches[0];
+    const point = history[index];
+    const zone = EXTREME_FEAR_GREED_ZONES.find(z => z === point.label);
+    if (zone === undefined) return null;
+    if (point.score === null || !Number.isFinite(point.score)) return null;
+    // Entries up to `index` depend only on the prefix, so the scan stops there.
+    const entries = zoneEntryIndices(
+        history.slice(0, index + 1),
+        zone,
+        resolveReentryGap(options.reentryGap)
+    );
+    // `zoneEntryIndices` already requires a labelled predecessor; the lookup
+    // here only supplies the value (and narrows it) for the result.
+    const previous = previousLabel(history, index);
+    if (entries[entries.length - 1] !== index || previous === null) return null;
+    return {
+        zone,
+        date: point.date,
+        score: point.score,
+        previousLabel: previous,
+    };
 }
 
 /**

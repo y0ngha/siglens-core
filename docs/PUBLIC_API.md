@@ -135,11 +135,12 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 
 ### Tier 2 — Domain Building Blocks
 
-**통합 계산기/감지기 (3)**
+**통합 계산기/감지기 (4)**
 | Symbol | Source |
 |---|---|
 | `calculateIndicators` | `domain/indicators/index.ts` |
 | `detectSignals` | `domain/signals/index.ts` |
+| `detectNewConfirmedSignals(bars)` — 마지막 봉에서 **새로 시작한** 확정 신호. `detectSignals(bars, calculateIndicators(bars))`의 `phase: 'confirmed'` 신호 중, 같은 계산을 `bars.slice(0, -1)`에 했을 때 같은 `type`의 확정 신호가 없던 것만 감지기 순서대로 돌려준다(하루 한 번 기록하는 쪽의 에피소드 시작 규칙을 봉만으로 계산). 직전 봉에서 이미 켜진 교차(lookback 안)·계속 이어지는 상태 신호·`expected` 신호는 빼고, 끝났다가 마지막 봉에서 다시 시작한 신호는 넣는다. 2봉 미만이면 `[]`. 마지막 봉이 기대한 세션인지는 consumer가 확인한다. 두 entrypoint 모두 export. Returns `readonly Signal[]`. | `domain/signals/newSignals.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
 
 **개별 지표 단독 export (2)** — 통합 계산기와 별개로 소비자가 직접 쓰도록 노출한 순수 함수. `calculateMA`는 서버 entry 전용, `calculateIchimokuFutureCloud`는 양 entrypoint.
@@ -174,6 +175,7 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | `computeLabelTransitions(history, limit)` — 인접한 두 세션의 라벨이 바뀐 지점 목록(최신순, 최대 `limit`개). 라벨 공백(`null`)은 사슬을 끊는다. Returns `FearGreedLabelTransition[]`. | `domain/indicators/fearGreed/regimeStats.ts` |
 | `summarizeExtremeZoneOutcomes(history, bars, options?)` — **@deprecated**: `summarizeExtremeZoneEpisodes`를 쓴다. 하위 호환을 위해 남기며 다음 major에서 제거한다. 극단 구간(`EXTREME_FEAR`·`EXTREME_GREED`)별 진입 횟수와 진입 후 N거래일(기본 5·20·60) 종가 변화율의 **중앙값·표본 수**. 표본이 `minSample`(기본 5) 미만이면 중앙값을 `null`로 숨기고, 같은 구간에 `reentryGap`(기본 20)세션 안에 다시 들어오면 같은 국면으로 보고 새 진입으로 세지 않으며, 진입 수가 모자라면 `status: 'insufficient_sample'`. `history`와 `bars`의 길이가 다르면 `[]`. **과거 사후 집계이며 예측이 아니다** — 숫자와 상태값만 돌려주고 문장·권유성 라벨·평균·승률은 만들지 않는다. 표시 문구와 "미래 보장 아님" 고지는 consumer 몫. Returns `ExtremeZoneOutcome[]`. | `domain/indicators/fearGreed/regimeStats.ts` |
 | `summarizeExtremeZoneEpisodes(history, options?)` — 극단 구간(`EXTREME_FEAR`·`EXTREME_GREED`)별 **머문 기록**. 구간마다 `entryCount`, `medianSessionsInZone`(기록이 없으면 `null`), 최신순 `episodes`(`startDate`·`endDate`·`sessionsInZone`·`peakScore`·`ongoing`)를 돌려준다. 진입 규칙은 `summarizeExtremeZoneOutcomes`와 같고(`reentryGap` 기본 20 안의 재진입은 같은 기록), `sessionsInZone`은 구간 라벨이었던 세션만 센다. 워밍업 공백(`label: null`) 바로 뒤의 구간 세션은 진입이 아니며, 앞 기록에서 `reentryGap`보다 멀면 어느 기록에도 속하지 않는다(횟수에서 빠지고, 히스토리가 그 세션으로 끝나도 `ongoing`은 `false`). `peakScore`는 공포면 최저·탐욕이면 최고 점수(점수 없는 비정상 입력만 `null`). 날짜·횟수·점수 같은 기록만 돌려주고 수익률·평균·승률은 계산하지 않는다. 표시 문구는 consumer 몫. Returns `ExtremeZoneEpisodeSummary[]`. | `domain/indicators/fearGreed/regimeStats.ts` |
+| `findExtremeZoneEntryOn(history, date, options?)` — `date` 세션이 극단 구간(`EXTREME_FEAR`·`EXTREME_GREED`)의 **진입**이면 `{ zone, date, score, previousLabel }`, 아니면 `null`. 진입 규칙은 `summarizeExtremeZoneEpisodes`와 같은 내부 함수 하나를 쓴다(다른 라벨이던 직전 세션에서 넘어온 세션만, `reentryGap` 기본 20 안의 재진입은 같은 국면이라 `null`). 구간에 머무는 둘째 날 이후·히스토리에 없는 날짜·워밍업 공백(`label: null`) 바로 뒤 첫 세션·진입 세션의 점수가 null/비유한이면 `null`. 25/75 컷오프는 라벨(`scoreToLabel`)이 이미 정한 것을 그대로 따른다. 과거 사실 하나를 돌려줄 뿐 예측이 아니다. 두 entrypoint 모두 export. Returns `ExtremeZoneEntry \| null`. | `domain/indicators/fearGreed/regimeStats.ts` |
 | `computeMarketScoreGap(symbolHistory, market)` — 같은 날짜의 종목 점수 − 시장 점수. 같은 날짜 쌍이 없거나 한쪽 점수가 `null`이면 `null`(다른 날끼리 비교하지 않는다). Returns `FearGreedScoreGap \| null`. | `domain/indicators/fearGreed/regimeStats.ts` |
 | `fearGreedInputs(data)` — 종목 공포·탐욕 계산에 쓸 일봉과 매수·매도 거래량. `BarsData.fearGreedBars`(5년)가 있으면 그것을, 없으면 `bars`·`indicators.buySellVolume`을 돌려준다. **종목 점수를 계산하는 모든 지점이 이 헬퍼를 거쳐야** 같은 날 점수가 표면마다 갈리지 않는다. Returns `FearGreedInputs`. | `domain/indicators/fearGreed/inputs.ts` |
 
@@ -528,7 +530,7 @@ ai.siglens.io 에이전트가 쓰는 도구 계약. 실행기는 소비자가 �
     - `FearGreedInputs` (`fearGreedInputs` 반환 타입)
     - `FearGreedReading`, `FearGreedLabelTransition`, `FearGreedScoreGap` (`FearGreedHistoryPoint`와 `MarketFearGreedHistoryPoint`는 `FearGreedReading`의 타입 별칭이다)
     - `ExtremeFearGreedZone`, `ForwardChangeStat`, `ExtremeZoneOutcome`, `ExtremeZoneOutcomeOptions` (과거 사후 집계, 예측 아님)
-    - `ExtremeZoneEpisode`, `ExtremeZoneEpisodeSummary`, `ExtremeZoneEpisodeOptions` (극단 구간 머문 기록)
+    - `ExtremeZoneEpisode`, `ExtremeZoneEpisodeSummary`, `ExtremeZoneEpisodeOptions` (극단 구간 머문 기록), `ExtremeZoneEntry` (`findExtremeZoneEntryOn` 반환)
 - Fear & Greed Index (market-wide):
     - `MarketFearGreedSeriesKey`, `MarketFearGreedFactorKey`
     - `MarketDailyClose`, `MarketFearGreedInput`

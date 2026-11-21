@@ -16,6 +16,7 @@ export {
     EXTREME_ZONE_FORWARD_HORIZONS,
     EXTREME_ZONE_MIN_SAMPLE,
     EXTREME_ZONE_REENTRY_GAP,
+    findExtremeZoneEntryOn,
     summarizeExtremeZoneEpisodes,
     summarizeExtremeZoneOutcomes,
 } from '@/domain/indicators/fearGreed/regimeStats';
