@@ -1280,7 +1280,10 @@ A doc sentence about a guarantee ("every tool refuses", "the gate checks X") nam
 mechanism that really enforces it and holds for every path; verify it against the code.
 When a review names a pattern, sweep the whole change for it with grep (including tests and
 helpers), not only the cited lines: a fix that stops at the named lines leaves the same
-violation elsewhere in the diff.
+violation elsewhere in the diff. The same applies to a rule the change itself adds or
+sharpens: grep its violating pattern across the change's own diff before pushing, or the
+change breaks its own new rule (for example a new "equality claims state their exact
+conditions" rule while another description in the diff still claims equality unconditionally).
 
 <a id="DS-6"></a>
 #### DS-6 — No process residue in code

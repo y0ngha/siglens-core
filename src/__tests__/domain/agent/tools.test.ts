@@ -508,7 +508,7 @@ describe('AGENT_TOOL_SPECS', () => {
             ...AGENT_HISTORY_INDICES,
         ]);
         expect(spec.inputSchema.properties.period?.description).toContain(
-            '1년 전보다) uses 1m, 3m, 6m or 1y here, never from; for 1m, 3m and 1y the figure then equals the calendarChange of get_bars_indicators'
+            '1년 전보다) uses 1m, 3m, 6m or 1y here, never from; for 1m, 3m and 1y, when no session is in progress, the figure then equals the calendarChange of get_bars_indicators (while one is, calendarChange runs to the live price), so name the dates'
         );
         expect(spec.inputSchema.properties.period?.description).toContain(
             `default ${AGENT_PRICE_STATS_DEFAULT_PERIOD}`

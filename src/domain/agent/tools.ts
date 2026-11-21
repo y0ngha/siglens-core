@@ -494,7 +494,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
                 period: {
                     type: 'string',
                     enum: [...AGENT_PRICE_STATS_PERIODS],
-                    description: `Window ending at the last completed session; default ${AGENT_PRICE_STATS_DEFAULT_PERIOD}. Omit when you pass year or from. A question relative to this time last year or N months ago (작년 이맘때 대비, N개월 전 대비, 1년 전보다) uses 1m, 3m, 6m or 1y here, never from; for 1m, 3m and 1y the figure then equals the calendarChange of get_bars_indicators`,
+                    description: `Window ending at the last completed session; default ${AGENT_PRICE_STATS_DEFAULT_PERIOD}. Omit when you pass year or from. A question relative to this time last year or N months ago (작년 이맘때 대비, N개월 전 대비, 1년 전보다) uses 1m, 3m, 6m or 1y here, never from; for 1m, 3m and 1y, when no session is in progress, the figure then equals the calendarChange of get_bars_indicators (while one is, calendarChange runs to the live price), so name the dates`,
                 },
                 year: {
                     type: 'integer',
