@@ -665,8 +665,14 @@ export interface G1Report {
     patterns: Record<G1PatternKey, number>;
     /** The counters this gate scores, by name. */
     scored: Record<string, number>;
-    /** The half the gate scores was measured (an `--only` run must not score the other as 0). */
+    /**
+     * The half the gate scores was measured AND evaluated something: an `--only` run must not
+     * score the other half as 0, and a run whose series are too short (0 pattern days) or that
+     * detected nothing (0 candle events) has nothing to pass.
+     */
     scoredHalfMeasured: boolean;
+    /** What the scored half evaluated: candle events (c9) or pattern window days. */
+    evaluated: number;
     /** Every scored counter is 0 and the scored half was measured; `null` without a gate. */
     pass: boolean | null;
 }
@@ -674,7 +680,8 @@ export interface G1Report {
 export function g1Report(
     candle: Record<CandleViolation, number> | null,
     counters: PatternCounters | null,
-    gate: G1Gate | null
+    gate: G1Gate | null,
+    candleEvents = 0
 ): G1Report {
     const candleCounts = recordOf(
         CANDLE_VIOLATIONS,
@@ -687,14 +694,20 @@ export function g1Report(
             : gate === 'c9'
               ? candleCounts
               : recordOf(G1_SCORED_PATTERN_KEYS[gate], key => patterns[key]);
-    const scoredHalfMeasured =
-        gate === 'c9' ? candle !== null : counters !== null;
+    const evaluated =
+        gate === 'c9'
+            ? candle === null
+                ? 0
+                : candleEvents
+            : (counters?.days ?? 0);
+    const scoredHalfMeasured = evaluated > 0;
     return {
         gate,
         candle: candleCounts,
         patterns,
         scored,
         scoredHalfMeasured,
+        evaluated,
         pass:
             gate === null
                 ? null
@@ -777,7 +790,8 @@ export function summarizeArm(input: {
         g1: g1Report(
             candles?.violations ?? null,
             input.patternCounters,
-            input.gate
+            input.gate,
+            candles?.events ?? 0
         ),
     };
 }

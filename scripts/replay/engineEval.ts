@@ -10,7 +10,8 @@
  * `--set` verifies the manifest hashes and also reports what a case's prompt carries;
  * `--bars` takes a plain directory of `<SYMBOL>.json` files (e.g. the published daily-AI
  * backtest bars) and fingerprints it by file hash. Optional: `--only candles|patterns`,
- * `--symbols A,B`, and `--gate c9|pivots|geometry` to score G1 for one PR (core-1, core-2,
+ * `--symbols A,B`, and `--gate c9|pivots|geometry` (with `--allow-skipped-cases` to tolerate cases without a bar at
+ * their `asOf` date) to score G1 for one PR (core-1, core-2,
  * core-3): a gated run passes only when every counter that PR owns is 0 and its half was
  * measured.
  *
@@ -67,6 +68,8 @@ export interface EngineEvalArgs {
     only: EvalOnly;
     symbols: readonly string[] | null;
     gate: G1Gate | null;
+    /** A gated run fails when a case has no bar at its `asOf` date, unless this is set. */
+    allowSkippedCases: boolean;
 }
 
 function parseOnly(raw: string | undefined): EvalOnly {
@@ -100,6 +103,7 @@ export function parseEngineEvalArgs(argv: readonly string[]): EngineEvalArgs {
         only: parseOnly(raw.only),
         symbols: raw.symbols === undefined ? null : raw.symbols.split(','),
         gate: parseGate(raw.gate),
+        allowSkippedCases: raw['allow-skipped-cases'] === 'true',
     };
 }
 
@@ -268,6 +272,12 @@ export function runEngineEval(
         args.symbols === null
             ? data.symbols
             : data.symbols.filter(s => args.symbols?.includes(s.symbol));
+    const missing = (args.symbols ?? []).filter(
+        wanted => !data.symbols.some(s => s.symbol === wanted)
+    );
+    if (missing.length > 0) {
+        throw new Error(`--symbols not in the data: ${missing.join(', ')}`);
+    }
     if (symbols.length === 0) throw new Error('no symbols to evaluate');
     deps.log(`arm ${args.arm}: ${symbols.length} symbols (${data.kind})`);
 
@@ -340,8 +350,18 @@ export function runEngineEval(
         `${JSON.stringify(summary, null, 2)}\n`
     );
     deps.log(`wrote ${args.out}`);
-    // A gated run that did not pass exits 2 (errors throw and exit 1).
-    return summary.g1.pass === false ? 2 : 0;
+    // A gated run that did not pass exits 2 (errors throw and exit 1). A skipped case is a
+    // case the numbers silently lack, so under a gate it fails the run unless allowed.
+    const skippedFails =
+        args.gate !== null &&
+        !args.allowSkippedCases &&
+        (cases?.skipped ?? 0) > 0;
+    if (skippedFails) {
+        deps.log(
+            'FAIL: skipped cases under --gate (pass --allow-skipped-cases to accept)'
+        );
+    }
+    return summary.g1.pass === false || skippedFails ? 2 : 0;
 }
 
 if (require.main === module) {

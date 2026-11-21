@@ -7,6 +7,8 @@ import {
     compareArms,
     exitCodeOf,
     InvalidEventError,
+    InvalidRunInfoError,
+    parseRunInfo,
     parseCompareArgs,
     readArm,
     runCompare,
@@ -23,6 +25,12 @@ import { REPO_ROOT } from '../../../../scripts/replay/fsUtil';
 import { candleEvent, patternEvent, spread } from './engineEvalFixtures';
 import { makeTempDir } from './replayFixtures';
 
+const temps2 = new Set<() => void>();
+afterEach(() => {
+    [...temps2].forEach(remove => remove());
+    temps2.clear();
+});
+
 const WEEKS = 12;
 const WEEK_LIST = Array.from(
     { length: WEEKS },
@@ -36,7 +44,7 @@ function run(name: string, overrides: Partial<RunInfo> = {}): RunInfo {
         dirtyDiffSha256: null,
         source: { kind: 'set', fingerprint: 'fp', symbols: ['A', 'B'] },
         only: null,
-        gate: null,
+        gate: 'geometry',
         constants: { ...EVAL_CONSTANTS },
         ...overrides,
     };
@@ -63,7 +71,7 @@ function arm(
         candles = true,
         patterns = true,
         candleCount = 24,
-        gate = null,
+        gate = 'geometry',
         pattern = 'hammer',
     } = options;
     const candleEvents = spread(candleCount, WEEKS, () =>
@@ -73,7 +81,7 @@ function arm(
         patternEvent({ target60: patternHit })
     );
     return {
-        run: run(name, options.run),
+        run: run(name, { gate, ...options.run }),
         events: [
             ...(candles ? candleEvents : []),
             ...(patterns ? patternEvents : []),
@@ -84,7 +92,7 @@ function arm(
             gate,
             candleEvents: candles ? candleEvents : null,
             patternEvents: patterns ? patternEvents : null,
-            patternCounters: patterns ? counters : null,
+            patternCounters: patterns ? { days: 100, ...counters } : null,
             caseLines: null,
         }),
     };
@@ -113,6 +121,15 @@ describe('assertComparable', () => {
         refuse({ source: { ...base.source, symbols: ['A'] } }, 'symbol list');
         refuse({ only: 'candles' }, '`only`');
         refuse({ constants: { ...EVAL_CONSTANTS, seed: 1 } }, 'constants');
+    });
+
+    it('refuses a gate mismatch between the two runs', () => {
+        expect(() =>
+            assertComparable(
+                run('a', { gate: 'c9' }),
+                run('b', { gate: 'geometry' })
+            )
+        ).toThrow('`gate` differ between a and b');
     });
 
     it('names every difference at once', () => {
@@ -273,8 +290,9 @@ describe('compareArms', () => {
         );
         expect(failing.gates.g1.pass).toBe(false);
         expect(failing.gates.g1.after.patterns.wrongSideDays).toBe(1);
-        const ungated = compareArms(arm('before'), arm('after'));
-        expect(ungated.gates.g1).toMatchObject({ pass: false, gate: null });
+        expect(() =>
+            compareArms(arm('before'), arm('after', { gate: null }))
+        ).toThrow('the after run (after) was made without --gate');
     });
 
     it('flags qualified-instance drops beyond the bound, per family, without failing G2', () => {
@@ -365,6 +383,54 @@ function writeRun(runDir: string, data: ArmData): string {
     );
     return runDir;
 }
+
+describe('parseRunInfo', () => {
+    it('returns a well-formed run and names every bad field otherwise', () => {
+        const good = run('a');
+        expect(parseRunInfo(good)).toEqual(good);
+        expect(() => parseRunInfo(null)).toThrow(InvalidRunInfoError);
+        expect(() => parseRunInfo('x')).toThrow('not an object');
+        expect(() =>
+            parseRunInfo({
+                ...good,
+                arm: 1,
+                gate: 3,
+                only: 2,
+                source: { kind: 'set' },
+            })
+        ).toThrow('bad field(s): arm, only, gate, source');
+        expect(() => parseRunInfo({ ...good, constants: null })).toThrow(
+            'constants'
+        );
+        expect(() =>
+            parseRunInfo({ ...good, source: { ...good.source, symbols: [1] } })
+        ).toThrow('source');
+        expect(() => parseRunInfo({ ...good, dirtyDiffSha256: 5 })).toThrow(
+            'dirtyDiffSha256'
+        );
+        expect(() => parseRunInfo({ ...good, coreGitSha: null })).toThrow(
+            'coreGitSha'
+        );
+        expect(
+            parseRunInfo({
+                ...good,
+                only: null,
+                gate: null,
+                dirtyDiffSha256: 'x',
+            }).gate
+        ).toBeNull();
+    });
+
+    it('is applied when a run directory is read', () => {
+        const { dir, remove } = makeTempDir();
+        temps2.add(remove);
+        const runDir = writeRun(join(dir, 'r'), arm('r'));
+        writeFileSync(join(runDir, 'run.json'), '{"arm":"r"}');
+        expect(() => readArm(runDir)).toThrow(
+            'run.json is not an engine-evaluation run'
+        );
+    });
+});
 
 describe('exitCodeOf', () => {
     it('is 0 only when G1 and G2 both pass, 2 when either fails', () => {

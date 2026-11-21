@@ -136,6 +136,7 @@ export function assertComparable(before: RunInfo, after: RunInfo): void {
         before.only !== after.only && '`only`',
         stableJson(before.constants) !== stableJson(after.constants) &&
             'constants',
+        before.gate !== after.gate && '`gate`',
     ].filter((name): name is string => typeof name === 'string');
     if (differences.length > 0) {
         throw new Error(
@@ -211,6 +212,11 @@ function upperBoundNonNegative(
 }
 
 export function compareArms(before: ArmData, after: ArmData): CompareReport {
+    if (after.run.gate === null) {
+        throw new Error(
+            `the after run (${after.run.arm}) was made without --gate: G1 cannot be scored; rerun both arms with the same --gate`
+        );
+    }
     assertComparable(before.run, after.run);
     const warnings = [before, after]
         .filter(arm => arm.run.coreGitSha.endsWith('+dirty'))
@@ -346,6 +352,53 @@ export function compareArms(before: ArmData, after: ArmData): CompareReport {
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
 
+/** A `run.json` that lacks the fields the comparison reads. */
+export class InvalidRunInfoError extends Error {
+    constructor(reason: string) {
+        super(`run.json is not an engine-evaluation run: ${reason}`);
+        this.name = 'InvalidRunInfoError';
+    }
+}
+
+const isString = (v: unknown): v is string => typeof v === 'string';
+const isNullOr = (v: unknown, check: (x: unknown) => boolean): boolean =>
+    v === null || check(v);
+
+/** Validates the fields of `run.json` the comparison reads; throws `InvalidRunInfoError`. */
+export function parseRunInfo(raw: unknown): RunInfo {
+    if (typeof raw !== 'object' || raw === null) {
+        throw new InvalidRunInfoError('not an object');
+    }
+    // Narrowed to a non-null object above; each field is checked individually below.
+    const run = raw as Record<string, unknown>;
+    const source = run.source as Record<string, unknown> | null | undefined;
+    const checks: readonly [string, boolean][] = [
+        ['arm', isString(run.arm)],
+        ['coreGitSha', isString(run.coreGitSha)],
+        ['dirtyDiffSha256', isNullOr(run.dirtyDiffSha256, isString)],
+        ['only', isNullOr(run.only, isString)],
+        ['gate', isNullOr(run.gate, isString)],
+        [
+            'constants',
+            typeof run.constants === 'object' && run.constants !== null,
+        ],
+        [
+            'source',
+            typeof source === 'object' &&
+                source !== null &&
+                isString(source.kind) &&
+                isString(source.fingerprint) &&
+                Array.isArray(source.symbols) &&
+                source.symbols.every(isString),
+        ],
+    ];
+    const bad = checks.filter(([, ok]) => !ok).map(([name]) => name);
+    if (bad.length > 0)
+        throw new InvalidRunInfoError(`bad field(s): ${bad.join(', ')}`);
+    // Every field the comparison reads was just checked above.
+    return raw as RunInfo;
+}
+
 /** One `events.jsonl` line; throws `InvalidEventError` unless it is a candle or pattern row. */
 export class InvalidEventError extends Error {
     constructor(line: string) {
@@ -372,7 +425,7 @@ function parseEvent(line: string): EvalEvent {
 /** Reads a run directory written by `engineEval.ts`. */
 export function readArm(runDir: string): ArmData {
     return {
-        run: readJson<RunInfo>(join(runDir, 'run.json')),
+        run: parseRunInfo(readJson<unknown>(join(runDir, 'run.json'))),
         summary: readJson<ArmSummary>(join(runDir, 'summary.json')),
         events: readFileSync(join(runDir, 'events.jsonl'), 'utf-8')
             .split('\n')

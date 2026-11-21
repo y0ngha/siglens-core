@@ -639,6 +639,7 @@ export function patternWalkForSymbol(
             '1Day',
             atrSeries
         );
+        // CP-5: the same single pass; each pattern updates the shared instance state.
         for (const pattern of qualified) {
             const geometry = computeCandidateGeometry(pattern, window, atr);
             if (geometry === null) continue;

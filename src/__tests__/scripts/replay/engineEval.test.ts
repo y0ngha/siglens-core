@@ -72,6 +72,7 @@ const baseArgs = (overrides: Partial<EngineEvalArgs>): EngineEvalArgs => ({
     only: null,
     symbols: null,
     gate: null,
+    allowSkippedCases: false,
     ...overrides,
 });
 
@@ -108,6 +109,7 @@ describe('parseEngineEvalArgs', () => {
             'A,B',
             '--gate',
             'c9',
+            '--allow-skipped-cases',
         ]);
         expect(parsed).toMatchObject({
             set: null,
@@ -115,6 +117,7 @@ describe('parseEngineEvalArgs', () => {
             only: 'candles',
             symbols: ['A', 'B'],
             gate: 'c9',
+            allowSkippedCases: true,
         });
         expect(parsed.bars).toMatch(/b$/);
         expect(parseEngineEvalArgs(['--out', 'o', '--set', 'a'])).toMatchObject(
@@ -124,6 +127,7 @@ describe('parseEngineEvalArgs', () => {
                 symbols: null,
                 bars: null,
                 gate: null,
+                allowSkippedCases: false,
             }
         );
     });
@@ -309,7 +313,7 @@ describe('runEngineEval', () => {
                 }),
                 deps()
             )
-        ).toThrow('no symbols to evaluate');
+        ).toThrow('--symbols not in the data: NOPE');
     });
 });
 
@@ -374,8 +378,27 @@ describe('exit code and skipped cases', () => {
         ).toBe(2);
     });
 
-    it('returns 0 for a gate whose counters are all zero', () => {
-        // 300 bars hold no 500-bar window: the geometry counters stay at 0.
+    it('returns 0 for a gate whose counters are all zero on evaluated days', () => {
+        const { dir, setDir } = makeSet();
+        const out = join(dir, 'z');
+        const code = runEngineEval(
+            baseArgs({
+                set: setDir,
+                out,
+                only: 'patterns',
+                gate: 'geometry',
+                symbols: ['NVDA'],
+            }),
+            deps()
+        );
+        const g1 = JSON.parse(
+            readFileSync(join(out, 'summary.json'), 'utf-8')
+        ).g1;
+        expect(g1).toMatchObject({ evaluated: 120, pass: true });
+        expect(code).toBe(0);
+    });
+
+    it('fails a gate that evaluated nothing: series shorter than the 500-bar window', () => {
         const { dir, remove } = makeTempDir();
         temps.add(remove);
         writeBarsDir(join(dir, 'short'), [
@@ -398,10 +421,25 @@ describe('exit code and skipped cases', () => {
             }),
             deps()
         );
-        expect(
-            JSON.parse(readFileSync(join(out, 'summary.json'), 'utf-8')).g1.pass
-        ).toBe(true);
-        expect(code).toBe(0);
+        const g1 = JSON.parse(
+            readFileSync(join(out, 'summary.json'), 'utf-8')
+        ).g1;
+        expect(g1).toMatchObject({ evaluated: 0, pass: false });
+        expect(code).toBe(2);
+    });
+
+    it('names symbols that are not in the data', () => {
+        const { dir, setDir } = makeSet();
+        expect(() =>
+            runEngineEval(
+                baseArgs({
+                    set: setDir,
+                    out: join(dir, 'm'),
+                    symbols: ['NVDA', 'NOPE', 'ALSO'],
+                }),
+                deps()
+            )
+        ).toThrow('--symbols not in the data: NOPE, ALSO');
     });
 
     it('counts and warns about a case with no bar at its asOf date', () => {
@@ -423,6 +461,37 @@ describe('exit code and skipped cases', () => {
         expect(summary.caseLines.cases).toBe(manifest.cases.length - 1);
         expect(
             log.mock.calls.flat().some(l => l.startsWith('WARNING: 1 case(s)'))
+        ).toBe(true);
+    });
+
+    it('fails a gated run with a skipped case unless it is allowed', () => {
+        const { dir, setDir, manifest } = makeSet();
+        const first = manifest.cases.findIndex(c => c.symbol === 'NVDA');
+        const cases = manifest.cases.map((c, i) =>
+            i === first ? { ...c, asOf: '2001-01-01' } : c
+        );
+        writeFileSync(
+            join(setDir, 'manifest.json'),
+            JSON.stringify({ ...manifest, cases })
+        );
+        const gated = (name: string, allowSkippedCases: boolean) =>
+            runEngineEval(
+                baseArgs({
+                    set: setDir,
+                    out: join(dir, name),
+                    gate: 'geometry',
+                    symbols: ['NVDA'],
+                    allowSkippedCases,
+                }),
+                deps()
+            );
+        // The gate passes on both runs; only the skipped case decides the exit code.
+        expect(gated('allowed', true)).toBe(0);
+        expect(gated('strict', false)).toBe(2);
+        expect(
+            JSON.parse(
+                readFileSync(join(dir, 'strict', 'summary.json'), 'utf-8')
+            ).g1.pass
         ).toBe(true);
     });
 });

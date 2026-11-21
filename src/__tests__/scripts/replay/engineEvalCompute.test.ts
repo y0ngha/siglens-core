@@ -493,6 +493,7 @@ describe('g1Report', () => {
         dojiSetup: 0,
         tweezersClose: 0,
     };
+    const days = { days: 10 };
 
     it('scores nothing without a gate but still lists every counter', () => {
         const report = g1Report(null, null, null);
@@ -502,30 +503,59 @@ describe('g1Report', () => {
         expect(report.patterns.wrongSideDays).toBe(0);
     });
 
-    it('c9 scores the four candle counters and needs the candle half', () => {
+    it('c9 scores the four candle counters and needs candle events', () => {
         const nonzero = { ...zeroCandle, setupBody: 2 };
-        expect(g1Report(nonzero, {}, 'c9')).toMatchObject({
+        expect(g1Report(nonzero, days, 'c9', 5)).toMatchObject({
             scored: nonzero,
             pass: false,
         });
-        expect(g1Report(zeroCandle, { wrongSideDays: 9 }, 'c9').pass).toBe(
-            true
-        );
-        const missing = g1Report(null, {}, 'c9');
+        expect(
+            g1Report(zeroCandle, { ...days, wrongSideDays: 9 }, 'c9', 5).pass
+        ).toBe(true);
+        const missing = g1Report(null, days, 'c9', 5);
         expect(missing.scoredHalfMeasured).toBe(false);
         expect(missing.pass).toBe(false);
     });
 
+    it('fails a gate whose half evaluated nothing: no candle events, no pattern days', () => {
+        // Measured but empty (series too short, nothing detected): nothing to pass.
+        const noEvents = g1Report(zeroCandle, days, 'c9', 0);
+        expect(noEvents).toMatchObject({
+            evaluated: 0,
+            scoredHalfMeasured: false,
+            pass: false,
+        });
+        const noDays = g1Report(null, { days: 0 }, 'geometry');
+        expect(noDays).toMatchObject({ evaluated: 0, pass: false });
+        expect(g1Report(null, {}, 'pivots').pass).toBe(false);
+        expect(g1Report(zeroCandle, days, 'c9', 1)).toMatchObject({
+            evaluated: 1,
+            pass: true,
+        });
+        expect(g1Report(null, { days: 1 }, 'geometry')).toMatchObject({
+            evaluated: 1,
+            pass: true,
+        });
+    });
+
     it('pivots scores the proof and repaint counters only, and needs the pattern half', () => {
         expect(
-            g1Report(null, { selfConfirmedNotCloseProvenPivots: 1 }, 'pivots')
+            g1Report(
+                null,
+                { ...days, selfConfirmedNotCloseProvenPivots: 1 },
+                'pivots'
+            )
         ).toMatchObject({
             scored: { selfConfirmedNotCloseProvenPivots: 1, pivotRepaints: 0 },
             pass: false,
         });
-        expect(g1Report(null, { pivotRepaints: 2 }, 'pivots').pass).toBe(false);
-        expect(g1Report(null, { wrongSideDays: 9 }, 'pivots').pass).toBe(true);
-        expect(g1Report(zeroCandle, null, 'pivots')).toMatchObject({
+        expect(
+            g1Report(null, { ...days, pivotRepaints: 2 }, 'pivots').pass
+        ).toBe(false);
+        expect(
+            g1Report(null, { ...days, wrongSideDays: 9 }, 'pivots').pass
+        ).toBe(true);
+        expect(g1Report(zeroCandle, null, 'pivots', 5)).toMatchObject({
             scoredHalfMeasured: false,
             pass: false,
         });
@@ -533,7 +563,7 @@ describe('g1Report', () => {
 
     it('geometry scores wrong side, non-positive, moving, status and repaints, not the proof counter', () => {
         const key = (name: string): boolean | null =>
-            g1Report(null, { [name]: 1 }, 'geometry').pass;
+            g1Report(null, { ...days, [name]: 1 }, 'geometry').pass;
         [
             'wrongSideDays',
             'nonPositiveDays',
@@ -543,7 +573,7 @@ describe('g1Report', () => {
             'pivotRepaints',
         ].forEach(name => expect(key(name)).toBe(false));
         expect(key('selfConfirmedNotCloseProvenPivots')).toBe(true);
-        expect(g1Report(null, {}, 'geometry').pass).toBe(true);
+        expect(g1Report(null, days, 'geometry').pass).toBe(true);
     });
 });
 
@@ -604,7 +634,7 @@ describe('summarizeArm and the event guards', () => {
                 candleEvent({ violations: ['context'] })
             ),
             patternEvents: spread(4, 4, () => patternEvent()),
-            patternCounters: { wrongSideDays: 3 },
+            patternCounters: { days: 4, wrongSideDays: 3 },
             caseLines: [{ lines: 1, bullish: true, bearish: false }],
         });
         expect(summary.candles?.tested).toBe(4);
