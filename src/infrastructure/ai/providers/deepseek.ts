@@ -189,30 +189,25 @@ async function callDeepSeekResponses(
     //
     // `temperature`는 추론 OFF일 때만 싣는다(ON이면 API가 무시한다). `seed`는 싣지
     // 않는다 — SDK의 Responses 파라미터에 그 필드가 없다.
-    const createStream = () =>
-        client.responses.create(
-            {
-                model: spec.apiModelId,
-                input: prompt,
-                instructions: options.system ?? AI_SYSTEM_PROMPT,
-                max_output_tokens: spec.maxOutputTokens,
-                text: {
-                    format: {
-                        type: 'json_schema',
-                        name: 'analysis_response',
-                        schema: options.responseSchema as Record<
-                            string,
-                            unknown
-                        >,
-                    },
+    const stream = await client.responses.create(
+        {
+            model: spec.apiModelId,
+            input: prompt,
+            instructions: options.system ?? AI_SYSTEM_PROMPT,
+            max_output_tokens: spec.maxOutputTokens,
+            text: {
+                format: {
+                    type: 'json_schema',
+                    name: 'analysis_response',
+                    schema: options.responseSchema as Record<string, unknown>,
                 },
-                reasoning: { effort: reasoningEffort(useThinking) },
-                ...(!useThinking && { temperature: spec.temperature }),
-                stream: true,
             },
-            { signal }
-        );
-    const stream = await createStream();
+            reasoning: { effort: reasoningEffort(useThinking) },
+            ...(!useThinking && { temperature: spec.temperature }),
+            stream: true,
+        },
+        { signal }
+    );
 
     let text = '';
     let usage: DeepSeekUsageLike | undefined;
