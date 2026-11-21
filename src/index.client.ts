@@ -39,6 +39,14 @@ export {
 export { FEAR_GREED_LOOKBACK_DAYS } from './domain/constants/market';
 export { classifyTrend, detectSignals } from './domain/signals';
 export { detectNewConfirmedSignals } from './domain/signals/newSignals';
+export {
+    confirmedSignalTimeline,
+    SIGNAL_SCAN_DAILY_LOOKBACK_DAYS,
+} from './domain/signals/timeline';
+export type {
+    ConfirmedSignalDay,
+    ConfirmedSignalTimelineOptions,
+} from './domain/signals/timeline';
 
 // Prompt builders
 export { buildChatPrompt } from './domain/chat/buildChatPrompt';

@@ -117,6 +117,8 @@ describe('public API exports', () => {
         // siglens' alert mail reads both instead of re-implementing the rules (API-1: also on index.client).
         expect(typeof coreApi.detectNewConfirmedSignals).toBe('function');
         expect(typeof coreApi.findExtremeZoneEntryOn).toBe('function');
+        expect(typeof coreApi.confirmedSignalTimeline).toBe('function');
+        expect(coreApi.SIGNAL_SCAN_DAILY_LOOKBACK_DAYS).toBe(400);
     });
 
     it('exports the indicator-confluence rule from package entrypoint', () => {
