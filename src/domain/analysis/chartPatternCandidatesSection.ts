@@ -64,8 +64,11 @@ function formatLevelLine(
     lastClose: number,
     quoting: PriceQuoting
 ): string {
-    // A target at or below zero (a down pattern taller than its breakout
-    // level) is not a price — N/A, never a negative quotable "target".
+    // A level at or below zero is not a price — N/A, never a negative quotable
+    // "target". The geometry no longer offers a non-positive target, so this is
+    // reachable only through rounding: the target is recomputed from the
+    // breakout and extreme rounded to the printed precision, and a small
+    // positive one can round to zero there.
     if (level === null || !Number.isFinite(level) || level <= 0)
         return `- ${label}: N/A`;
     const distance =
@@ -102,6 +105,11 @@ type BreakoutGeometry =
  * sweep). The pattern stays listed and drawn — its structure is intact, and
  * only a close past its invalidation spends it (`isSpentPattern`) — and
  * prints `failed breakout`.
+ *
+ * A sloped line (boundary pair, flag) is read where it froze:
+ * `shape.breakoutIndex`, the first close beyond it, else the last bar. Past
+ * that bar the line keeps sliding, but the level the block prints and the
+ * status read does not.
  *
  * The neckline families (double/triple tops and bottoms, head and shoulders,
  * cup and handle, rounding, high tight flag) read the printed breakout level
@@ -151,7 +159,9 @@ export function isFailedBreakout(
         ];
         return sides.some(({ line, sign }) =>
             brokeAndReturned(
-                i => lineValueAt(line, i),
+                // The frozen breakout: a sloped line read past the break bar
+                // would slide away from the level the status prints.
+                i => lineValueAt(line, Math.min(i, shape.breakoutIndex)),
                 sign,
                 line.end.index + 1,
                 offset => offset <= slack
@@ -217,7 +227,8 @@ function keyPointsLine(
 
 /**
  * A boundary pair with no prior trend: both
- * boundaries as they stand, no direction and no target — the status is
+ * boundaries as they stood at the pair's break bar (the first close beyond
+ * a line), or the last bar while nothing has closed beyond one, no direction and no target — the status is
  * `broken` once the last close sits outside either printed boundary.
  */
 function formatUndirectedCandidate(
@@ -421,7 +432,8 @@ export function printedPatternGeometriesByOverlayId(
  * instead of asking the model to work one out. Pre-screener hits that did not
  * qualify are not named (see {@link CHART_PATTERN_CANDIDATES_SECTION_INTRO}).
  * {@link NO_CHART_PATTERNS_LINE} when nothing qualified; a qualified pattern whose geometry is unavailable
- * (boundaries crossed by the last bar) still gets a one-line block rather
+ * (boundaries crossed by their break bar, or a measured move that is not
+ * offered) still gets a one-line block rather
  * than being dropped.
  *
  * @param candidates - Qualified patterns (`qualifyPatterns`), computed once

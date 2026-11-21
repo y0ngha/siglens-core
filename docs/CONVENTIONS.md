@@ -841,7 +841,7 @@ without the fix. In-memory stubs honour TTL, or the test cannot see expiry bugs.
 <a id="TE-16"></a>
 #### TE-16 — Evaluation and replay scripts fail closed
 
-A gate or replay tool scopes pass criteria to the change it gates, and exits non-zero when a result is not computable (null bound, no events), inputs are incomparable (different dataset or subset), or a job's own generation did not run. A paid run validates its inputs and refuses before the first billed call. Headline rates use one row per case, never repeats.
+A gate or replay tool scopes pass criteria to the change it gates, and exits non-zero when a result is not computable (null bound, no events), inputs are incomparable (different dataset or subset), or a job's own generation did not run. A paid run validates its inputs and refuses before the first billed call. Headline rates use one row per case, never repeats. A check or reference arm recomputes the definition from raw inputs; it never calls the function or reads the field it checks, or a bug in it reads as zero violations.
 ❌ A single all-counters pass that prints "pass" across different datasets and exits 0. ✅ A per-change gate that refuses incomparable runs and signals failure through its exit code.
 
 

@@ -2,8 +2,19 @@ import { describe, expect, it } from 'vitest';
 import type { Bar, ChartPatternId, PatternCandidate } from '@/domain/types';
 import { qualifyPatterns } from '@/domain/patterns/qualify/qualifyPatterns';
 import { screenChartPatterns } from '@/domain/patterns/screenChartPatterns';
-import { SCREEN_LOOKBACK_BARS } from '@/domain/patterns/constants';
+import {
+    PATTERN_MIN_HEIGHT_PRICE_PCT,
+    SCREEN_LOOKBACK_BARS,
+} from '@/domain/patterns/constants';
+import { calculateATR } from '@/domain/indicators/atr';
+import { lineValueAt } from '@/domain/patterns/boundaryLines';
+import { computeCandidateGeometry } from '@/domain/patterns/patternGeometry';
+import { extractPivots } from '@/domain/patterns/pivots';
+import { qualifyTrendlines } from '@/domain/patterns/qualify/trendlines';
 import { makeBars } from '@/__tests__/domain/patterns/helpers';
+import { chartFixture } from '@/__tests__/domain/patterns/fixtures/chartFixture';
+import apexUnbrokenFile from '@/__tests__/domain/patterns/fixtures/charts/daily-triangle-reaches-apex-unbroken.json';
+import pennantBelowZeroFile from '@/__tests__/domain/patterns/fixtures/charts/daily-pennant-target-below-zero.json';
 import hsTextbook from '@/__tests__/domain/patterns/fixtures/hs-textbook.json';
 import doubleTop from '@/__tests__/domain/patterns/fixtures/double-top.json';
 import ascendingTriangle from '@/__tests__/domain/patterns/fixtures/ascending-triangle.json';
@@ -199,5 +210,101 @@ describe('qualifyPatterns — arbitration losers are reported for logging', () =
             qualifyPatterns([hit('double_top')], [], 1, '1Day')
                 .arbitrationDropped
         ).toEqual([]);
+    });
+});
+
+describe('a pattern whose geometry a guard dropped is withheld like a spent one', () => {
+    // The pennant's measured move runs below zero (see breakoutFreezeCharts),
+    // so it has no geometry: not qualified, and not a shape hint either — a
+    // hint would still inject the pennant skill guide.
+    const chart = chartFixture(pennantBelowZeroFile);
+    const series = calculateATR(chart.bars);
+    const atr = series[series.length - 1];
+    if (atr === null || atr === undefined) throw new Error('ATR not ready');
+
+    it('is neither qualified nor listed as a shape hint when the screener also hit it', () => {
+        const { qualified, shapeHints } = qualifyPatterns(
+            [hit('pennant')],
+            chart.bars,
+            atr,
+            '1Day',
+            series
+        );
+        expect(qualified).toEqual([]);
+        expect(shapeHints).toEqual([]);
+    });
+
+    it('a screener hit of another id that did not qualify stays a hint', () => {
+        const { shapeHints } = qualifyPatterns(
+            [hit('pennant'), hit('rounding_top')],
+            chart.bars,
+            atr,
+            '1Day',
+            series
+        );
+        expect(shapeHints).toEqual(['rounding_top']);
+    });
+});
+
+describe('a triangle that reaches its apex unbroken has no geometry and is withheld too', () => {
+    // The symmetrical triangle's lines meet on the last bar of the full chart
+    // before any close has gone beyond either line, so there is nothing left to
+    // break out of; two bars earlier the same pair is still open.
+    const chart = chartFixture(apexUnbrokenFile);
+    const atrOf = (length: number) => {
+        const bars = chart.bars.slice(0, length);
+        const series = calculateATR(bars);
+        const atr = series[series.length - 1];
+        if (atr === null || atr === undefined) throw new Error('ATR not ready');
+        return { bars, series, atr };
+    };
+    const hits = [hit('symmetrical_triangle')];
+
+    it('the pair is found, unbroken, with its lines crossed on the last bar', () => {
+        const { bars, series, atr } = atrOf(250);
+        const windowStart = Math.max(0, bars.length - SCREEN_LOOKBACK_BARS);
+        const [pair] = qualifyTrendlines({
+            bars,
+            pivots: extractPivots(bars, series, {
+                onePivotPerBar: true,
+            }).filter(p => p.index >= windowStart),
+            atr,
+            lastIndex: bars.length - 1,
+            minHeightPricePct: PATTERN_MIN_HEIGHT_PRICE_PCT['1Day'],
+        });
+        if (pair.shape.kind !== 'trendline') throw new Error('trendline');
+        const last = bars.length - 1;
+        expect(pair.id).toBe('symmetrical_triangle');
+        expect(pair.shape.breakoutIndex).toBe(last);
+        expect(lineValueAt(pair.shape.upper, last)).toBeLessThan(
+            lineValueAt(pair.shape.lower, last)
+        );
+        expect(computeCandidateGeometry(pair, bars, atr)).toBeNull();
+    });
+
+    it('is neither qualified nor a shape hint although the screener hit it', () => {
+        const { bars, series, atr } = atrOf(250);
+        const { qualified, shapeHints } = qualifyPatterns(
+            hits,
+            bars,
+            atr,
+            '1Day',
+            series
+        );
+        expect(qualified).toEqual([]);
+        expect(shapeHints).toEqual([]);
+    });
+
+    it('control: the same pair while still open is qualified (and so not a hint)', () => {
+        const { bars, series, atr } = atrOf(244);
+        const { qualified, shapeHints } = qualifyPatterns(
+            hits,
+            bars,
+            atr,
+            '1Day',
+            series
+        );
+        expect(qualified.map(q => q.id)).toEqual(['symmetrical_triangle']);
+        expect(shapeHints).toEqual([]);
     });
 });

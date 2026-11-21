@@ -216,7 +216,7 @@ describe('buildPatternOverlayCandidates', () => {
         ).toEqual(q.map(p => patternOverlayId(p, f.bars)));
     });
 
-    it('skips a pattern without geometry (boundaries crossed by the last bar)', () => {
+    it('skips a pattern without geometry (boundaries crossed by the break bar)', () => {
         const bars = makeBars(Array.from({ length: 10 }, () => 100));
         const crossed: QualifiedPattern = {
             id: 'symmetrical_triangle',
@@ -236,6 +236,7 @@ describe('buildPatternOverlayCandidates', () => {
                     touches: [],
                 },
                 direction: 'up',
+                breakoutIndex: 9,
             },
             touches: 4,
         };
@@ -266,6 +267,7 @@ describe('buildPatternOverlayCandidates', () => {
                             touches: [],
                         },
                         direction: null,
+                        breakoutIndex: 9,
                     },
                     touches: 4,
                 },
@@ -305,6 +307,7 @@ describe('buildPatternOverlayCandidates', () => {
                             touches: [],
                         },
                         direction: null,
+                        breakoutIndex: 9,
                     },
                     touches: 4,
                 },
@@ -321,6 +324,116 @@ describe('buildPatternOverlayCandidates', () => {
         ]);
         expect(dashed[0].to.price).toBeCloseTo(20.8, 10);
         expect(dashed[1].to.price).toBeCloseTo(10.7, 10);
+    });
+
+    describe('the dashed continuation ends at the break bar, not at the last bar', () => {
+        // Twelve bars, so the last bar (11) is past every break bar below.
+        const bars = makeBars(Array.from({ length: 12 }, () => 100));
+        // Touches matter: a directed pair's invalidation is the opposite
+        // line's last touch.
+        const upper = {
+            start: { index: 1, price: 20 },
+            end: { index: 5, price: 24 },
+            touches: [
+                { index: 1, price: 20 },
+                { index: 5, price: 24 },
+            ],
+        };
+        const lower = {
+            start: { index: 2, price: 10 },
+            end: { index: 6, price: 14 },
+            touches: [
+                { index: 2, price: 10 },
+                { index: 6, price: 14 },
+            ],
+        };
+        const pair = (
+            direction: 'up' | 'down' | null,
+            breakoutIndex: number
+        ): QualifiedPattern => ({
+            id: 'symmetrical_triangle',
+            startIndex: 1,
+            endIndex: 6,
+            pivots: [],
+            shape: {
+                kind: 'trendline',
+                upper,
+                lower,
+                direction,
+                breakoutIndex,
+            },
+            touches: 4,
+        });
+        const dashedOf = (p: QualifiedPattern) => {
+            const [c] = buildPatternOverlayCandidates([p], bars, 1, DP);
+            return c.segments
+                .filter(s => s.style === 'dashed')
+                .map(s => [s.role, s.to.time, s.to.price]);
+        };
+
+        it('a directed-up pair: the upper line to the break bar, at the printed breakout', () => {
+            // Upper line 19 + i: 26 at bar 7 (28 at bar 9, 30 at the last bar).
+            expect(dashedOf(pair('up', 7))).toEqual([
+                ['boundary_upper', bars[7].time, 26],
+            ]);
+        });
+
+        it('a directed-down pair: the lower line to the break bar', () => {
+            // Lower line 8 + i: 15 at bar 7.
+            expect(dashedOf(pair('down', 7))).toEqual([
+                ['boundary_lower', bars[7].time, 15],
+            ]);
+        });
+
+        it('an undirected pair: both boundaries to the break bar', () => {
+            expect(dashedOf(pair(null, 7))).toEqual([
+                ['boundary_upper', bars[7].time, 26],
+                ['boundary_lower', bars[7].time, 15],
+            ]);
+        });
+
+        it('a flag: the breakout channel line to the break bar, the other line to the flag end', () => {
+            const [c] = buildPatternOverlayCandidates(
+                [
+                    {
+                        id: 'bull_flag',
+                        startIndex: 0,
+                        endIndex: 8,
+                        pivots: [],
+                        shape: {
+                            kind: 'flag',
+                            direction: 'up',
+                            poleBase: { index: 0, price: 80, kind: 'low' },
+                            poleTop: { index: 3, price: 100, kind: 'high' },
+                            upper: {
+                                start: { index: 4, price: 99 },
+                                end: { index: 8, price: 97 },
+                                touches: [],
+                            },
+                            lower: {
+                                start: { index: 5, price: 96 },
+                                end: { index: 7, price: 95 },
+                                touches: [],
+                            },
+                            flagExtreme: { index: 7, price: 95 },
+                            breakoutIndex: 10,
+                        },
+                        touches: 4,
+                    },
+                ],
+                bars,
+                1,
+                DP
+            );
+            expect(
+                c.segments
+                    .filter(s => s.style === 'dashed')
+                    .map(s => [s.role, s.to.time, s.to.price])
+            ).toEqual([
+                ['channel_upper', bars[10].time, 96],
+                ['channel_lower', bars[8].time, 94.5],
+            ]);
+        });
     });
 
     it('rounding: the drawing is the sampled arc, one leg per pair of samples', () => {

@@ -87,8 +87,9 @@ function lineSegment(
 
 /**
  * The dashed continuation of `line` from its last touch to bar `toIndex` —
- * the bar its printed value is read at (the last bar for a breakout or an
- * undirected boundary, the break bar for a neckline). Without it the chart
+ * the bar its printed value is read at (for a breakout, an undirected boundary
+ * or a neckline: the break bar, the first close beyond the line, or the last
+ * bar while nothing has closed beyond it). Without it the chart
  * stopped at the last touch while the prompt quoted the line further right,
  * so the printed level sat on nothing drawn. Empty when the line already
  * ends there.
@@ -228,9 +229,9 @@ interface PatternDrawing {
  * Every line is solid between its touches and continues dashed to the bar
  * its printed value is read at, so each boundary value the prompt block
  * prints lies on a drawn line: the breakout side of a directed boundary pair
- * and of a flag to the last bar, both boundaries of an undirected pair to
- * the last bar, a flag's other channel line to the flag's last bar (its key
- * point) and the neckline to the break bar.
+ * and of a flag, both boundaries of an undirected pair and the neckline to
+ * the break bar (`shape.breakoutIndex`: the first close beyond the line, else
+ * the last bar), and a flag's other channel line to the flag's last bar (its key point).
  */
 function drawingOf(
     pattern: QualifiedPattern,
@@ -238,17 +239,17 @@ function drawingOf(
     bars: readonly Bar[]
 ): PatternDrawing {
     const { shape } = pattern;
-    const lastIndex = bars.length - 1;
     switch (shape.kind) {
         case 'trendline': {
-            // A side is read at the last bar when it is the breakout side or
-            // the pair is undirected; otherwise only its touches are drawn.
+            // A side is read at the break bar (the first close beyond the
+            // line, else the last bar) when it is the breakout side or the pair is undirected;
+            // otherwise only its touches are drawn.
             const readAt = (
                 line: PatternLine,
                 side: PatternBreakoutDirection
             ): number =>
                 direction === null || direction === side
-                    ? lastIndex
+                    ? shape.breakoutIndex
                     : line.end.index;
             return {
                 segments: [
@@ -284,13 +285,13 @@ function drawingOf(
                     ...extendedLine(
                         bars,
                         shape.upper,
-                        up ? lastIndex : pattern.endIndex,
+                        up ? shape.breakoutIndex : pattern.endIndex,
                         'channel_upper'
                     ),
                     ...extendedLine(
                         bars,
                         shape.lower,
-                        up ? pattern.endIndex : lastIndex,
+                        up ? pattern.endIndex : shape.breakoutIndex,
                         'channel_lower'
                     ),
                 ],

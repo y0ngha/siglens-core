@@ -221,7 +221,13 @@ function trendline(
         startIndex: 0,
         endIndex: 10,
         pivots: [],
-        shape: { kind: 'trendline', upper, lower, direction },
+        shape: {
+            kind: 'trendline',
+            upper,
+            lower,
+            direction,
+            breakoutIndex: 29,
+        },
         touches: 4,
     };
 }
@@ -479,6 +485,7 @@ describe('dayFlags: other families', () => {
                 upper: risingUpper,
                 lower: flatLower,
                 flagExtreme: { index: 8, price: 95 },
+                breakoutIndex: 29,
             },
             touches: 4,
         };
@@ -522,6 +529,24 @@ describe('dayFlags: failed-breakout status against the frozen level', () => {
         const bars = series(30, { 15: { close: 120 }, 29: { close: 120 } });
         // On the sliding line the last close (120 against 129) is back inside after a break, so
         // the engine's test says failed; on the line frozen at 115 it is still beyond.
+        expect(
+            flagsOf(pattern, directed('up', { breakoutLevel: 115 }), bars)
+                .failedDisagree
+        ).toBe(true);
+    });
+
+    it("is judged against a reference that ignores the pattern's own breakoutIndex", () => {
+        const bars = series(30, { 15: { close: 120 }, 29: { close: 120 } });
+        const frozenAt15 = {
+            ...pattern,
+            shape: { ...pattern.shape, breakoutIndex: 15 },
+        } as QualifiedPattern;
+        // An engine that froze at the true break bar agrees with the reference ...
+        expect(
+            flagsOf(frozenAt15, directed('up', { breakoutLevel: 115 }), bars)
+                .failedDisagree
+        ).toBe(false);
+        // ... and one that kept reading the last bar does not.
         expect(
             flagsOf(pattern, directed('up', { breakoutLevel: 115 }), bars)
                 .failedDisagree

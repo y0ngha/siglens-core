@@ -180,6 +180,8 @@ describe('isSpentPattern', () => {
                     touches: [],
                 },
                 direction: null,
+                // The first close beyond a boundary: bar 4 closes at 14.8 over the upper 11.
+                breakoutIndex: 4,
             },
             touches: 4,
         };
@@ -207,6 +209,45 @@ describe('isSpentPattern', () => {
         expect(isSpentPattern(pattern, geometry, down.slice(0, 5), 1)).toBe(
             true
         );
+    });
+
+    it('an undirected pair reaches its boundaries where the geometry froze them, not where the lines stand at the last bar', () => {
+        // Both lines fall 1 per bar (upper 21 − i, lower 19 − i, height 2).
+        // Frozen at bar 5 they stand at 16 / 14, so a flat 15 is inside by
+        // more than a height; read at the last bar (9) they stand at 12 / 10
+        // and the same 15 is already a full height over the upper line.
+        const bars: Bar[] = Array.from({ length: 10 }, (_, i) => ({
+            time: i,
+            open: 15,
+            high: 15,
+            low: 15,
+            close: 15,
+            volume: 1,
+        }));
+        const pair = (breakoutIndex: number): QualifiedPattern => ({
+            id: 'rectangle',
+            startIndex: 0,
+            endIndex: 3,
+            pivots: [],
+            shape: {
+                kind: 'trendline',
+                upper: {
+                    start: { index: 0, price: 21 },
+                    end: { index: 3, price: 18 },
+                    touches: [],
+                },
+                lower: {
+                    start: { index: 0, price: 19 },
+                    end: { index: 3, price: 16 },
+                    touches: [],
+                },
+                direction: null,
+                breakoutIndex,
+            },
+            touches: 4,
+        });
+        expect(spent(pair(5), bars, 1)).toBe(false);
+        expect(spent(pair(9), bars, 1)).toBe(true);
     });
 
     it('the prompt leaves a fulfilled pattern out of its candidates and overlays', () => {

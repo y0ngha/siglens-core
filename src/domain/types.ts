@@ -4572,11 +4572,14 @@ export type PatternBreakoutDirection = 'up' | 'down';
  */
 export interface PatternGeometry {
     keyPoints: PatternKeyPoint[];
-    /** Neckline / boundary / handle resistance / rim / flag channel edge the pattern breaks through. */
+    /**
+     * Neckline / boundary / handle resistance / rim / flag channel edge the pattern breaks through. Always > 0
+     * and on the pattern's side of {@link invalidationLevel}; a sloped line is read at the shape's `breakoutIndex`.
+     */
     breakoutLevel: number;
     /** Textbook measured-move height (head→neckline, flagpole length, cup depth, …). Always > 0. */
     height: number;
-    /** `breakoutLevel ± height` in the breakout direction. */
+    /** `breakoutLevel ± height` in the breakout direction. Always > 0: a measured move that reaches zero is not offered. */
     measuredTarget: number;
     /** `breakoutLevel ± height / 2` — the 50% partial target. */
     conservativeTarget: number;
@@ -4604,9 +4607,9 @@ export interface UndirectedPatternGeometry {
     keyPoints: PatternKeyPoint[];
     /** Boundary width the measured move would use once a side breaks. Always > 0. */
     height: number;
-    /** Upper boundary read at the last bar. */
+    /** Upper boundary read at the shape's `breakoutIndex` (the break bar, or the last bar while nothing has closed beyond a line). Always > 0. */
     upperLevel: number;
-    /** Lower boundary read at the last bar. */
+    /** Lower boundary read at the shape's `breakoutIndex` (the break bar, or the last bar while nothing has closed beyond a line). Always > 0. */
     lowerLevel: number;
     direction: null;
 }
@@ -4659,6 +4662,15 @@ export interface TrendlinePatternShape {
     lower: PatternLine;
     /** `null` when the breakout side is undetermined (no prior trend). */
     direction: PatternBreakoutDirection | null;
+    /**
+     * First bar after the pattern's last touch that closed beyond the breakout
+     * side's line (strictly, no slack), else the last bar. An undirected pair
+     * takes the earlier of the first close above the upper line and the first
+     * close below the lower one. Breakout and boundary levels, the status and
+     * the drawing all read the lines at this bar, so a level never slides
+     * after the break — the same freeze as the head and shoulders neckline.
+     */
+    breakoutIndex: number;
 }
 
 /** @internal Bull/bear flag or pennant: a pole of two confirmed pivots, then a channel fitted on bar highs/lows. */
@@ -4677,6 +4689,12 @@ export interface FlagPatternShape {
      * the flag has stopped extending.
      */
     flagExtreme: PatternPoint;
+    /**
+     * First bar after the flag's fitted end that closed beyond the breakout-side
+     * channel line (strictly, no slack), else the last bar. The breakout level
+     * and its drawing are read there, so they stop moving once price breaks out.
+     */
+    breakoutIndex: number;
 }
 
 /** @internal High tight flag: pole base/top and the lowest low after the top. */

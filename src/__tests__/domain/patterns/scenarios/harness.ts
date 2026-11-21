@@ -113,8 +113,11 @@ const LINE_ROLES = new Set([
  * beyond ε over its solid touch-to-touch span, a neckline holds between its
  * two troughs,
  * each line family meets its touch count, and no two drawn patterns with
- * opposite directions share bars, and every printed boundary value lies on
- * a drawn line. Returns readable violations (empty = ok).
+ * opposite directions share bars, every printed boundary value lies on
+ * a drawn line, every offered geometry has positive prices (breakout, targets,
+ * undirected levels), a breakout on its pattern's side of the invalidation
+ * and a printed breakout equal to the line at the shape's `breakoutIndex`.
+ * Returns readable violations (empty = ok).
  */
 export function invariantViolations(run: PipelineRun): string[] {
     const slack = BOUNDARY_CONTAINMENT_ATR * run.atr + 1e-9;
@@ -180,6 +183,7 @@ export function invariantViolations(run: PipelineRun): string[] {
     }
 
     violations.push(...printedLevelsOffLine(run));
+    violations.push(...geometryViolations(run));
 
     const directions = run.qualified.map(q => ({
         q,
@@ -197,6 +201,113 @@ export function invariantViolations(run: PipelineRun): string[] {
         }
     }
     return violations;
+}
+
+/** `a` and `b` agree within float noise. */
+const sameValue = (a: number, b: number): boolean => Math.abs(a - b) <= 1e-9;
+
+/**
+ * The break bar recomputed from OHLC, not read from the shape: the first bar
+ * from `from` whose close is strictly beyond `levelAt` on the `sign` side, else
+ * the last bar. Deliberately not `firstCloseBeyond`, so the invariant below
+ * does not trust the code that stored `breakoutIndex`.
+ */
+function breakBarOf(
+    bars: readonly Bar[],
+    levelAt: (i: number) => number,
+    sign: 1 | -1,
+    from: number
+): number {
+    const last = bars.length - 1;
+    return (
+        Array.from({ length: Math.max(0, last - from + 1) }, (_, k) => from + k)
+            .filter(i => sign * (bars[i].close - levelAt(i)) > 0)
+            .at(0) ?? last
+    );
+}
+
+/**
+ * What every offered geometry must hold, whatever the family: prices are
+ * positive, the breakout lies on the pattern's side of its invalidation, and
+ * a boundary pair's, a flag's or a neckline's printed level is the line read
+ * at the break bar recomputed from OHLC (never at a later bar), which is also
+ * the shape's stored `breakoutIndex`.
+ */
+function geometryViolations(run: PipelineRun): string[] {
+    return run.qualified.flatMap(q => {
+        const g = geometryOf(run, q);
+        const { shape } = q;
+        if (g.direction === null) {
+            if (shape.kind !== 'trendline') return [];
+            const { upper, lower } = shape;
+            const at = Math.min(
+                breakBarOf(
+                    run.bars,
+                    i => lineValueAt(upper, i),
+                    1,
+                    q.endIndex + 1
+                ),
+                breakBarOf(
+                    run.bars,
+                    i => lineValueAt(lower, i),
+                    -1,
+                    q.endIndex + 1
+                )
+            );
+            return [
+                ...(g.upperLevel > 0 && g.lowerLevel > 0
+                    ? []
+                    : [`${q.id} non-positive boundary level`]),
+                ...(shape.breakoutIndex === at &&
+                sameValue(g.upperLevel, lineValueAt(upper, at)) &&
+                sameValue(g.lowerLevel, lineValueAt(lower, at))
+                    ? []
+                    : [`${q.id} levels off the recomputed break bar`]),
+            ];
+        }
+        const sign = g.direction === 'up' ? 1 : -1;
+        const frozen =
+            shape.kind === 'trendline' || shape.kind === 'flag'
+                ? {
+                      line: sign === 1 ? shape.upper : shape.lower,
+                      from: q.endIndex + 1,
+                      stored: shape.breakoutIndex,
+                  }
+                : shape.kind === 'head_and_shoulders'
+                  ? {
+                        line: shape.neckline,
+                        from: q.pivots[q.pivots.length - 1].index + 1,
+                        stored: shape.breakoutIndex,
+                    }
+                  : null;
+        const at =
+            frozen === null
+                ? null
+                : breakBarOf(
+                      run.bars,
+                      i => lineValueAt(frozen.line, i),
+                      sign,
+                      frozen.from
+                  );
+        return [
+            ...(g.breakoutLevel > 0 &&
+            g.measuredTarget > 0 &&
+            g.conservativeTarget > 0
+                ? []
+                : [`${q.id} non-positive breakout or target`]),
+            ...(sign * (g.breakoutLevel - g.invalidationLevel) > 0
+                ? []
+                : [`${q.id} breakout not past its invalidation`]),
+            ...(frozen === null ||
+            at === null ||
+            (frozen.stored === at &&
+                sameValue(g.breakoutLevel, lineValueAt(frozen.line, at)))
+                ? []
+                : [
+                      `${q.id} breakout off the line at the recomputed break bar`,
+                  ]),
+        ];
+    });
 }
 
 /** A segment of `role` ending at bar `index` at `price` (within float noise). */
@@ -217,12 +328,12 @@ function endsOn(
 /**
  * Every boundary value the prompt block prints lies on a drawn line, at the
  * bar it is read at: the breakout side (both sides when undirected) of a
- * boundary pair and a flag's breakout channel at the last bar, a flag's
+ * boundary pair and a flag's breakout channel at the break bar (the last bar
+ * before a break, `breakoutIndex`), a flag's
  * other channel line at the flag's end (its key point), a neckline at its
  * break bar.
  */
 function printedLevelsOffLine(run: PipelineRun): string[] {
-    const lastTime = run.bars[run.bars.length - 1].time;
     return run.qualified.flatMap(q => {
         const overlay = run.overlays.find(
             o => o.id === patternOverlayId(q, run.bars)
@@ -232,13 +343,14 @@ function printedLevelsOffLine(run: PipelineRun): string[] {
         const { shape } = q;
         const expected: [string, number, number][] = [];
         if (shape.kind === 'trendline') {
+            const breakTime = run.bars[shape.breakoutIndex].time;
             if (g.direction === null) {
-                expected.push(['boundary_upper', lastTime, g.upperLevel]);
-                expected.push(['boundary_lower', lastTime, g.lowerLevel]);
+                expected.push(['boundary_upper', breakTime, g.upperLevel]);
+                expected.push(['boundary_lower', breakTime, g.lowerLevel]);
             } else {
                 expected.push([
                     g.direction === 'up' ? 'boundary_upper' : 'boundary_lower',
-                    lastTime,
+                    breakTime,
                     g.breakoutLevel,
                 ]);
             }
@@ -247,7 +359,7 @@ function printedLevelsOffLine(run: PipelineRun): string[] {
             const up = g.direction === 'up';
             expected.push([
                 up ? 'channel_upper' : 'channel_lower',
-                lastTime,
+                run.bars[shape.breakoutIndex].time,
                 g.breakoutLevel,
             ]);
             // The other channel line's printed key point, at the flag's end.

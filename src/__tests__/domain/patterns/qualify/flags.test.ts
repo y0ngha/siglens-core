@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import type { Bar, PivotPoint } from '@/domain/types';
 import type { QualifyContext } from '@/domain/patterns/qualify/context';
 import { qualifyFlags } from '@/domain/patterns/qualify/flags';
 import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
@@ -142,5 +143,95 @@ describe("qualifyFlags — flag or pennant is read over the channel's touches", 
                 )
             )
         ).toEqual(['bull_flag']);
+    });
+});
+
+describe('qualifyFlags — the breakout bar is frozen at the first close beyond the channel line', () => {
+    // The base flag ends at bar 23 (upper line flat at 107.8, lower at 106.3).
+    // `after` bars follow it: each is [high, low] and closes at its low.
+    const base = zigzag(
+        () => 107.8,
+        () => 106.3
+    );
+    const outside: [number, number] = [109.6, 108.7];
+    const only = (after: [number, number][]) => {
+        const [q] = qualifyFlags(flagCtx([...base, ...after]));
+        return q;
+    };
+
+    /** The same chart mirrored around 200: a bear flag breaking down. */
+    const mirrored = (ctx: QualifyContext): QualifyContext => {
+        const flip = (price: number): number => 200 - price;
+        const bars: Bar[] = ctx.bars.map(b => ({
+            ...b,
+            open: flip(b.open),
+            high: flip(b.low),
+            low: flip(b.high),
+            close: flip(b.close),
+        }));
+        const pivots: PivotPoint[] = ctx.pivots.map(p => ({
+            index: p.index,
+            price: flip(p.price),
+            kind: p.kind === 'high' ? 'low' : 'high',
+        }));
+        return { ...ctx, bars, pivots };
+    };
+
+    it('is the first bar after the fitted end that closes above the upper line (bull flag)', () => {
+        const q = only([outside, outside]);
+        expect([q.id, q.endIndex, q.shape]).toMatchObject([
+            'bull_flag',
+            23,
+            { kind: 'flag', breakoutIndex: 24 },
+        ]);
+    });
+
+    it('a close equal to the line is not a break: the next close beyond it is', () => {
+        // Bar 24 reaches 109 but closes at 107.8, exactly on the flat upper line.
+        const q = only([[109, 107.8], outside, outside]);
+        expect(q.shape).toMatchObject({ kind: 'flag', breakoutIndex: 25 });
+        expect(q.endIndex).toBe(23);
+    });
+
+    it("a close over the line on the flag's own last bar (inside the containment slack) is not the break", () => {
+        // Bar 23 reaches 108 and closes at 107.9, over the 107.8 line by less
+        // than the 0.25 slack that still counts as inside; the break is read
+        // from the bar after the fitted end.
+        const q = qualifyFlags(
+            flagCtx([...base.slice(0, -1), [108, 107.9], outside, outside])
+        )[0];
+        expect(q.endIndex).toBe(23);
+        expect(q.shape).toMatchObject({ breakoutIndex: 24 });
+    });
+
+    it('stays at the break bar however far price runs afterwards', () => {
+        const q = only([outside, [115, 114], [120, 119]]);
+        expect(q.shape).toMatchObject({ breakoutIndex: 24 });
+    });
+
+    it('is the last bar while no close has gone beyond the line', () => {
+        const q = only([]);
+        expect(q.shape).toMatchObject({
+            breakoutIndex: q.endIndex,
+            kind: 'flag',
+        });
+        expect(q.endIndex).toBe(base.length + 10);
+    });
+
+    it('a bear flag breaks on a close below its lower line, the mirror of the bull flag', () => {
+        const [q] = qualifyFlags(
+            mirrored(flagCtx([...base, outside, outside]))
+        );
+        expect([q.id, q.shape]).toMatchObject([
+            'bear_flag',
+            { direction: 'down', breakoutIndex: 24 },
+        ]);
+    });
+
+    it('a bear flag also ignores a close equal to its line', () => {
+        const [q] = qualifyFlags(
+            mirrored(flagCtx([...base, [109, 107.8], outside, outside]))
+        );
+        expect(q.shape).toMatchObject({ breakoutIndex: 25 });
     });
 });

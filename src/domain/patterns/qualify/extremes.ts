@@ -7,6 +7,7 @@ import type {
 } from '@/domain/types';
 import {
     classifyLineDrift,
+    firstCloseBeyond,
     fitBoundaryLine,
     lineValueAt,
 } from '@/domain/patterns/boundaryLines';
@@ -321,10 +322,14 @@ function necklineBreakIndex(
     ctx: QualifyContext,
     neckline: PatternLine,
     rightShoulderIndex: number,
-    sign: number
+    sign: 1 | -1
 ): number {
-    for (let i = rightShoulderIndex + 1; i <= ctx.lastIndex; i++) {
-        if (sign * (ctx.bars[i].close - lineValueAt(neckline, i)) < 0) return i;
-    }
-    return ctx.lastIndex;
+    // A regular pattern (sign 1) breaks by closing BELOW the neckline.
+    return firstCloseBeyond(
+        ctx.bars,
+        i => lineValueAt(neckline, i),
+        sign === 1 ? -1 : 1,
+        rightShoulderIndex + 1,
+        ctx.lastIndex
+    );
 }

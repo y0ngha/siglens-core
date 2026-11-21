@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
     classifyLineDrift,
+    firstCloseBeyond,
     fitBoundaryLine,
     lineValueAt,
     trendlineHeight,
@@ -30,6 +31,64 @@ describe('lineValueAt', () => {
 
     it('is flat at the start price when start and end share a bar', () => {
         expect(lineValueAt(line([3, 7], [3, 9]), 8)).toBe(7);
+    });
+});
+
+describe('firstCloseBeyond', () => {
+    // Closes by bar index; a flat level of 10 unless a test passes its own.
+    const closes = (values: number[]) =>
+        makeHLBars(values.map((c): [number, number] => [c, c]));
+    const flat = (): number => 10;
+    const last = (values: number[]): number => values.length - 1;
+
+    it('is the first bar from `from` whose close is strictly above the level (sign +1)', () => {
+        const v = [9, 11, 12, 11];
+        expect(firstCloseBeyond(closes(v), flat, 1, 0, last(v))).toBe(1);
+    });
+
+    it('is the first bar whose close is strictly below the level (sign −1)', () => {
+        const v = [11, 9, 8, 9];
+        expect(firstCloseBeyond(closes(v), flat, -1, 0, last(v))).toBe(1);
+    });
+
+    it('a close equal to the level is not a break, in either direction', () => {
+        const v = [9, 10, 10, 10.01];
+        expect(firstCloseBeyond(closes(v), flat, 1, 0, last(v))).toBe(3);
+        const w = [11, 10, 10, 9.99];
+        expect(firstCloseBeyond(closes(w), flat, -1, 0, last(w))).toBe(3);
+    });
+
+    it('a break before `from` is ignored', () => {
+        const v = [12, 9, 9, 11];
+        expect(firstCloseBeyond(closes(v), flat, 1, 1, last(v))).toBe(3);
+    });
+
+    it('a break at `from` counts', () => {
+        const v = [9, 9, 11, 9];
+        expect(firstCloseBeyond(closes(v), flat, 1, 2, last(v))).toBe(2);
+    });
+
+    it('is the last bar when no close is beyond the level', () => {
+        const v = [9, 9.5, 10, 9];
+        expect(firstCloseBeyond(closes(v), flat, 1, 0, last(v))).toBe(3);
+    });
+
+    it('is the last bar when `from` is past it', () => {
+        const v = [9, 11];
+        expect(firstCloseBeyond(closes(v), flat, 1, 5, last(v))).toBe(1);
+    });
+
+    it('does not read bars after `lastIndex`', () => {
+        const v = [9, 9, 11];
+        expect(firstCloseBeyond(closes(v), flat, 1, 0, 1)).toBe(1);
+    });
+
+    it('reads the level at each bar: a sloped line is compared where the bar stands', () => {
+        // Level rises 1 per bar from 10; closes 9.5, 10.9, 12.5 → only the
+        // last is above its own bar's level (12); against a flat 10, bar 1
+        // would already be a break.
+        const v = [9.5, 10.9, 12.5];
+        expect(firstCloseBeyond(closes(v), i => 10 + i, 1, 0, last(v))).toBe(2);
     });
 });
 

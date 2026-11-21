@@ -20,6 +20,7 @@ import {
 import type { OutcomeBarTuple, OutcomeWindow } from '@/domain/outcomes/types';
 import { lineValueAt } from '@/domain/patterns/boundaryLines';
 import {
+    BOUNDARY_CONTAINMENT_ATR,
     PIVOT_REVERSAL_ATR_MULT,
     SCREEN_LOOKBACK_BARS,
 } from '@/domain/patterns/constants';
@@ -31,7 +32,6 @@ import type {
     Bar,
     FlagPatternShape,
     PatternGeometry,
-    PatternLine,
     QualifiedPattern,
     QualifiedPatternGeometry,
     TrendlinePatternShape,
@@ -144,8 +144,8 @@ export interface DayFlags {
     printedBroken: boolean | null;
     frozenBroken: boolean | null;
     /**
-     * `isFailedBreakout` disagrees with the same test run on the level frozen at the
-     * recomputed break bar; `null` for a family with no boundary lines.
+     * `isFailedBreakout` disagrees with the failed-breakout rule recomputed from OHLC on
+     * the level frozen at the recomputed break bar; `null` for a family with no boundary lines.
      */
     failedDisagree: boolean | null;
 }
@@ -178,10 +178,11 @@ function firstBreak(
 }
 
 /**
- * `isFailedBreakout` on the level frozen at `breakIndex`: the side's line becomes a flat
- * line at its value there, and the closes between the line's last touch and the break are
- * shifted so their offset from the flat level equals their offset from the real line
- * (before the break the frozen level IS the line).
+ * The failed-breakout rule recomputed from OHLC and the containment slack, on the level
+ * frozen at `breakIndex` (the recomputed first close beyond the line): a close beyond the
+ * frozen level by more than the slack after the line's last touch, and the last close back
+ * within the slack of it. Independent of `isFailedBreakout` and of any `breakoutIndex` the
+ * pattern carries (it is the reference the engine's own reading is compared against).
  */
 function frozenFailedBreakout(
     pattern: LinePattern,
@@ -190,28 +191,20 @@ function frozenFailedBreakout(
     side: 'up' | 'down',
     breakIndex: number
 ): boolean {
+    if (!(atr > 0) || bars.length === 0) return false;
     const line = side === 'up' ? pattern.shape.upper : pattern.shape.lower;
-    const level = lineValueAt(line, breakIndex);
-    const flat: PatternLine = {
-        start: { index: line.end.index, price: level },
-        end: { index: line.end.index, price: level },
-        touches: line.touches,
-    };
-    const shifted = bars.map((bar, i) =>
-        i > line.end.index && i < breakIndex
-            ? { ...bar, close: bar.close - lineValueAt(line, i) + level }
-            : bar
-    );
-    const shape = {
-        ...pattern.shape,
-        upper: side === 'up' ? flat : pattern.shape.upper,
-        lower: side === 'down' ? flat : pattern.shape.lower,
-    };
-    return isFailedBreakout(
-        { ...pattern, shape },
-        { direction: side, breakoutLevel: level },
-        shifted,
-        atr
+    const sign = side === 'up' ? 1 : -1;
+    const slack = BOUNDARY_CONTAINMENT_ATR * atr;
+    const last = bars.length - 1;
+    const start = line.end.index + 1;
+    const offset = (i: number): number =>
+        sign * (bars[i].close - lineValueAt(line, Math.min(i, breakIndex)));
+    return (
+        offset(last) <= slack &&
+        Array.from(
+            { length: Math.max(0, last - start) },
+            (_, k) => start + k
+        ).some(i => offset(i) > slack)
     );
 }
 
