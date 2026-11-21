@@ -23,6 +23,7 @@ import {
     recordAnalysisUsageSafely,
 } from '@/application/usage';
 import { computeRiskLevel } from '@/domain/analysis/riskLevel';
+import { trendBasisOf } from '@/domain/analysis/analysisTrend';
 import {
     isFallbackAnalysis,
     normalizeCachedAnalysisResponse,
@@ -500,6 +501,7 @@ async function runAnalysisImpl(
         patternScreenFailure,
         patternArbitration,
         patternGeometries,
+        trend: trendReading,
     } = buildAnalysisPrompt(
         symbol,
         companyName,
@@ -697,8 +699,20 @@ async function runAnalysisImpl(
         events: marketEventCandidates,
         earningsDates: options.earningsDates,
     });
+    // `trend` is computed too, from the same reading the prompt stated: EMA20's 20-bar
+    // move in ATR and the close against EMA20. The model's value is overwritten, and
+    // `trendBasis` records what decided it. When the reading is `null` (too little
+    // history, no usable ATR or close, or misaligned series) nothing is overwritten and
+    // there is no basis: an unmeasurable chart is not proof of "neutral", so the model's
+    // own value stands.
     const result = {
         ...reconciled,
+        ...(trendReading !== null
+            ? {
+                  trend: trendReading.trend,
+                  trendBasis: trendBasisOf(trendReading),
+              }
+            : {}),
         riskLevel,
         trendlines: resolvedOverlays.trendlines,
         chartOverlays: resolvedOverlays.chartOverlays,

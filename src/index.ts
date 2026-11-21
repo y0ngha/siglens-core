@@ -1206,6 +1206,7 @@ export type {
     Trendline,
     TrendlineDirection,
     TrendlinePoint,
+    TrendBasis,
     TrendState,
     OverlayKind,
     StrategyOverlayKind,

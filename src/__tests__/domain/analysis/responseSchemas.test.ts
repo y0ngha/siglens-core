@@ -631,6 +631,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
     const sample: Required<AnalysisResponse> = {
         summary: '요약',
         trend: 'bullish',
+        trendBasis: { slopeAtr: 1.2, lookbackBars: 20, emaPeriod: 20 },
         indicatorResults: [indicatorSample],
         riskLevel: 'medium',
         keyLevels: keyLevelsSample,
@@ -662,6 +663,8 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             key =>
                 key !== 'analyzedAt' &&
                 key !== 'dataAsOf' &&
+                // Computed by core from the bars (`computeAnalysisTrend`), never asked of the model.
+                key !== 'trendBasis' &&
                 key !== 'chartOverlays' &&
                 key !== 'trendlines'
         )

@@ -25,6 +25,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternScreenFailure: null,
         patternArbitration: { kept: [], dropped: [] },
         patternGeometries: new Map(),
+        trend: null,
     })),
 }));
 vi.mock('@/domain/indicators/fearGreed', async () => ({
@@ -81,6 +82,10 @@ import {
     PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
 import { DEFAULT_TIER } from '@/domain/tier';
+import {
+    TREND_EMA_PERIOD,
+    TREND_SLOPE_LOOKBACK,
+} from '@/domain/signals/constants';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
@@ -452,6 +457,84 @@ describe('runAnalysis', () => {
             }
             // Two bars: no volatility, trend or event points -> 'low'.
             expect(levels).toEqual(['low', 'low']);
+        });
+
+        describe('computed trend', () => {
+            const reading = {
+                trend: 'bearish' as const,
+                slopeAtr: -1.84,
+                emaLast: 175.1,
+                emaFrom: 182.4,
+                close: 171.2,
+            };
+            const promptWith = (trend: typeof reading | null) => ({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: [],
+                patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
+                patternGeometries: new Map(),
+                trend,
+            });
+
+            it("overwrites the model's trend with the computed one and attaches trendBasis", async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(
+                    promptWith(reading)
+                );
+                // The model said 'bullish' (mockRawResult); the computed reading says 'bearish'.
+                const result = await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                );
+                expect(result.status).toBe('done');
+                if (result.status !== 'done') return;
+                expect(result.unfilteredResult.trend).toBe('bearish');
+                expect(result.unfilteredResult.trendBasis).toEqual({
+                    slopeAtr: -1.84,
+                    lookbackBars: TREND_SLOPE_LOOKBACK,
+                    emaPeriod: TREND_EMA_PERIOD,
+                });
+            });
+
+            it('writes the computed trend and its basis to the cache', async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(
+                    promptWith(reading)
+                );
+                await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                );
+                const stored = mockCacheSet.mock.calls
+                    .map(call => call[1])
+                    .find(value => value?.trendBasis !== undefined);
+                expect(stored?.trend).toBe('bearish');
+                expect(stored?.trendBasis.slopeAtr).toBe(-1.84);
+            });
+
+            it("keeps the model's trend and attaches no trendBasis when the trend cannot be measured", async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(promptWith(null));
+                const result = await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    mockTimeframe,
+                    false,
+                    undefined,
+                    { marketDataProvider: fakeProvider }
+                );
+                expect(result.status).toBe('done');
+                if (result.status !== 'done') return;
+                expect(result.unfilteredResult.trend).toBe('bullish');
+                expect('trendBasis' in result.unfilteredResult).toBe(false);
+            });
         });
 
         it('result carries dataAsOf = start time and close of the last bar the prompt used', async () => {
@@ -1704,6 +1787,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternScreenFailure: null,
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
+                trend: null,
             });
 
             await runAnalysis(
@@ -1749,6 +1833,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternScreenFailure: null,
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
+                trend: null,
             });
             const reconciledWithCandidate: AnalysisResponse = {
                 ...mockRawResult,
@@ -1818,6 +1903,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternScreenFailure: null,
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map([[overlayCandidate.id, printed]]),
+                trend: null,
             });
             const enrichedWithMiscopy: AnalysisResponse = {
                 ...mockRawResult,
@@ -1872,6 +1958,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternScreenFailure: null,
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
+                trend: null,
             });
             const reconciledWithUnknownId: AnalysisResponse = {
                 ...mockRawResult,
@@ -1939,6 +2026,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternScreenFailure: null,
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
+                trend: null,
             });
             const citedByStrategy: AnalysisResponse = {
                 ...mockRawResult,
@@ -2058,6 +2146,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternScreenFailure: null,
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
+                trend: null,
             });
             const warnSpy = vi
                 .spyOn(console, 'warn')
@@ -2088,6 +2177,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternScreenFailure: 'Error: qualifier exploded',
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
+                trend: null,
             };
 
             it('pattern screening failed 경고에 symbol·timeframe·error를 남긴다', async () => {
@@ -2168,6 +2258,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                         dropped: [dropped],
                     },
                     patternGeometries: new Map(),
+                    trend: null,
                 });
                 const infoSpy = vi
                     .spyOn(console, 'info')

@@ -112,6 +112,7 @@ import type {
     Timeframe,
     Trend,
 } from '@/domain/types';
+import { computeAnalysisTrend } from '@/domain/analysis/analysisTrend';
 import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
 import { buildIndicatorStateSection } from '@/domain/analysis/indicatorState';
 import {
@@ -1965,7 +1966,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Apply these rules to summary, strategyResults[].summary, candlePatterns[].summary, patternSummaries[].summary, and every actionRecommendation text field.',
         '',
         '### Summary Writing Checklist (follow every step)',
-        '1. STATE the overall trend direction and strength in plain language.',
+        '1. STATE the overall trend direction and strength in plain language. When ## Deterministic Metrics gives a `### Trend (computed)` value, state that trend.',
         '2. SUMMARIZE key indicator findings — explain practical meaning, not raw values (e.g., "주가가 빠르게 상승하여 단기 조정 가능성이 있습니다" not "RSI is 75").',
         '3. REPORT detected chart/candle patterns and what they typically predict.',
         '4. INCLUDE strategy conclusions — for each strategy in strategyResults, state its finding (e.g., MACD/MA cycle stage, divergence detection result, mean reversion signal, breakout setup, Fibonacci level, Elliott wave position). If a strategy contradicts the dominant trend, explicitly state the conflict.',
@@ -2565,7 +2566,7 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   it lets the pivot block use the last bar once its session has closed (instead of
  *   always the bar before). Omitted, daily pivots use the bar before the last, as they
  *   did before the parameter existed.
- * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries }` — see {@link TechnicalAssembledPrompt}.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries, trend }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2685,6 +2686,8 @@ export function buildAnalysisPrompt(
         marketReference,
         fmt: { timeframe, quoting },
     });
+    // Computed once: the prompt prints it and the caller overwrites the model's `trend` with it.
+    const trendReading = computeAnalysisTrend(bars, indicators);
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
     const overlayCandidatesSection =
         formatChartOverlayCandidatesSection(overlayCandidates);
@@ -2851,7 +2854,8 @@ export function buildAnalysisPrompt(
             marketReference,
             quoting,
             marketEvents,
-            earningsDates
+            earningsDates,
+            trendReading
         ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),
@@ -2898,5 +2902,6 @@ export function buildAnalysisPrompt(
             offeredPatternOverlayIds,
             patternCandidateGeometries
         ),
+        trend: trendReading,
     };
 }

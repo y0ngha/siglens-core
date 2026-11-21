@@ -197,6 +197,10 @@ export function filterAnalysisResult(
     const filtered: FilteredAnalysisResponse = {
         summary: allowSummary ? result.summary : null,
         trend: allowDirection ? result.trend : null,
+        // Rides the `direction` depth with `trend`: it is the basis of that label.
+        ...(result.trendBasis !== undefined
+            ? { trendBasis: allowDirection ? result.trendBasis : null }
+            : {}),
         indicatorResults: allowPartialDetail ? result.indicatorResults : null,
         riskLevel: allowPartialDetail ? result.riskLevel : null,
         keyLevels: allowPartialDetail ? result.keyLevels : null,

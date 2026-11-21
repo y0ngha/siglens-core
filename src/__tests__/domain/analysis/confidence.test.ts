@@ -963,6 +963,24 @@ describe('confidence', () => {
         });
     }); // enrichAnalysisWithConfidence
 
+    describe('model-supplied trendBasis', () => {
+        it('is dropped on the raw-reply path: the basis is core-computed, never the model', () => {
+            const result = enrichAnalysisWithConfidence(
+                {
+                    trend: 'bullish',
+                    trendBasis: {
+                        slopeAtr: 9,
+                        lookbackBars: 20,
+                        emaPeriod: 20,
+                    },
+                },
+                []
+            );
+
+            expect('trendBasis' in result).toBe(false);
+        });
+    });
+
     describe('normalizeCachedAnalysisResponse', () => {
         it('캐시된 id, confidenceWeight, renderConfig를 보존하면서 누락 필드를 정규화한다', () => {
             const renderConfig = makeSkillChartDisplay({ color: '#22c55e' });
@@ -1039,6 +1057,59 @@ describe('confidence', () => {
 
             expect('dataAsOf' in result).toBe(false);
         });
+
+        it('trendBasis를 보존한다 — 캐시 hit이 trend의 근거를 잃으면 안 된다', () => {
+            const trendBasis = {
+                slopeAtr: -1.84,
+                lookbackBars: 20,
+                emaPeriod: 20,
+            };
+            const result = normalizeCachedAnalysisResponse({
+                trend: 'bearish',
+                trendBasis,
+            });
+
+            expect(result.trendBasis).toEqual(trendBasis);
+        });
+
+        it.each([
+            ['없는 경우', undefined],
+            ['객체가 아닌 경우', 'x'],
+            ['기울기가 빠진 경우', { lookbackBars: 20, emaPeriod: 20 }],
+            [
+                '기울기가 유한하지 않은 경우',
+                { slopeAtr: Infinity, lookbackBars: 20, emaPeriod: 20 },
+            ],
+            [
+                '기울기가 문자열인 경우',
+                { slopeAtr: '1.2', lookbackBars: 20, emaPeriod: 20 },
+            ],
+            ['기간이 빠진 경우', { slopeAtr: 1.2, lookbackBars: 20 }],
+            ['룩백이 빠진 경우', { slopeAtr: 1.2, emaPeriod: 20 }],
+            [
+                '룩백이 정수가 아닌 경우',
+                { slopeAtr: 1.2, lookbackBars: 20.5, emaPeriod: 20 },
+            ],
+            [
+                'EMA 기간이 정수가 아닌 경우',
+                { slopeAtr: 1.2, lookbackBars: 20, emaPeriod: 19.5 },
+            ],
+            [
+                '룩백이 0 이하인 경우',
+                { slopeAtr: 1.2, lookbackBars: 0, emaPeriod: 20 },
+            ],
+            [
+                'EMA 기간이 0 이하인 경우',
+                { slopeAtr: 1.2, lookbackBars: 20, emaPeriod: -20 },
+            ],
+        ])(
+            'trendBasis가 %s 키 자체를 만들지 않는다 (보정 없이 버린다)',
+            (_label, trendBasis) => {
+                const result = normalizeCachedAnalysisResponse({ trendBasis });
+
+                expect('trendBasis' in result).toBe(false);
+            }
+        );
 
         it('문자열로 저장된 캐시 JSON도 파싱한 뒤 정규화한다', () => {
             const result = normalizeCachedAnalysisResponse(

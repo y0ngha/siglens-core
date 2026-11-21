@@ -1,6 +1,7 @@
 import { UNMATCHED_SKILL_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type {
     AnalysisDataAsOf,
+    TrendBasis,
     AnalysisResponse,
     CandlePatternSummary,
     ChartDisplayType,
@@ -490,6 +491,28 @@ function normalizeDataAsOf(value: unknown): AnalysisDataAsOf | undefined {
         : undefined;
 }
 
+/**
+ * Keep a cached `trendBasis` only when all three members are valid: a finite slope and
+ * positive integer lookback and period. A half-formed basis would print a tooltip that
+ * explains a different rule than the one that decided `trend`; absence already means
+ * "not measurable" to a consumer, so a corrupt value is dropped, never coerced.
+ */
+function normalizeTrendBasis(value: unknown): TrendBasis | undefined {
+    const obj = asObject(value);
+    const slopeAtr = asNumber(obj?.slopeAtr);
+    const lookbackBars = asNumber(obj?.lookbackBars);
+    const emaPeriod = asNumber(obj?.emaPeriod);
+    if (slopeAtr === undefined) return undefined;
+    if (lookbackBars === undefined || !Number.isInteger(lookbackBars)) {
+        return undefined;
+    }
+    if (emaPeriod === undefined || !Number.isInteger(emaPeriod)) {
+        return undefined;
+    }
+    if (lookbackBars <= 0 || emaPeriod <= 0) return undefined;
+    return { slopeAtr, lookbackBars, emaPeriod };
+}
+
 function parseCachedPayload(raw: unknown): unknown {
     return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
 }
@@ -531,10 +554,14 @@ export function normalizeCachedAnalysisResponse(
 
     const analyzedAt = asString(raw.analyzedAt);
     const dataAsOf = normalizeDataAsOf(raw.dataAsOf);
+    const trendBasis = normalizeTrendBasis(raw.trendBasis);
 
     return {
         summary: asString(raw.summary, EMPTY_ANALYSIS_FALLBACK_SUMMARY),
         trend: normalizeTrend(raw.trend),
+        // Kept on a cache read: `trendBasis` is attached after the model reply, so the
+        // raw-reply path never has one, but a stored result does and must keep it.
+        ...(trendBasis !== undefined ? { trendBasis } : {}),
         indicatorResults: compact(
             asArray(raw.indicatorResults).map(normalizeIndicatorGuideResult)
         ),

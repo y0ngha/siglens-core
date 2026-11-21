@@ -441,6 +441,11 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
     type: 'object',
     properties: {
         summary: { type: 'string' },
+        // Kept for backward compatibility with cached/parsed shapes (and so the model
+        // still states its own reading when the rule cannot be measured: short history, no usable
+        // ATR or close);
+        // core overwrites it with `computeAnalysisTrend`'s value after normalization
+        // whenever that can be measured, so the model's pick is then never shown.
         trend: TREND_SCHEMA,
         indicatorResults: {
             type: 'array',

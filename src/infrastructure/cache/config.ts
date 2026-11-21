@@ -1106,6 +1106,11 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * moving after the break; a pair broken before its apex keeps its geometry. A
  * measured move with a non-positive breakout or target, or a breakout past its
  * invalidation, is not offered (the pattern is dropped).
+ * The top-level `trend` is computed (EMA20's 20-bar move in ATR(14) and the close
+ * against EMA20) and stated in `## Deterministic Metrics` as `### Trend (computed)`;
+ * the model's value is overwritten, and kept only when it cannot be measured
+ * (under 40 bars, no usable ATR or close). Results carry an optional `trendBasis`. Bytes change for every technical
+ * prompt.
  *
  * @internal
  */

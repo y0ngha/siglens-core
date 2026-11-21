@@ -493,7 +493,8 @@ the union exposes every terminal case, and a missing handler becomes a compile e
 #### TS-3 — Interface optionality matches runtime
 
 A field the implementation defaults (`bars ?? []`) is optional in the interface; a field
-that is always present is not marked `?`. Keep the JSDoc consistent with the type (see
+that is always present is not marked `?`. A parameter carrying a fact the output must
+state is required (`T | null`), never optional with `undefined` silently omitting it. Keep the JSDoc consistent with the type (see
 [JD-1](#JD-1)).
 
 <a id="TS-4"></a>
