@@ -32,6 +32,10 @@ two checkouts.
 | `storedProvider.ts` | Market-data provider that serves stored bars up to a case's `asOf`. |
 | `markets.ts` | US / KRX session, currency, tick table and the clock instant of a case. |
 | `symbols.ts` | The 65 symbols. |
+| `engineEval.ts` | Engine evaluation CLI: candle and chart-pattern detection over a bars set, matched placebo, week-clustered intervals, G1 counters. |
+| `engineEvalCandles.ts`, `engineEvalPatterns.ts` | The candle and chart-pattern passes (pure). |
+| `engineEvalCompute.ts`, `engineEvalStats.ts`, `engineEvalTypes.ts` | Pools, bootstrap, seeded randomness and the pre-registered constants. |
+| `engineEvalCompare.ts` | Before/after comparison of two evaluation runs (G2). |
 
 ## The set
 
@@ -260,3 +264,69 @@ false for dates made under the shim.
 `src/__tests__/scripts/replay/`. No test reaches a provider or the network: the fetch path
 runs on a stubbed `fetch` that rejects by default, the runner on a stub analyzer, and bars
 are synthetic.
+
+## Engine evaluation (candle and chart-pattern engines)
+
+A placebo-controlled measurement of what `detectCandlePatternEntries` and the chart-pattern
+walk-forward (`screenChartPatterns`, `qualifyPatterns`, `computeCandidateGeometry`) print. No
+model call, no network, no cost; the only randomness is a seeded placebo draw (mulberry32,
+seed 20261121, one stream per event keyed by `sha256(symbol|t|pattern[|start time])`), so
+identical events draw identical placebos in every arm. An arm is a checkout: run the same set
+from two checkouts and compare.
+
+```bash
+npx tsx scripts/replay/engineEval.ts --set <set-dir> --out <run-dir> --arm before --gate c9
+npx tsx scripts/replay/engineEval.ts --bars <bars-dir> --out <run-dir> --arm before   # plain <SYMBOL>.json files
+npx tsx scripts/replay/engineEvalCompare.ts --before <run-dir> --after <run-dir> --out <dir>
+```
+
+`--only candles|patterns` and `--symbols A,B` narrow a run; `--gate c9|pivots|geometry` scores
+G1 for one PR (below); `engineEval.ts` then exits 2 when the gate did not pass (0 otherwise, 1 on an error). The output lives outside the repository (`--out` inside it is
+refused): `run.json` (core sha, a sha256 of the dirty diff when the tree is dirty, data
+fingerprint, every constant), `events.jsonl` (one row per candle event and per
+first-appearance pattern instance) and `summary.json` (with the bootstrap's week list, taken
+from the bars so a narrowed run resamples the same weeks).
+
+- **Candles.** Events are the entries ending at bar `t` on the production 500-bar window.
+  Outcome `Y_h = d x (close[t+h] - close[t]) / ATR14[t]`, `h` in 1, 5, 10 (primary 5), percent
+  beside it. Placebo: 20 dates of the same symbol within 250 bars, matched on the prior-move
+  bucket (decline / none / advance, 10 bars, 1 ATR, read at the same offset before the
+  pattern's first bar). Edge `E = mean(Y - mean placebo)`; the interval clusters by ISO week
+  (percentile, 2,000 resamples, resamples without any observation of a pool are counted and
+  skipped); pools are bullish, bearish and pooled, Holm-adjusted; per pattern from n = 100,
+  with its US/KR and time-half splits and a Holm adjustment across the families.
+- **Chart patterns.** A 500-bar window every day from bar 500, directed instances at their
+  first appearance. Outcome: measured target (and the 50% target) touched within 60 bars before
+  a close beyond the invalidation. Placebo: the same levels transplanted by ATR% to 20 dates of
+  the same symbol matched on the 20-bar / 2 ATR prior-trend bucket. `D` = hit share minus the
+  placebo's, with the ISO-week interval and a 13-week-block interval beside it (G3 reads the
+  wider). The WP-06 `labelPatternOutcome` result (20 bars) is reported beside it.
+- **Placebo dates leave out the event's forward window** (an approved deviation from the
+  brief): a date within 10 bars of a candle event, or 60 bars of a pattern event, shares its
+  outcome window, so it is not drawn. The rule is arm-independent.
+- **G1 counters** (deterministic, recomputed from OHLC, never from the classifier they check):
+  candle context / setup-body / doji-setup / tweezers-close violations (on the 500-bar window
+  the detector sees); chart-pattern wrong-side, non-positive, moving post-break levels,
+  unexplained status flips, days where `isFailedBreakout` disagrees with the same test on the
+  level frozen at the recomputed break bar, self-confirmed pivots that the close does not
+  prove (in the engine's effective ATR), pivot repaints. `--gate` picks the counters one PR is
+  scored on: `c9` the four candle counters, `pivots` the proof and repaint counters,
+  `geometry` wrong side, non-positive, moving, status flips and repaints. A gated run passes
+  only when those counters are 0 and its half was measured and evaluated something (`--only`
+  never scores the missing half as zero; 0 pattern days or 0 candle events is a failure, not a
+  pass). Under a gate, a case with no bar at its `asOf` date fails the run (exit 2) unless
+  `--allow-skipped-cases`; `--symbols` naming a symbol absent from the data is an error.
+- **Robustness (reported, never gating):** prior move 0.5 and 1.5 ATR (violations and the
+  pooled edge over the re-matched placebo), body floor 0.1 and 0.5 ATR (violations).
+- **G2** (`engineEvalCompare.ts`): `Delta = E_after - E_before` inside each resample of one
+  shared week bootstrap; the upper bound of the pooled Delta must be >= 0 (a bound that cannot
+  be computed fails when both arms measured the half); qualified instances may fall by at most
+  25% (reported per family, not an automatic fail); detected candle events per pattern are
+  listed before and after. Compare refuses runs whose data fingerprint, symbol list, `only`
+  or constants differ, and warns about a `+dirty` checkout. `before` and `after` must be made with the same `--gate` (a mismatch is refused), and the
+  `after` run must have one (without it compare exits 1: G1 cannot be scored). Exit codes: 0 when G1 and G2 both
+  pass, 2 when either fails, 1 on an error (including a refused comparison).
+
+The WP-17 thresholds are the instrument's own copy (`engineEvalTypes.ts`), deliberately
+independent of the arm under test; everything the engine defines (the 500-bar window, the
+detection window, the pivot reversal multiple) is read from core and recorded in `run.json`.

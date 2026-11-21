@@ -2,6 +2,7 @@
  * File helpers of the replay tooling: hashing, atomic JSON writes and the guard that
  * keeps market data and run output out of the repository.
  */
+import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import {
     closeSync,
@@ -18,6 +19,15 @@ import type { LabelRow } from './types';
 
 /** The repository root: market data and run output must never be written inside it. */
 export const REPO_ROOT = resolve(__dirname, '../..');
+
+/** Runs a read-only `git` command in the repository root and returns its trimmed output. */
+export function gitOutput(args: readonly string[]): string {
+    return execFileSync('git', [...args], {
+        cwd: REPO_ROOT,
+        encoding: 'utf-8',
+        maxBuffer: 256 * 1024 * 1024,
+    }).trim();
+}
 
 export function sha256Hex(data: string | Uint8Array): string {
     return createHash('sha256').update(data).digest('hex');
