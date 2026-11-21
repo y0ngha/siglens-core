@@ -10,6 +10,10 @@ import {
     splitAgentFollowUps,
     SWING_MIN_PCT,
     computeSwingHistory,
+    alignNewsWithPriceMoves,
+    buildLevelLadder,
+    readPutCallRatio,
+    tallyEarningsReactions,
 } from '@/index';
 
 describe('index — agent exports', () => {
@@ -24,6 +28,21 @@ describe('index — agent exports', () => {
         expect(typeof computeSwingHistory).toBe('function');
         expect(SWING_MIN_PCT.default).toBe(10);
         expect('computeSwingHistory' in clientApi).toBe(false);
+    });
+
+    // 서버 진입점 전용이다: 해석 사실 계산은 도구 실행기(서버)만 부르고 브라우저 번들은 쓰지 않는다.
+    it('해석 사실 계산 함수 4개를 서버 진입점으로만 내보낸다', () => {
+        const fns = {
+            alignNewsWithPriceMoves,
+            buildLevelLadder,
+            readPutCallRatio,
+            tallyEarningsReactions,
+        };
+        Object.entries(fns).forEach(([name, fn]) => {
+            expect(typeof fn).toBe('function');
+            expect(name in clientApi).toBe(false);
+        });
+        expect(Object.keys(fns)).toHaveLength(4);
     });
 
     it('findUngroundedNumbers를 값으로 내보낸다', () => {
