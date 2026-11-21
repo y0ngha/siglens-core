@@ -365,6 +365,14 @@ Name the flag after the fact proven, not the conclusion you hope for.
 // ✅ direction only when the change survives the split guard; otherwise 'unknown'
 ```
 
+A gap in the data is not a fact about the market. When the series ends before the asked
+date, say the data has no value yet and name the latest value; assert "no session" or
+"closed" only when the gap is provably so (a weekend directly after the last session, with
+no weekday in between). Input cleaning that drops rows (non-positive, NaN, duplicates)
+returns what it dropped, and downstream wording separates "row unusable" from "no row"
+instead of claiming the date had no trading. An attribution helper never assigns an input
+outside its window to an in-window bucket; it counts those separately.
+
 <a id="DOM-13"></a>
 #### DOM-13 — A rendered comparison names its basis
 
@@ -639,6 +647,11 @@ make `now` required rather than optional.
 // ❌ const time = new Date();                          // ignores options.now
 // ✅ const time = options.now ?? new Date();  // or take `now: Date` and use it directly
 ```
+
+Calendar-relative periods ("year to date", "this year", "today") take their anchor from an
+injected exchange-local date, never from the latest data row: between Jan 1 and the first
+session the last row still belongs to the previous year. Use the later of the injected date
+and the last close, and note when the injected date is invalid.
 
 <a id="DOM-4"></a>
 #### DOM-4 — Calendar-day differences use date components, not rounded milliseconds

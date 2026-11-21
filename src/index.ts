@@ -546,6 +546,40 @@ export type {
     SwingSummary,
     WindowHigh,
 } from './domain/agent/swingHistory';
+// Server entry only: the period statistics run in the agent tool executor, never in a browser bundle.
+export {
+    closeOnOrBefore,
+    calendarPeriodChange,
+    isIsoDate,
+    minusCalendarMonths,
+} from './domain/agent/calendarPeriods';
+export type { CalendarPeriodChange } from './domain/agent/calendarPeriods';
+export {
+    computePriceStats,
+    priceStatsEarliestDate,
+} from './domain/agent/priceStats';
+export {
+    AGENT_PRICE_STATS_DEFAULT_PERIOD,
+    AGENT_PRICE_STATS_MAX_DATES,
+    AGENT_PRICE_STATS_MAX_SUBJECTS,
+    AGENT_PRICE_STATS_PERIODS,
+    PRICE_STATS_NOTE_TEMPLATES,
+} from './domain/agent/priceStats';
+export type {
+    AgentPriceStatsPeriod,
+    PriceStatsClose,
+    PriceStatsCorrelation,
+    PriceStatsCorrelationLeg,
+    PriceStatsDateClose,
+    PriceStatsDateStatus,
+    PriceStatsDrawdown,
+    PriceStatsRequest,
+    PriceStatsResult,
+    PriceStatsSubjectInput,
+    PriceStatsSubjectView,
+    PriceStatsWindow,
+    PriceStatsWindowRequest,
+} from './domain/agent/priceStats';
 // Server entry only: the interpretive-fact helpers run in agent tool executors, never in a browser bundle.
 export { tallyEarningsReactions } from './domain/agent/earningsReactionTally';
 export type {
