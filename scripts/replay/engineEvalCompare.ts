@@ -334,13 +334,40 @@ export function compareArms(before: ArmData, after: ArmData): CompareReport {
                 candleUpperBoundNonNegative: candleBound,
                 patternUpperBoundNonNegative: patternBound,
                 instancesWithinBound,
-                pass: candleBound !== false && patternBound !== false,
+                // Fails closed: with neither half measured there is nothing to pass.
+                pass:
+                    (candleBound !== null || patternBound !== null) &&
+                    candleBound !== false &&
+                    patternBound !== false,
             },
         },
     };
 }
 
 // ─── CLI ──────────────────────────────────────────────────────────────────────
+
+/** One `events.jsonl` line; throws `InvalidEventError` unless it is a candle or pattern row. */
+export class InvalidEventError extends Error {
+    constructor(line: string) {
+        super(
+            `events.jsonl holds a row that is not a candle or pattern event: ${line.slice(0, 80)}`
+        );
+        this.name = 'InvalidEventError';
+    }
+}
+
+function parseEvent(line: string): EvalEvent {
+    const row: unknown = JSON.parse(line);
+    const kind =
+        typeof row === 'object' && row !== null && 'kind' in row
+            ? row.kind
+            : undefined;
+    if (kind !== 'candle' && kind !== 'pattern')
+        throw new InvalidEventError(line);
+    // The `kind` field was just checked; the rest is trusted to be what `engineEval.ts`
+    // wrote, and every reader goes through the typed fields.
+    return row as EvalEvent;
+}
 
 /** Reads a run directory written by `engineEval.ts`. */
 export function readArm(runDir: string): ArmData {
@@ -352,7 +379,7 @@ export function readArm(runDir: string): ArmData {
             .filter(line => line !== '')
             // Trusts each line to be an event row `engineEval.ts` wrote; every reader goes
             // through the typed fields, and a row of another shape fails there.
-            .map(line => JSON.parse(line) as EvalEvent),
+            .map(line => parseEvent(line)),
     };
 }
 

@@ -707,6 +707,8 @@ export function g1Report(
 
 export interface CaseLinesReport {
     cases: number;
+    /** Cases with no bar at their `asOf` date, left out of the numbers below. */
+    skipped: number;
     meanLines: number | null;
     byLineCount: Record<string, number>;
     /** Share of analyses whose printed lines carry both a bullish and a bearish pattern. */
@@ -714,10 +716,12 @@ export interface CaseLinesReport {
 }
 
 export function caseLinesReport(
-    rows: readonly CaseCandleLines[]
+    rows: readonly CaseCandleLines[],
+    skipped = 0
 ): CaseLinesReport {
     return {
         cases: rows.length,
+        skipped,
         meanLines: mean(rows.map(r => r.lines)),
         byLineCount: countBy(rows, r => String(r.lines)),
         shareBothDirections: mean(
@@ -746,6 +750,8 @@ export function summarizeArm(input: {
     patternEvents: readonly PatternEvent[] | null;
     patternCounters: PatternCounters | null;
     caseLines: readonly CaseCandleLines[] | null;
+    /** Cases with no bar at their `asOf` date. */
+    skippedCases?: number;
 }): ArmSummary {
     const resamplings = makeResamplings(input.weeks);
     const candles =
@@ -765,7 +771,9 @@ export function summarizeArm(input: {
                       resamplings
                   ),
         caseLines:
-            input.caseLines === null ? null : caseLinesReport(input.caseLines),
+            input.caseLines === null
+                ? null
+                : caseLinesReport(input.caseLines, input.skippedCases ?? 0),
         g1: g1Report(
             candles?.violations ?? null,
             input.patternCounters,

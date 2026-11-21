@@ -606,6 +606,7 @@ export function patternWalkForSymbol(
     };
     const events: PatternEvent[] = [];
 
+    // CP-5: state (seen instances, previous day, previous pivots) is tracked across steps in one pass.
     for (let t = windowBars; t < bars.length; t++) {
         const offset = t - windowBars + 1;
         const window = bars.slice(offset, t + 1);

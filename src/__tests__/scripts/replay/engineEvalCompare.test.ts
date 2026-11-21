@@ -6,6 +6,7 @@ import {
     assertComparable,
     compareArms,
     exitCodeOf,
+    InvalidEventError,
     parseCompareArgs,
     readArm,
     runCompare,
@@ -196,6 +197,16 @@ describe('compareArms', () => {
         expect(patternOnly.candles).toBeNull();
         expect(patternOnly.candleEventCounts).toBeNull();
         expect(patternOnly.gates.g2.candleUpperBoundNonNegative).toBeNull();
+    });
+
+    it('fails closed when neither half was measured', () => {
+        const report = compareArms(
+            arm('before', { candles: false, patterns: false }),
+            arm('after', { candles: false, patterns: false })
+        );
+        expect(report.gates.g2.candleUpperBoundNonNegative).toBeNull();
+        expect(report.gates.g2.patternUpperBoundNonNegative).toBeNull();
+        expect(report.gates.g2.pass).toBe(false);
     });
 
     it('refuses runs that are not comparable', () => {
@@ -419,6 +430,16 @@ describe('compare CLI', () => {
         expect(lines.some(line => line.startsWith('WARNING'))).toBe(true);
         expect(readArm(before).events).toHaveLength(48);
         expect(readArm(before).run.arm).toBe('before');
+    });
+
+    it('refuses an events file with a row that is not an event', () => {
+        const { dir, remove } = makeTempDir();
+        temps.add(remove);
+        const runDir = writeRun(join(dir, 'bad'), arm('bad'));
+        writeFileSync(join(runDir, 'events.jsonl'), '{"kind":"other"}\n');
+        expect(() => readArm(runDir)).toThrow(InvalidEventError);
+        writeFileSync(join(runDir, 'events.jsonl'), '[1]\n');
+        expect(() => readArm(runDir)).toThrow('not a candle or pattern event');
     });
 
     it('refuses an output path inside the repository', () => {

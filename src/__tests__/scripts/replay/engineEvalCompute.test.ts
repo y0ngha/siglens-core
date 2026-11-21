@@ -551,6 +551,7 @@ describe('caseLinesReport', () => {
     it('is empty for no cases', () => {
         expect(caseLinesReport([])).toEqual({
             cases: 0,
+            skipped: 0,
             meanLines: null,
             byLineCount: {},
             shareBothDirections: null,
@@ -565,6 +566,8 @@ describe('caseLinesReport', () => {
             { lines: 2, bullish: false, bearish: true },
         ]);
         expect(report.cases).toBe(4);
+        expect(report.skipped).toBe(0);
+        expect(caseLinesReport([], 3).skipped).toBe(3);
         expect(report.meanLines).toBe(1.25);
         expect(report.byLineCount).toEqual({ '0': 1, '1': 1, '2': 2 });
         expect(report.shareBothDirections).toBe(0.25);

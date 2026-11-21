@@ -7,6 +7,8 @@ import {
     dirtyDiffSha256,
     loadBarsDir,
     loadSet,
+    parseStoredBars,
+    InvalidBarsFileError,
     parseEngineEvalArgs,
     runEngineEval,
     type EngineEvalArgs,
@@ -308,6 +310,120 @@ describe('runEngineEval', () => {
                 deps()
             )
         ).toThrow('no symbols to evaluate');
+    });
+});
+
+describe('parseStoredBars', () => {
+    const bar = { time: 1, open: 1, high: 2, low: 0, close: 1, volume: 5 };
+
+    it('returns the bars of a well-formed file', () => {
+        expect(
+            parseStoredBars('A.json', JSON.stringify({ bars: [bar] }))
+        ).toEqual([bar]);
+    });
+
+    it('names the file and the reason for a wrong shape', () => {
+        const fails = (value: unknown, reason: string) => {
+            const attempt = () =>
+                parseStoredBars('A.json', JSON.stringify(value));
+            expect(attempt).toThrow(InvalidBarsFileError);
+            expect(attempt).toThrow(
+                `A.json is not a stored-bars file: ${reason}`
+            );
+        };
+        fails([], 'no `bars` array');
+        fails(null, 'no `bars` array');
+        fails({ bars: 'x' }, 'no `bars` array');
+        fails({ bars: [bar, null] }, 'bar 1 lacks numeric');
+        fails({ bars: [bar, { ...bar, close: '1' }] }, 'bar 1 lacks numeric');
+        fails({ bars: [{ ...bar, volume: undefined }] }, 'bar 0 lacks numeric');
+    });
+
+    it('is applied to every file of a bars directory', () => {
+        const { dir } = makeSet();
+        writeFileSync(
+            join(dir, 'src', 'NVDA.json'),
+            JSON.stringify({ bars: [{ time: 1 }] })
+        );
+        expect(() => loadBarsDir(join(dir, 'src'))).toThrow(
+            'NVDA.json is not a stored-bars file'
+        );
+    });
+});
+
+describe('exit code and skipped cases', () => {
+    it('returns 0 without a gate and 2 when the gate did not pass', () => {
+        const { dir, setDir } = makeSet();
+        expect(
+            runEngineEval(
+                baseArgs({ set: setDir, out: join(dir, 'u') }),
+                deps()
+            )
+        ).toBe(0);
+        // The pattern half alone cannot score the candle gate.
+        expect(
+            runEngineEval(
+                baseArgs({
+                    set: setDir,
+                    out: join(dir, 'g'),
+                    only: 'patterns',
+                    gate: 'c9',
+                }),
+                deps()
+            )
+        ).toBe(2);
+    });
+
+    it('returns 0 for a gate whose counters are all zero', () => {
+        // 300 bars hold no 500-bar window: the geometry counters stay at 0.
+        const { dir, remove } = makeTempDir();
+        temps.add(remove);
+        writeBarsDir(join(dir, 'short'), [
+            {
+                symbol: 'NVDA',
+                bars: tradingBars({
+                    symbol: 'NVDA',
+                    startIso: '2018-01-02',
+                    count: 300,
+                }),
+            },
+        ]);
+        const out = join(dir, 'z');
+        const code = runEngineEval(
+            baseArgs({
+                bars: join(dir, 'short'),
+                out,
+                only: 'patterns',
+                gate: 'geometry',
+            }),
+            deps()
+        );
+        expect(
+            JSON.parse(readFileSync(join(out, 'summary.json'), 'utf-8')).g1.pass
+        ).toBe(true);
+        expect(code).toBe(0);
+    });
+
+    it('counts and warns about a case with no bar at its asOf date', () => {
+        const { dir, setDir, manifest } = makeSet();
+        const cases = manifest.cases.map((c, i) =>
+            i === 0 ? { ...c, asOf: '2001-01-01' } : c
+        );
+        writeFileSync(
+            join(setDir, 'manifest.json'),
+            JSON.stringify({ ...manifest, cases })
+        );
+        const log = vi.fn<(line: string) => void>();
+        const out = join(dir, 'skip');
+        runEngineEval(baseArgs({ set: setDir, out }), deps(log));
+        const summary = JSON.parse(
+            readFileSync(join(out, 'summary.json'), 'utf-8')
+        );
+        expect(summary.caseLines.skipped).toBe(1);
+        expect(summary.caseLines.cases).toBe(manifest.cases.length - 1);
+        expect(
+            log.mock.calls.flat().some(l => l.startsWith('WARNING: 1 case(s)'))
+        ).toBe(true);
     });
 });
 

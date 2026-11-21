@@ -135,6 +135,44 @@ export function loadSet(setDir: string): LoadedData {
     };
 }
 
+const BAR_FIELDS = ['time', 'open', 'high', 'low', 'close', 'volume'] as const;
+
+/**
+ * The bars of a stored-bars file (`{ bars: [{ time, open, high, low, close, volume }] }`).
+ * Throws `InvalidBarsFileError` naming the file when the shape is not that, instead of
+ * letting a wrong file fail somewhere inside the evaluation.
+ */
+export class InvalidBarsFileError extends Error {
+    constructor(file: string, reason: string) {
+        super(`${file} is not a stored-bars file: ${reason}`);
+        this.name = 'InvalidBarsFileError';
+    }
+}
+
+export function parseStoredBars(file: string, text: string): Bar[] {
+    const parsed: unknown = JSON.parse(text);
+    const bars =
+        typeof parsed === 'object' && parsed !== null && 'bars' in parsed
+            ? parsed.bars
+            : undefined;
+    if (!Array.isArray(bars))
+        throw new InvalidBarsFileError(file, 'no `bars` array');
+    const bad = bars.findIndex(
+        bar =>
+            typeof bar !== 'object' ||
+            bar === null ||
+            BAR_FIELDS.some(field => typeof bar[field] !== 'number')
+    );
+    if (bad >= 0) {
+        throw new InvalidBarsFileError(
+            file,
+            `bar ${bad} lacks numeric ${BAR_FIELDS.join(', ')}`
+        );
+    }
+    // Every element was just checked to carry the six numeric `Bar` fields.
+    return bars as Bar[];
+}
+
 /** A plain directory of `<SYMBOL>.json` files, fingerprinted by the hash of every file. */
 export function loadBarsDir(dir: string): LoadedData {
     const files = readdirSync(dir)
@@ -153,10 +191,7 @@ export function loadBarsDir(dir: string): LoadedData {
             return {
                 symbol,
                 market: marketOfSymbol(symbol),
-                // Trusts the file to be a stored-bars JSON, as `fetchBars` writes it; a file of
-                // another shape fails at the first `bars` read instead of passing silently.
-                bars: (JSON.parse(contents[i].toString('utf-8')) as StoredBars)
-                    .bars,
+                bars: parseStoredBars(name, contents[i].toString('utf-8')),
             };
         }),
         cases: [],
@@ -166,28 +201,29 @@ export function loadBarsDir(dir: string): LoadedData {
 // ─── Running ──────────────────────────────────────────────────────────────────
 
 function mergeCounters(parts: readonly PatternCounters[]): PatternCounters {
-    return parts.reduce<PatternCounters>((acc, part) => {
-        Object.entries(part).forEach(([key, value]) => {
-            acc[key] = (acc[key] ?? 0) + value;
-        });
-        return acc;
-    }, {});
+    const keys = [...new Set(parts.flatMap(part => Object.keys(part)))];
+    return Object.fromEntries(
+        keys.map(key => [
+            key,
+            parts.reduce((sum, part) => sum + (part[key] ?? 0), 0),
+        ])
+    );
 }
 
-function caseLinesOf(data: LoadedData): CaseCandleLines[] {
+/** Case lines of every case whose `asOf` bar exists, and how many cases had none. */
+function caseLinesOf(data: LoadedData): {
+    rows: CaseCandleLines[];
+    skipped: number;
+} {
     const bySymbol = new Map(data.symbols.map(s => [s.symbol, s.bars]));
-    return data.cases.flatMap(c => {
+    const rows = data.cases.flatMap(c => {
         const bars = bySymbol.get(c.symbol);
         if (bars === undefined) return [];
         const asOfSeconds = Date.parse(`${c.asOf}T00:00:00Z`) / 1000;
         const t = bars.findIndex(bar => bar.time === asOfSeconds);
         return t < 0 ? [] : [caseCandleLines(bars, t)];
     });
-}
-
-export interface EngineEvalDeps {
-    log: (line: string) => void;
-    gitSha: () => string;
+    return { rows, skipped: data.cases.length - rows.length };
 }
 
 /**
@@ -220,6 +256,7 @@ export const defaultDeps: EngineEvalDeps = {
     dirtyDiffSha256,
 };
 
+/** Writes the run and returns its exit code: 0, or 2 when the `--gate` did not pass. */
 export function runEngineEval(
     args: EngineEvalArgs,
     deps: EngineEvalDeps
@@ -252,6 +289,15 @@ export function runEngineEval(
     const patternEvents = perSymbol.flatMap(s => s.patterns.events);
     const counters = mergeCounters(perSymbol.map(s => s.patterns.counters));
 
+    const cases =
+        args.only === 'patterns' || data.cases.length === 0
+            ? null
+            : caseLinesOf(data);
+    if (cases !== null && cases.skipped > 0) {
+        deps.log(
+            `WARNING: ${cases.skipped} case(s) have no bar at their asOf date and are not in the case lines`
+        );
+    }
     const summary = summarizeArm({
         arm: args.arm,
         weeks: weeksOfTimes(symbols.flatMap(s => s.bars.map(bar => bar.time))),
@@ -259,10 +305,8 @@ export function runEngineEval(
         candleEvents: args.only === 'patterns' ? null : candleEvents,
         patternEvents: args.only === 'candles' ? null : patternEvents,
         patternCounters: args.only === 'candles' ? null : counters,
-        caseLines:
-            args.only === 'patterns' || data.cases.length === 0
-                ? null
-                : caseLinesOf(data),
+        caseLines: cases?.rows ?? null,
+        skippedCases: cases?.skipped ?? 0,
     });
     const events: EvalEvent[] = [...candleEvents, ...patternEvents];
     writeFileAtomic(
@@ -296,7 +340,8 @@ export function runEngineEval(
         `${JSON.stringify(summary, null, 2)}\n`
     );
     deps.log(`wrote ${args.out}`);
-    return 0;
+    // A gated run that did not pass exits 2 (errors throw and exit 1).
+    return summary.g1.pass === false ? 2 : 0;
 }
 
 if (require.main === module) {

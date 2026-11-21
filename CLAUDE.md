@@ -254,3 +254,6 @@ repo-relative path for layer files: `CONVENTIONS.md#TE-5`, `PUBLIC_API.md#API-4`
 `src/domain/CLAUDE.md#DOM-2`. Code comments, docs, agent prompts and fix-log `Rule:` fields
 all use this form. `src/__tests__/guards/ruleReferences.test.ts` fails when a reference
 points at an anchor that does not exist.
+
+After any rule-doc edit (including the promotion step), run `yarn test src/__tests__/guards`
+before pushing: an anchor must sit on the line directly above its heading, with no blank line.

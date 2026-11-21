@@ -281,7 +281,7 @@ npx tsx scripts/replay/engineEvalCompare.ts --before <run-dir> --after <run-dir>
 ```
 
 `--only candles|patterns` and `--symbols A,B` narrow a run; `--gate c9|pivots|geometry` scores
-G1 for one PR (below). The output lives outside the repository (`--out` inside it is
+G1 for one PR (below); `engineEval.ts` then exits 2 when the gate did not pass (0 otherwise, 1 on an error). The output lives outside the repository (`--out` inside it is
 refused): `run.json` (core sha, a sha256 of the dirty diff when the tree is dirty, data
 fingerprint, every constant), `events.jsonl` (one row per candle event and per
 first-appearance pattern instance) and `summary.json` (with the bootstrap's week list, taken

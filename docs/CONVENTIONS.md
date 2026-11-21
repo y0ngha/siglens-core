@@ -839,7 +839,6 @@ Lock ownership, generation binding and similar coordination fixes need tests tha
 without the fix. In-memory stubs honour TTL, or the test cannot see expiry bugs.
 
 <a id="TE-16"></a>
-
 #### TE-16 — Evaluation and replay scripts fail closed
 
 A gate or replay tool scopes pass criteria to the change it gates, and exits non-zero when a result is not computable (null bound, no events), inputs are incomparable (different dataset or subset), or a job's own generation did not run. A paid run validates its inputs and refuses before the first billed call. Headline rates use one row per case, never repeats.
@@ -1290,7 +1289,8 @@ helpers), not only the cited lines: a fix that stops at the named lines leaves t
 violation elsewhere in the diff. The same applies to a rule the change itself adds or
 sharpens: grep its violating pattern across the change's own diff before pushing, or the
 change breaks its own new rule (for example a new "equality claims state their exact
-conditions" rule while another description in the diff still claims equality unconditionally).
+conditions" rule while another description in the diff still claims equality unconditionally). The sweep includes the change's own entry points: a new "gate tools exit non-zero" rule is
+checked against the main CLI added in the same change.
 
 <a id="DS-6"></a>
 #### DS-6 — No process residue in code
