@@ -297,6 +297,17 @@ computing derived values, so a recomputation from the rendered text matches.
 - A rule that enumerates markers or values the renderer emits is built from the renderer's
   single exported list, never retyped; otherwise it silently covers only the first marker
   once the renderer grows another.
+- A claim that one tool's figure equals another's ("the 1/3/12-month returns equal
+  `calendarChange`") states its exact conditions (no session in progress, only the windows
+  both tools have), or it is omitted; an unconditional equality is false at the first
+  open session or on a window one tool lacks.
+- A routing change re-reads the tool's argument descriptions too: the model reads them at
+  call time, and a `symbols` text saying "put every symbol in one call" contradicts a row
+  saying "more than three go in parallel calls".
+- A description that quotes result field names is pinned by a test that runs the real
+  function and compares the quoted names with the emitted keys in both directions (an
+  allow-list for names that are deliberately not fields), so neither a stale nor a missing
+  name passes.
 - Adding a branch to a tool (a new argument, market, timeframe or variant) rewrites the
   description's opening and defaults, it does not append a clause to an opening that still
   describes only the old scope: the model picks tools from the opening. Cover every branch the

@@ -555,7 +555,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-21.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-21.2');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -962,7 +962,7 @@ describe('buildAgentSystemPrompt', () => {
                     guest: true,
                 });
             expect(guestOf(AGENT_TOOL_SPECS)).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, price statistics over any period, web search'
             );
             expect(
                 guestOf(
@@ -971,7 +971,7 @@ describe('buildAgentSystemPrompt', () => {
                     )
                 )
             ).toContain(
-                'congress trades, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, web search) works without it'
+                'congress trades, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, price statistics over any period, web search) works without it'
             );
         });
 
@@ -998,7 +998,7 @@ describe('buildAgentSystemPrompt', () => {
                 guest: true,
             });
             expect(guest).toContain(
-                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, web search'
+                'congress trades, investor flows (수급) for US and Korean stocks, analyst targets and rating changes, company SEC filings, official company and CEO posts on X, commodity, futures and exchange-rate quotes, theme baskets, long-run index statistics, past declines and rallies of a symbol, price statistics over any period, web search'
             );
         });
     });
@@ -2165,6 +2165,108 @@ describe('buildAgentSystemPrompt computed-fact rules (WP-08)', () => {
         );
         expect(build(['get_news'])).not.toContain(
             'Explaining a move with news'
+        );
+    });
+});
+
+describe('buildAgentSystemPrompt price statistics routing (WP-09)', () => {
+    const build = (without: readonly string[] = []): string =>
+        buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS.filter(t => !without.includes(t.name)),
+            guest: true,
+        });
+    const rowOf = (prompt: string, needle: string): string =>
+        prompt.split('\n').find(l => l.includes(needle)) ?? '';
+    const CHART_MIRROR =
+        'A return, a closing high or low, or a drawdown over a stated calendar window, a calendar year or since a date matches the price statistics row; the 52-week high or low (52주 최고가) and 20- or 60-session highs and lows stay with this row.';
+    const INDEX_MIRROR =
+        'A named recent window or one calendar year of an index (올해, 작년 한 해, 최근 10년), its close on a date and its deepest daily drop in such a window are the price statistics row.';
+    const SWINGS_TAIL =
+        'How often, how deep on average or how long declines or rallies run is the swings row; the single deepest drop in one window is this row.';
+    const INDEX_TAIL =
+        "An index's year-by-year, monthly or election-cycle history is the index statistics row.";
+
+    it('the row routes period statistics to get_price_stats with its triggers and the no-own-arithmetic ban', () => {
+        const row = rowOf(build(), '→ get_price_stats');
+        for (const term of [
+            '올해 수익률',
+            '연초 대비',
+            '작년 수익률',
+            '2022년 수익률',
+            '10년 연평균 수익률',
+            '올해 최대 낙폭',
+            'MDD',
+            '작년 마지막 거래일 종가',
+            '상관관계',
+            '같이 움직여?',
+            'with every subject of the question in one call',
+            '(index for the S&P 500, Nasdaq Composite, KOSPI or KOSDAQ themselves)',
+            'More than three subjects go in parallel calls of up to three in the same step; a correlation comes only for two subjects in the same call.',
+            'Quote each return with its base and end dates and say once that it is a closing-price change (without dividends for a stock, ETF or index; for a coin just a closing-price change)',
+            'A question relative to this time last year or N months ago (작년 이맘때 대비, N개월 전 대비, 1년 전보다) passes period (1m, 3m, 6m or 1y), never from.',
+            "today's move and the current price stay with the quote row",
+            'Never compute a period return, an annual rate, a drawdown or a correlation from bars yourself while this tool is available.',
+        ])
+            expect(row).toContain(term);
+    });
+
+    it('the row comes directly after the chart row and the row is absent without the tool', () => {
+        const lines = build().split('\n');
+        const chart = lines.findIndex(l =>
+            l.includes('→ get_bars_indicators;')
+        );
+        const stats = lines.findIndex(l => l.includes('→ get_price_stats'));
+        expect(chart).toBeGreaterThan(-1);
+        expect(stats).toBe(chart + 1);
+        const without = build(['get_price_stats']);
+        expect(without).not.toContain('get_price_stats');
+        expect(without).not.toContain('price statistics row');
+        expect(without).not.toContain('price statistics over any period');
+    });
+
+    it('the swings and index tails render only with their own tools', () => {
+        const row = (without: readonly string[]) =>
+            rowOf(build(without), '→ get_price_stats');
+        expect(row([])).toContain(SWINGS_TAIL);
+        expect(row([])).toContain(INDEX_TAIL);
+        expect(row(['get_swing_history'])).not.toContain(SWINGS_TAIL);
+        expect(row(['get_swing_history'])).toContain(INDEX_TAIL);
+        expect(row(['get_index_history_stats'])).not.toContain(INDEX_TAIL);
+        expect(row(['get_index_history_stats'])).toContain(SWINGS_TAIL);
+        expect(
+            row(['get_swing_history', 'get_index_history_stats'])
+        ).not.toMatch(/swings row|index statistics row/);
+    });
+
+    it('the chart and index rows hand period questions over only with get_price_stats', () => {
+        const chart = (without: readonly string[]) =>
+            rowOf(build(without), '→ get_bars_indicators;');
+        const index = (without: readonly string[]) =>
+            rowOf(build(without), '→ get_index_history_stats');
+        expect(chart([])).toContain(CHART_MIRROR);
+        expect(chart(['get_price_stats'])).not.toContain(CHART_MIRROR);
+        expect(chart(['get_price_stats'])).toContain(
+            'A Korean outlook question (전망, 오를까, 떨어질까, 반등할까) matches the outlook row above'
+        );
+        expect(index([])).toContain(INDEX_MIRROR);
+        expect(index(['get_price_stats'])).not.toContain(INDEX_MIRROR);
+        // The long-run table statistic stays on the index row.
+        expect(index([])).toContain('평균 연간 수익률');
+    });
+
+    it('the guest line names price statistics only with the tool', () => {
+        expect(build()).toContain(
+            'past declines and rallies of a symbol, price statistics over any period, web search'
+        );
+        expect(build(['get_price_stats'])).not.toContain(
+            'price statistics over any period'
+        );
+    });
+
+    it('the computed-figures rule lists the price statistics fields', () => {
+        expect(build()).toContain(
+            'price statistics returnPct/cagrPct/fromHighestClosePct/maxDrawdown/correlation coefficient'
         );
     });
 });
