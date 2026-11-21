@@ -546,6 +546,33 @@ export type {
     SwingSummary,
     WindowHigh,
 } from './domain/agent/swingHistory';
+// Server entry only: the interpretive-fact helpers run in agent tool executors, never in a browser bundle.
+export { tallyEarningsReactions } from './domain/agent/earningsReactionTally';
+export type {
+    EarningsReactionExtreme,
+    EarningsReactionInput,
+    EarningsReactionTally,
+} from './domain/agent/earningsReactionTally';
+export { readPutCallRatio } from './domain/options/putCallReading';
+export type {
+    PutCallBasis,
+    PutCallReading,
+    PutCallSide,
+} from './domain/options/putCallReading';
+export { buildLevelLadder } from './domain/analysis/levelLadder';
+export type {
+    LevelCandidate,
+    LevelLadder,
+    LevelLadderCloser,
+    LevelRung,
+    LevelSourceKind,
+} from './domain/analysis/levelLadder';
+export { alignNewsWithPriceMoves } from './domain/agent/newsPriceMoves';
+export type {
+    NewsMoveDay,
+    NewsPriceMoves,
+    NewsPriceMovesInput,
+} from './domain/agent/newsPriceMoves';
 export { findUngroundedNumbers } from './domain/agent/groundedNumbers';
 export {
     AGENT_FOLLOW_UP_MARKER,
