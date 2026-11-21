@@ -4,14 +4,18 @@
  *
  * Usage:
  *   npx tsx scripts/replay/run.ts --set <set-dir> --out <run-dir> [--skills <path ending in /skills>]
- *     [--subset variance] [--repeat N] [--limit N] [--concurrency 4] [--keep-raw] [--retry-errors]
- *     [--execute --approved-calls <n>]
+ *     [--tier free|member] [--subset variance] [--repeat N] [--limit N] [--concurrency 4]
+ *     [--keep-raw] [--retry-errors] [--execute --approved-calls <n>]
  *
  * The default is a dry run: it checks the set's hashes, counts the calls still to make
  * (cases × repeats, minus result files that already exist), prints the token and USD
  * estimate and exits having made no provider call. `--execute` runs only when
  * `--approved-calls` equals that pending count exactly; `--skills` and a
  * `DEEPSEEK_API_KEY` in the environment are needed then.
+ *
+ * `--tier` is the tier the analyses run as (default `member`; `free` caps the skills of the
+ * prompt like a free user's). It is part of the run identity, so a resumed run must use the
+ * same tier.
  *
  * `--limit N` takes the N cases with the smallest sha256(caseId), so a pilot is a spread
  * over symbols and regimes and two arms given the same `--limit` run the same cases.
@@ -61,7 +65,7 @@ import type {
     StoredBars,
 } from './types';
 import { AI_RETRY_MAX_ATTEMPTS } from '@/infrastructure/ai/retry/withRetry';
-import type { AssembledPromptRecord } from '@/domain/types';
+import type { AssembledPromptRecord, Tier } from '@/domain/types';
 
 // ─── Cost estimate ────────────────────────────────────────────────────────────
 /** Measured mean call size and price of a daily technical analysis (flash, reasoning off). */
@@ -130,10 +134,27 @@ export function estimateCost(calls: number, startedAt: Date): CostEstimate {
 }
 
 // ─── Arguments ────────────────────────────────────────────────────────────────
+/** The tiers a replay can run as (`pro` has the member's prompt and is not measured). */
+export const RUN_TIERS = ['free', 'member'] as const satisfies readonly Tier[];
+export type RunTier = (typeof RUN_TIERS)[number];
+
+function parseTier(raw: string | undefined): RunTier {
+    if (raw === undefined) return 'member';
+    const tier = RUN_TIERS.find(candidate => candidate === raw);
+    if (tier === undefined) {
+        throw new Error(
+            `--tier must be one of ${RUN_TIERS.join(', ')} (got "${raw}")`
+        );
+    }
+    return tier;
+}
+
 export interface RunArgs {
     set: string;
     out: string;
     skills: string | null;
+    /** The tier the analyses run as; part of the run identity. */
+    tier: RunTier;
     subset: 'variance' | null;
     repeat: number;
     limit: number | null;
@@ -177,6 +198,7 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
         set: resolve(raw.set),
         out: resolve(raw.out),
         skills: raw.skills === undefined ? null : resolve(raw.skills),
+        tier: parseTier(raw.tier),
         subset: raw.subset === 'variance' ? 'variance' : null,
         repeat: parsePositiveIntArg(raw.repeat, 'repeat'),
         limit:
@@ -354,7 +376,8 @@ export interface RunDeps {
     /** Imports core and builds the analyzer; only called after the approval check passed. */
     loadExecuteDeps: (
         skillsDir: string,
-        log: (line: string) => void
+        log: (line: string) => void,
+        tier: RunTier
     ) => Promise<ExecuteDeps>;
 }
 
@@ -674,7 +697,7 @@ async function executeApproved(
     split: JobSplit,
     skills: string
 ): Promise<number> {
-    const executeDeps = await deps.loadExecuteDeps(skills, deps.log);
+    const executeDeps = await deps.loadExecuteDeps(skills, deps.log, args.tier);
     const meta: RunMeta = {
         setId: manifest.setId,
         setBarsSha256: barsFingerprint(manifest),
@@ -753,7 +776,8 @@ export async function assertSkillsLoaded(
  */
 export async function loadCoreExecuteDeps(
     skillsDir: string,
-    log: (line: string) => void
+    log: (line: string) => void,
+    tier: RunTier
 ): Promise<ExecuteDeps> {
     if (!statSync(skillsDir).isDirectory()) {
         throw new Error(`${skillsDir} is not a directory`);
@@ -776,7 +800,6 @@ export async function loadCoreExecuteDeps(
     await assertSkillsLoaded(loadSkillsCached, log);
     installFetchRecorder();
     const dirty = gitOutput(['status', '--porcelain']) !== '';
-    const tier = 'member';
     return {
         identity: {
             coreGitSha: `${gitOutput(['rev-parse', 'HEAD'])}${dirty ? '+dirty' : ''}`,

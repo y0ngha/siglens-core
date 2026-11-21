@@ -1,0 +1,202 @@
+import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+    groupOf,
+    renderWithCore,
+    type RenderInput,
+} from '../../../../scripts/replay/analysisFieldsEvalRender';
+import type { AssembledPromptRecord } from '@/domain/types';
+
+/**
+ * Core is replaced by stubs: what is under test is how the renderer treats the process
+ * (cwd, `fetch`, the console, the API key variable) around the call, not the analysis.
+ */
+type RunAnalysisStub = (
+    symbol: string,
+    companyName: string,
+    timeframe: string,
+    force: boolean,
+    fmpSymbol: undefined,
+    options: { onPromptAssembled: (record: AssembledPromptRecord) => void }
+) => Promise<{ status: string }>;
+
+const core = vi.hoisted(() => ({
+    runAnalysis: vi.fn<RunAnalysisStub>(),
+}));
+
+vi.mock('@/application/market/runAnalysis', () => ({
+    runAnalysis: core.runAnalysis,
+}));
+vi.mock('@/application/chat/constants', () => ({
+    DEEPSEEK_V4_1_FLASH_MODEL: 'deepseek-v4.1-flash',
+}));
+vi.mock('@/infrastructure/skills/loader', () => ({
+    loadSkillsCached: async () => ({
+        skillsDegraded: false,
+        skills: [
+            {
+                name: 'Core A',
+                type: 'indicator_guide',
+                gating: { tier: 'always_on' },
+            },
+            {
+                name: 'Smc Full',
+                type: 'strategy',
+                smcFullGuide: true,
+                gating: { tier: 'always_on' },
+            },
+            {
+                name: 'G1',
+                category: 'reversal_bullish',
+                gating: { tier: 'gated' },
+            },
+        ],
+    }),
+}));
+vi.mock('@/domain/analysis/skillWhitelist', () => ({
+    isSkillAllowedInContext: () => true,
+}));
+
+const originals = {
+    fetch: globalThis.fetch,
+    info: console.info,
+    warn: console.warn,
+    error: console.error,
+    cwd: process.cwd(),
+    key: process.env.DEEPSEEK_API_KEY,
+};
+
+let root = '';
+beforeEach(() => {
+    root = mkdtempSync(join(tmpdir(), 'render-test-'));
+    mkdirSync(join(root, 'app', 'skills'), { recursive: true });
+    core.runAnalysis.mockReset();
+});
+afterEach(() => {
+    process.chdir(originals.cwd);
+    rmSync(root, { recursive: true, force: true });
+    if (originals.key === undefined) delete process.env.DEEPSEEK_API_KEY;
+    else process.env.DEEPSEEK_API_KEY = originals.key;
+});
+
+const input = (): RenderInput => ({
+    skillsDir: join(root, 'app', 'skills'),
+    cases: [
+        {
+            caseId: 'NVDA|2024-03-08',
+            symbol: 'NVDA',
+            timeframe: '1Day',
+            asOf: '2024-03-08',
+            regime: 'range',
+            variance: false,
+        },
+    ],
+    storedOf: symbol => ({
+        ticker: symbol,
+        companyName: `${symbol} Inc`,
+        fetchedAt: 'x',
+        from: '2024-01-01',
+        to: '2024-03-08',
+        bars: [],
+    }),
+    log: () => undefined,
+});
+
+/** The process state the renderer touches, as it is right now. */
+const processState = () => ({
+    fetch: globalThis.fetch,
+    info: console.info,
+    warn: console.warn,
+    error: console.error,
+    key: process.env.DEEPSEEK_API_KEY,
+});
+
+describe('groupOf', () => {
+    it('is the type, else the category, else regular', () => {
+        expect(
+            groupOf({ type: 'strategy', category: 'reversal_bullish' })
+        ).toBe('strategy');
+        expect(groupOf({ category: 'reversal_bullish' })).toBe(
+            'reversal_bullish'
+        );
+        expect(groupOf({})).toBe('regular');
+    });
+});
+
+describe('renderWithCore', () => {
+    it('puts fetch, the console and the key variable back when a case fails to assemble a prompt', async () => {
+        core.runAnalysis.mockResolvedValue({ status: 'error' });
+        const before = processState();
+        await expect(renderWithCore(input())).rejects.toThrow(
+            'NVDA|2024-03-08 (free): no prompt was assembled'
+        );
+        expect(processState()).toEqual(before);
+    });
+
+    it('puts them back when the analysis throws, and that error is the one reported', async () => {
+        core.runAnalysis.mockImplementation(() => {
+            throw new Error('boom');
+        });
+        const before = processState();
+        await expect(renderWithCore(input())).rejects.toThrow('boom');
+        expect(processState()).toEqual(before);
+    });
+
+    it('blocks the network and mutes the console only while rendering', async () => {
+        const during: { fetchThrows: boolean; muted: boolean; key: boolean }[] =
+            [];
+        core.runAnalysis.mockImplementation(
+            async (_symbol, _name, _timeframe, _force, _fmp, options) => {
+                during.push({
+                    fetchThrows: (() => {
+                        try {
+                            void globalThis.fetch('https://example.test');
+                            return false;
+                        } catch {
+                            return true;
+                        }
+                    })(),
+                    muted: console.info !== originals.info,
+                    key: process.env.DEEPSEEK_API_KEY !== undefined,
+                });
+                options.onPromptAssembled({
+                    system: 's',
+                    stable: '### Core A (guide)',
+                    dynamic: '### G1 (guide)',
+                    promptVersion: 'p34',
+                });
+                return { status: 'error' };
+            }
+        );
+        const before = processState();
+        const rendered = await renderWithCore(input());
+        expect(during).toEqual([
+            { fetchThrows: true, muted: true, key: true },
+            { fetchThrows: true, muted: true, key: true },
+        ]);
+        expect(processState()).toEqual(before);
+        expect(rendered.samples.map(s => s.tier)).toEqual(['free', 'member']);
+        expect(rendered.catalog).toEqual([
+            {
+                name: 'Core A',
+                group: 'indicator_guide',
+                alwaysOn: true,
+                injected: true,
+            },
+            {
+                name: 'Smc Full',
+                group: 'strategy',
+                alwaysOn: true,
+                injected: false,
+            },
+            {
+                name: 'G1',
+                group: 'reversal_bullish',
+                alwaysOn: false,
+                injected: true,
+            },
+        ]);
+    });
+});

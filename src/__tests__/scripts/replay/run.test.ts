@@ -207,6 +207,7 @@ describe('replay runner', () => {
                 set: '/s',
                 out: '/o',
                 skills: null,
+                tier: 'member',
                 subset: null,
                 repeat: 1,
                 limit: null,
@@ -216,6 +217,25 @@ describe('replay runner', () => {
                 execute: false,
                 approvedCalls: null,
             });
+        });
+
+        it('takes the tier of the run, member by default', () => {
+            const base = ['--set', '/s', '--out', '/o'];
+            expect(parseRunArgs(base).tier).toBe('member');
+            expect(parseRunArgs([...base, '--tier', 'free']).tier).toBe('free');
+            expect(parseRunArgs([...base, '--tier', 'member']).tier).toBe(
+                'member'
+            );
+        });
+
+        it('rejects a tier that is not measured', () => {
+            const base = ['--set', '/s', '--out', '/o'];
+            expect(() => parseRunArgs([...base, '--tier', 'pro'])).toThrow(
+                '--tier must be one of free, member (got "pro")'
+            );
+            expect(() => parseRunArgs([...base, '--tier'])).toThrow(
+                '--tier must be one of free, member (got "true")'
+            );
         });
 
         it('resolves path arguments to absolute paths', () => {
@@ -1043,7 +1063,8 @@ describe('replay runner', () => {
             );
             expect(loadExecuteDeps).toHaveBeenCalledWith(
                 f.skillsDir,
-                expect.any(Function)
+                expect.any(Function),
+                'member'
             );
             expect(resultFiles(f)).toHaveLength(planned);
             const meta = JSON.parse(
@@ -1058,6 +1079,56 @@ describe('replay runner', () => {
             });
             expect(meta.skillsSha256).toBe(hashTree(f.skillsDir));
             expect(meta.startedAt).toBe('2026-11-21T12:00:00.000Z');
+        });
+
+        it('passes the requested tier to the loader and records it in run.json', async () => {
+            const f = makeFixture();
+            const planned = f.manifest.cases.length;
+            const { deps, loadExecuteDeps } = makeDeps(undefined, {
+                ...IDENTITY,
+                tier: 'free',
+            });
+            await runReplay(
+                argsFor(f, [
+                    '--tier',
+                    'free',
+                    '--execute',
+                    '--approved-calls',
+                    String(planned),
+                ]),
+                deps
+            );
+            expect(loadExecuteDeps).toHaveBeenCalledWith(
+                f.skillsDir,
+                expect.any(Function),
+                'free'
+            );
+            const meta = JSON.parse(
+                readFileSync(join(f.outDir, 'run.json'), 'utf-8')
+            ) as RunMeta;
+            expect(meta.tier).toBe('free');
+        });
+
+        it('refuses to resume a run directory under another tier', async () => {
+            const f = makeFixture();
+            const withLimit = (tier: string) =>
+                argsFor(f, [
+                    '--tier',
+                    tier,
+                    '--limit',
+                    '2',
+                    '--execute',
+                    '--approved-calls',
+                    '2',
+                ]);
+            const first = makeDeps(undefined, { ...IDENTITY, tier: 'free' });
+            await runReplay(withLimit('free'), first.deps);
+            // Pending again, so the run reaches the identity check.
+            rmSync(join(f.outDir, 'results'), { recursive: true });
+            const second = makeDeps();
+            await expect(
+                runReplay(withLimit('member'), second.deps)
+            ).rejects.toThrow('tier differ from the run already');
         });
 
         it('skips existing results when resumed and asks for the new pending count', async () => {
