@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import * as clientApi from '@/index.client';
 import {
     AGENT_FOLLOW_UP_MARKER,
+    BARS_RESULT_NOTES,
+    FUNDAMENTALS_RESULT_NOTES,
     AGENT_TOOL_SPECS,
     CounterStoreUnavailableError,
     findUngroundedNumbers,
@@ -76,6 +78,15 @@ describe('index — agent exports', () => {
         expect(typeof PRICE_STATS_NOTE_TEMPLATES.historyStart).toBe('function');
         expect('AGENT_PRICE_STATS_PERIODS' in clientApi).toBe(false);
         expect('PRICE_STATS_NOTE_TEMPLATES' in clientApi).toBe(false);
+    });
+
+    // 서버 진입점 전용이다: 결과 notes는 도구 실행기(서버)만 붙이고 브라우저 번들은 쓰지 않는다.
+    it('결과 notes 문구를 서버 진입점으로만 내보낸다', () => {
+        expect(typeof BARS_RESULT_NOTES.dailyOnlyFields).toBe('function');
+        expect(typeof BARS_RESULT_NOTES.closeStreakUnavailable).toBe('string');
+        expect(typeof FUNDAMENTALS_RESULT_NOTES.peUntrusted).toBe('string');
+        expect('BARS_RESULT_NOTES' in clientApi).toBe(false);
+        expect('FUNDAMENTALS_RESULT_NOTES' in clientApi).toBe(false);
     });
 
     it('findUngroundedNumbers를 값으로 내보낸다', () => {

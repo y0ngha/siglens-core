@@ -721,18 +721,6 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain('when present, `derived.closeStreak`');
             expect(d).toContain('up, down or flat');
             expect(d).toContain("say 'at least N days'");
-            expect(d).toContain(
-                'When null or absent (older app, non-1Day, fewer than 2 completed bars)'
-            );
-            expect(d).toContain('call get_bars_indicators with timeframe 1Day');
-            expect(d).toContain('intraday bars have no daily closes');
-            expect(d).toContain(
-                'completed daily bars only, excluding an in-progress last bar'
-            );
-            expect(d).toContain(
-                "say 'at least N days' when the count reaches the first loaded bar"
-            );
-            expect(d).toContain('the streak cannot be determined');
         });
 
         it('investor flows: Form 144 counts, formType, web_search conditional', () => {
@@ -770,15 +758,8 @@ describe('AGENT_TOOL_SPECS', () => {
                 'cite the Wikipedia constituents list and asOf'
             );
             expect(d).toContain(
-                'When null or absent, search and cite when web_search is available'
-            );
-            expect(d).toContain(
                 'never derive an annual or trailing yield from a single payment'
             );
-            expect(d).toContain(
-                'say the trailing-12-month yield could not be confirmed'
-            );
-            expect(d).toContain('not in this tool');
             expect(d).toContain('US domestic filers only');
             expect(d).toContain(
                 'null for Korean stocks and foreign/ADR filers'
@@ -793,17 +774,13 @@ describe('AGENT_TOOL_SPECS', () => {
             );
             expect(d).toContain('YoY revenue growth from sec.revenueYoYPct');
             expect(d).toContain(
-                'Any other null sec field likewise means that figure is not in the filing: do not take it from the row or compute it'
-            );
-            expect(d).toContain(
                 'When sec is null or absent use the row fields'
             );
             expect(d).toContain('answer with the newest Q1–Q3 row');
             expect(d).toContain('say the form is not confirmed');
             expect(d).toContain('the rows do not say which form was filed');
             expect(d).toContain('a confirmed non-payer');
-            expect(d).toContain('do not web_search');
-            expect(d).toContain('absent or null `dividends` means unknown');
+            expect(d).toContain('(see notes); never derive');
             expect(d).toContain(
                 'trailing12mAmount and trailingYieldPct may include special dividends'
             );
@@ -817,12 +794,6 @@ describe('AGENT_TOOL_SPECS', () => {
             );
             expect(d).toContain('citing the filing form');
             expect(d).toContain('and the filed date');
-            expect(d).toContain(
-                'sec.epsDiluted is null for a fiscal Q4 derived from the 10-K'
-            );
-            expect(d).toContain(
-                'the quarterly EPS is not in the filing, never compute it'
-            );
             expect(d).toContain('headline `yieldOnLastClosePct`');
             expect(d).toContain(
                 'FY<fiscalYear> annual DPS ÷ current price (source DART)'
@@ -833,22 +804,10 @@ describe('AGENT_TOOL_SPECS', () => {
             expect(d).toContain(
                 'When annualReported is absent use the trailing fields as described above, never a single payment'
             );
-            expect(d).toContain(
-                'If yieldOnLastClosePct is null, quote `dartYieldPct` labeled as the DART-reported yield on the record-date price'
-            );
-            expect(d).toContain('never compute a yield yourself');
             expect(d).toContain('special payouts are not separated');
             expect(d).toContain(
                 'dpsCommon 0 means no common-stock cash dividend for that FY'
             );
-            expect(d).toContain(
-                'null means the DPS for that FY could not be confirmed (use the trailing fields)'
-            );
-            expect(d).toContain('report only the latest payment');
-            expect(d).toContain(
-                'otherwise say SIGLENS does not carry it and it could not be confirmed'
-            );
-            expect(d).toContain('never answer from memory');
         });
 
         it('market overview: lastClose vs live price', () => {
@@ -1065,7 +1024,9 @@ describe('AGENT_TOOL_SPECS', () => {
         // pullback is null for no washout (2026-10-03); a 'none' reading the
         // model could report must not come back into the contract.
         expect(bars).not.toContain('| none');
-        expect(bars).toContain('null when there is no washout reading');
+        expect(bars).toContain(
+            'null when there is no reading, and also when `range.bars` is below 200 (too little daily history to read one: then say the history is too short, never that there is no reading);'
+        );
         expect(bars).not.toContain('still a tally');
         // RSI(2) stays available when there is no washout block.
         expect(bars).toContain('RSI(2) as `rsi2` on 1Day only');
@@ -1272,7 +1233,7 @@ describe('tool descriptions — consumer-provided freshness and history fields',
         expect(d).toContain("calendarChange['1month'|'3months'|'1year']");
         expect(d).toContain('highDate/lowDate');
         expect(d).toContain('maCross50_200');
-        expect(d).toContain('never that no cross happened');
+        expect(d).toContain('null when the scan is incomplete (see notes)');
     });
     it('bars: 진행 중인 마지막 봉의 값은 현재가이고, 최근 종가는 lastCompletedClose로 답하게 한다', () => {
         const d = desc('get_bars_indicators');
@@ -1282,14 +1243,11 @@ describe('tool descriptions — consumer-provided freshness and history fields',
         expect(d).toContain('are intraday readings');
         expect(d).toContain('on intraday timeframes call timeframe 1Day');
     });
-    it('fundamentals: 확정 여부·분기 행·실적 반응·신뢰할 수 없는 P/E를 설명한다', () => {
+    it('fundamentals: 확정 여부·분기 행·실적 반응을 설명한다', () => {
         const d = desc('get_fundamentals');
         expect(d).toContain('earningsDateConfirmed');
         expect(d).toContain('recentQuarters');
         expect(d).toContain('earningsReactions');
-        expect(d).toContain(
-            'A null P/E means the source figure was not trustworthy'
-        );
     });
     it('quote·options·economy: 해석된 종목, 낡은 상장, 호가 없는 내재 변동폭, 국채 기준일', () => {
         expect(desc('get_quote')).toContain('stale_listing');
@@ -1415,5 +1373,88 @@ describe('show_chart — 라우팅 행과 설명의 예외 예시 동기화', ()
         });
         expect(findToolSpec('show_chart')?.description).toContain(examples);
         expect(prompt).toContain(examples);
+    });
+});
+
+describe('tool descriptions — null rules moved to result notes (WP-09 core-3)', () => {
+    const bars = findToolSpec('get_bars_indicators')?.description ?? '';
+    const fundamentals = findToolSpec('get_fundamentals')?.description ?? '';
+    const POINTER =
+        '`notes` (when present) say why a field is null in this result and what to do instead.';
+    const count = (text: string, needle: string): number =>
+        text.split(needle).length - 1;
+
+    it('the pointer sentence is present once in each description', () => {
+        expect(count(bars, POINTER)).toBe(1);
+        expect(count(fundamentals, POINTER)).toBe(1);
+    });
+
+    it('no other description carries the pointer', () => {
+        expect(
+            AGENT_TOOL_SPECS.filter(t => t.description.includes(POINTER)).map(
+                t => t.name
+            )
+        ).toEqual(['get_bars_indicators', 'get_fundamentals']);
+    });
+
+    it('the removed bars clauses are gone and the replacements point to notes', () => {
+        [
+            'older app',
+            'When null or absent',
+            'It is null on other timeframes',
+            'too short to rank',
+            'null when there is no washout reading',
+            'then say the data does not reach that far',
+            'never that no cross happened',
+            'count the streak yourself',
+            'and `lastCompletedClose` are null',
+        ].forEach(gone => expect(bars).not.toContain(gone));
+        expect(bars).toContain('null when the scan is incomplete (see notes)');
+        expect(bars).toContain('the 1Day-only fields are null (see notes)');
+        expect(bars).toContain(
+            'null when there is no reading, and also when `range.bars` is below 200 (too little daily history to read one: then say the history is too short, never that there is no reading);'
+        );
+        // The non-null rules stay.
+        expect(bars).toContain('[] when none happened');
+        expect(bars).toContain(
+            "truncated true means the streak spans every loaded bar (say 'at least N days'); volumeVsAvg20"
+        );
+    });
+
+    it('the removed fundamentals clauses are gone and the value rules stay', () => {
+        [
+            'A null P/E',
+            'not trustworthy',
+            'sec.epsDiluted is null for a fiscal Q4',
+            'Any other null sec field',
+            'absent or null `dividends` means unknown',
+            'If yieldOnLastClosePct is null',
+            'null means the DPS for that FY',
+            'When null or absent, search',
+            'never answer from memory',
+        ].forEach(gone => expect(fundamentals).not.toContain(gone));
+        [
+            'a confirmed non-payer has latestExDate and latestAmount null with trailing12mAmount 0 and trailingYieldPct 0 (see notes)',
+            'never derive an annual or trailing yield from a single payment',
+            'trailing12mAmount and trailingYieldPct may include special dividends',
+            'headline `yieldOnLastClosePct`',
+            'dpsCommon 0 means no common-stock cash dividend for that FY.',
+            'When annualReported is absent use the trailing fields as described above, never a single payment',
+            'When sec is null or absent use the row fields',
+            'cite the Wikipedia constituents list and asOf',
+            'it has not been announced while the date is unsettled',
+            "When `earningsSession` is null or absent the timing is not in this tool, so never state it from memory, and do not cite the company's usual reporting time from memory either: search the company announcement and cite it when web_search is available, otherwise say SIGLENS does not carry it and it could not be confirmed.",
+        ].forEach(kept => expect(fundamentals).toContain(kept));
+    });
+
+    it('both descriptions tell the model to follow notes and the system prompt rule says the same', () => {
+        const prompt = buildAgentSystemPrompt({
+            locale: 'ko',
+            tools: AGENT_TOOL_SPECS,
+            guest: true,
+        });
+        expect(count(prompt, '- Result notes:')).toBe(1);
+        expect(bars).toContain('`notes` (when present)');
+        expect(fundamentals).toContain('`notes` (when present)');
     });
 });

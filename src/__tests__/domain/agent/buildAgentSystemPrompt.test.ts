@@ -555,7 +555,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-21.3');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-21.5');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again
@@ -1308,7 +1308,7 @@ describe('buildAgentSystemPrompt', () => {
 
     it('눌림 판독이 none이면 언급하지 않게 한다', () => {
         expect(prompt).toContain(
-            'When pullback is null, say nothing about it at either level.'
+            'When pullback is null, do not bring it up at either level; if the question asks about it, answer as the get_bars_indicators description says (no reading, or too little history when range.bars is below 200).'
         );
     });
 
@@ -2268,5 +2268,38 @@ describe('buildAgentSystemPrompt price statistics routing (WP-09)', () => {
         expect(build()).toContain(
             'price statistics returnPct/cagrPct/fromHighestClosePct/maxDrawdown/correlation coefficient'
         );
+    });
+});
+
+describe('buildAgentSystemPrompt result notes rule (WP-09 core-3)', () => {
+    const RULE =
+        "- Result notes: a tool result's \`notes\` say how to read a null, partial or substituted field in that result. When your answer uses such a field or the question asks about it, follow its note and never fill the field from memory or from your own calculation (the one-operation allowance above does not apply to it); a note about the window or dates behind a figure you quote always applies, but a note about a field the question does not need is no reason to mention it, search or call another tool.";
+    const build = (tools: readonly (typeof AGENT_TOOL_SPECS)[number][]) =>
+        buildAgentSystemPrompt({ locale: 'ko', tools, guest: true });
+
+    it('is present exactly once, right after the computed-figures rule', () => {
+        const prompt = build(AGENT_TOOL_SPECS);
+        expect(prompt.split(RULE)).toHaveLength(2);
+        const lines = prompt.split('\n');
+        const at = lines.indexOf(RULE);
+        expect(lines[at - 1]).toContain('- Computed figures:');
+    });
+
+    it('conditions the action on the question and exempts the field from the one-operation allowance', () => {
+        expect(RULE).toContain(
+            'When your answer uses such a field or the question asks about it'
+        );
+        expect(RULE).toContain(
+            'the one-operation allowance above does not apply to it'
+        );
+        expect(RULE).toContain(
+            'is no reason to mention it, search or call another tool'
+        );
+    });
+
+    it('is not tied to a tool: it renders with only get_quote and with every tool', () => {
+        const quoteOnly = AGENT_TOOL_SPECS.filter(t => t.name === 'get_quote');
+        expect(build(quoteOnly)).toContain(RULE);
+        expect(build(AGENT_TOOL_SPECS)).toContain(RULE);
     });
 });
