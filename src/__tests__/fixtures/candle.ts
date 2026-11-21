@@ -41,3 +41,40 @@ export const makeEngulfingPair = (startIndex: number): [Bar, Bar] => [
         close: 118,
     }),
 ];
+
+/** Direction of a {@link makeTrendLead} run; `none` is flat. */
+export type TrendLeadDirection = 'decline' | 'advance' | 'none';
+
+export const TREND_LEAD_BARS = 20;
+const TREND_LEAD_STEP = 2;
+
+/**
+ * Bars that lead into a pattern: `count` bars whose closes fall (rise) by
+ * `step` per bar and end at `endClose`, each with a 1-point body (colours
+ * alternate, the last bar follows the trend) and half-point wicks. The ATR of the run is about `step + 0.5`, so the 10-bar move is about
+ * `10 * step / (step + 0.5)` ATR (8 ATR at the default step); `none` keeps the
+ * closes flat (move 0). At least 15 bars are needed so the ATR(14) of the
+ * series is warm before the pattern starts.
+ */
+export const makeTrendLead = (
+    direction: TrendLeadDirection,
+    endClose: number,
+    count = TREND_LEAD_BARS,
+    step = TREND_LEAD_STEP
+): Bar[] => {
+    const sign = direction === 'decline' ? 1 : direction === 'advance' ? -1 : 0;
+    return Array.from({ length: count }, (_, k) => {
+        const close = endClose + sign * step * (count - 1 - k);
+        // Alternate colours (the last bar follows the trend) so the lead itself never
+        // forms a same-colour run or a long-body pattern with the bars after it.
+        const withTrend = (count - 1 - k) % 2 === 0;
+        const bearish = sign >= 0 ? withTrend : !withTrend;
+        const open = close + (bearish ? 1 : -1);
+        return makeBar(k - count, {
+            open,
+            high: Math.max(open, close) + 0.5,
+            low: Math.min(open, close) - 0.5,
+            close,
+        });
+    });
+};

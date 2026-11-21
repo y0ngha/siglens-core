@@ -29,7 +29,15 @@ import {
 } from '@/domain/analysis/chartOverlayCandidatesSection';
 import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 import { calculateIndicators } from '@/domain/indicators/index';
+import { calculateATR } from '@/domain/indicators/atr';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
+import {
+    CANDLE_PRIOR_TREND_BARS,
+    CANDLE_PRIOR_TREND_MIN_ATR,
+} from '@/domain/analysis/candle-context';
+import { makeTrendLead } from '@/__tests__/fixtures/candle';
+import { chartFixture } from '@/__tests__/domain/patterns/fixtures/chartFixture';
+import hangingManChart from '@/__tests__/fixtures/charts/candle-hanging-man-after-advance.json';
 import doubleTopFixture from '@/__tests__/domain/patterns/fixtures/double-top.json';
 import {
     ATR_DEFAULT_PERIOD,
@@ -69,6 +77,7 @@ import {
     TEST_BAR_INTERVAL,
 } from '@/__tests__/fixtures/candle';
 import type {
+    AssetClass,
     Bar,
     FearGreedSnapshot,
     IndicatorResult,
@@ -79,6 +88,7 @@ import type {
     SkillUsageRole,
     SMCResult,
     SqueezeMomentumResult,
+    Timeframe,
 } from '@/domain/types';
 import type { PriceQuoting } from '@/domain/analysis/promptFormat';
 import { US_EQUITY_SESSION } from '@/domain/session';
@@ -2481,6 +2491,46 @@ describe('prompt', () => {
     });
 
     describe('캔들 패턴 레이블', () => {
+        /** 패턴 봉 앞에 하락 리드를 붙인다: 하락 뒤 반전형(장악형, 망치)의 전제. */
+        const afterDecline = (bars: Bar[], gap = 0): Bar[] => [
+            ...makeTrendLead('decline', bars[0].open + gap),
+            ...bars,
+        ];
+        const afterAdvance = (bars: Bar[], gap = 0): Bar[] => [
+            ...makeTrendLead('advance', bars[0].open + gap),
+            ...bars,
+        ];
+        const buildWith = (
+            bars: Bar[],
+            timeframe: Timeframe = '1Day',
+            assetClass: AssetClass = 'equity'
+        ): string =>
+            buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators(),
+                [],
+                timeframe,
+                undefined,
+                assetClass
+            );
+        /** `## Detected Candle Patterns` 섹션 본문(다음 `## ` 제목 전까지). */
+        const patternSection = (prompt: string): string =>
+            (prompt.split(CANDLE_PATTERNS_HEADER)[1] ?? '').split('\n## ')[0];
+        // 리드가 패턴 봉 시가보다 10 낮게 끝나게 해, 패턴 봉이 리드 마지막 봉을 덮는 장악형이 되지 않게 한다
+        const LEAD_GAP = -10;
+        const hammerBar = (): Bar => ({
+            time: TEST_BAR_BASE_TIME,
+            open: 90,
+            high: 90 + HAMMER_HIGH_OFFSET,
+            low: 90 + HAMMER_LOW_OFFSET,
+            close: 90 + HAMMER_BODY_OFFSET,
+            volume: TEST_BAR_BASE_VOLUME,
+        });
+        // 이 파일의 다른 테스트가 쓰는 헤더 상수는 없어 한 곳에 둔다.
+        const CANDLE_PATTERNS_HEADER = '## Detected Candle Patterns (computed)';
+
         it('단봉 캔들 패턴 레이블이 대괄호 형식으로 bar row에 포함된다', () => {
             const bars = [makeBar(0)];
             const result = buildAnalysisPrompt(
@@ -2494,42 +2544,21 @@ describe('prompt', () => {
         });
 
         it('다봉 패턴 감지 시 패턴명이 포함된다', () => {
-            // prevBar(음봉) → currBar(양봉, 장악형 조건 충족) → bullish_engulfing 반드시 감지됨
-            const bars = makeEngulfingBars();
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                makeIndicators(),
-                []
-            );
+            // prevBar(음봉) → currBar(양봉, 장악형 조건 충족) → 하락 뒤 bullish_engulfing 감지
+            const result = buildWith(afterDecline(makeEngulfingBars()));
             expect(result).toMatch(/Multi-candle pattern: .+/);
         });
 
         it('슬라이딩 윈도우로 감지된 다봉 패턴은 봉 위치와 함께 포함된다', () => {
-            // prevBar(음봉) → currBar(양봉, 장악형 조건 충족) → bullish_engulfing 반드시 감지됨
-            const bars = makeEngulfingBars();
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                makeIndicators(),
-                []
-            );
+            const result = buildWith(afterDecline(makeEngulfingBars()));
             expect(result).toMatch(
                 /\[\d+ bars ago · bar \d{4}-\d{2}-\d{2} \d{2}:\d{2}] Multi-candle pattern: .+/
             );
         });
 
         it('패턴 줄의 봉 날짜는 N bars ago 위치의 실제 봉과 같고, Recent Bar Data 행에 그대로 있다', () => {
-            const bars = makeEngulfingBars();
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                makeIndicators(),
-                []
-            );
+            const bars = afterDecline(makeEngulfingBars());
+            const result = buildWith(bars);
             const lines = result.split('\n');
             const entries = lines
                 .map(l =>
@@ -2549,94 +2578,187 @@ describe('prompt', () => {
 
         it('다봉 패턴 라인에 사전 계산된 trend가 포함된다', () => {
             // bullish_engulfing → getMultiPatternTrend → 'bullish'
-            const bars = makeEngulfingBars();
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                makeIndicators(),
-                []
-            );
+            const result = buildWith(afterDecline(makeEngulfingBars()));
             expect(result).toMatch(
                 /Multi-candle pattern: bullish_engulfing \[trend: bullish]/
             );
         });
 
         it('단봉 패턴은 봉 위치 정보와 함께 패턴 섹션에 포함된다', () => {
-            const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                makeIndicators(),
-                []
-            );
+            const result = buildWith(afterDecline([hammerBar()], LEAD_GAP));
             expect(result).toMatch(
                 /\[\d+ bars ago · bar \d{4}-\d{2}-\d{2} \d{2}:\d{2}] Single candle pattern: .+/
             );
         });
 
         it('단봉 패턴 라인에 사전 계산된 trend가 포함된다', () => {
-            // hammer → getSinglePatternTrend → 'bullish'
-            const hammerBar: Bar = {
-                time: TEST_BAR_BASE_TIME,
-                open: TEST_BAR_BASE_PRICE,
-                high: TEST_BAR_BASE_PRICE + HAMMER_HIGH_OFFSET,
-                low: TEST_BAR_BASE_PRICE + HAMMER_LOW_OFFSET,
-                close: TEST_BAR_BASE_PRICE + HAMMER_BODY_OFFSET,
-                volume: TEST_BAR_BASE_VOLUME,
-            };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [hammerBar],
-                makeIndicators(),
-                []
-            );
+            // 하락 뒤 hammer → getSinglePatternTrend → 'bullish'
+            const result = buildWith(afterDecline([hammerBar()], LEAD_GAP));
             expect(result).toMatch(
                 /Single candle pattern: hammer \[trend: bullish]/
             );
         });
 
+        it('맥락으로 이름 붙은 패턴 줄은 직전 움직임을 ATR 단위로 밝힌다', () => {
+            const bars = afterDecline([hammerBar()], LEAD_GAP);
+            const atrBefore = calculateATR(bars)[bars.length - 2] ?? Number.NaN;
+            const move =
+                (bars[bars.length - 2].close -
+                    bars[bars.length - 2 - CANDLE_PRIOR_TREND_BARS].close) /
+                atrBefore;
+            const line = patternSection(buildWith(bars))
+                .split('\n')
+                .find(l => l.includes('Single candle pattern: hammer'));
+            expect(line).toMatch(
+                new RegExp(
+                    `\\[trend: bullish] \\(after a decline of ${Math.abs(move).toFixed(1)} ATR over the ${CANDLE_PRIOR_TREND_BARS} bars before it\\)$`
+                )
+            );
+        });
+
+        it('상승 뒤 같은 봉은 hanging_man이고 상승으로 밝힌다', () => {
+            const line = patternSection(
+                buildWith(afterAdvance([hammerBar()], -LEAD_GAP))
+            )
+                .split('\n')
+                .find(l => l.includes('Single candle pattern'));
+            expect(line).toMatch(
+                /Single candle pattern: hanging_man \[trend: bearish] \(after an advance of \d+\.\d ATR over the 10 bars before it\)$/
+            );
+        });
+
+        it('다봉 패턴 줄도 첫 봉 앞의 움직임을 밝힌다', () => {
+            const result = buildWith(afterDecline(makeEngulfingBars()));
+            expect(result).toMatch(
+                /Multi-candle pattern: bullish_engulfing \[trend: bullish] \(after a decline of \d+\.\d ATR over the 10 bars before it\)\n/
+            );
+        });
+
+        it('모양만으로 정해지는 패턴(마루보주) 줄에는 근거 문구가 없다', () => {
+            const marubozu: Bar = {
+                time: TEST_BAR_BASE_TIME,
+                open: 90,
+                high: 110,
+                low: 90,
+                close: 110,
+                volume: TEST_BAR_BASE_VOLUME,
+            };
+            // 하락 뒤 장악형으로 묶이지 않게 시가를 직전 리드 종가 위에 둔다
+            const line = patternSection(
+                buildWith(afterDecline([marubozu], LEAD_GAP))
+            )
+                .split('\n')
+                .find(l => l.includes('Single candle pattern'));
+            expect(line).toMatch(
+                /Single candle pattern: bullish_marubozu \[trend: bullish]$/
+            );
+        });
+
+        it('섹션 제목과 정의·신뢰도 문장은 상수에서 만든다', () => {
+            const result = buildWith(afterDecline([hammerBar()], LEAD_GAP));
+            expect(result).toContain(`${CANDLE_PATTERNS_HEADER}\n`);
+            expect(result).not.toContain('Short-term Trend Signal');
+            expect(result).not.toContain('short-term trend signals');
+            const section = patternSection(result);
+            expect(section).toContain(
+                `at least ${CANDLE_PRIOR_TREND_MIN_ATR.toFixed(1)} ATR over the ${CANDLE_PRIOR_TREND_BARS} bars before the pattern's first bar`
+            );
+            expect(section).toContain(
+                "Descriptive only: on daily bars, candle labels showed no forward edge over matched random dates in SIGLENS's own measurement."
+            );
+        });
+
+        describe('신뢰도 문장은 측정한 범위에만 붙는다', () => {
+            const RELIABILITY = 'Descriptive only: on daily bars';
+            const bars = afterDecline([hammerBar()], LEAD_GAP);
+
+            it('일봉 주식·ETF에는 정의와 함께 붙는다', () => {
+                expect(
+                    patternSection(buildWith(bars, '1Day', 'equity'))
+                ).toContain(RELIABILITY);
+            });
+
+            it.each(['5Min', '15Min', '30Min', '1Hour', '4Hour'] as const)(
+                '%s 봉에는 정의만 붙고 신뢰도 문장은 없다',
+                timeframe => {
+                    const section = patternSection(buildWith(bars, timeframe));
+                    expect(section).toContain(
+                        'Candle formations of the most recent bars'
+                    );
+                    expect(section).not.toContain('Descriptive only');
+                }
+            );
+
+            it('암호화폐 일봉(측정하지 않음)에는 정의만 붙는다', () => {
+                const section = patternSection(
+                    buildWith(bars, '1Day', 'crypto')
+                );
+                expect(section).toContain(
+                    'Candle formations of the most recent bars'
+                );
+                expect(section).not.toContain('Descriptive only');
+            });
+        });
+
+        it('감지된 패턴이 없으면 섹션이 없다', () => {
+            expect(buildWith(makeTrendLead('none', 100))).not.toContain(
+                CANDLE_PATTERNS_HEADER
+            );
+        });
+
+        it('Recent Bar Data 행의 라벨도 직전 움직임으로 이름 붙는다 (상승 뒤는 교수형, 하락 뒤는 망치형)', () => {
+            const top = buildWith(afterAdvance([hammerBar()], -LEAD_GAP));
+            const bottom = buildWith(afterDecline([hammerBar()], LEAD_GAP));
+            const lastRow = (prompt: string): string =>
+                prompt
+                    .split('\n')
+                    .filter(l => l.startsWith('[ts:'))
+                    .at(-1) ?? '';
+            expect(lastRow(top)).toContain('[교수형]');
+            expect(lastRow(top)).not.toContain('[망치형]');
+            expect(lastRow(bottom)).toContain('[망치형]');
+            expect(lastRow(bottom)).not.toContain('[교수형]');
+        });
+
+        it('실제 차트의 상승 뒤 긴 아래꼬리 양봉은 행 라벨도 줄도 교수형이다', () => {
+            const { bars } = chartFixture(hangingManChart);
+            const result = buildWith(bars);
+            const lastRow = result
+                .split('\n')
+                .filter(l => l.startsWith('[ts:'))
+                .at(-1);
+            expect(lastRow).toContain('[교수형]');
+            expect(patternSection(result)).toMatch(
+                /- \[0 bars ago · bar [^\]]+] Single candle pattern: hanging_man \[trend: bearish] \(after an advance of \d+\.\d ATR over the 10 bars before it\)/
+            );
+            expect(patternSection(result)).not.toContain(': hammer ');
+        });
+
         it('다봉 패턴이 있으면 해당 다봉 패턴과 관련 봉의 단봉 패턴만 포함된다', () => {
             // hammer bar (단봉) + engulfing pair (다봉)
             // 마지막 패턴(다봉)과 그 관련 봉의 단봉만 포함되어야 함
-            const hammerBar: Bar = {
-                time: TEST_BAR_BASE_TIME - TEST_BAR_INTERVAL,
-                open: TEST_BAR_BASE_PRICE,
-                high: TEST_BAR_BASE_PRICE + HAMMER_HIGH_OFFSET,
-                low: TEST_BAR_BASE_PRICE + HAMMER_LOW_OFFSET,
-                close: TEST_BAR_BASE_PRICE + HAMMER_BODY_OFFSET,
-                volume: TEST_BAR_BASE_VOLUME,
-            };
             const [engulfingPrev, engulfingCurr] = makeEngulfingBars();
-            const bars = [hammerBar, engulfingPrev, engulfingCurr];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                makeIndicators(),
-                []
+            const bars = afterDecline(
+                [
+                    { ...hammerBar(), open: engulfingPrev.open },
+                    engulfingPrev,
+                    engulfingCurr,
+                ],
+                LEAD_GAP
             );
+            const result = buildWith(bars);
             // Multi-candle pattern should be included
             expect(result).toMatch(/Multi-candle pattern: .+/);
             // Hammer bar is NOT involved in the multi pattern, so it should be excluded
-            const patternSection =
-                result.split('Short-term Trend Signal')[1] ?? '';
-            expect(patternSection).not.toContain('Hammer');
+            const lines = patternSection(result)
+                .split('\n')
+                .filter(line => line.startsWith('- ['));
+            expect(lines.join('\n')).not.toContain('hammer');
         });
 
         it('다봉 패턴만 존재할 때 해당 다봉 패턴만 포함된다', () => {
-            // prevBar(음봉) → currBar(양봉, 장악형 조건 충족) → bullish_engulfing 감지
             // 다봉 패턴에 관련된 봉의 단봉 패턴은 detectCandlePatternEntries에서 이미 제외됨
-            const bars = makeEngulfingBars();
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                bars,
-                makeIndicators(),
-                []
-            );
+            const result = buildWith(afterDecline(makeEngulfingBars()));
             expect(result).toMatch(/Multi-candle pattern/);
             expect(result).not.toMatch(/Single candle pattern/);
         });

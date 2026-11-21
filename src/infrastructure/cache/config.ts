@@ -1085,8 +1085,17 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * read the latest element, so `N/A`), and the reconciled plan drops targets that
  * are not above the entry zone instead of inventing one. (Parabolic SAR now
  * resets its acceleration to `afStart` on a reversal, which changes nothing at
- * the defaults because `PSAR_AF_START` equals `PSAR_AF_INCREMENT`.) Bytes change
- * for every technical prompt.
+ * the defaults because `PSAR_AF_START` equals `PSAR_AF_INCREMENT`.) Candle
+ * patterns are context-aware: hammer / hanging man and inverted hammer
+ * / shooting star are named by the 10-bar move before the bar (at least 1 ATR),
+ * not by body colour; dragonfly / gravestone doji, belt holds and every
+ * multi-bar pattern need the prior move their definition requires; two- and
+ * three-bar reversals need a first-bar body of at least 0.25 ATR (engulfing,
+ * three outside and tweezers also a non-doji first bar); tweezers need a
+ * confirming close. So fewer candle lines print, each with its basis
+ * (`after a decline of 2.4 ATR over the 10 bars before it`), under the header
+ * `## Detected Candle Patterns (computed)`, and the `## Recent Bar Data` row
+ * labels follow the same context. Bytes change for every technical prompt.
  *
  * @internal
  */

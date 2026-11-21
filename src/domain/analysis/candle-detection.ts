@@ -1,12 +1,19 @@
 import type {
     Bar,
+    CandlePattern,
     CandlePatternEntry,
+    CandlePriorMove,
     MultiCandlePattern,
 } from '@/domain/types';
 import {
     detectCandlePattern,
     detectMultiCandlePattern,
 } from '@/domain/analysis/candle';
+import {
+    CANDLE_PRIOR_TREND_BARS,
+    candlePriorMove,
+} from '@/domain/analysis/candle-context';
+import { calculateATR } from '@/domain/indicators/atr';
 import { EXCLUDED_SINGLE_PATTERNS } from '@/domain/analysis/candle-trend';
 import { findLast } from '@/domain/arrayCompat';
 
@@ -15,8 +22,29 @@ import { findLast } from '@/domain/arrayCompat';
 /** @internal Number of recent bars scanned for candle patterns. */
 export const CANDLE_PATTERN_DETECTION_BARS = 15;
 
-/** @internal Extra bars before the detection window so 5-bar multi-candle patterns are detectable at the start. */
+/** @internal Bars before the last bar of the longest (5-bar) multi-candle pattern. */
 export const MULTI_CANDLE_PATTERN_BUFFER = 4;
+
+/**
+ * Trailing bars handed to the multi-pattern detector per scanned bar: the
+ * pattern ({@link MULTI_CANDLE_PATTERN_BUFFER} + 1 bars), the bar before it
+ * (where its prior move ends) and the {@link CANDLE_PRIOR_TREND_BARS} bars
+ * the move spans.
+ */
+const MULTI_PATTERN_WINDOW_BARS =
+    MULTI_CANDLE_PATTERN_BUFFER + 1 + 1 + CANDLE_PRIOR_TREND_BARS;
+
+/** Single patterns named by the move before them; every other single is shape-only. */
+const CONTEXT_GATED_SINGLE_PATTERNS: ReadonlySet<CandlePattern> = new Set([
+    'hammer',
+    'hanging_man',
+    'inverted_hammer',
+    'shooting_star',
+    'dragonfly_doji',
+    'gravestone_doji',
+    'bullish_belt_hold',
+    'bearish_belt_hold',
+]);
 
 const FIVE_BAR_PATTERN_COUNT = 5;
 const FOUR_BAR_PATTERN_COUNT = 4;
@@ -61,11 +89,30 @@ const THREE_BAR_PATTERNS: ReadonlySet<MultiCandlePattern> = new Set([
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function getPatternBarCount(pattern: MultiCandlePattern): number {
+/**
+ * @internal Bars a multi-bar pattern spans. Kept beside the detector in a test
+ * that runs every pattern through the real detector, so the suppression span
+ * and the basis clause cannot drift from the length the gate used.
+ */
+export function getPatternBarCount(pattern: MultiCandlePattern): number {
     if (FIVE_BAR_PATTERNS.has(pattern)) return FIVE_BAR_PATTERN_COUNT;
     if (FOUR_BAR_PATTERNS.has(pattern)) return FOUR_BAR_PATTERN_COUNT;
     if (THREE_BAR_PATTERNS.has(pattern)) return THREE_BAR_PATTERN_COUNT;
     return TWO_BAR_PATTERN_COUNT;
+}
+
+/**
+ * @internal The caller's ATR when aligned with `bars`, otherwise ATR(14) of
+ * `bars`. The one rule every candle consumer (detection, prompt rows and
+ * basis clauses) uses, so they read the same series.
+ */
+export function resolveCandleAtr(
+    bars: readonly Bar[],
+    atr: readonly (number | null)[] | undefined
+): readonly (number | null)[] {
+    return atr !== undefined && atr.length === bars.length
+        ? atr
+        : calculateATR(bars);
 }
 
 /** Yield merged entries from two sorted arrays in O(n) using two-pointer. */
@@ -113,54 +160,68 @@ export function getDetectionBars(bars: Bar[]): Bar[] {
  * Detect every candle pattern within the trailing detection window.
  *
  * For each bar in the last `CANDLE_PATTERN_DETECTION_BARS`, evaluates 2- to
- * 5-bar multi-candle patterns first (using a small leading buffer so 5-bar
- * patterns can be detected at the start of the window). Bars
- * involved in any multi pattern are excluded from single-pattern detection
- * to prevent overlap. Single-pattern entries in `EXCLUDED_SINGLE_PATTERNS`
- * (the directional / flat / spinning-top noise patterns) are also dropped.
+ * 5-bar multi-candle patterns first. Bars involved in any multi pattern are
+ * excluded from single-pattern detection to prevent overlap; a multi pattern
+ * that fails its context rule is not a detection, so it suppresses nothing.
+ * Single-pattern entries in `EXCLUDED_SINGLE_PATTERNS` (the directional / flat
+ * / spinning-top noise patterns) are also dropped.
+ *
+ * Patterns are context-aware: hammer / hanging man and inverted hammer /
+ * shooting star are named by the 10-bar move before the bar (at least 1 ATR,
+ * not by body colour); a dragonfly or gravestone doji and a belt-hold need
+ * that move; every multi pattern needs the move its definition requires, a
+ * first-bar body of at least 0.25 ATR (two- and three-bar reversals), and
+ * tweezers need a confirming close (see `detectMultiCandlePattern`). Reading
+ * the move needs at least 15 bars before a pattern's first bar (the ATR(14)
+ * warm-up); a pattern with fewer bars before it is not detected. Shape-only
+ * patterns (marubozu, doji, spinning top) are unaffected.
  *
  * Returned entries are merged in chronological `barIndex` order using a
- * two-pointer merge of the multi and single sub-lists.
+ * two-pointer merge of the multi and single sub-lists. `barIndex` counts from
+ * the start of the trailing detection window.
  *
- * @param bars - Full OHLCV bar series sorted oldest-first; only the trailing
- *   detection window plus a small buffer is examined.
+ * @param bars - Full OHLCV bar series sorted oldest-first. Only the trailing
+ *   detection window is scanned, but earlier bars supply each pattern's prior
+ *   move.
+ * @param options - Optional. `atr`: the ATR(14) series aligned with `bars`
+ *   (e.g. `IndicatorResult.atr`). Used only when it has `bars.length`
+ *   elements; otherwise the ATR is calculated from `bars`.
  * @returns Detected pattern entries in ascending `barIndex` order.
  *
  * @see selectLastCandlePatternEntries
  * @see getDetectionBars
  */
-export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
-    const extendedCount =
-        CANDLE_PATTERN_DETECTION_BARS + MULTI_CANDLE_PATTERN_BUFFER;
-    const extendedBars = bars.slice(-extendedCount);
-    const extendedLength = extendedBars.length;
+export function detectCandlePatternEntries(
+    bars: Bar[],
+    options?: { atr?: readonly (number | null)[] }
+): CandlePatternEntry[] {
+    const atr = resolveCandleAtr(bars, options?.atr);
     const detectionStartIndex = Math.max(
         0,
-        extendedLength - CANDLE_PATTERN_DETECTION_BARS
+        bars.length - CANDLE_PATTERN_DETECTION_BARS
     );
 
     // Detect multi-candle patterns and collect involved bar indices
-    const multiEntryMap = new Map<
-        number,
-        { pattern: MultiCandlePattern; involvedIndices: number[] }
-    >();
-    for (let i = detectionStartIndex; i < extendedLength; i++) {
-        const candleWindow = extendedBars.slice(
-            Math.max(0, i - MULTI_CANDLE_PATTERN_BUFFER),
-            i + 1
-        );
-        const detected = detectMultiCandlePattern(candleWindow);
-        if (detected === null) continue;
+    const multiEntryMap = new Map(
+        Array.from(
+            { length: bars.length - detectionStartIndex },
+            (__, offset) => detectionStartIndex + offset
+        ).flatMap(i => {
+            const windowStart = Math.max(0, i + 1 - MULTI_PATTERN_WINDOW_BARS);
+            const detected = detectMultiCandlePattern(
+                bars.slice(windowStart, i + 1),
+                atr.slice(windowStart, i + 1)
+            );
+            if (detected === null) return [];
 
-        const patternBarCount = getPatternBarCount(detected);
-        const startIdx = Math.max(0, i - patternBarCount + 1);
-        const involvedIndices = Array.from(
-            { length: i - startIdx + 1 },
-            (__, offset) => startIdx + offset
-        );
-
-        multiEntryMap.set(i, { pattern: detected, involvedIndices });
-    }
+            const startIdx = Math.max(0, i - getPatternBarCount(detected) + 1);
+            const involvedIndices = Array.from(
+                { length: i - startIdx + 1 },
+                (___, offset) => startIdx + offset
+            );
+            return [[i, { pattern: detected, involvedIndices }] as const];
+        })
+    );
 
     // Collect all bar indices involved in any multi-candle pattern
     const multiInvolvedIndices = new Set(
@@ -180,12 +241,15 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     }));
 
     // Build single entries (excluding bars involved in multi patterns)
-    const detectionBars = extendedBars.slice(detectionStartIndex);
+    const detectionBars = bars.slice(detectionStartIndex);
     const singleEntries: CandlePatternEntry[] = detectionBars.flatMap(
         (bar, i) => {
-            const extendedIndex = i + detectionStartIndex;
-            if (multiInvolvedIndices.has(extendedIndex)) return [];
-            const pattern = detectCandlePattern(bar);
+            const index = i + detectionStartIndex;
+            if (multiInvolvedIndices.has(index)) return [];
+            const pattern = detectCandlePattern(
+                bar,
+                candlePriorMove(bars, index, atr).trend
+            );
             if (EXCLUDED_SINGLE_PATTERNS.has(pattern)) return [];
             const entry: CandlePatternEntry = {
                 barIndex: i,
@@ -198,6 +262,40 @@ export function detectCandlePatternEntries(bars: Bar[]): CandlePatternEntry[] {
     );
 
     return mergeSortedEntries(singleEntries, multiEntries);
+}
+
+/**
+ * The prior move a context-gated entry rests on, for the prompt's basis clause.
+ *
+ * `null` for a shape-only entry (marubozu, plain doji): nothing to explain.
+ * Otherwise the move before the entry's FIRST bar, read from the same `bars`
+ * and ATR as {@link detectCandlePatternEntries} (`atr` is resolved the same
+ * way).
+ *
+ * @internal
+ * @param bars - The same bar series the entry was detected on.
+ * @param entry - An entry returned for `bars`.
+ * @param atr - The `options.atr` given to the detection, if any.
+ */
+export function candleEntryPriorMove(
+    bars: readonly Bar[],
+    entry: CandlePatternEntry,
+    atr?: readonly (number | null)[]
+): CandlePriorMove | null {
+    if (
+        entry.patternType === 'single' &&
+        !CONTEXT_GATED_SINGLE_PATTERNS.has(entry.singlePattern)
+    )
+        return null;
+
+    const lastIndex =
+        Math.max(0, bars.length - CANDLE_PATTERN_DETECTION_BARS) +
+        entry.barIndex;
+    const firstIndex =
+        entry.patternType === 'multi'
+            ? lastIndex - getPatternBarCount(entry.multiPattern) + 1
+            : lastIndex;
+    return candlePriorMove(bars, firstIndex, resolveCandleAtr(bars, atr));
 }
 
 // ─── Selection ──────────────────────────────────────────────────────────────

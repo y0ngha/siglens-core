@@ -10,10 +10,10 @@
  * `--set` verifies the manifest hashes and also reports what a case's prompt carries;
  * `--bars` takes a plain directory of `<SYMBOL>.json` files (e.g. the published daily-AI
  * backtest bars) and fingerprints it by file hash. Optional: `--only candles|patterns`,
- * `--symbols A,B`, and `--gate c9|pivots|geometry` (with `--allow-skipped-cases` to tolerate cases without a bar at
- * their `asOf` date) to score G1 for one PR (core-1, core-2,
- * core-3): a gated run passes only when every counter that PR owns is 0 and its half was
- * measured.
+ * `--symbols A,B`, and `--gate c9|pivots|geometry` (with `--allow-skipped-cases` to
+ * tolerate cases without a bar at their `asOf` date) to score G1 for one PR (core-1,
+ * core-2, core-3): a gated run passes only when every counter that PR owns is 0 and its
+ * half was measured.
  *
  * Writes `run.json` (core sha, data fingerprint, constants), `events.jsonl` and
  * `summary.json`. No network, no model call, no cost; the only randomness is the seeded
@@ -141,11 +141,7 @@ export function loadSet(setDir: string): LoadedData {
 
 const BAR_FIELDS = ['time', 'open', 'high', 'low', 'close', 'volume'] as const;
 
-/**
- * The bars of a stored-bars file (`{ bars: [{ time, open, high, low, close, volume }] }`).
- * Throws `InvalidBarsFileError` naming the file when the shape is not that, instead of
- * letting a wrong file fail somewhere inside the evaluation.
- */
+/** A bars file whose shape is not the stored-bars shape; the message names the file. */
 export class InvalidBarsFileError extends Error {
     constructor(file: string, reason: string) {
         super(`${file} is not a stored-bars file: ${reason}`);
@@ -153,6 +149,11 @@ export class InvalidBarsFileError extends Error {
     }
 }
 
+/**
+ * The bars of a stored-bars file (`{ bars: [{ time, open, high, low, close, volume }] }`).
+ * Throws `InvalidBarsFileError` naming the file when the shape is not that, instead of
+ * letting a wrong file fail somewhere inside the evaluation.
+ */
 export function parseStoredBars(file: string, text: string): Bar[] {
     const parsed: unknown = JSON.parse(text);
     const bars =

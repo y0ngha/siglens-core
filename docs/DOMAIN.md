@@ -843,7 +843,7 @@ validateKeyLevels(keyLevels: KeyLevels): KeyLevels
 
 ### 위치
 
-`domain/analysis/candle.ts` — 순수 함수로 구현, 외부 의존성 없음.
+`domain/analysis/candle.ts`(모양·기하·맥락 규칙), `candle-context.ts`(직전 움직임), `candle-detection.ts`(창 스캔) — 순수 함수로 구현, 외부 의존성 없음.
 
 ### 단봉 패턴 (CandlePattern)
 
@@ -851,19 +851,19 @@ validateKeyLevels(keyLevels: KeyLevels): KeyLevels
 type CandlePattern =
     // Doji 계열
     | 'flat'              // 시고저종 동일
-    | 'gravestone_doji'   // 위꼬리만 긴 도지
-    | 'dragonfly_doji'    // 아래꼬리만 긴 도지
+    | 'gravestone_doji'   // 위꼬리만 긴 도지 (상승 뒤에만, 아니면 doji)
+    | 'dragonfly_doji'    // 아래꼬리만 긴 도지 (하락 뒤에만, 아니면 doji)
     | 'doji'              // 일반 도지
     // Marubozu 계열
     | 'bullish_marubozu'  // 상승 마루보주 (몸통 90% 이상)
     | 'bearish_marubozu'  // 하락 마루보주
     // 반전 패턴
-    | 'shooting_star'     // 유성형 (위꼬리 긴 하락 전환)
-    | 'inverted_hammer'   // 역망치 (위꼬리 긴 상승 전환)
-    | 'hammer'            // 망치형 (아래꼬리 긴 상승 전환)
-    | 'hanging_man'       // 교수형 (아래꼬리 긴 하락 전환)
-    | 'bullish_belt_hold' // 상승 벨트홀드
-    | 'bearish_belt_hold' // 하락 벨트홀드
+    | 'shooting_star'     // 유성형 (상승 뒤 위꼬리 긴 봉)
+    | 'inverted_hammer'   // 역망치 (하락 뒤 위꼬리 긴 봉)
+    | 'hammer'            // 망치형 (하락 뒤 아래꼬리 긴 봉)
+    | 'hanging_man'       // 교수형 (상승 뒤 아래꼬리 긴 봉)
+    | 'bullish_belt_hold' // 상승 벨트홀드 (하락 뒤에만)
+    | 'bearish_belt_hold' // 하락 벨트홀드 (상승 뒤에만)
     // 기본 형태
     | 'spinning_top'      // 팽이형 (몸통 작고 꼬리 양쪽)
     | 'bullish'           // 일반 양봉
@@ -923,18 +923,87 @@ type MultiCandlePattern =
 ### 감지 함수
 
 ```typescript
-// 단봉: 현재 봉 1개로 판별
-detectCandlePattern(bar: Bar): CandlePattern
+// 단봉: 봉 1개 + 그 봉 앞의 움직임(prior)으로 판별 (내부 함수)
+detectCandlePattern(bar: Bar, prior: 'decline' | 'advance' | 'none'): CandlePattern
 
-// 다봉: 최근 2~5봉으로 판별 (감지 안 되면 null)
+// 다봉: 마지막 봉에서 끝나는 2~5봉으로 판별 (감지 안 되면 null, 내부 함수)
+// bars는 패턴의 마지막 봉에서 끝나고, atr은 bars와 정렬된 ATR(14) 시리즈다.
 // 5봉 → 4봉 → 3봉 → 2봉 순으로 첫 매치를 반환한다. stomach는 기존 2봉 패턴 뒤의 폴백이다.
-detectMultiCandlePattern(bars: Bar[]): MultiCandlePattern | null
+detectMultiCandlePattern(bars: readonly Bar[], atr: readonly (number | null)[]): MultiCandlePattern | null
+
+// 공개(Tier 2): 최근 15봉 창의 모든 엔트리. atr은 bars와 길이가 같을 때만 쓰고, 아니면 bars에서 계산한다.
+detectCandlePatternEntries(bars: Bar[], options?: { atr?: readonly (number | null)[] }): CandlePatternEntry[]
 ```
+
+### 직전 움직임 (candle-context)
+
+`domain/analysis/candle-context.ts`의 `candlePriorMove(bars, s, atr)`. `s`는 패턴의 **첫 봉** 인덱스이고,
+움직임은 그 앞 봉(`s − 1`)의 종가와 `CANDLE_PRIOR_TREND_BARS`(10)봉 더 앞의 종가 차를 `atr[s − 1]`로
+나눈 값(ATR 단위)이다. 패턴 자신의 봉은 읽지 않는다.
+
+- `≤ −CANDLE_PRIOR_TREND_MIN_ATR`(1.0) → `decline`, `≥ +1.0` → `advance`, 그 사이 → `none` (경계 포함).
+- `s − 11 < 0`이거나 `atr[s − 1]`이 null·비유한·0 이하이면 잴 수 없어 `none`(`moveAtr: null`).
+  ATR(14)의 첫 값이 인덱스 14이므로 패턴 첫 봉 앞에 봉이 15개 이상 있어야 맥락이 필요한 패턴이 나온다.
+- 차트 패턴 `priorTrend`(20봉·2 ATR)와 같은 형태이고, 캔들 패턴이 설명하는 1~5봉 지평에 맞춰 줄였다.
+  문턱은 사전 등록값이며 평가 데이터로 조정하지 않는다.
+
+### 단봉의 이름은 직전 움직임이 정한다
+
+모양 판정 비율과 검사 순서는 그대로이고, 맥락이 필요한 네 모양의 이름만 바뀐다. 몸통 색은 이름을
+정하지 않는다. "떨어진다"는 남은 검사(벨트홀드, 팽이형, 색)를 기존 순서대로 이어서 한다.
+
+| 모양 | decline | advance | none |
+|---|---|---|---|
+| 긴 아래꼬리 | `hammer` | `hanging_man` | 떨어진다 |
+| 긴 위꼬리 | `inverted_hammer` | `shooting_star` | 떨어진다 |
+| 잠자리형 도지 | `dragonfly_doji` | `doji` | `doji` |
+| 비석형 도지 | `doji` | `gravestone_doji` | `doji` |
+| 상승 벨트홀드 | `bullish_belt_hold` | 떨어진다 | 떨어진다 |
+| 하락 벨트홀드 | 떨어진다 | `bearish_belt_hold` | 떨어진다 |
+| 마루보주, 도지, 팽이형, flat, 색 | 모양만으로 결정 | | |
+
+`getSinglePatternTrend`는 정적 표 그대로이며, 이제 구성상 맞다(`hammer`는 늘 하락 뒤).
+
+### 다봉 > 맥락 규칙
+
+다봉 패턴은 기하 조건에 더해 아래 규칙을 모두 통과해야 감지된다. 규칙은 패턴 이름 전부를 덮는
+하나의 `satisfies Record<MultiCandlePattern, CandleContextRule>` 상수다.
+
+| 직전 움직임 | 패턴 |
+|---|---|
+| `decline` | 상승 반전 16종 전부, 지속형 `falling_three_methods` · `downside_gap_tasuki` · `on_neck` · `in_neck`, 3선 타격 `bearish_three_line_strike`(하락 3봉 뒤) |
+| `advance` | 하락 반전 16종 전부, 지속형 `rising_three_methods` · `upside_gap_tasuki`, 3선 타격 `bullish_three_line_strike` |
+
+- 적삼병과 흑삼병도 직전 움직임이 필요하다(교과서상 반전형).
+- **첫 봉 몸통 하한**: 2·3봉 반전(장악형, 잉태형·잉태 십자형, 관통형·먹구름형, 반격선, on/in neck,
+  stomach, 족집게, 삼내형·삼외형, 샛별·석별형, 버려진 아기)은 첫 봉의
+  `|close − open| ≥ CANDLE_MIN_SETUP_BODY_ATR(0.25) × atr[s − 1]`이어야 한다. 장악형, 삼외형,
+  족집게는 장대봉 검사가 없으므로 첫 봉이 도지(`몸통/range ≤ DOJI_BODY_RATIO`)가 아니어야 한다는
+  조건도 더한다.
+- **족집게 확인 종가**: `tweezers_bottom`은 `curr.close > prev.close`, `tweezers_top`은
+  `curr.close < prev.close`(엄격). 같은 종가는 거부한다.
+- **규칙에 실패하면 그 길이는 아무것도 내지 않는다**: 5 → 4 → 3 → 2봉 순으로 기하 감지기의 첫
+  매치가 규칙을 통과해야 채택되고, 실패하면 다음으로 짧은 길이를 시도한다. 같은 길이의 낮은
+  우선순위 라벨로 내려가지 않는다(라벨이 안정적이고 길이마다 규칙 하나를 테스트할 수 있다).
+- `getMultiPatternTrend`(3선 타격 방향 반전 포함)는 그대로다.
+
+### 엔트리와 프롬프트
+
+- `detectCandlePatternEntries`는 최근 15봉만 훑지만 각 패턴의 직전 움직임을 읽으려고 그 앞 봉도
+  쓴다. 규칙에 실패한 다봉은 감지가 아니므로 그 봉들의 단봉 라벨을 억제하지 않는다.
+- 프롬프트 `## Recent Bar Data` 행의 라벨은 행마다 같은 맥락 판정을 쓴다(꼭대기에서 `[망치형]`이 찍히지
+  않는다). `## Detected Candle Patterns (computed)`의 줄은 맥락으로 이름 붙은 패턴에 근거를 덧붙인다:
+  `... [trend: bullish] (after a decline of 2.4 ATR over the 10 bars before it)`. 모양만으로 정해지는
+  패턴(마루보주 등)에는 붙이지 않는다. 머리말은 정의(문턱 상수에서 만든다)를 말하고, 측정한 범위(일봉 주식·ETF, `1Day` + `equity`)에서만
+  "Descriptive only: on daily bars, candle labels showed no forward edge over matched random dates in
+  SIGLENS's own measurement."를 덧붙인다. 분봉·시간봉과 암호화폐는 측정하지 않았으므로 정의만 나간다.
+  `collectDetectedCandleNames`(스킬 게이팅)는 그대로이고, 감지가 줄면 주입되는 캔들 가이드도 준다.
 
 ### 다봉 > 단봉 우선순위
 
 동일 봉에서 다봉 패턴과 단봉 패턴이 동시에 감지될 경우, 다봉 패턴이 우선한다.
-다봉 패턴에 관여한 봉들의 단봉 패턴은 억제한다.
+다봉 패턴에 관여한 봉들의 단봉 패턴은 억제한다. 맥락 규칙을 통과하지 못한 다봉은 감지가 아니므로
+억제도 일어나지 않는다.
 
 ```
 예: 봉 A, B, C에서 morning_star(다봉) 감지
@@ -954,6 +1023,9 @@ LONG_DAY_BODY_RATIO = 0.6   — 몸통 60% 이상이면 장대봉
 BELT_HOLD_TAIL_RATIO = 0.1  — 벨트홀드 꼬리 허용 비율
 NEAR_PRICE_TOLERANCE = 0.002 — 가격 근접 판정 허용오차 (0.2%)
 IN_NECK_RATIO = 0.05        — 인넥 허용 비율
+CANDLE_PRIOR_TREND_BARS = 10      — 직전 움직임을 재는 봉 수 (candle-context.ts)
+CANDLE_PRIOR_TREND_MIN_ATR = 1.0  — 직전 움직임 문턱 (ATR 단위, 경계 포함)
+CANDLE_MIN_SETUP_BODY_ATR = 0.25  — 2·3봉 반전 첫 봉의 몸통 하한 (ATR 단위)
 ```
 
 ---

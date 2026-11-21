@@ -376,7 +376,9 @@ to reformat.
 A boolean field, a parameter, or a sentence a renderer emits asserts exactly what the code
 established. Do not infer a cause from absence (null metrics do not prove "source
 unavailable"): the caller that knows passes an explicit flag, and the renderer reads it.
-Name the flag after the fact proven, not the conclusion you hope for.
+Name the flag after the fact proven, not the conclusion you hope for. A measured claim
+(a hit rate, a reliability sentence) carries the scope it was measured on (daily bars, one
+market), so it is not rendered on a prompt outside that scope.
 
 ```typescript
 // ❌ metrics === null ? 'FINRA unavailable' : ...   // null also means "nothing reported"

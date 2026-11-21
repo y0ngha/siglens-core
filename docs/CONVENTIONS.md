@@ -1290,7 +1290,8 @@ violation elsewhere in the diff. The same applies to a rule the change itself ad
 sharpens: grep its violating pattern across the change's own diff before pushing, or the
 change breaks its own new rule (for example a new "equality claims state their exact
 conditions" rule while another description in the diff still claims equality unconditionally). The sweep includes the change's own entry points: a new "gate tools exit non-zero" rule is
-checked against the main CLI added in the same change.
+checked against the main CLI added in the same change, and a new prompt-content rule against
+every prompt and output the change renders (each interval and asset class).
 
 <a id="DS-6"></a>
 #### DS-6 — No process residue in code

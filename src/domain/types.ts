@@ -1133,6 +1133,25 @@ export type CandlePatternEntry =
 
 /**
  * @internal
+ * The move a candle pattern follows: `decline` / `advance` when the close over
+ * the bars before the pattern's first bar moved at least the prior-move
+ * threshold (in ATR) down / up, `none` otherwise or when it cannot be measured.
+ */
+export type CandlePriorTrend = 'decline' | 'advance' | 'none';
+
+/**
+ * @internal
+ * Prior move of a candle pattern. `moveAtr` is the signed close-to-close move
+ * in ATR units, `null` when it could not be measured (too few bars, or the ATR
+ * is missing or not positive); `trend` is then `'none'`.
+ */
+export interface CandlePriorMove {
+    trend: CandlePriorTrend;
+    moveAtr: number | null;
+}
+
+/**
+ * @internal
  * Direction of an indicator cross (up / down).
  */
 export type CrossDirection = 'up' | 'down';
