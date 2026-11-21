@@ -171,11 +171,12 @@ describe('quotedPrice', () => {
 
 describe('expectedStopOf: the stop WP-15 section 3.2 prescribes', () => {
     // zone 98 to 100 (mean 99), ATR 1.2: the band is [93, 96.8]
+    const noSupports: readonly number[] | null = [];
     const base = {
         zoneLow: 98,
         zoneMid: 99,
         atr: 1.2,
-        supports: [] as readonly number[] | null,
+        supports: noSupports,
         market: 'us' as const,
     };
 

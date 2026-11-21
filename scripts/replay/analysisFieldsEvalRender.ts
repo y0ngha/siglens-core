@@ -106,6 +106,7 @@ export const renderWithCore: RenderSkills = async input => {
     const unmute = muteConsole();
     try {
         const samples: PromptSample[] = [];
+        // CP-5: sequential on purpose: the clock shim and the console mute are process-wide.
         for (const [i, replayCase] of input.cases.entries()) {
             const stored = input.storedOf(replayCase.symbol);
             const profile = profileOf(marketOfSymbol(replayCase.symbol));

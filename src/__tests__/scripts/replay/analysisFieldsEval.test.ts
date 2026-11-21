@@ -5,6 +5,7 @@ import {
     assertComparableRuns,
     defaultDeps,
     loadRunData,
+    liveSkillsInput,
     loadSetData,
     parseFieldsEvalArgs,
     runFieldsEval,
@@ -51,6 +52,12 @@ interface World {
     stored: ReadonlyMap<string, StoredBars>;
 }
 
+// `JSON.parse` returns `any`, so these typed returns need no cast.
+const readStoredBars = (path: string): StoredBars =>
+    JSON.parse(readFileSync(path, 'utf-8'));
+const readManifest = (path: string): ReplayManifest =>
+    JSON.parse(readFileSync(path, 'utf-8'));
+
 /** A frozen two-symbol set (one US, one KR) written by the real `writeSet`. */
 function makeWorld(): World {
     const { dir, remove } = makeTempDir();
@@ -78,9 +85,7 @@ function makeWorld(): World {
     const stored = new Map(
         symbols.map(symbol => [
             symbol,
-            JSON.parse(
-                readFileSync(join(setDir, manifest.bars[symbol].file), 'utf-8')
-            ) as StoredBars,
+            readStoredBars(join(setDir, manifest.bars[symbol].file)),
         ])
     );
     return { dir, setDir, manifest, stored };
@@ -251,12 +256,59 @@ function makeDeps(
     };
 }
 
-const readOut = (out: string, file: string): unknown =>
-    JSON.parse(readFileSync(join(out, file), 'utf-8'));
+interface PlanOut {
+    n: number;
+    basis: string;
+    positions: Record<string, { count: number }>;
+    reasons: Record<string, number>;
+    stopBasis: Record<string, number>;
+    recompute: { withStoredState: number };
+    stop: { mismatch: number };
+}
+
+/** The parts of `summary.json` these tests read; which exist depends on the mode. */
+interface SummaryOut {
+    skippedRows?: number;
+    plumbing?: { total: number; n: number; equal: number };
+    stored?: { n: number };
+    plan?: PlanOut;
+    planAllResults?: PlanOut | null;
+    outcomesByPosition?: Record<string, { n: number }> | null;
+    paired?: unknown;
+    p7Sample?: Record<string, string[]>;
+    skills?: { cases: number };
+}
 
 interface Summary {
-    summary: Record<string, unknown>;
+    summary: SummaryOut;
     gates: { id: string; pass: boolean | null; value: string | null }[];
+}
+
+interface RunFile {
+    tool: string;
+    inputs: Record<string, unknown>;
+}
+
+// `JSON.parse` returns `any`, so these typed returns need no cast.
+const readSummary = (out: string): Summary =>
+    JSON.parse(readFileSync(join(out, 'summary.json'), 'utf-8'));
+const readRun = (out: string): RunFile =>
+    JSON.parse(readFileSync(join(out, 'run.json'), 'utf-8'));
+
+/** The value, or a thrown error naming the missing part: narrows without a cast. */
+function need<T>(value: T | null | undefined, name: string): T {
+    if (value === null || value === undefined) {
+        throw new Error(`${name} is missing from the output`);
+    }
+    return value;
+}
+
+/** An object value as a record, for spreading a stored fixture part. */
+function asBody(value: unknown): ResultBody {
+    if (typeof value !== 'object' || value === null) {
+        throw new Error('fixture part is not an object');
+    }
+    return Object.fromEntries(Object.entries(value));
 }
 
 describe('parseFieldsEvalArgs', () => {
@@ -498,6 +550,14 @@ describe('loading a set and a run', () => {
         expect(() => assertComparableRuns(a, b, ['model'])).not.toThrow();
     });
 
+    it('does not mistake an unreadable labels.jsonl for an absent one', () => {
+        const world = makeWorld();
+        const set = loadSetData(world.setDir);
+        const run = writeRun(world, { name: 'a' });
+        mkdirSync(join(run, 'labels.jsonl'));
+        expect(() => loadRunData(run, set)).toThrow(/EISDIR/);
+    });
+
     it('reads labels only when labels.jsonl exists', () => {
         const world = makeWorld();
         const set = loadSetData(world.setDir);
@@ -529,7 +589,7 @@ describe('runFieldsEval: trend', () => {
             deps
         );
         expect(code).toBe(0);
-        const run = readOut(out, 'run.json') as Record<string, unknown>;
+        const run = readRun(out);
         expect(run).toMatchObject({
             tool: 'analysisFieldsEval',
             mode: 'trend',
@@ -537,8 +597,8 @@ describe('runFieldsEval: trend', () => {
             coreGitSha: 'abc123+dirty',
             dirtyDiffSha256: 'f'.repeat(64),
         });
-        const { summary, gates } = readOut(out, 'summary.json') as Summary;
-        const plumbing = summary.plumbing as { n: number; equal: number };
+        const { summary, gates } = readSummary(out);
+        const plumbing = need(summary.plumbing, 'plumbing');
         expect(plumbing.n).toBe(world.manifest.cases.length);
         expect(gates.map(g => g.id)).toEqual(['T1', 'T2', 'T3', 'T4', 'T5']);
         expect(
@@ -574,9 +634,7 @@ describe('runFieldsEval: trend', () => {
             }),
             makeDeps()
         );
-        const inputs = (
-            readOut(out, 'run.json') as { inputs: Record<string, number> }
-        ).inputs;
+        const inputs = readRun(out).inputs;
         expect(inputs.failedResults).toBe(1);
         expect(inputs.repeatsIgnored).toBe(1);
     });
@@ -706,9 +764,7 @@ describe('runFieldsEval: trend', () => {
         const world = makeWorld();
         // the generated set flags every small case as variance: keep every other one
         const manifestPath = join(world.setDir, 'manifest.json');
-        const manifest = JSON.parse(
-            readFileSync(manifestPath, 'utf-8')
-        ) as ReplayManifest;
+        const manifest = readManifest(manifestPath);
         manifest.cases = manifest.cases.map((c, i) => ({
             ...c,
             variance: i % 2 === 0,
@@ -756,12 +812,8 @@ describe('runFieldsEval: trend', () => {
             }),
             makeDeps()
         );
-        const { summary, gates } = readOut(out, 'summary.json') as Summary;
-        const plumbing = summary.plumbing as {
-            total: number;
-            n: number;
-            equal: number;
-        };
+        const { summary, gates } = readSummary(out);
+        const plumbing = need(summary.plumbing, 'plumbing');
         expect(plumbing.total).toBe(world.manifest.cases.length);
         expect(plumbing.n).toBe(world.manifest.cases.length - 1);
         expect(plumbing.equal).toBeLessThan(plumbing.total);
@@ -794,8 +846,8 @@ describe('runFieldsEval: trend', () => {
             makeDeps()
         );
         expect(code).toBe(0);
-        const { summary } = readOut(out, 'summary.json') as Summary;
-        expect((summary.stored as { n: number }).n).toBe(3);
+        const { summary } = readSummary(out);
+        expect(need(summary.stored, 'stored').n).toBe(3);
         expect(summary.plumbing).toBeNull();
     });
 
@@ -835,10 +887,7 @@ describe('runFieldsEval: trend', () => {
                 makeDeps()
             );
         expect(await run({})).toBe(0);
-        const { summary } = readOut(
-            join(world.dir, 'out'),
-            'summary.json'
-        ) as Summary;
+        const { summary } = readSummary(join(world.dir, 'out'));
         expect(summary.skippedRows).toBe(1);
         expect(await run({ gate: ['T3'] })).toBe(2);
         expect(await run({ gate: ['T3'], allowSkippedCases: true })).toBe(0);
@@ -973,9 +1022,7 @@ describe('runFieldsEval: gate selection', () => {
             baseArgs({ set: world.setDir, labels, out }),
             makeDeps()
         );
-        const run = readOut(out, 'run.json') as {
-            inputs: { labelsSha256: string };
-        };
+        const run = readRun(out);
         expect(run.inputs.labelsSha256).toBe(sha256Hex(text));
     });
 });
@@ -994,12 +1041,8 @@ describe('runFieldsEval: plan', () => {
             makeDeps()
         );
         expect(code).toBe(0);
-        const { summary, gates } = readOut(out, 'summary.json') as Summary;
-        const plan = summary.plan as {
-            n: number;
-            basis: string;
-            positions: Record<string, { count: number }>;
-        };
+        const { summary, gates } = readSummary(out);
+        const plan = need(summary.plan, 'plan');
         expect(plan.n).toBe(world.manifest.cases.length);
         expect(plan.basis).toBe('all');
         expect(
@@ -1015,7 +1058,7 @@ describe('runFieldsEval: plan', () => {
             'P5',
             'P6',
         ]);
-        const sample = summary.p7Sample as Record<string, string[]>;
+        const sample = need(summary.p7Sample, 'p7Sample');
         expect(Object.values(sample).flat().length).toBeGreaterThan(0);
         expect(readdirSync(out).toSorted()).toEqual([
             'rows.jsonl',
@@ -1036,13 +1079,10 @@ describe('runFieldsEval: plan', () => {
             }),
             makeDeps()
         );
-        const { summary } = readOut(out, 'summary.json') as Summary;
-        expect((summary.plan as { basis: string }).basis).toBe('headline');
+        const { summary } = readSummary(out);
+        expect(need(summary.plan, 'plan').basis).toBe('headline');
         expect(summary.planAllResults).not.toBeNull();
-        const outcomes = summary.outcomesByPosition as Record<
-            string,
-            { n: number }
-        >;
+        const outcomes = need(summary.outcomesByPosition, 'outcomesByPosition');
         expect(Object.values(outcomes).reduce((sum, o) => sum + o.n, 0)).toBe(
             world.manifest.cases.length
         );
@@ -1133,12 +1173,9 @@ describe('runFieldsEval: plan', () => {
         // the same plan breaks the floor while being left out of the headline rows
         const broken = await run('broken', true, false);
         expect(broken.code).toBe(2);
-        const { summary } = readOut(broken.out, 'summary.json') as Summary;
-        const plan = summary.plan as { n: number };
-        const all = summary.planAllResults as {
-            n: number;
-            stop: { mismatch: number };
-        };
+        const { summary } = readSummary(broken.out);
+        const plan = need(summary.plan, 'plan');
+        const all = need(summary.planAllResults, 'planAllResults');
         expect(plan.n).toBe(world.manifest.cases.length - 1);
         expect(all.n).toBe(world.manifest.cases.length);
         expect(all.stop.mismatch).toBe(1);
@@ -1177,11 +1214,8 @@ describe('runFieldsEval: plan', () => {
             }),
             makeDeps()
         );
-        const { summary } = readOut(out, 'summary.json') as Summary;
-        const outcomes = summary.outcomesByPosition as Record<
-            string,
-            { n: number }
-        >;
+        const { summary } = readSummary(out);
+        const outcomes = need(summary.outcomesByPosition, 'outcomesByPosition');
         expect(Object.keys(outcomes)).toEqual(['no_setup']);
         expect(outcomes.no_setup.n).toBe(world.manifest.cases.length);
     });
@@ -1202,7 +1236,7 @@ describe('runFieldsEval: plan', () => {
             makeDeps()
         );
         expect(code).toBe(0);
-        const { summary, gates } = readOut(out, 'summary.json') as Summary;
+        const { summary, gates } = readSummary(out);
         expect(summary.paired).not.toBeNull();
         expect(gates.find(g => g.id === 'P6')?.pass).toBe(true);
         const pair = (name: string, extra: Partial<RunOptions>) =>
@@ -1261,7 +1295,7 @@ describe('runFieldsEval: plan', () => {
                         return {
                             ...body,
                             actionRecommendation: {
-                                ...(body.actionRecommendation as ResultBody),
+                                ...asBody(body.actionRecommendation),
                                 reconciledLevels: {
                                     stopLoss: c.close * 0.9,
                                     takeProfitPrices: [c.close * 1.2],
@@ -1280,11 +1314,8 @@ describe('runFieldsEval: plan', () => {
             }),
             makeDeps()
         );
-        const { summary } = readOut(out, 'summary.json') as Summary;
-        const plan = summary.plan as {
-            stopBasis: Record<string, number>;
-            recompute: { withStoredState: number };
-        };
+        const { summary } = readSummary(out);
+        const plan = need(summary.plan, 'plan');
         expect(plan.stopBasis).toEqual({ atr: world.manifest.cases.length });
         expect(plan.recompute.withStoredState).toBe(
             world.manifest.cases.length
@@ -1305,7 +1336,7 @@ describe('runFieldsEval: plan', () => {
                         return {
                             ...body,
                             actionRecommendation: {
-                                ...(body.actionRecommendation as ResultBody),
+                                ...asBody(body.actionRecommendation),
                                 reconciledLevels: {
                                     stopLoss: c.close * 0.9,
                                     stopLossRejected: true,
@@ -1318,8 +1349,8 @@ describe('runFieldsEval: plan', () => {
             }),
             makeDeps()
         );
-        const { summary } = readOut(out, 'summary.json') as Summary;
-        const plan = summary.plan as { reasons: Record<string, number> };
+        const { summary } = readSummary(out);
+        const plan = need(summary.plan, 'plan');
         expect(plan.reasons).toEqual({ no_stop: world.manifest.cases.length });
     });
 
@@ -1339,6 +1370,69 @@ describe('runFieldsEval: plan', () => {
                 makeDeps()
             )
         ).rejects.toThrow('no result with a plan to measure');
+    });
+});
+
+describe('liveSkillsInput', () => {
+    const live = (
+        world: World,
+        runs: { run?: string; before?: string; memberRun?: string }
+    ) =>
+        liveSkillsInput(
+            {
+                run: runs.run ?? null,
+                before: runs.before ?? null,
+                memberRun: runs.memberRun ?? null,
+                noisePp: 2,
+            },
+            loadSetData(world.setDir)
+        );
+
+    it('has no live input without a run pair', () => {
+        const world = makeWorld();
+        expect(live(world, {})).toBeNull();
+        expect(
+            live(world, { run: writeRun(world, { name: 'a', tier: 'free' }) })
+        ).toBeNull();
+    });
+
+    it('reads the call statistics of both runs and the noise floor, with no overlap without a member run', () => {
+        const world = makeWorld();
+        const result = live(world, {
+            run: writeRun(world, { name: 'after', tier: 'free' }),
+            before: writeRun(world, { name: 'before', tier: 'free' }),
+        });
+        expect(result?.after.n).toBe(world.manifest.cases.length);
+        expect(result?.before.n).toBe(world.manifest.cases.length);
+        expect(result?.overlap).toBeNull();
+        expect(result?.noiseFloor).toBe(0.02);
+    });
+
+    it('adds the level overlap with a member run', () => {
+        const world = makeWorld();
+        const result = live(world, {
+            run: writeRun(world, { name: 'after', tier: 'free' }),
+            before: writeRun(world, { name: 'before', tier: 'free' }),
+            memberRun: writeRun(world, { name: 'member', tier: 'member' }),
+        });
+        // the same key levels in every run: every free level is near a member level
+        expect(result?.overlap?.overlap.after.mean).toBe(1);
+        expect(result?.overlap?.overlap.diff.mean).toBe(0);
+    });
+
+    it('refuses a run that is not free, a member run that is free, and runs that differ', () => {
+        const world = makeWorld();
+        const free = writeRun(world, { name: 'f', tier: 'free' });
+        const member = writeRun(world, { name: 'm', tier: 'member' });
+        expect(() => live(world, { run: member, before: member })).toThrow(
+            'S5 and S6 are about free'
+        );
+        expect(() =>
+            live(world, { run: free, before: free, memberRun: free })
+        ).toThrow('must be a member run');
+        expect(() => live(world, { run: free, before: member })).toThrow(
+            'not comparable: tier differ'
+        );
     });
 });
 
@@ -1391,8 +1485,8 @@ describe('runFieldsEval: skills', () => {
         expect(input.skillsDir).toBe(join(world.dir, 'skills'));
         expect(input.storedOf('NVDA').ticker).toBe('NVDA');
         expect(() => input.storedOf('ZZZ')).toThrow('no bars for ZZZ');
-        const { summary, gates } = readOut(out, 'summary.json') as Summary;
-        expect((summary.skills as { cases: number }).cases).toBe(3);
+        const { summary, gates } = readSummary(out);
+        expect(need(summary.skills, 'skills').cases).toBe(3);
         expect(gates.map(g => g.id)).toEqual(['S1', 'S2', 'S3']);
         expect(
             readFileSync(join(out, 'rows.jsonl'), 'utf-8').trim().split('\n')
@@ -1445,7 +1539,7 @@ describe('runFieldsEval: skills', () => {
             makeDeps(render(['Core A']))
         );
         expect(code).toBe(0);
-        const { gates } = readOut(out, 'summary.json') as Summary;
+        const { gates } = readSummary(out);
         expect(gates.map(g => g.id)).toEqual(['S1', 'S2', 'S3', 'S5', 'S6']);
         expect(gates.find(g => g.id === 'S5')?.pass).toBe(true);
         expect(gates.find(g => g.id === 'S6')?.pass).toBe(true);

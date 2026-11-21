@@ -11,7 +11,6 @@ import { mean, quantile, standardError } from './stats';
 import {
     EPS,
     FIELDS_EVAL_CONSTANTS as C,
-    RULE_NAMES,
     TREND_LABELS,
     type AgreementStats,
     type GateResult,
@@ -30,6 +29,11 @@ import {
 } from './analysisFieldsEvalTypes';
 
 // ─── Small shared helpers ─────────────────────────────────────────────────────
+
+/** A record over the three rules, built key by key so its type needs no cast. */
+export function byRule<V>(make: (rule: RuleName) => V): Record<RuleName, V> {
+    return { R4: make('R4'), R1: make('R1'), R3: make('R3') };
+}
 
 export function share(count: number, n: number): Share {
     return { count, n, share: n === 0 ? null : count / n };
@@ -66,6 +70,7 @@ export function groupBy<T>(
     items: readonly T[],
     keyOf: (item: T) => string
 ): Map<string, T[]> {
+    // CP-5: a local accumulator filled in one pass.
     const groups = new Map<string, T[]>();
     items.forEach(item => {
         const key = keyOf(item);
@@ -125,6 +130,7 @@ export function emaSeries(
     const k = 2 / (period + 1);
     out[period - 1] =
         values.slice(0, period).reduce((sum, v) => sum + v, 0) / period;
+    // CP-5: each EMA value depends on the previous one.
     for (let i = period; i < values.length; i++) {
         out[i] = values[i] * k + (out[i - 1] ?? 0) * (1 - k);
     }
@@ -152,6 +158,7 @@ export function wilderAtrSeries(
     const out: (number | null)[] = bars.map(() => null);
     out[period] =
         tr.slice(1, period + 1).reduce((sum, v) => sum + v, 0) / period;
+    // CP-5: Wilder smoothing depends on the previous ATR.
     for (let i = period + 1; i < bars.length; i++) {
         const prev = out[i - 1] ?? 0;
         out[i] = (prev * (period - 1) + tr[i]) / period;
@@ -161,6 +168,7 @@ export function wilderAtrSeries(
 
 /** Prefix sums so a simple average over any window is O(1). */
 function prefixSums(values: readonly number[]): readonly number[] {
+    // CP-5: each prefix sum extends the previous one.
     const sums = [0];
     values.forEach((v, i) => {
         sums.push(sums[i] + v);
@@ -314,6 +322,7 @@ function countSeries(
         ...EMPTY_COUNTS,
         distribution: { ...EMPTY_COUNTS.distribution },
     };
+    // CP-5: one pass; each day compares with the previous label and updates several counters.
     for (let i = from; i < labels.length; i++) {
         const label = labels[i];
         if (label === null) continue;
@@ -383,25 +392,22 @@ export function allDaysStats(
     symbols: readonly SymbolBars[]
 ): Record<RuleName, SeriesStats> {
     const perSymbol = symbols.map(s => ruleSeries(s.bars));
-    return Object.fromEntries(
-        RULE_NAMES.map(rule => [
-            rule,
-            statsOf(
-                perSymbol.reduce(
-                    (sum, series) =>
-                        addCounts(
-                            sum,
-                            countSeries(
-                                series.labels[rule],
-                                series.closes,
-                                C.allDaysFromBar
-                            )
-                        ),
-                    EMPTY_COUNTS
-                )
-            ),
-        ])
-    ) as Record<RuleName, SeriesStats>;
+    return byRule(rule =>
+        statsOf(
+            perSymbol.reduce(
+                (sum, series) =>
+                    addCounts(
+                        sum,
+                        countSeries(
+                            series.labels[rule],
+                            series.closes,
+                            C.allDaysFromBar
+                        )
+                    ),
+                EMPTY_COUNTS
+            )
+        )
+    );
 }
 
 // ─── Stored labels against the rules ──────────────────────────────────────────
@@ -602,44 +608,42 @@ export function storedLabelStats(
         ),
         dayToDayChange: stored.change,
         hardFlip: stored.hard,
-        rules: Object.fromEntries(
-            RULE_NAMES.map(rule => {
-                const pairs = measured.map(m => ({
-                    stored: m.row.stored,
-                    rule: m.rules.labels[rule],
-                }));
-                const regimed = measured.flatMap(m =>
-                    m.row.regime === null
-                        ? []
-                        : [
-                              {
-                                  key: m.row.regime,
-                                  stored: m.row.stored,
-                                  rule: m.rules.labels[rule],
-                              },
-                          ]
-                );
-                const rowStats: RuleVsStored = {
-                    ...agreementOf(pairs),
-                    byRegime: groupAgreement(regimed),
-                    byMarket: groupAgreement(
-                        measured.map(m => ({
-                            key: m.row.market,
-                            stored: m.row.stored,
-                            rule: m.rules.labels[rule],
-                        }))
-                    ),
-                    ...(() => {
-                        const onDates = ruleChangeOnStoredDates(measured, rule);
-                        return {
-                            ruleDayToDayChange: onDates.change,
-                            ruleHardFlip: onDates.hard,
-                        };
-                    })(),
-                };
-                return [rule, rowStats];
-            })
-        ) as Record<RuleName, RuleVsStored>,
+        rules: byRule(rule => {
+            const pairs = measured.map(m => ({
+                stored: m.row.stored,
+                rule: m.rules.labels[rule],
+            }));
+            const regimed = measured.flatMap(m =>
+                m.row.regime === null
+                    ? []
+                    : [
+                          {
+                              key: m.row.regime,
+                              stored: m.row.stored,
+                              rule: m.rules.labels[rule],
+                          },
+                      ]
+            );
+            const rowStats: RuleVsStored = {
+                ...agreementOf(pairs),
+                byRegime: groupAgreement(regimed),
+                byMarket: groupAgreement(
+                    measured.map(m => ({
+                        key: m.row.market,
+                        stored: m.row.stored,
+                        rule: m.rules.labels[rule],
+                    }))
+                ),
+                ...(() => {
+                    const onDates = ruleChangeOnStoredDates(measured, rule);
+                    return {
+                        ruleDayToDayChange: onDates.change,
+                        ruleHardFlip: onDates.hard,
+                    };
+                })(),
+            };
+            return rowStats;
+        }),
     };
 }
 

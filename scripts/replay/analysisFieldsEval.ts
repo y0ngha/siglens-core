@@ -59,6 +59,7 @@ import {
     levelOverlapPerCase,
     skillRows,
     skillsGates,
+    type SkillsGateInput,
     summarizeSkills,
     type LevelCase,
 } from './analysisFieldsEvalSkills';
@@ -324,11 +325,16 @@ export function loadRunData(runDir: string, set: SetData): RunData {
     };
 }
 
+/** A filesystem error saying the path does not exist. */
+function isMissingFile(error: unknown): boolean {
+    return error instanceof Error && 'code' in error && error.code === 'ENOENT';
+}
+
 function readLabelsIfAny(runDir: string): readonly LabelRow[] | null {
     try {
         return readLabelRows(runDir);
     } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+        if (isMissingFile(error)) return null;
         throw error;
     }
 }
@@ -364,7 +370,8 @@ type Rec = Record<string, unknown>;
 
 const asRec = (value: unknown): Rec | null =>
     typeof value === 'object' && value !== null && !Array.isArray(value)
-        ? (value as Rec)
+        ? // A shallow copy: the narrowed `object` has no index signature, and a copy gives one.
+          Object.fromEntries(Object.entries(value))
         : null;
 
 const asNum = (value: unknown): number | null =>
@@ -437,6 +444,7 @@ function trendRowsOfRun(
 /** Splits one CSV line, honouring double quotes. */
 export function splitCsvLine(line: string): string[] {
     const cells: string[] = [];
+    // CP-5: one pass whose quote state carries across characters.
     let cell = '';
     let quoted = false;
     for (let i = 0; i < line.length; i++) {
@@ -699,7 +707,7 @@ function relabelAsWait(
     if (row.subject === null || row.subject.plan === null) return row;
     const asOfTime = Date.parse(`${row.asOf}T00:00:00Z`) / 1000;
     const anchor = bars.find(bar => bar.time === asOfTime);
-    const window = buildOutcomeWindow(bars as Bar[], {
+    const window = buildOutcomeWindow(bars, {
         barTime: asOfTime,
         closeAtAnalysis:
             dataAsOfClose !== null && dataAsOfClose > 0
@@ -887,6 +895,57 @@ function levelCasesOf(run: RunData, set: SetData): readonly LevelCase[] {
         });
 }
 
+/**
+ * The live inputs of S5 and S6: the call statistics of the free run and its baseline, and
+ * the level overlap with a member run when one is given. `null` without a run pair. Refuses
+ * runs that cannot be compared, a run that is not free, and a member run that is free.
+ */
+export function liveSkillsInput(
+    args: Pick<FieldsEvalArgs, 'run' | 'before' | 'memberRun' | 'noisePp'>,
+    set: SetData
+): SkillsGateInput['live'] {
+    if (args.run === null || args.before === null) return null;
+    const afterRun = loadRunData(args.run, set);
+    const beforeRun = loadRunData(args.before, set);
+    assertComparableRuns(afterRun, beforeRun, PAIRED_RUN_FIELDS);
+    const memberRun =
+        args.memberRun === null ? null : loadRunData(args.memberRun, set);
+    if (afterRun.meta.tier !== 'free') {
+        throw new Error(
+            `${afterRun.dir} is a ${afterRun.meta.tier} run; S5 and S6 are about free`
+        );
+    }
+    if (memberRun !== null) {
+        assertComparableRuns(afterRun, memberRun, [
+            'setId',
+            'setBarsSha256',
+            'model',
+        ]);
+        if (memberRun.meta.tier === 'free') {
+            throw new Error(`${memberRun.dir} must be a member run`);
+        }
+    }
+    const overlap =
+        memberRun === null
+            ? null
+            : compareLevelOverlap(
+                  levelOverlapPerCase(
+                      levelCasesOf(afterRun, set),
+                      levelCasesOf(memberRun, set)
+                  ),
+                  levelOverlapPerCase(
+                      levelCasesOf(beforeRun, set),
+                      levelCasesOf(memberRun, set)
+                  )
+              );
+    return {
+        after: runCallStats(afterRun.results, afterRun.labels),
+        before: runCallStats(beforeRun.results, beforeRun.labels),
+        overlap,
+        noiseFloor: args.noisePp / 100,
+    };
+}
+
 async function skillsMode(
     args: FieldsEvalArgs,
     deps: FieldsEvalDeps
@@ -909,48 +968,7 @@ async function skillsMode(
         log: deps.log,
     });
     const summary = summarizeSkills(rendered.catalog, rendered.samples);
-    const live = (() => {
-        if (args.run === null || args.before === null) return null;
-        const afterRun = loadRunData(args.run, set);
-        const beforeRun = loadRunData(args.before, set);
-        assertComparableRuns(afterRun, beforeRun, PAIRED_RUN_FIELDS);
-        const memberRun =
-            args.memberRun === null ? null : loadRunData(args.memberRun, set);
-        if (afterRun.meta.tier !== 'free') {
-            throw new Error(
-                `${afterRun.dir} is a ${afterRun.meta.tier} run; S5 and S6 are about free`
-            );
-        }
-        if (memberRun !== null) {
-            assertComparableRuns(afterRun, memberRun, [
-                'setId',
-                'setBarsSha256',
-                'model',
-            ]);
-            if (memberRun.meta.tier === 'free') {
-                throw new Error(`${memberRun.dir} must be a member run`);
-            }
-        }
-        const overlap =
-            memberRun === null
-                ? null
-                : compareLevelOverlap(
-                      levelOverlapPerCase(
-                          levelCasesOf(afterRun, set),
-                          levelCasesOf(memberRun, set)
-                      ),
-                      levelOverlapPerCase(
-                          levelCasesOf(beforeRun, set),
-                          levelCasesOf(memberRun, set)
-                      )
-                  );
-        return {
-            after: runCallStats(afterRun.results, afterRun.labels),
-            before: runCallStats(beforeRun.results, beforeRun.labels),
-            overlap,
-            noiseFloor: args.noisePp / 100,
-        };
-    })();
+    const live = liveSkillsInput(args, set);
     return {
         inputs: {
             fingerprint: set.fingerprint,

@@ -206,6 +206,7 @@ const usableAtr = (atr: number | null): number | null =>
  */
 export function printedSupports(prompt: string): readonly number[] {
     const found: number[] = [];
+    // CP-5: one pass whose "inside a Support list" state carries across lines.
     let inSupport = false;
     for (const raw of prompt.split('\n')) {
         const line = raw.trim();
@@ -469,6 +470,18 @@ export function measurePlan(plan: PlanCase): PlanMeasure {
     };
 }
 
+/** A record over the four positions, built key by key so its type needs no cast. */
+function byPosition<V>(
+    make: (position: PlanPosition) => V
+): Record<PlanPosition, V> {
+    return {
+        in_zone: make('in_zone'),
+        above_zone: make('above_zone'),
+        below_zone: make('below_zone'),
+        no_setup: make('no_setup'),
+    };
+}
+
 // ─── Run summary ──────────────────────────────────────────────────────────────
 
 export interface StopStats {
@@ -649,12 +662,9 @@ export function summarizePlanRun(
     return {
         n: rows.length,
         basis: headlineKeys === null ? 'all' : 'headline',
-        positions: Object.fromEntries(
-            PLAN_POSITIONS.map(p => [
-                p,
-                share(rows.filter(m => m.position === p).length, rows.length),
-            ])
-        ) as Record<PlanPosition, Share>,
+        positions: byPosition(p =>
+            share(rows.filter(m => m.position === p).length, rows.length)
+        ),
         reasons: countBy(
             rows.filter(m => m.reason !== null),
             m => m.reason ?? ''
