@@ -189,6 +189,7 @@ describe('patternWalkForSymbol', () => {
                         upper: upper(offset),
                         lower: lower(offset),
                         direction: 'up',
+                        breakoutIndex: window.length - 1,
                     },
                     touches: 4,
                 };

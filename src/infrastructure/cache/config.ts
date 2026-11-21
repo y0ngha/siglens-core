@@ -1100,6 +1100,12 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * unless that bar's close proves the reversal (a daily bar does not say whether
  * its high or its low printed first), so qualified patterns, the candidate
  * lines and the drawn overlays shift with the pivots they are built on.
+ * Triangles, wedges, channels, rectangles and flags read their breakout at the
+ * first close beyond the line (the head and shoulders neckline already did), so
+ * the breakout level, target, status and the dashed end of the drawing stop
+ * moving after the break; a pair broken before its apex keeps its geometry. A
+ * measured move with a non-positive breakout or target, or a breakout past its
+ * invalidation, is not offered (the pattern is dropped).
  *
  * @internal
  */

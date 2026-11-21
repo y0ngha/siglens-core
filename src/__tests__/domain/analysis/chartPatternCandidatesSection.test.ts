@@ -150,6 +150,10 @@ const undirectedRectangle: QualifiedPattern = {
             ],
         },
         direction: null,
+        // Bar 5 is the first close beyond a boundary in the 6-bar series below
+        // that break out (and the last bar where none does); both lines are flat,
+        // so a longer series reads the same levels.
+        breakoutIndex: 5,
     },
     touches: 4,
 };
@@ -321,11 +325,35 @@ describe('formatChartPatternCandidatesSection', () => {
         }
     );
 
-    it('prints N/A for a measured target at or below zero', () => {
+    it('offers no target for a measured target at or below zero: the pattern has no geometry', () => {
         const bars = makeBars([20, 25, 10, 25, 20]);
         const section = render([tallDoubleTop], bars, 1);
-        expect(section).toContain('- Measured target: N/A');
+        expect(section).toContain('### double_top — geometry unavailable');
+        expect(section).not.toContain('Measured target');
         expect(section).not.toMatch(/target(?: \(50%\))?: -\d/);
+    });
+
+    it('prints N/A for a target that is positive but rounds to zero at the printed precision', () => {
+        // Peaks 0.0203 over a 0.0104 neckline: a positive 0.0005 target, but the
+        // block recomputes it from the breakout and extreme printed at 2
+        // decimals (0.01 and 0.02), which leaves 0.
+        const smallTop: QualifiedPattern = {
+            ...tallDoubleTop,
+            pivots: [
+                pivot(1, 0.0203, 'high'),
+                pivot(2, 0.0104, 'low'),
+                pivot(3, 0.0203, 'high'),
+            ],
+            shape: { kind: 'extreme', neckline: pivot(2, 0.0104, 'low') },
+        };
+        const section = render(
+            [smallTop],
+            makeBars([0.02, 0.02, 0.02, 0.02, 0.02]),
+            0.001
+        );
+        const b = block(section, 'double_top');
+        expect(b).toContain('- Breakout level: 0.01');
+        expect(b).toContain('- Measured target: N/A');
     });
 
     it('takes the status from the printed (rounded) breakout — 19.9951 prints 20.00 and a close of 20 is not "broken"', () => {
@@ -715,4 +743,110 @@ describe('KRX conservative target', () => {
             expect(checked).toBeGreaterThan(0);
         }
     );
+});
+
+describe('a pair or flag broken out of is judged against its frozen breakout level', () => {
+    // Upper line 19 + i through (1,20) and (5,24), lower line flat at 10.
+    const triangle = (breakoutIndex: number): QualifiedPattern => ({
+        id: 'symmetrical_triangle',
+        startIndex: 1,
+        endIndex: 6,
+        pivots: [],
+        shape: {
+            kind: 'trendline',
+            upper: {
+                start: { index: 1, price: 20 },
+                end: { index: 5, price: 24 },
+                touches: [
+                    { index: 1, price: 20 },
+                    { index: 5, price: 24 },
+                ],
+            },
+            lower: {
+                start: { index: 2, price: 10 },
+                end: { index: 6, price: 10 },
+                touches: [
+                    { index: 2, price: 10 },
+                    { index: 6, price: 10 },
+                ],
+            },
+            direction: 'up',
+            breakoutIndex,
+        },
+        touches: 4,
+    });
+    // Bars 0-6 sit at 15, bar 7 closes at 28 (over the line's 26 there),
+    // bars 8-10 at 27, then the last bar (11) closes at `last`.
+    const barsEndingAt = (last: number): Bar[] =>
+        makeBars([
+            ...Array.from({ length: 7 }, () => 15),
+            28,
+            27,
+            27,
+            27,
+            last,
+        ]);
+
+    it('the status reads the printed frozen level: a last close over it is "broken" although the line has since climbed over the close', () => {
+        // The sliding line stands at 30 on the last bar; the frozen level is 26.
+        const section = render([triangle(7)], barsEndingAt(27.5), 1);
+        const b = block(section, 'symmetrical_triangle');
+        expect(b.startsWith('symmetrical_triangle (broken)')).toBe(true);
+        expect(b).toContain('- Breakout level: 26.00');
+    });
+
+    it('a last close back under the frozen level after a break reads "failed breakout"', () => {
+        const section = render([triangle(7)], barsEndingAt(25.5), 1);
+        expect(section).toContain('### symmetrical_triangle (failed breakout)');
+    });
+
+    it('isFailedBreakout counts a pair as failed only when it is back under the frozen level', () => {
+        const up26 = { direction: 'up', breakoutLevel: 26 } as const;
+        const bars = barsEndingAt(27.5);
+        // Frozen at the break bar: still over 26, not failed.
+        expect(isFailedBreakout(triangle(7), up26, bars, 1)).toBe(false);
+        // The same shape read along the sliding line (frozen only at bar 11)
+        // would call the 27.5 close "back inside" the line's 30.
+        expect(isFailedBreakout(triangle(11), up26, bars, 1)).toBe(true);
+    });
+
+    it('isFailedBreakout reads a flag at its frozen channel line too', () => {
+        // Upper channel 99 − 0.5·(i − 4): 96.5 at the break bar 9, 95.5 at bar 11.
+        const flag = (breakoutIndex: number): QualifiedPattern => ({
+            id: 'bull_flag',
+            startIndex: 0,
+            endIndex: 8,
+            pivots: [],
+            shape: {
+                kind: 'flag',
+                direction: 'up',
+                poleBase: pivot(0, 80, 'low'),
+                poleTop: pivot(3, 100, 'high'),
+                upper: {
+                    start: { index: 4, price: 99 },
+                    end: { index: 8, price: 97 },
+                    touches: [],
+                },
+                lower: {
+                    start: { index: 5, price: 96 },
+                    end: { index: 7, price: 95 },
+                    touches: [],
+                },
+                flagExtreme: { index: 7, price: 95 },
+                breakoutIndex,
+            },
+            touches: 4,
+        });
+        const bars = makeBars([
+            ...Array.from({ length: 9 }, () => 90),
+            98,
+            98,
+            96,
+        ]);
+        const up = { direction: 'up', breakoutLevel: 96.5 } as const;
+        // Back under the frozen 96.5 → failed; against the sliding 95.5 the
+        // 96 close would still be over the line.
+        expect(isFailedBreakout(flag(9), up, bars, 1)).toBe(true);
+        expect(isFailedBreakout(flag(11), up, bars, 1)).toBe(false);
+    });
 });

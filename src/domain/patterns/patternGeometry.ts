@@ -23,9 +23,11 @@ import { lineValueAt, trendlineHeight } from '@/domain/patterns/boundaryLines';
  *
  * Every level comes from the fixed inputs `qualifyPatterns` attached
  * (`pattern.shape`): confirmed pivots and boundaries through touches, never
- * the still-forming extreme or a regression line. Only a breakout read off a
- * sloped boundary (triangle, wedge, channel, flag, neckline) moves with the
- * last bar; invalidation levels are pivot prices and stay put.
+ * the still-forming extreme or a regression line. A breakout read off a
+ * sloped boundary (triangle, wedge, channel, flag, neckline) is read at the
+ * shape's `breakoutIndex` — the last bar until a close breaks the line, the
+ * break bar after it — so it stops moving once price has broken out;
+ * invalidation levels are pivot prices and stay put.
  */
 
 const HALF = 0.5;
@@ -47,7 +49,11 @@ function point(
 /**
  * The directed geometry every family ends in: targets are breakout ± height
  * (and half of it), and the invalidation carries the bar index it applies
- * from. `null` for a height that is not a positive number.
+ * from. `null` unless every price is a price and the breakout is on the
+ * pattern's side of its invalidation: a height that is not a positive number,
+ * a breakout or a target at or below zero (a measured move taller than the
+ * price it starts from is not offered), or a breakout already past its
+ * invalidation (a line read beyond the level that voids the pattern).
  */
 function measuredMove(
     keyPoints: PatternKeyPoint[],
@@ -58,11 +64,16 @@ function measuredMove(
 ): PatternGeometry | null {
     if (!Number.isFinite(height) || height <= 0) return null;
     const sign = direction === 'up' ? 1 : -1;
+    const measuredTarget = breakoutLevel + sign * height;
+    // The 50% target lies between the breakout and the measured target, so
+    // a positive breakout and measured target make it positive too.
+    if (!(breakoutLevel > 0) || !(measuredTarget > 0)) return null;
+    if (sign * (breakoutLevel - invalidation.price) <= 0) return null;
     return {
         keyPoints,
         breakoutLevel,
         height,
-        measuredTarget: breakoutLevel + sign * height,
+        measuredTarget,
         conservativeTarget: breakoutLevel + sign * height * HALF,
         invalidationLevel: invalidation.price,
         invalidationIndex: invalidation.index,
@@ -109,7 +120,8 @@ function extremeGeometry(
 
 /**
  * Breakout, height and status all read the SLOPED neckline: breakout
- * is the neckline at the break bar (or the last bar before a break), height
+ * is the neckline at the break bar (first close beyond it), or the last bar
+ * while nothing has closed beyond it; height
  * is the head's distance from the neckline at the head's own bar.
  */
 function headAndShouldersGeometry(
@@ -143,19 +155,20 @@ function headAndShouldersGeometry(
 // ─── Triangles / wedges / channels / rectangle / broadening ────────────────
 
 /**
- * Boundary pairs: the breakout side's boundary read at the last bar, the opposite
- * boundary's last touch as the invalidation, and the fixed
- * {@link trendlineHeight}. `null` once the boundaries have crossed at the
- * last bar — a pattern past its apex has nothing left to break out of.
+ * Boundary pairs: the breakout side's boundary read at the shape's `breakoutIndex`
+ * (the first close beyond it, else the last bar), the opposite boundary's last
+ * touch as the invalidation, and the fixed {@link trendlineHeight}. `null`
+ * once the boundaries have crossed at that bar — a pair that broke before its
+ * apex keeps its geometry, one that reaches its apex unbroken has nothing left
+ * to break out of. Undirected levels must both be prices (> 0).
  */
 function trendlineGeometry(
     shape: TrendlinePatternShape,
     bars: readonly Bar[],
     id: QualifiedPattern['id']
 ): QualifiedPatternGeometry | null {
-    const lastIndex = bars.length - 1;
-    const upperLevel = lineValueAt(shape.upper, lastIndex);
-    const lowerLevel = lineValueAt(shape.lower, lastIndex);
+    const upperLevel = lineValueAt(shape.upper, shape.breakoutIndex);
+    const lowerLevel = lineValueAt(shape.lower, shape.breakoutIndex);
     if (!(upperLevel > lowerLevel)) return null;
     const keyPoints = [
         ...shape.upper.touches.map((p, i) =>
@@ -167,6 +180,7 @@ function trendlineGeometry(
     ];
     const height = trendlineHeight(id, shape.upper, shape.lower);
     if (shape.direction === null) {
+        if (!(upperLevel > 0 && lowerLevel > 0)) return null;
         return { keyPoints, height, upperLevel, lowerLevel, direction: null };
     }
     const up = shape.direction === 'up';
@@ -182,14 +196,13 @@ function trendlineGeometry(
 
 // ─── Flags and pennants ─────────────────────────────────────────────────────
 
-/** Breakout = the breakout-side channel line at the last bar; height = the pole. */
+/** Breakout = the breakout-side channel line at the shape's `breakoutIndex`; height = the pole. */
 function flagGeometry(
     pattern: QualifiedPattern,
     shape: FlagPatternShape,
     bars: readonly Bar[]
 ): PatternGeometry | null {
     const up = shape.direction === 'up';
-    const lastIndex = bars.length - 1;
     const channelPoint = (line: FlagPatternShape['upper']): PatternPoint => ({
         index: pattern.endIndex,
         price: lineValueAt(line, pattern.endIndex),
@@ -201,7 +214,7 @@ function flagGeometry(
             point('flag upper channel', channelPoint(shape.upper), bars),
             point('flag lower channel', channelPoint(shape.lower), bars),
         ],
-        lineValueAt(up ? shape.upper : shape.lower, lastIndex),
+        lineValueAt(up ? shape.upper : shape.lower, shape.breakoutIndex),
         Math.abs(shape.poleTop.price - shape.poleBase.price),
         shape.direction,
         shape.flagExtreme
@@ -281,7 +294,9 @@ function roundingGeometry(
 /**
  * Computes the measured-move geometry of one qualified pattern from its
  * fixed shape. `null` when `atr`/bounds are invalid, when a boundary pair has
- * crossed by the last bar, or when the shape yields no positive height.
+ * crossed by its break bar, or when the shape yields no offered measured move
+ * (a non-positive height, breakout or target, or a breakout past its
+ * invalidation).
  *
  * @param pattern - A `qualifyPatterns` result, indexed into `bars`.
  * @param bars - The full bar series the pattern came from (oldest-first).

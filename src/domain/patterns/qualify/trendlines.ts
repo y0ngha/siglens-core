@@ -7,6 +7,7 @@ import type {
 } from '@/domain/types';
 import {
     classifyLineDrift,
+    firstCloseBeyond,
     fitBoundaryLine,
     lineValueAt,
     parallelBoundaryLine,
@@ -234,21 +235,64 @@ function patternFromBoundaries(
     if (id === null) return null;
     if (trendlineHeight(id, upper, lower) < minHeight(ctx, price)) return null;
 
+    const endIndex = Math.max(upper.end.index, lower.end.index);
+    const direction =
+        FIXED_TRENDLINE_DIRECTION[id] ??
+        priorTrend(ctx, Math.min(upper.start.index, lower.start.index));
     return {
         id,
         startIndex: Math.min(upper.start.index, lower.start.index),
-        endIndex: Math.max(upper.end.index, lower.end.index),
+        endIndex,
         pivots: window,
         shape: {
             kind: 'trendline',
             upper,
             lower,
-            direction:
-                FIXED_TRENDLINE_DIRECTION[id] ??
-                priorTrend(ctx, Math.min(upper.start.index, lower.start.index)),
+            direction,
+            breakoutIndex: trendlineBreakIndex(
+                ctx,
+                upper,
+                lower,
+                direction,
+                endIndex + 1
+            ),
         },
         touches: upper.touches.length + lower.touches.length,
     };
+}
+
+/**
+ * The bar a pair's breakout is read at: the first close beyond the breakout
+ * side's line from `from` on (the earlier of the two sides when undirected),
+ * else the last bar. Freezing it here keeps the breakout level, the target and
+ * the status from sliding along a sloped line after price has broken out.
+ */
+function trendlineBreakIndex(
+    ctx: QualifyContext,
+    upper: PatternLine,
+    lower: PatternLine,
+    direction: PatternBreakoutDirection | null,
+    from: number
+): number {
+    const beyondUpper = (): number =>
+        firstCloseBeyond(
+            ctx.bars,
+            i => lineValueAt(upper, i),
+            1,
+            from,
+            ctx.lastIndex
+        );
+    const beyondLower = (): number =>
+        firstCloseBeyond(
+            ctx.bars,
+            i => lineValueAt(lower, i),
+            -1,
+            from,
+            ctx.lastIndex
+        );
+    if (direction === 'up') return beyondUpper();
+    if (direction === 'down') return beyondLower();
+    return Math.min(beyondUpper(), beyondLower());
 }
 
 /**

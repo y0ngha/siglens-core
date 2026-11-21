@@ -50,7 +50,9 @@ import {
  *
  * Hits the price has already failed or fulfilled (`isSpentPattern`) are
  * dropped before the overlap arbitration, so a spent hit cannot knock out a
- * live one.
+ * live one. A hit with no geometry (a measured move that is not offered, or a
+ * pair past its apex) is dropped the same way, and neither kind is returned
+ * as a shape hint.
  *
  * Pure and deterministic; never mutates its inputs.
  *
@@ -105,12 +107,18 @@ export function qualifyPatterns(
         ...qualifyRounding(ctx, 'top'),
     ];
 
+    // Ids whose strict pattern was found but is not offered: spent by price, or
+    // without geometry (a guard of `computeCandidateGeometry` dropped it). Neither
+    // may come back as a shape hint, which would inject its skill guide.
     const spentIds = new Set<ChartPatternId>();
     const live: Contender[] = [];
     for (const pattern of detected) {
         const geometry: QualifiedPatternGeometry | null =
             computeCandidateGeometry(pattern, bars, atr);
-        if (geometry === null) continue;
+        if (geometry === null) {
+            spentIds.add(pattern.id);
+            continue;
+        }
         if (isSpentPattern(pattern, geometry, bars, atr))
             spentIds.add(pattern.id);
         else live.push({ pattern, direction: geometry.direction });

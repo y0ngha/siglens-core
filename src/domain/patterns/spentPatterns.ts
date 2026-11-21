@@ -27,12 +27,14 @@ import { PATTERN_SPENT_SLACK_ATR } from '@/domain/patterns/constants';
  *   measured target. Not counted from the first point: a converging pattern's
  *   target often sits inside its own earlier range (a rising wedge's target
  *   is below its first support touch). The last structural point is a
- *   confirmed pivot now, not the still-forming bar it used to be. A target at
- *   or below zero is not a price and is never fulfilled. Allows
- *   PATTERN_SPENT_SLACK_ATR of slack (price reacts in a zone).
+ *   confirmed pivot now, not the still-forming bar it used to be. Allows
+ *   PATTERN_SPENT_SLACK_ATR of slack (price reacts in a zone). A target at or
+ *   below zero never reaches this check: `computeCandidateGeometry` yields no
+ *   geometry for it, so such a pattern is not qualified at all.
  * - Undirected (no prior trend, no target): spent once a bar after the last
  *   touch has travelled a full height beyond either boundary, the boundaries
- *   read where they stand at the last bar (with the same slack).
+ *   read where the geometry froze them (the pair's break bar, else the last
+ *   bar; with the same slack).
  */
 export function isSpentPattern(
     pattern: QualifiedPattern,
@@ -60,7 +62,6 @@ export function isSpentPattern(
                 : b.close > geometry.invalidationLevel
         );
     if (failed) return true;
-    if (!(geometry.measuredTarget > 0)) return false;
     return bars
         .slice(pattern.endIndex + 1)
         .some(b =>

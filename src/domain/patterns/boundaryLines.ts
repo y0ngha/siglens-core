@@ -24,6 +24,28 @@ export function lineValueAt(line: PatternLine, x: number): number {
     return line.start.price + slope * (x - line.start.index);
 }
 
+/**
+ * @internal
+ * The first bar `i ≥ from` whose close is strictly beyond `levelAt(i)` on the
+ * `sign` side (`sign × (close − level) > 0`, `+1` above, `−1` below; a close
+ * equal to the level is not a break), else `lastIndex`. The one rule every
+ * family uses to freeze a sloped line at its break (head & shoulders neckline,
+ * boundary pairs, flags): the bar a level is read at must not move once price
+ * has closed through it.
+ */
+export function firstCloseBeyond(
+    bars: readonly Bar[],
+    levelAt: (i: number) => number,
+    sign: 1 | -1,
+    from: number,
+    lastIndex: number
+): number {
+    for (let i = from; i <= lastIndex; i++) {
+        if (sign * (bars[i].close - levelAt(i)) > 0) return i;
+    }
+    return lastIndex;
+}
+
 /** @internal Which side of the pattern a boundary bounds. */
 export type BoundarySide = 'upper' | 'lower';
 

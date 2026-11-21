@@ -9,6 +9,7 @@ import type {
 import { detectHighTightFlagAnchors } from '@/domain/patterns/classifiers';
 import {
     classifyLineDrift,
+    firstCloseBeyond,
     fitBoundaryLine,
     lineValueAt,
 } from '@/domain/patterns/boundaryLines';
@@ -278,6 +279,15 @@ function fitFlag(
             upper,
             lower,
             flagExtreme,
+            // The breakout side's channel line, frozen at the first close
+            // beyond it after the fitted end.
+            breakoutIndex: firstCloseBeyond(
+                ctx.bars,
+                i => lineValueAt(direction === 'up' ? upper : lower, i),
+                sign,
+                end + 1,
+                ctx.lastIndex
+            ),
         },
         touches: upper.touches.length + lower.touches.length,
     };

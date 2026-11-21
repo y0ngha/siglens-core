@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { PivotPoint } from '@/domain/types';
+import type { Bar, PivotPoint } from '@/domain/types';
 import type { QualifyContext } from '@/domain/patterns/qualify/context';
 import { qualifyTrendlines } from '@/domain/patterns/qualify/trendlines';
 import { makeHLBars } from '@/__tests__/domain/patterns/helpers';
@@ -123,5 +123,192 @@ describe('qualifyTrendlines — channel drawn parallel to its better-touched lin
         ];
         const ctx = ctxOf(pivots, () => [108, 105], { 22: 100, 58: 100 });
         expect(qualifyTrendlines(ctx)).toEqual([]);
+    });
+});
+
+describe('qualifyTrendlines — the breakout bar is frozen at the first close beyond the breakout line', () => {
+    /** A bar closing at `close`, spanning `[low, high]` (a tail bar's own range is irrelevant to the pair). */
+    const tailBar = (close: number): [number, number, number] => [
+        close + 0.1,
+        close - 0.1,
+        close,
+    ];
+
+    /**
+     * `ctxOf` with extra closing bars after the last pivot. `lastPivot` is the
+     * last index with a pivot; bars up to it follow `inside`, the tail bars
+     * start right after it.
+     */
+    function ctxWithTail(
+        pivots: readonly PivotPoint[],
+        inside: [high: number, low: number],
+        tail: readonly number[],
+        mirror = false,
+        closeAt: Readonly<Record<number, number>> = {}
+    ): QualifyContext {
+        const last = pivots[pivots.length - 1].index;
+        const head = makeHLBars(
+            Array.from({ length: last + 1 }, (_, i): [number, number] => {
+                const pivot = pivots.filter(p => p.index === i);
+                const h =
+                    pivot.find(p => p.kind === 'high')?.price ?? inside[0];
+                const l = pivot.find(p => p.kind === 'low')?.price ?? inside[1];
+                return [h, l];
+            })
+        );
+        const tailBars: Bar[] = tail.map((close, k) => {
+            const [high, low] = tailBar(close);
+            return {
+                time: last + 1 + k,
+                open: close,
+                high,
+                low,
+                close,
+                volume: 1000,
+            };
+        });
+        const bars = [...head, ...tailBars].map((b, i) =>
+            closeAt[i] === undefined
+                ? b
+                : {
+                      ...b,
+                      close: closeAt[i],
+                      high: Math.max(b.high, closeAt[i]),
+                  }
+        );
+        const ctx: QualifyContext = {
+            bars,
+            pivots,
+            atr: 1,
+            lastIndex: bars.length - 1,
+            minHeightPricePct: 0.03,
+        };
+        if (!mirror) return ctx;
+        const flip = (price: number): number => 220 - price;
+        return {
+            ...ctx,
+            bars: bars.map(b => ({
+                ...b,
+                open: flip(b.open),
+                high: flip(b.low),
+                low: flip(b.high),
+                close: flip(b.close),
+            })),
+            pivots: pivots.map(p => ({
+                index: p.index,
+                price: flip(p.price),
+                kind: p.kind === 'high' ? 'low' : 'high',
+            })),
+        };
+    }
+
+    // Flat resistance 110, support rising 0.1/bar from 100 at bar 20: an
+    // ascending triangle, last touch at bar 70, so a break is read from bar 71.
+    const triangle = [
+        piv(20, 100, 'low'),
+        piv(30, 110, 'high'),
+        piv(40, 102, 'low'),
+        piv(50, 110, 'high'),
+        piv(60, 104, 'low'),
+        piv(70, 110, 'high'),
+    ];
+    const upTriangle = (tail: number[], mirror = false) => {
+        const [q] = qualifyTrendlines(
+            ctxWithTail(triangle, [108, 106], tail, mirror)
+        );
+        return q;
+    };
+    const breakoutIndex = (q: ReturnType<typeof upTriangle>): number => {
+        if (q.shape.kind !== 'trendline') throw new Error('trendline');
+        return q.shape.breakoutIndex;
+    };
+
+    it('a directed-up pair breaks at the first close above its upper line', () => {
+        const q = upTriangle([107, 109, 110.5, 111, 125]);
+        expect(q.id).toBe('ascending_triangle');
+        expect(q.endIndex).toBe(70);
+        expect(breakoutIndex(q)).toBe(73);
+    });
+
+    it('a close equal to the upper line is not a break', () => {
+        // Bar 72 closes exactly on the flat 110, bar 74 is the first above.
+        expect(breakoutIndex(upTriangle([107, 110, 109, 110.01]))).toBe(74);
+    });
+
+    it('is the last bar while no close is above the upper line', () => {
+        expect(breakoutIndex(upTriangle([107, 109, 110]))).toBe(73);
+        expect(breakoutIndex(upTriangle([]))).toBe(70);
+    });
+
+    it("a close over the line on the pair's own last bar (inside the containment slack) is not the break", () => {
+        // Lows 100 / 102 / 104 at 20 / 40 / 60 under flat highs 110 at 30 / 50:
+        // the pair ends on the low at bar 60, whose bar reaches 110.1 and
+        // closes there, over the 110 line by less than the 0.25 slack.
+        const lowEnd = [
+            piv(20, 100, 'low'),
+            piv(30, 110, 'high'),
+            piv(40, 102, 'low'),
+            piv(50, 110, 'high'),
+            piv(60, 104, 'low'),
+        ];
+        const [q] = qualifyTrendlines(
+            ctxWithTail(lowEnd, [108, 106], [107, 111], false, { 60: 110.1 })
+        );
+        expect(q.endIndex).toBe(60);
+        expect(breakoutIndex(q)).toBe(62);
+    });
+
+    it('a close under the lower line is not the breakout of an up pair', () => {
+        // Bar 72 closes far under the rising support; the up break is bar 74.
+        expect(breakoutIndex(upTriangle([107, 90, 107, 111]))).toBe(74);
+    });
+
+    it('a directed-down pair (the mirror) breaks at the first close below its lower line', () => {
+        // The tail is given in the up chart's prices and mirrored with it.
+        const q = upTriangle([107, 109, 110.5, 111, 125], true);
+        expect(q.id).toBe('descending_triangle');
+        expect(breakoutIndex(q)).toBe(73);
+        // Equal close: 220 − 110 = 110, exactly on the flat lower line.
+        expect(breakoutIndex(upTriangle([107, 110, 109, 110.01], true))).toBe(
+            74
+        );
+    });
+
+    describe('an undirected pair takes the earlier of its two sides', () => {
+        // Flat 110 / 100 rectangle with three touches each, last touch at bar 60.
+        const rectangle = [
+            piv(10, 110, 'high'),
+            piv(20, 100, 'low'),
+            piv(30, 110, 'high'),
+            piv(40, 100, 'low'),
+            piv(50, 110, 'high'),
+            piv(60, 100, 'low'),
+        ];
+        const rect = (tail: number[]) => {
+            const [q] = qualifyTrendlines(
+                ctxWithTail(rectangle, [108, 102], tail)
+            );
+            return q;
+        };
+
+        it('a close below the lower line first', () => {
+            const q = rect([105, 99.9, 105, 110.5]);
+            expect([q.id, q.shape]).toMatchObject([
+                'rectangle',
+                { direction: null, breakoutIndex: 62 },
+            ]);
+        });
+
+        it('a close above the upper line first', () => {
+            expect(breakoutIndex(rect([105, 105, 110.5, 99]))).toBe(63);
+        });
+
+        it('only one side breaks', () => {
+            expect(breakoutIndex(rect([105, 105, 105, 110.5]))).toBe(64);
+        });
+
+        it('closes equal to either line are not a break', () => {
+            expect(breakoutIndex(rect([100, 110, 105]))).toBe(63);
+        });
     });
 });

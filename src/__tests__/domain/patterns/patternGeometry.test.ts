@@ -210,7 +210,13 @@ describe('computeCandidateGeometry', () => {
             startIndex: 1,
             endIndex: 6,
             pivots: [],
-            shape: { kind: 'trendline', upper, lower, direction: 'up' },
+            shape: {
+                kind: 'trendline',
+                upper,
+                lower,
+                direction: 'up',
+                breakoutIndex: 9,
+            },
             touches: 4,
         };
 
@@ -240,6 +246,7 @@ describe('computeCandidateGeometry', () => {
                             upper,
                             lower,
                             direction: 'down',
+                            breakoutIndex: 7,
                         },
                     },
                     makeBars(Array.from({ length: 8 }, () => 100)),
@@ -271,6 +278,7 @@ describe('computeCandidateGeometry', () => {
                                 { index: 6, price: 6 }
                             ),
                             direction: 'up',
+                            breakoutIndex: 9,
                         },
                         touches: 4,
                     },
@@ -294,6 +302,7 @@ describe('computeCandidateGeometry', () => {
                             { index: 6, price: 10 }
                         ),
                         direction: null,
+                        breakoutIndex: 9,
                     },
                 },
                 BARS,
@@ -308,7 +317,7 @@ describe('computeCandidateGeometry', () => {
             });
         });
 
-        it('returns null once the boundaries have crossed by the last bar (past the apex)', () => {
+        it('returns null once the boundaries have crossed by the break bar (here the last bar, past the apex)', () => {
             const g = computeCandidateGeometry(
                 {
                     ...triangle,
@@ -321,6 +330,7 @@ describe('computeCandidateGeometry', () => {
                         ),
                         lower,
                         direction: 'up',
+                        breakoutIndex: 9,
                     },
                 },
                 BARS,
@@ -353,6 +363,7 @@ describe('computeCandidateGeometry', () => {
                                 { index: 7, price: 95 }
                             ),
                             flagExtreme: { index: 7, price: 95 },
+                            breakoutIndex: 9,
                         },
                         touches: 4,
                     },
@@ -396,6 +407,7 @@ describe('computeCandidateGeometry', () => {
                                 { index: 8, price: 83 }
                             ),
                             flagExtreme: { index: 7, price: 86 },
+                            breakoutIndex: 9,
                         },
                         touches: 4,
                     },
@@ -551,6 +563,249 @@ describe('computeCandidateGeometry', () => {
             expect(g.height).toBe(20);
             expect(g.measuredTarget).toBe(60);
             expect(g.keyPoints[1].label).toBe('top');
+        });
+    });
+});
+
+describe('computeCandidateGeometry — a sloped breakout line is read at breakoutIndex', () => {
+    // Both lines rise 1 per bar: upper 19 + i (touches at bars 1 and 5), lower
+    // 8 + i (bars 2 and 6). The last bar is 9; the break was read at `at`.
+    const upper = line({ index: 1, price: 20 }, { index: 5, price: 24 });
+    const lower = line({ index: 2, price: 10 }, { index: 6, price: 14 });
+    const pair = (
+        direction: 'up' | 'down' | null,
+        breakoutIndex: number
+    ): QualifiedPattern => ({
+        id: 'symmetrical_triangle',
+        startIndex: 1,
+        endIndex: 6,
+        pivots: [],
+        shape: { kind: 'trendline', upper, lower, direction, breakoutIndex },
+        touches: 4,
+    });
+
+    it('directed up: the upper line at the break bar, not at the last bar', () => {
+        const g = directed(computeCandidateGeometry(pair('up', 7), BARS, ATR));
+        expect(g.breakoutLevel).toBe(26);
+        expect(g.measuredTarget).toBe(37);
+        expect(
+            directed(computeCandidateGeometry(pair('up', 9), BARS, ATR))
+                .breakoutLevel
+        ).toBe(28);
+    });
+
+    it('directed down: the lower line at the break bar', () => {
+        const g = directed(
+            computeCandidateGeometry(pair('down', 7), BARS, ATR)
+        );
+        expect(g.breakoutLevel).toBe(15);
+        expect(g.invalidationLevel).toBe(24);
+        expect(g.measuredTarget).toBe(4);
+    });
+
+    it('undirected: both boundaries at the break bar', () => {
+        expect(computeCandidateGeometry(pair(null, 7), BARS, ATR)).toEqual({
+            keyPoints: expect.any(Array),
+            height: 11,
+            upperLevel: 26,
+            lowerLevel: 15,
+            direction: null,
+        });
+    });
+
+    it('a flag: the breakout channel line at the break bar', () => {
+        const flag = (breakoutIndex: number): QualifiedPattern => ({
+            id: 'bull_flag',
+            startIndex: 0,
+            endIndex: 8,
+            pivots: [lo(0, 80), hi(3, 100)],
+            shape: {
+                kind: 'flag',
+                direction: 'up',
+                poleBase: lo(0, 80),
+                poleTop: hi(3, 100),
+                upper: line({ index: 4, price: 99 }, { index: 8, price: 97 }),
+                lower: line({ index: 5, price: 96 }, { index: 7, price: 95 }),
+                flagExtreme: { index: 7, price: 95 },
+                breakoutIndex,
+            },
+            touches: 4,
+        });
+        expect(
+            directed(computeCandidateGeometry(flag(8), BARS, ATR)).breakoutLevel
+        ).toBe(97);
+        expect(
+            directed(computeCandidateGeometry(flag(9), BARS, ATR)).breakoutLevel
+        ).toBe(96.5);
+    });
+
+    describe('a pair broken before its apex keeps its geometry', () => {
+        // Upper 21 − i falling through (1,20) and (3,18); lower 7 + i rising
+        // through (2,9) and (6,13): they meet at bar 7 (14 = 14).
+        const crossing = (breakoutIndex: number): QualifiedPattern => ({
+            ...pair('up', breakoutIndex),
+            shape: {
+                kind: 'trendline',
+                upper: line({ index: 1, price: 20 }, { index: 3, price: 18 }),
+                lower: line({ index: 2, price: 9 }, { index: 6, price: 13 }),
+                direction: 'up',
+                breakoutIndex,
+            },
+        });
+
+        it('broke at bar 6, where the upper line (15) is still over the lower (13)', () => {
+            const g = directed(
+                computeCandidateGeometry(crossing(6), BARS, ATR)
+            );
+            expect(g.breakoutLevel).toBe(15);
+            expect(g.invalidationLevel).toBe(13);
+        });
+
+        it('has nothing left to break out of once the lines meet (bar 7) or cross (bar 9)', () => {
+            expect(computeCandidateGeometry(crossing(7), BARS, ATR)).toBeNull();
+            expect(computeCandidateGeometry(crossing(9), BARS, ATR)).toBeNull();
+        });
+    });
+});
+
+describe('computeCandidateGeometry — guards for a measured move that is not offered', () => {
+    const cup = (rim: number, handleLow: number): QualifiedPattern => ({
+        id: 'cup_and_handle',
+        startIndex: 0,
+        endIndex: 8,
+        pivots: [],
+        shape: {
+            kind: 'cup',
+            leftRim: hi(0, rim + 1),
+            rightRim: hi(6, rim),
+            bottom: { index: 3, price: rim - 20 },
+            handleLow: { index: 8, price: handleLow },
+        },
+        touches: 4,
+    });
+    const topWith = (peak: number, neck: number): QualifiedPattern => ({
+        id: 'double_top',
+        startIndex: 1,
+        endIndex: 3,
+        pivots: [hi(1, peak), lo(2, neck), hi(3, peak)],
+        shape: { kind: 'extreme', neckline: lo(2, neck) },
+        touches: 2,
+    });
+    const offered = (p: QualifiedPattern): boolean =>
+        computeCandidateGeometry(p, BARS, ATR) !== null;
+
+    it('a breakout at or below zero is not offered (an up pattern whose target is positive)', () => {
+        // Rim 0 → target 20 > 0, invalidation −30 below it: only the breakout guard fires.
+        expect(offered(cup(0, -30))).toBe(false);
+        expect(offered(cup(-1, -30))).toBe(false);
+        expect(offered(cup(0.01, -30))).toBe(true);
+    });
+
+    it('a measured target at or below zero is not offered (down)', () => {
+        // Peaks 20 stand 10 over the neckline 10: target exactly 0.
+        expect(offered(topWith(20, 10))).toBe(false);
+        expect(offered(topWith(25, 10))).toBe(false);
+        expect(offered(topWith(19.9, 10))).toBe(true);
+    });
+
+    it('an up breakout at or below its invalidation is not offered', () => {
+        expect(offered(cup(120, 120))).toBe(false);
+        expect(offered(cup(120, 125))).toBe(false);
+        expect(offered(cup(120, 119.99))).toBe(true);
+    });
+
+    it('a down breakout at or above its invalidation is not offered', () => {
+        // Peaks 15 and 15.2 (the invalidation is the higher one).
+        const base = topWith(15, 11);
+        const wide = (neck: number): QualifiedPattern => ({
+            ...base,
+            pivots: [hi(1, 15), lo(2, neck), hi(3, 15.2)],
+            shape: { kind: 'extreme', neckline: lo(2, neck) },
+        });
+        expect(offered(wide(15.2))).toBe(false);
+        expect(offered(wide(16))).toBe(false);
+        expect(offered(wide(15.19))).toBe(true);
+    });
+
+    describe('wrong side of the invalidation, per remaining family', () => {
+        const rounding = (
+            id: 'rounding_bottom' | 'rounding_top',
+            invalidation: number
+        ): QualifiedPattern => {
+            const bottom = id === 'rounding_bottom';
+            const rim = bottom ? hi : lo;
+            return {
+                id,
+                startIndex: 0,
+                endIndex: 7,
+                pivots: [],
+                shape: {
+                    kind: 'rounding',
+                    leftRim: rim(0, bottom ? 119 : 81),
+                    rightRim: rim(6, bottom ? 120 : 80),
+                    extreme: { index: 3, price: 100 },
+                    invalidation: { index: 7, price: invalidation },
+                    arc: [],
+                },
+                touches: 3,
+            };
+        };
+        const highTightFlag = (flagLow: number): QualifiedPattern => ({
+            id: 'high_tight_flag',
+            startIndex: 0,
+            endIndex: 9,
+            pivots: [],
+            shape: {
+                kind: 'high_tight_flag',
+                poleBase: lo(0, 100),
+                poleTop: hi(5, 200),
+                flagLow: { index: 7, price: flagLow },
+            },
+            touches: 2,
+        });
+
+        it('rounding bottom: an invalidation at or above the lip is not offered, one under it is', () => {
+            expect(offered(rounding('rounding_bottom', 120))).toBe(false);
+            expect(offered(rounding('rounding_bottom', 125))).toBe(false);
+            expect(offered(rounding('rounding_bottom', 119.9))).toBe(true);
+        });
+
+        it('rounding top: an invalidation at or under the lip is not offered, one over it is', () => {
+            expect(offered(rounding('rounding_top', 80))).toBe(false);
+            expect(offered(rounding('rounding_top', 75))).toBe(false);
+            expect(offered(rounding('rounding_top', 80.1))).toBe(true);
+        });
+
+        it('high tight flag: a flag low at or above the pole top is not offered, one under it is', () => {
+            expect(offered(highTightFlag(200))).toBe(false);
+            expect(offered(highTightFlag(210))).toBe(false);
+            expect(offered(highTightFlag(199.99))).toBe(true);
+        });
+    });
+
+    describe('undirected', () => {
+        const rectangle = (lowerPrice: number): QualifiedPattern => ({
+            id: 'rectangle',
+            startIndex: 1,
+            endIndex: 6,
+            pivots: [],
+            shape: {
+                kind: 'trendline',
+                upper: line({ index: 1, price: 20 }, { index: 5, price: 20 }),
+                lower: line(
+                    { index: 2, price: lowerPrice },
+                    { index: 6, price: lowerPrice }
+                ),
+                direction: null,
+                breakoutIndex: 9,
+            },
+            touches: 4,
+        });
+
+        it('a lower boundary at or below zero is not offered', () => {
+            expect(offered(rectangle(0))).toBe(false);
+            expect(offered(rectangle(-5))).toBe(false);
+            expect(offered(rectangle(0.01))).toBe(true);
         });
     });
 });

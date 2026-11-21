@@ -1,25 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import type { Bar, PatternGeometry, QualifiedPattern } from '@/domain/types';
+import { describe, expect, it } from 'vitest';
+import type { Bar, QualifiedPattern } from '@/domain/types';
 import { buildPatternOverlayCandidates } from '@/domain/overlays/patternOverlays';
-
-// vi.mock is hoisted above the imports; vi.hoisted keeps the geometry in reach.
-const geometry: PatternGeometry = vi.hoisted(() => ({
-    keyPoints: [],
-    breakoutLevel: 10,
-    height: 15,
-    measuredTarget: -5,
-    conservativeTarget: 2.5,
-    invalidationLevel: 14,
-    invalidationIndex: 4,
-    direction: 'down' as const,
-}));
-
-vi.mock('@/domain/patterns/patternGeometry', async importOriginal => ({
-    ...(await importOriginal<
-        typeof import('@/domain/patterns/patternGeometry')
-    >()),
-    computeCandidateGeometry: () => geometry,
-}));
 
 const bars: Bar[] = Array.from({ length: 6 }, (_, i) => ({
     time: 1_000 + i * 86_400,
@@ -37,35 +18,57 @@ const doubleTop = (
     startIndex,
     endIndex: 4,
     pivots,
-    shape: { kind: 'extreme', neckline: { index: 2, price: 9, kind: 'low' } },
+    shape: {
+        kind: 'extreme',
+        neckline: pivots.find(p => p.kind === 'low') ?? pivots[0],
+    },
     touches: 2,
 });
+const top = (peak: number, neck: number): QualifiedPattern =>
+    doubleTop(
+        [
+            { index: 0, price: peak, kind: 'high' },
+            { index: 2, price: neck, kind: 'low' },
+            { index: 4, price: peak, kind: 'high' },
+        ],
+        0
+    );
+const DP2 = { dp: 2, krxTick: null };
 
 describe('buildPatternOverlayCandidates — outcome levels', () => {
-    it('leaves out a target at or below zero, as the prompt block prints N/A', () => {
+    // A measured target at or below zero is not offered by the geometry, so it
+    // can only reach the drawing through rounding at the printed precision: a
+    // 0.0099 move under a 0.0104 neckline is a positive 0.0005 target, but both
+    // levels print at 0.01 and 0.02 on a 2-decimal quote.
+    it('leaves out a target that only rounds to zero at the printed precision, as the prompt block prints N/A', () => {
         const [c] = buildPatternOverlayCandidates(
-            [
-                doubleTop(
-                    [
-                        { index: 0, price: 14, kind: 'high' },
-                        { index: 2, price: 9, kind: 'low' },
-                        { index: 4, price: 14, kind: 'high' },
-                    ],
-                    0
-                ),
-            ],
+            [top(0.0203, 0.0104)],
             bars,
-            1,
-            { dp: 2, krxTick: null }
+            0.001,
+            DP2
         );
         expect(c.levels.map(l => [l.label, l.price])).toEqual([
-            ['breakout', 10],
-            ['invalidation', 14],
+            ['breakout', 0.01],
+            ['invalidation', 0.02],
         ]);
         // Every level starts at the pattern's first point, like the breakout.
         expect(c.levels.map(l => l.fromTime)).toEqual([
             bars[0].time,
             bars[0].time,
+        ]);
+    });
+
+    it('keeps the target when it stays positive after rounding (same shape, one cent higher)', () => {
+        const [c] = buildPatternOverlayCandidates(
+            [top(0.0303, 0.0204)],
+            bars,
+            0.001,
+            DP2
+        );
+        expect(c.levels.map(l => [l.label, l.price])).toEqual([
+            ['breakout', 0.02],
+            ['invalidation', 0.03],
+            ['target', 0.01],
         ]);
     });
 
@@ -83,7 +86,7 @@ describe('buildPatternOverlayCandidates — outcome levels', () => {
             ],
             bars,
             1,
-            { dp: 2, krxTick: null }
+            DP2
         );
         expect(c.segments).toHaveLength(1);
         expect(c.segments[0].to.time).toBeGreaterThan(c.segments[0].from.time);
