@@ -555,13 +555,15 @@ export {
 } from './domain/agent/calendarPeriods';
 export type { CalendarPeriodChange } from './domain/agent/calendarPeriods';
 export {
+    computePriceStats,
+    priceStatsEarliestDate,
+} from './domain/agent/priceStats';
+export {
     AGENT_PRICE_STATS_DEFAULT_PERIOD,
     AGENT_PRICE_STATS_MAX_DATES,
     AGENT_PRICE_STATS_MAX_SUBJECTS,
     AGENT_PRICE_STATS_PERIODS,
     PRICE_STATS_NOTE_TEMPLATES,
-    computePriceStats,
-    priceStatsEarliestDate,
 } from './domain/agent/priceStats';
 export type {
     AgentPriceStatsPeriod,

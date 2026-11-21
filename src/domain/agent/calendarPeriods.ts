@@ -51,7 +51,7 @@ export function minusCalendarMonths(isoDate: string, months: number): string {
     return `${targetYear}-${pad2(targetMonth + 1)}-${pad2(Math.min(day, daysInMonth))}`;
 }
 
-/** Result of {@link normalizeCloses}. */
+/** @internal Result of {@link normalizeCloses}. */
 export interface NormalizedCloses {
     /** Usable closes ascending by date, one per date. */
     closes: MarketDailyClose[];
@@ -68,6 +68,7 @@ function isUsableClose(close: MarketDailyClose): boolean {
 }
 
 /**
+ * @internal Shared with `priceStats.ts`; not exported from the package entry.
  * The one cleaning rule for a close series: rows with an invalid date or a
  * price that is not finite and above zero are dropped, the rest sorted by
  * date, and the first of a repeated date wins. Every period function reads
