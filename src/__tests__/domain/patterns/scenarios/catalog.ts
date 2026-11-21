@@ -615,8 +615,8 @@ const SMALL_ROUNDING: Anchor[] = [
 
 /**
  * The series for `anchors`. Throws when one bar would span the 1.5-ATR pivot
- * reversal by itself (ATR 1 unless given) — such a bar confirms its own
- * high and low as pivots and the scenario would test that artifact instead
+ * reversal by itself (ATR 1 unless given) — such a bar can be a swing high
+ * or low on its own close and the scenario would test that artifact instead
  * of its shape.
  */
 function calm(anchors: readonly Anchor[], wick = 0.15, atr = 1): Bar[] {
@@ -876,14 +876,29 @@ const symmetricalScenarios: Scenario[] = [
     scenario(
         'symmetrical_triangle',
         'b pierce',
-        'two bars poke under support: the first is one wide bar that confirms its own high, the second becomes the swing low and support is re-fit through it (never crossed)',
-        // Bar 44 (low 101.2, high 104.3) reverses 1.5 ATR within itself, so it
-        // confirms its high only; the swing low it starts is bar 45's 101.3.
-        // A bar is never both a swing high and a swing low.
+        'two bars poke under support: the first is one wide bar whose high the next bar confirms, the second becomes the swing low and support is re-fit through it (never crossed)',
+        // Bar 44 (low 101.2, high 104.3) closes at 104.2, so its own close
+        // proves only 0.1 of the reversal: bar 45 (low 101.3) confirms the
+        // high, and the swing low it starts is bar 45's 101.3. A bar is never
+        // both a swing high and a swing low.
+        patchBar(patchBar(symTriangle, 44, { low: 101.2 }), 45, {
+            low: 101.3,
+            high: 104.3,
+        }),
+        { drawn: 'symmetrical_triangle', levels: { invalidation: 101.3 } }
+    ),
+    scenario(
+        'symmetrical_triangle',
+        'b pierce',
+        'the same two pokes, but bar 45 also makes a new high: the wide bar 44 confirms nothing on its own close, so neither poke is a swing low and support stays pierced',
+        // Bar 45's high 104.75 exceeds bar 44's, so the high moves to bar 45;
+        // its close (104.65) does not prove the reversal either, and no later
+        // bar confirms it until bar 48. The lows 101.2 and 101.3 sit 0.6 under
+        // the support line through the confirmed swing lows.
         patchBar(patchBar(symTriangle, 44, { low: 101.2 }), 45, {
             low: 101.3,
         }),
-        { drawn: 'symmetrical_triangle', levels: { invalidation: 101.3 } }
+        { notDrawn: 'symmetrical_triangle' }
     ),
     scenario(
         'symmetrical_triangle',
