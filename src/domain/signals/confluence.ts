@@ -1,6 +1,7 @@
 import type {
     Bar,
     IndicatorResult,
+    Signal,
     SignalType,
     TrendState,
 } from '@/domain/types';
@@ -318,6 +319,46 @@ export interface EvaluateConfluenceOptions {
     trendMaPeriod?: number;
     /** Minimum bars before scoring is attempted. Default {@link CONFLUENCE_MIN_BARS}. */
     minBars?: number;
+    /**
+     * The signals of `bars` and which of them are newly lit, when the caller already read them
+     * ({@link readSignalFreshness}); omitted, they are read here. Lets one prompt build take the
+     * previous-bar pass once for the printed `Newly lit on this bar` lines and the cards.
+     */
+    freshness?: SignalFreshness;
+}
+
+/** The signal types on a bar's list, split by direction, and those not on the previous bar's list. */
+export interface SignalFreshness {
+    readonly bullish: string[];
+    readonly bearish: string[];
+    /** On this bar's list and not on the previous bar's: `Newly lit on this bar (bullish)`. */
+    readonly freshBullish: string[];
+    readonly freshBearish: string[];
+}
+
+/**
+ * @internal The one place "newly lit" is decided. `current` is `detectSignals` of `bars`; core
+ * evaluates only the tail of the array it is given, so there is no "state at bar N−1" to read
+ * out of a single call — recomputing on the truncated bars is the only way to obtain it, and
+ * the diff is what "newly lit" means. Callers apply the minimum-bars rule themselves (see
+ * {@link CONFLUENCE_MIN_BARS}): below it the catalogue is incomplete and nothing is newly lit.
+ */
+export function readSignalFreshness(
+    bars: readonly Bar[],
+    current: readonly Signal[]
+): SignalFreshness {
+    const prevBars = bars.slice(0, -1);
+    const previous = detectSignals(prevBars, calculateIndicators(prevBars));
+    const bullish = typesOf(current, 'bullish');
+    const bearish = typesOf(current, 'bearish');
+    const prevBullish = new Set(typesOf(previous, 'bullish'));
+    const prevBearish = new Set(typesOf(previous, 'bearish'));
+    return {
+        bullish,
+        bearish,
+        freshBullish: bullish.filter(t => !prevBullish.has(t)),
+        freshBearish: bearish.filter(t => !prevBearish.has(t)),
+    };
 }
 
 /**
@@ -468,19 +509,12 @@ export function evaluateConfluence(
     if (!last || !Number.isFinite(last.close) || last.close <= 0) return null;
 
     const mutable = bars as Bar[];
-    const current = detectSignals(mutable, calculateIndicators(mutable));
-    // Core evaluates only the tail of the array it is given, so there is no "state at
-    // bar N−1" to read out of a single call — recomputing on the truncated array is the
-    // only way to obtain it, and that diff is what "newly lit" means.
-    const prevBars = mutable.slice(0, -1);
-    const previous = detectSignals(prevBars, calculateIndicators(prevBars));
-
-    const bullish = typesOf(current, 'bullish');
-    const bearish = typesOf(current, 'bearish');
-    const prevBullish = new Set(typesOf(previous, 'bullish'));
-    const prevBearish = new Set(typesOf(previous, 'bearish'));
-    const freshBullish = bullish.filter(t => !prevBullish.has(t));
-    const freshBearish = bearish.filter(t => !prevBearish.has(t));
+    const { bullish, bearish, freshBullish, freshBearish } =
+        options.freshness ??
+        readSignalFreshness(
+            mutable,
+            detectSignals(mutable, calculateIndicators(mutable))
+        );
 
     const ma = trailingMa(mutable, maPeriod);
 

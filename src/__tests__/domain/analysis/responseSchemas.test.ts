@@ -17,7 +17,6 @@ import type {
     ActionRecommendation,
     AnalysisResponse,
     AnalysisSignal,
-    AnalysisSignalType,
     CandlePatternSummary,
     ChartDisplayType,
     EntryRecommendation,
@@ -48,7 +47,6 @@ import type {
     PriceTargets,
     RiskLevel,
     ResponseJsonSchema,
-    SignalStrength,
     StrategyResult,
     Trend,
     Trendline,
@@ -195,14 +193,6 @@ const RISK_LEVEL_VALUES = Object.keys({
     medium: true,
     high: true,
 } satisfies Record<RiskLevel, true>).toSorted();
-const SIGNAL_TYPE_VALUES = Object.keys({
-    skill: true,
-} satisfies Record<AnalysisSignalType, true>).toSorted();
-const SIGNAL_STRENGTH_VALUES = Object.keys({
-    strong: true,
-    moderate: true,
-    weak: true,
-} satisfies Record<SignalStrength, true>).toSorted();
 const CHART_DISPLAY_TYPE_VALUES = Object.keys({
     line: true,
     marker: true,
@@ -539,7 +529,9 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
     // Each nested fixture is typed as its full interface and supplies every
     // OPTIONAL field too, so the schema must model those keys (nullable under
     // strict mode) or the key-set comparisons below fail.
-    const signalSample: Required<AnalysisSignal> = {
+    // `reading` and `StrategyResult.cycle` are written by core (the cards it computes),
+    // never by the model, and `indicatorResults` is not in the schema at all.
+    const signalSample: Omit<Required<AnalysisSignal>, 'reading'> = {
         type: 'skill',
         description: '설명',
         strength: 'strong',
@@ -588,7 +580,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             invalidationLevel: 155,
         },
     };
-    const strategySample: Required<StrategyResult> = {
+    const strategySample: Omit<Required<StrategyResult>, 'cycle'> = {
         id: 's1',
         strategyName: 'trend-follow',
         trend: 'bullish',
@@ -665,6 +657,8 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
                 key !== 'dataAsOf' &&
                 // Computed by core from the bars (`computeAnalysisTrend`), never asked of the model.
                 key !== 'trendBasis' &&
+                // Built by core from the prompt's own lines (`buildIndicatorCards`), not asked of the model.
+                key !== 'indicatorResults' &&
                 key !== 'chartOverlays' &&
                 key !== 'trendlines'
         )
@@ -689,27 +683,13 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         );
     });
 
-    it('nested indicatorResults + signals schemas match their interfaces', () => {
-        const indicator = nestedItems(
-            TECHNICAL_RESPONSE_SCHEMA,
+    it('does not ask the model for indicatorResults: core builds the cards', () => {
+        expect(propertyKeys(TECHNICAL_RESPONSE_SCHEMA)).not.toContain(
             'indicatorResults'
         );
-        expect(sortedRequired(indicator)).toEqual(sortedKeys(indicatorSample));
-        expect(propertyKeys(indicator)).toEqual(sortedKeys(indicatorSample));
-        expect(indicator.additionalProperties).toBe(false);
-
-        const signal = nestedItems(indicator, 'signals');
-        expect(sortedRequired(signal)).toEqual(sortedKeys(signalSample));
-        expect(propertyKeys(signal)).toEqual(sortedKeys(signalSample));
-        expect(signal.additionalProperties).toBe(false);
-        expect(nestedEnumValues(signal, 'type')).toEqual(SIGNAL_TYPE_VALUES);
-        // optional strength → nullable string enum: enum must include null so it
-        // matches the nullable type, with the non-null values equal to the union.
-        const strengthEnum = nullableEnumValues(signal, 'strength');
-        expect(strengthEnum.includesNull).toBe(true);
-        expect(strengthEnum.values).toEqual(SIGNAL_STRENGTH_VALUES);
-        expect(nestedEnumValues(signal, 'trend')).toEqual(TREND_VALUES);
-        expect(propType(signal, 'strength')).toEqual(['null', 'string']);
+        expect(sortedRequired(TECHNICAL_RESPONSE_SCHEMA)).not.toContain(
+            'indicatorResults'
+        );
     });
 
     it('nested keyLevels schema matches the interface (poc nullable)', () => {

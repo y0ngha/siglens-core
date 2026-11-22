@@ -27,6 +27,8 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternGeometries: new Map(),
         trend: null,
         injectedSkills: [],
+        indicatorCards: [],
+        cycleCards: [],
     })),
 }));
 vi.mock('@/domain/analysis/priceProvenance', async importOriginal => {

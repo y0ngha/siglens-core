@@ -28,6 +28,8 @@ vi.mock('@/domain/analysis/prompt', () => ({
         trend: null,
         printedSupportPrices: [],
         injectedSkills: [],
+        indicatorCards: [],
+        cycleCards: [],
     })),
 }));
 vi.mock('@/domain/indicators/fearGreed', async () => ({
@@ -498,6 +500,8 @@ describe('runAnalysis', () => {
                 trend,
                 printedSupportPrices: [],
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
 
             it("overwrites the model's trend with the computed one and attaches trendBasis", async () => {
@@ -723,6 +727,9 @@ describe('runAnalysis', () => {
                 stable: 'mock-stable',
                 dynamic: providerArgs.prompt,
                 promptVersion: PROMPT_TEMPLATE_VERSION,
+                // The cards code built for this prompt travel with the record.
+                indicatorCards: [],
+                cycleCards: [],
             });
         });
 
@@ -917,6 +924,8 @@ describe('runAnalysis', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: injected,
+                indicatorCards: [],
+                cycleCards: [],
             });
             mockEnrichAnalysisWithConfidence.mockClear();
 
@@ -942,6 +951,8 @@ describe('runAnalysis', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: injected,
+                indicatorCards: [],
+                cycleCards: [],
             });
             mockEnrichAnalysisWithConfidence.mockClear();
 
@@ -1975,6 +1986,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
 
             await runAnalysis(
@@ -2023,6 +2036,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
             const reconciledWithCandidate: AnalysisResponse = {
                 ...mockRawResult,
@@ -2093,6 +2108,9 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map([[overlayCandidate.id, printed]]),
                 trend: null,
+                injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
             const enrichedWithMiscopy: AnalysisResponse = {
                 ...mockRawResult,
@@ -2151,6 +2169,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
             mockCallAnalysisAi.mockResolvedValueOnce(
                 JSON.stringify(mockRawResult)
@@ -2166,7 +2186,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             expect(mockEnrichAnalysisWithConfidence).toHaveBeenCalledWith(
                 expect.anything(),
                 expect.anything(),
-                ['Cup Guide']
+                ['Cup Guide'],
+                { withoutModelCards: true }
             );
         });
 
@@ -2182,6 +2203,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
             const reconciledWithUnknownId: AnalysisResponse = {
                 ...mockRawResult,
@@ -2252,6 +2275,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
             const citedByStrategy: AnalysisResponse = {
                 ...mockRawResult,
@@ -2321,6 +2346,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 trend: null,
                 printedSupportPrices: printed,
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
             await runAnalysis(
                 mockSymbol,
@@ -2405,6 +2432,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 trend: null,
                 printedSupportPrices: [],
                 injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             });
             const warnSpy = vi
                 .spyOn(console, 'warn')
@@ -2436,6 +2465,9 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
                 trend: null,
+                injectedSkills: [],
+                indicatorCards: [],
+                cycleCards: [],
             };
 
             it('pattern screening failed 경고에 symbol·timeframe·error를 남긴다', async () => {
@@ -2517,6 +2549,9 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                     },
                     patternGeometries: new Map(),
                     trend: null,
+                    injectedSkills: [],
+                    indicatorCards: [],
+                    cycleCards: [],
                 });
                 const infoSpy = vi
                     .spyOn(console, 'info')

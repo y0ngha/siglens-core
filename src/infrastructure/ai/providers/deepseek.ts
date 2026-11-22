@@ -135,11 +135,13 @@ export interface DeepSeekCallOptions {
      * 스키마가 있으면 그쪽으로 라우팅한다 ({@link callDeepSeekResponses}).
      *
      * 강제하지 않을 때의 피해: 아주 긴 기술 분석 프롬프트에서
-     * `indicatorResults[].signals`와 `patternSummaries`가 **전부 빈 배열**로
-     * 돌아왔다. 같은 프롬프트를 gemini는 정상적으로 채웠고, DeepSeek도 짧은
-     * 프롬프트에서는 정상 생성한다 — 모델 능력이 아니라 긴 프롬프트에서
-     * 지시를 놓치는 문제이고, 스키마 강제가 그것을 막는다. 같은 프롬프트에서
-     * `json_object`는 신호가 비었고 `json_schema`는 신호가 채워졌다.
+     * 신호 카드 배열(당시 `indicatorResults[].signals`)과 `patternSummaries`가
+     * **전부 빈 배열**로 돌아왔다. 같은 프롬프트를 gemini는 정상적으로 채웠고,
+     * DeepSeek도 짧은 프롬프트에서는 정상 생성한다 — 모델 능력이 아니라 긴
+     * 프롬프트에서 지시를 놓치는 문제이고, 스키마 강제가 그것을 막는다. 같은
+     * 프롬프트에서 `json_object`는 신호가 비었고 `json_schema`는 신호가 채워졌다.
+     * (`indicatorResults`는 이제 모델이 쓰지 않는다: 코드가 카드를 만든다. 남은
+     * 배열 필드 `patternSummaries`·`strategyResults`·`candlePatterns`에 같은 이유가 적용된다.)
      */
     responseSchema?: unknown;
     /**

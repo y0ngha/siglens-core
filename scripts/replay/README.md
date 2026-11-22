@@ -444,15 +444,25 @@ npx tsx scripts/replay/analysisFieldsEval.ts --mode output --set <set-dir> --ski
   lines are folded only where a removal joined them; the hash of the plain remainder is
   reported beside it. D1 and D2 are undecided when the catalog has no gated guide of the family. D9 needs the indicator rule
   block and the cycle strategies gone from the prompt and `indicatorResults` gone from the
-  response schema. D5, D6 and D8 read the cards of the assembled prompt (`indicatorCards`,
-  `cycleCards` on the prompt record, core-2 on): one card per injected tagged guide, and per kind with a
-  reader (`ma`, `ema`, `adx`, `atr`, `obv`, `volume_profile`, `stochastic`, `stoch_rsi`,
-  `williams_r`, `buy_sell_volume`) values that are printed on the kind's own lines and the state
-  recomputed from them, then the cycle stage against the printed line and its history
-  recomputed from the closes of the bars the prompt saw. They are `null` ("core without
-  cards") while the catalog has no `computed_card` tag, and D6 is `null` while a card is of a
-  kind without a reader: add the reader to `analysisFieldsEvalCards.ts` rather than reading
-  the card as its own reference. The cycle history (the orchestrator's decision): window = the
+  response schema. D5, D6 and D8 read the cards of the assembled prompt record
+  (`AssembledPromptRecord.indicatorCards` and `cycleCards`, typed `@internal` fields that
+  `runAnalysis` hands out; the render reads them typed and `analysisFieldsEvalRender.test.ts`
+  pins the field names): one card per injected tagged guide, and, for each of the 36 indicator
+  kinds, a reader of that kind's own printed lines (`## Indicator Values`, `## Indicator State`,
+  `## Pro-Indicator Agreement`, `## Market Regime & Risk Context`, `## Volume Analysis`, and
+  the `Bullish signals:` / `Bearish signals:` lists for the event kinds) with the instrument's
+  own thresholds: the values are printed numbers (the close comes from `## Analysis Snapshot`),
+  the state is recomputed from them, and the trend is the trend of the printed state. Where the
+  prompt does not print the history a state needs (the previous Force Index sign, the Elder-Ray
+  turn, a Chandelier flip within three bars, a volatility regime against its 20-bar mean) the
+  reading is `partial`: the card's state must be one the printed lines allow, a necessary
+  condition rather than a recomputation, and the number of such cards is reported. D8 reads a
+  cycle card against the printed `- MA cycle` / `- MACD cycle` line (stage, printed values, the
+  MA order), the stage history recomputed from the closes of the bars the prompt saw, and the
+  set of cards against the strategy-block note that names the cycles code builds. They are
+  `null` ("core without cards") while the catalog has no `computed_card` tag, and D6 is `null`
+  while a card is of a kind without a reader: add the reader to `analysisFieldsEvalCards.ts`
+  rather than reading the card as its own reference. The cycle history (the orchestrator's decision): window = the
   last 120 bars by count including the current bar, bars with no stage are ignored (they
   neither end a run nor count as a change), `previousStage` is the stage of the run before
   the current one, `barsInStage` counts the bars of the current run and is `null` when it
@@ -470,7 +480,9 @@ npx tsx scripts/replay/analysisFieldsEval.ts --mode output --set <set-dir> --ski
   differs from the before run is accepted only when every prompt hash matches. D7 reads the
   before run's per-card trends against the rule of the skill's kind (`computed_card` tag,
   else the core-0 baseline names) on its stored prompt lines; a skill with at least 30
-  readings and more than 5% opposite maps to `neutral` before the live run. A tagged kind
+  readings and more than 5% opposite maps to `neutral` before the live run (applied, in core
+  and in the instrument's `NEUTRAL_AFTER_D7`, to stochastic, stoch_rsi, williams_r, bollinger,
+  macd_v, elder_ray and chandelier after the member run `2026-11-22-wp15-c2-after2`). A tagged kind
   without a trend rule makes D7 undecided. O1, O2, L1, L2 and V1 to V5 are undecided when
   fewer than 90% of the cases are paired. An unknown run tier is an error. `proseSample` lists the 40 cases the manual prose read (P)
   takes. Both modes: gates `D1`, `D2`, `D3`, `D5`, `D6`, `D8`, `D9` and `D7`, `O1`, `O2`, `F1`, `F2`, `L1`, `L2`,

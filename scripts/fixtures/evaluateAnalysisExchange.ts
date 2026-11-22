@@ -102,6 +102,9 @@ export function evaluateAnalysisExchange(
         // The stop floor snaps to a support the stored prompt printed; the fixture keeps
         // that prompt, so the candidates are read back from its text.
         stopCandidates: parsePromptSupportPrices(fixture.dynamic),
+        // The fixture stores the model's reply only; the cards code builds are not part of it.
+        computedIndicatorResults: [],
+        computedStrategyResults: [],
         currency: 'USD',
     });
     return {

@@ -38,6 +38,8 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternGeometries: new Map(),
         trend: null,
         injectedSkills: [],
+        indicatorCards: [],
+        cycleCards: [],
     })),
 }));
 

@@ -12,6 +12,11 @@ import type {
     SkillTier,
 } from '../../../../scripts/replay/analysisFieldsEvalSkills';
 import { sha256Hex } from '../../../../scripts/replay/fsUtil';
+import type {
+    IndicatorGuideResult,
+    IndicatorReading,
+    RawStrategyResult,
+} from '@/domain/types';
 import { withoutGuideParts } from '../../../../scripts/replay/analysisFieldsEvalPrompt';
 import {
     CANDLE_GUIDE_DOJI,
@@ -447,32 +452,36 @@ describe('gate D6 for a kind without a reader', () => {
     const tagged: readonly CatalogSkill[] = [
         ...CATALOG,
         {
-            name: 'RSI Signal Guide',
+            name: 'Mystery Signal Guide',
             group: 'indicator_guide',
             alwaysOn: false,
             injected: true,
-            computedCard: 'rsi',
+            computedCard: 'mystery',
         },
     ];
-    const d6 = (valueOk: boolean) => {
+    const d6 = (kind: string) => {
         const { summary } = summarizeGating(
             input(
                 [
                     {
                         ...sample('member', {}),
-                        stable: `${STABLE}### RSI Signal Guide [High Confidence]\nbody\n`,
+                        stable: `${STABLE}### Mystery Signal Guide [High Confidence]\nbody\n`,
                         cards: {
                             indicator: [
                                 {
-                                    indicatorName: 'RSI Signal Guide',
+                                    indicatorName: 'Mystery Signal Guide',
                                     signals: [
                                         {
+                                            type: 'skill',
+                                            description: 'x',
                                             trend: 'bullish',
                                             reading: {
-                                                kind: valueOk ? 'rsi' : 'macd',
+                                                kind,
+                                                basis: 'event',
                                                 state: 'rsi_oversold',
                                                 values: { rsi: 28 },
-                                            },
+                                                signals: [],
+                                            } as unknown as IndicatorReading,
                                         },
                                     ],
                                 },
@@ -489,14 +498,14 @@ describe('gate D6 for a kind without a reader', () => {
     };
 
     it('is undecided, naming the readers, rather than passing', () => {
-        const g = d6(true);
+        const g = d6('mystery');
         expect(g?.pass).toBeNull();
         expect(g?.value).toContain('without a reader 1 of 1');
-        expect(g?.value).toContain('readers: ma, ema, adx');
+        expect(g?.value).toContain('readers: 36 kinds');
     });
 
     it('still fails on a mismatch the instrument can see', () => {
-        expect(d6(false)?.pass).toBe(false);
+        expect(d6('rsi')?.pass).toBe(false);
     });
 });
 
@@ -522,25 +531,46 @@ describe('the card gates', () => {
         '- MA: MA(5): 10 / MA(20): 20',
         '- MA stack: mixed (x)',
         '- MACD cycle (EMA9/21/60): upper (EMA9−EMA21) 1, middle (EMA9−EMA60) 1, lower (EMA21−EMA60) 1; stage 4',
+        '- The MACD cycle card is built by code from the `- MACD cycle` line of ## Indicator State; do not add a strategyResults entry for it.',
     ];
     const closes = Array.from({ length: 300 }, (_, i) => 900 - i);
-    const withCards = (indicator: unknown, cycle: unknown): PromptSample => ({
+    const withCards = (
+        indicator: readonly IndicatorGuideResult[],
+        cycle: readonly RawStrategyResult[]
+    ): PromptSample => ({
         ...sample('member', { stateLines }),
         stable: `${STABLE}### MA Signal Guide [High Confidence]\nbody\n`,
         cards: { indicator, cycle },
     });
-    const maCard = {
+    const maReading: IndicatorReading = {
+        kind: 'ma',
+        basis: 'always_on',
+        state: 'mixed',
+        values: {
+            close: null,
+            ma5: 10,
+            ma20: 20,
+            ma60: null,
+            ma120: null,
+            ma200: null,
+        },
+        signals: [],
+    };
+    const maCard: IndicatorGuideResult = {
         indicatorName: 'MA Signal Guide',
         signals: [
             {
+                type: 'skill',
+                description: 'MA Signal Guide: mixed.',
                 trend: 'neutral',
-                reading: { kind: 'ma', state: 'mixed', values: { ma5: 10 } },
+                reading: maReading,
             },
         ],
     };
-    const cycleCard = {
+    const cycleCard: RawStrategyResult = {
         strategyName: 'MACD 대순환 분석',
         trend: 'bearish',
+        summary: 'MACD cycle: stage 4',
         cycle: {
             kind: 'macd_cycle',
             stage: 4,
@@ -548,6 +578,8 @@ describe('the card gates', () => {
             barsInStage: null,
             progression: null,
             stageChanges: 0,
+            values: { upper: 1, middle: 1, lower: 1 },
+            slopes: { ema9: null, ema21: null, ema60: null },
         },
     };
     const gates = (s: PromptSample) => {
@@ -586,22 +618,19 @@ describe('the card gates', () => {
 
     it('fails D5 for a missing card, D6 for a wrong state and D8 for a wrong stage', () => {
         expect(gates(withCards([], [cycleCard])).D5.pass).toBe(false);
-        const wrongState = {
+        const wrongState: IndicatorGuideResult = {
             ...maCard,
             signals: [
                 {
                     ...maCard.signals[0],
-                    reading: {
-                        ...maCard.signals[0].reading,
-                        state: 'bullish_stack',
-                    },
+                    reading: { ...maReading, state: 'bullish_stack' },
                 },
             ],
         };
         expect(gates(withCards([wrongState], [cycleCard])).D6.pass).toBe(false);
-        const wrongStage = {
+        const wrongStage: RawStrategyResult = {
             ...cycleCard,
-            cycle: { ...cycleCard.cycle, stage: 3 },
+            cycle: cycleCard.cycle && { ...cycleCard.cycle, stage: 3 },
         };
         expect(gates(withCards([maCard], [wrongStage])).D8.pass).toBe(false);
     });

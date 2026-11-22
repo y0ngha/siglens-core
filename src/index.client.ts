@@ -362,6 +362,9 @@ export {
     STRATEGY_KIND_SOURCE_REF,
     STRATEGY_OVERLAY_KINDS,
 } from './domain/overlays/constants';
+// Computed cards (WP-16): the `computed_card` values a skill's frontmatter may take, for the
+// siglens catalog validator (a Tier 4 constant, its own block per PUBLIC_API.md#API-7).
+export { COMPUTED_CARD_KINDS } from './domain/analysis/computedCardKinds';
 export {
     extractReconciledActionLines,
     validateActionPrices,
@@ -735,6 +738,20 @@ export type {
     Trendline,
     TrendlineDirection,
     TrendlinePoint,
+    // Computed cards (WP-16) — the structured readings of indicator and cycle cards.
+    IndicatorCardKind,
+    CycleCardKind,
+    ComputedCardKind,
+    IndicatorCardBasis,
+    IndicatorCardStates,
+    IndicatorCardValues,
+    IndicatorCardExtras,
+    IndicatorCardSignal,
+    IndicatorReading,
+    CycleStage,
+    CycleLineSlope,
+    CycleReading,
+    RawStrategyResult,
     // Chart overlays — logic-drawn coordinates the model selects by id.
     ChartOverlay,
     OverlayKind,

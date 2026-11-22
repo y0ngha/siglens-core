@@ -866,6 +866,16 @@ export interface Skill {
      * nothing under its own card.
      */
     overlayKind?: StrategyOverlayKind;
+    /**
+     * The card kind core builds for this skill in code (`computed_card`
+     * frontmatter): an `indicator_guide` gets one {@link IndicatorGuideResult}
+     * per prompt that injects it, `ma-cycle` / `macd-cycle` a {@link StrategyResult}
+     * with a {@link CycleReading}. An unknown value is dropped, so the skill
+     * then has no card (the siglens catalog validator fails the build first).
+     * It joins the catalog fingerprint: a tag edit changes the prompt and the
+     * card output.
+     */
+    computedCard?: ComputedCardKind;
 }
 
 /**
@@ -986,6 +996,14 @@ export interface SkillSelectionContext {
     indicators: IndicatorResult;
     /** Result of {@link detectSignals} — drives the event gating path. */
     signals: readonly Signal[];
+    /**
+     * The types in {@link SkillSelectionContext.signals} that were not detected on the previous
+     * bar: the `Newly lit on this bar` set of the prompt, read once for the printed lines and
+     * the cards. An event card puts these first and reads its trend from them alone. Omitted
+     * (too few bars for the confluence section, or a hand-built context), no signal counts as
+     * newly lit and a card keeps detection order.
+     */
+    newSignalTypes?: readonly string[];
     /** Timeframe of the analyzed bars; drives TF-aware thresholds. */
     timeframe: Timeframe;
     /**
@@ -1010,6 +1028,18 @@ export interface SkillSelectionContext {
     price: number;
     /** ATR as a percent of price (`ATR / price * 100`) for ATR-extreme promotion. */
     atrPercent: number;
+    /**
+     * The precision the prompt prints its price-axis figures and price differences at. When
+     * given, the band, VWAP and Bollinger state predicates decide on the figures as printed
+     * (the price, the band edges, VWAP and ATR rounded to it), so a recomputation from the
+     * prompt text reaches the same state and the card built for the skill cannot disagree
+     * with a line the model reads. Omitted (a chartless prompt, a caller with no prompt), they
+     * decide on the unrounded values.
+     */
+    print?: {
+        readonly quoting: PriceQuoting;
+        readonly differenceDp: number;
+    };
 }
 
 /** Lightweight skill summary used for showcase / listing UIs. */
@@ -1201,20 +1231,206 @@ export type CrossDirection = 'up' | 'down';
  */
 export type RiskLevel = 'low' | 'medium' | 'high';
 
+// ─── Computed cards (WP-16) ──────────────────────────────────────────────────
+
+/**
+ * The indicator guides core builds a card for (`computed_card` frontmatter of an
+ * `indicator_guide` skill), one per kind. Listed once in {@link COMPUTED_CARD_KINDS}
+ * order: always-on kinds, event kinds, then state kinds.
+ */
+export type IndicatorCardKind =
+    | 'ma'
+    | 'ema'
+    | 'adx'
+    | 'atr'
+    | 'obv'
+    | 'volume_profile'
+    | 'rsi'
+    | 'macd'
+    | 'cci'
+    | 'cmf'
+    | 'dmi'
+    | 'ichimoku'
+    | 'mfi'
+    | 'parabolic_sar'
+    | 'squeeze_momentum'
+    | 'supertrend'
+    | 'bollinger_percent_b'
+    | 'stochastic'
+    | 'stoch_rsi'
+    | 'williams_r'
+    | 'connors_rsi'
+    | 'bollinger'
+    | 'keltner'
+    | 'donchian'
+    | 'vwap'
+    | 'buy_sell_volume'
+    | 'macd_v'
+    | 'force_index'
+    | 'elder_ray'
+    | 'elder_impulse'
+    | 'chandelier'
+    | 'hurst'
+    | 'variance_ratio'
+    | 'regression'
+    | 'yang_zhang'
+    | 'ewma';
+
+/** The strategy skills core builds a card for (`computed_card` of a `strategy` skill). */
+export type CycleCardKind = 'ma_cycle' | 'macd_cycle';
+
+/** Every value `computed_card` frontmatter may take. */
+export type ComputedCardKind = IndicatorCardKind | CycleCardKind;
+
+/**
+ * Where an indicator card's state comes from: `always_on` guides are read on every chart,
+ * `event` guides fire on detected signals, `state` guides on a textbook extreme.
+ */
+export type IndicatorCardBasis = 'always_on' | 'event' | 'state';
+
+/** The states an indicator card of each kind takes. */
+export interface IndicatorCardStates {
+    ma: 'bullish_stack' | 'bearish_stack' | 'mixed';
+    ema: 'bullish_stack' | 'bearish_stack' | 'mixed';
+    adx: 'trending' | 'between' | 'weak';
+    atr: 'rising' | 'falling' | 'flat';
+    obv: 'rising' | 'falling' | 'flat';
+    volume_profile:
+        'above_value_area' | 'inside_value_area' | 'below_value_area';
+    rsi: SignalType;
+    macd: SignalType;
+    cci: SignalType;
+    cmf: SignalType;
+    dmi: SignalType;
+    ichimoku: SignalType;
+    mfi: SignalType;
+    parabolic_sar: SignalType;
+    squeeze_momentum: SignalType;
+    supertrend: SignalType;
+    bollinger_percent_b: SignalType;
+    stochastic: 'overbought' | 'oversold';
+    stoch_rsi: 'overbought' | 'oversold';
+    williams_r: 'overbought' | 'oversold';
+    connors_rsi: 'overbought' | 'oversold';
+    bollinger: 'above_band_pctb' | 'below_band_pctb';
+    keltner: 'beyond_upper' | 'beyond_lower' | 'near_upper' | 'near_lower';
+    donchian: 'beyond_upper' | 'beyond_lower' | 'near_upper' | 'near_lower';
+    vwap: 'above' | 'below';
+    buy_sell_volume: 'buy_dominant' | 'sell_dominant';
+    macd_v: 'high_positive' | 'high_negative';
+    force_index: 'turned_positive' | 'turned_negative';
+    elder_ray: 'bear_power_rising' | 'bull_power_falling' | 'both';
+    elder_impulse: 'green' | 'red' | 'blue';
+    chandelier: 'flipped_long' | 'flipped_short';
+    hurst: 'trending' | 'mean_reverting';
+    variance_ratio: 'trending' | 'mean_reverting';
+    regression: 'strong_fit_up' | 'strong_fit_down';
+    yang_zhang: 'high_volatility' | 'low_volatility';
+    ewma: 'high_volatility' | 'low_volatility';
+}
+
+/**
+ * The value keys of an indicator card of each kind. A value is the number the prompt printed
+ * for it (the price axis at the quoted precision, `fmt` figures at two decimals, volumes as
+ * integers, percentages in percent units), `null` only when the section printed `N/A`.
+ */
+export interface IndicatorCardValues {
+    ma: 'close' | 'ma5' | 'ma20' | 'ma60' | 'ma120' | 'ma200';
+    ema: 'ema9' | 'ema20' | 'ema21' | 'ema60';
+    adx: 'adx' | 'diPlus' | 'diMinus';
+    atr: 'atr' | 'atrPercent';
+    obv: 'obv';
+    volume_profile: 'close' | 'poc' | 'vah' | 'val' | 'bars';
+    rsi: 'rsi';
+    macd: 'macd' | 'signal' | 'histogram';
+    cci: 'cci';
+    cmf: 'cmf';
+    dmi: 'diPlus' | 'diMinus' | 'adx';
+    ichimoku: 'tenkan' | 'kijun' | 'senkouA' | 'senkouB';
+    mfi: 'mfi';
+    parabolic_sar: 'sar';
+    squeeze_momentum: 'momentum';
+    supertrend: 'supertrend';
+    bollinger_percent_b: 'pctB';
+    stochastic: 'percentK' | 'percentD';
+    stoch_rsi: 'k' | 'd';
+    williams_r: 'williamsR';
+    connors_rsi: 'crsi';
+    bollinger: 'close' | 'upper' | 'lower' | 'pctB';
+    keltner: 'close' | 'upper' | 'lower' | 'atr';
+    donchian: 'close' | 'upper' | 'lower';
+    vwap: 'close' | 'vwap' | 'atr';
+    buy_sell_volume: 'buyRatio';
+    macd_v: 'macdV';
+    force_index: 'forceIndex';
+    elder_ray: 'bullPower' | 'bearPower';
+    elder_impulse: never;
+    chandelier: 'stop';
+    hurst: 'hurst';
+    variance_ratio: 'varianceRatio';
+    regression: 'r2';
+    yang_zhang: 'sigma';
+    ewma: 'sigma';
+}
+
+/** Fields only some kinds carry on top of the common reading shape. */
+export interface IndicatorCardExtras extends Record<IndicatorCardKind, object> {
+    /** The colour of the previous coloured bar when the impulse flipped to the current one, else `null`. */
+    elder_impulse: { readonly flippedFrom: ImpulseColor | null };
+}
+
+/** One fired signal of an event card. */
+export interface IndicatorCardSignal {
+    readonly type: SignalType;
+    readonly phase: SignalPhase;
+    /** Bars between the signal's bar and the last bar (0 = the last bar). */
+    readonly barsAgo: number;
+}
+
+/**
+ * What an indicator card says, as data: the kind, how the state was reached, the state, the
+ * printed values it rests on and the signals that fired. `IndicatorReading` is the union over
+ * kinds, so a renderer's `switch (reading.kind)` is exhaustive.
+ */
+export type IndicatorReading = {
+    [K in IndicatorCardKind]: {
+        readonly kind: K;
+        readonly basis: IndicatorCardBasis;
+        /** Event cards: the first fired signal's type; `signals` carries all of them. */
+        readonly state: IndicatorCardStates[K];
+        /** As printed in the prompt (its precision); `null` only for a value the section printed as N/A. */
+        readonly values: Readonly<
+            Record<IndicatorCardValues[K], number | null>
+        >;
+        readonly signals: readonly IndicatorCardSignal[];
+    } & IndicatorCardExtras[K];
+}[IndicatorCardKind];
+
 /** A single AI-derived signal entry inside an indicator-guide result. */
 export interface AnalysisSignal {
     /** Signal source — currently always `'skill'`. */
     type: AnalysisSignalType;
-    /** Korean explanation including the indicator name + numeric condition. */
+    /**
+     * Korean explanation including the indicator name + numeric condition. A card core computed
+     * carries an English canonical fact line instead (it feeds the agent, the legacy chat prompt
+     * and API users); render {@link AnalysisSignal.reading} in the reader's language.
+     */
     description: string;
-    /** Signal strength assigned by the AI analyst. */
+    /** Signal strength: the AI analyst's, or the code rule's for RSI, Stochastic and CCI cards. */
     strength?: SignalStrength;
     /** Directional bias of the signal. */
     trend: Trend;
+    /**
+     * The structured reading behind a card core computed. Absent on a signal the model wrote
+     * and on results cached before the field existed (those carry a Korean `description`).
+     */
+    reading?: IndicatorReading;
 }
 
 /**
- * AI interpretation of a single indicator-guide skill.
+ * An indicator-guide card: core builds one per injected `indicator_guide` skill that carries a
+ * `computed_card` tag (the model no longer writes them), with a single signal that holds the
+ * reading.
  */
 export interface IndicatorGuideResult {
     /** Skill name (matches a loaded indicator-guide skill verbatim). */
@@ -1690,6 +1906,142 @@ export interface StrategyResult {
      * index 1 the alternate.
      */
     candidateIds?: string[];
+    /**
+     * The structured reading of a cycle card core computed (`ma-cycle`, `macd-cycle`);
+     * `summary` is then an English canonical line and this is what to render. Absent on every
+     * other strategy card and on results cached before the field existed.
+     */
+    cycle?: CycleReading;
+}
+
+/** The six stages of a moving-average or MACD cycle (1 = all lines rising, 4 = all falling). */
+export type CycleStage = 1 | 2 | 3 | 4 | 5 | 6;
+
+/** Which way a cycle line moved over the prompt's trend sample; `null` when it cannot be told. */
+export type CycleLineSlope = 'rising' | 'falling' | 'flat' | null;
+
+/**
+ * A cycle card's facts. `stage` is the stage the prompt printed on its `- MA cycle` /
+ * `- MACD cycle` line, the history is read from the same per-bar stage series over the last
+ * `CYCLE_LOOKBACK_BARS` bars (the current bar included): a bar with no stage (a transition)
+ * neither ends a run nor counts as a change.
+ */
+export interface CycleReading {
+    readonly kind: CycleCardKind;
+    readonly stage: CycleStage;
+    /** The stage of the run before the current one within the window, or `null`. */
+    readonly previousStage: CycleStage | null;
+    /** Bars with a stage in the current run; `null` when the run reaches the first bar of the window (or of the series). */
+    readonly barsInStage: number | null;
+    /** previous → current is the next step of 1→2→…→6→1 (`'forward'`), the previous step (`'reverse'`), else `null`. */
+    readonly progression: 'forward' | 'reverse' | null;
+    /** Changes between consecutive stages inside the window (no verdict attached). */
+    readonly stageChanges: number;
+    /**
+     * As printed: `ma_cycle` — `ma5`, `ma20`, `ma60` (price axis); `macd_cycle` — `upper`
+     * (EMA9−EMA21), `middle` (EMA9−EMA60), `lower` (EMA21−EMA60) at the difference precision.
+     */
+    readonly values: Readonly<Record<string, number>>;
+    /** `ma_cycle` only: the three lines from highest to lowest. */
+    readonly order?: readonly ('short' | 'medium' | 'long')[];
+    /** Direction of each line over the prompt's trend sample (`ma5`/`ma20`/`ma60`, `ema9`/`ema21`/`ema60`). */
+    readonly slopes: Readonly<Record<string, CycleLineSlope>>;
+}
+
+// ─── Computed-card internals (WP-16) ─────────────────────────────────────────
+
+/** @internal How the prompt printed the figures an indicator card repeats. */
+export interface IndicatorPrintContext {
+    /** The price axis: bars, bands, averages, stops. */
+    readonly quoting: PriceQuoting;
+    /** Decimals of a difference of prices (MACD, ATR, momentum, Elder-Ray). */
+    readonly differenceDp: number;
+    /** The prompt's trend sample (`config.trendSampleCount`) behind the `[rising]` tags. */
+    readonly trendSampleCount: number;
+    /** Bars the prompt was built from; the age of a signal is counted against the last one. */
+    readonly barCount: number;
+}
+
+/** @internal What an indicator reader works from: the selection context the gates read, plus the print settings. */
+export interface IndicatorReadInput {
+    readonly selection: SkillSelectionContext;
+    readonly print: IndicatorPrintContext;
+}
+
+/** @internal The reading of one indicator kind. */
+export type ReadingOf<K extends IndicatorCardKind> = Extract<
+    IndicatorReading,
+    { kind: K }
+>;
+
+/** @internal A notable state and the values it was decided on (see `readIndicatorState`). */
+export interface StateRead<S extends string, V extends string> {
+    readonly state: S;
+    readonly raw: Readonly<Record<V, number | null>>;
+}
+
+/** @internal What `readIndicatorState` returns for any feature: the state it found. */
+export interface IndicatorStateRead {
+    readonly state: string;
+}
+
+/** @internal The signals an event guide listens to that fired: the first one's type is the card's state. */
+export interface FiredSignals {
+    readonly state: SignalType;
+    readonly signals: IndicatorCardSignal[];
+}
+
+/** @internal A volatility series in a regime extreme: its latest read and which extreme. */
+export interface VolRegimeRead {
+    readonly latest: number;
+    readonly state: 'high_volatility' | 'low_volatility';
+}
+
+/** @internal How a prompt prints the numbers a cycle card repeats. */
+export interface CyclePrintContext {
+    /** The price axis (the `- MA:` line). */
+    readonly quoting: PriceQuoting;
+    /** Decimals of a difference of prices (the `- MACD cycle` line). */
+    readonly differenceDp: number;
+    /** The prompt's trend sample (`config.trendSampleCount`) for the line slopes. */
+    readonly trendSampleCount: number;
+}
+
+/** @internal The history fields of a {@link CycleReading}. */
+export interface CycleHistory {
+    readonly previousStage: CycleStage | null;
+    readonly barsInStage: number | null;
+    readonly progression: 'forward' | 'reverse' | null;
+    readonly stageChanges: number;
+}
+
+/** @internal One of the three lines of the MA cycle. */
+export type MaCycleRole = 'short' | 'medium' | 'long';
+
+/** @internal The MA cycle at one bar: the three lines from highest to lowest and the stage that order gives. */
+export interface MaCycleStage {
+    readonly stage: CycleStage;
+    readonly order: readonly MaCycleRole[];
+}
+
+/** @internal Options of `enrichAnalysisWithConfidence`. */
+export interface EnrichOptions {
+    /**
+     * Drop the model's `indicatorResults` and every strategy entry whose skill carries a
+     * `computed_card` tag: core computes those cards (`attachComputedCards`) and a model that
+     * still writes them (older schema, a provider that ignores the schema) must not show its
+     * own numbers next to the computed ones (CP-13: a computed field is never trusted from
+     * the model).
+     */
+    readonly withoutModelCards?: boolean;
+}
+
+/** @internal The cards core computed for a prompt (see `attachComputedCards`). */
+export interface ComputedCards {
+    /** `TechnicalAssembledPrompt.indicatorCards`. */
+    readonly indicatorResults: readonly IndicatorGuideResult[];
+    /** `TechnicalAssembledPrompt.cycleCards`. */
+    readonly strategyResults: readonly RawStrategyResult[];
 }
 
 /**
@@ -2205,12 +2557,29 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      */
     printedSupportPrices: readonly number[];
     /**
-     * The skills whose digests this prompt carries: every always-on skill plus the fired
-     * gated skills that survived the tier cap (the SMC full guide is never injected, so it
-     * is absent). The caller enriches the model's output with exactly these, so a skill the
-     * cap left out of the prompt never supplies a confidence weight.
+     * The skills this prompt injects: every always-on skill plus the fired gated skills that
+     * survived the tier cap (the SMC full guide is never injected, so it is absent). A cycle
+     * strategy code builds a card for is among them although its digest is not rendered. The
+     * caller enriches the model's output with exactly these, so a skill the cap left out of
+     * the prompt never supplies a confidence weight.
      */
     injectedSkills: Skill[];
+    /**
+     * @internal
+     * The indicator cards core builds for this prompt: one per injected `indicator_guide` skill
+     * that carries a `computed_card` tag (and whose source line is not `N/A`), in the prompt's
+     * order (always-on name-sorted, then fired by relevance). The caller hands them to
+     * `postProcessRawAnalysis` as `computedIndicatorResults`; the model does not write them.
+     */
+    indicatorCards: readonly IndicatorGuideResult[];
+    /**
+     * @internal
+     * The cycle cards (`ma-cycle`, `macd-cycle`) of the injected strategy skills that carry a
+     * `computed_card` tag and whose stage line is not `N/A`. Their digests are not rendered and
+     * they are not in the strategy list the model answers; the caller hands them to
+     * `postProcessRawAnalysis` as `computedStrategyResults`.
+     */
+    cycleCards: readonly RawStrategyResult[];
 }
 
 /**
@@ -2238,6 +2607,17 @@ export interface AssembledPromptRecord {
     readonly dynamic: string;
     /** Prompt-template generation that produced this text, so stored prompts can be grouped by generation. */
     readonly promptVersion: string;
+    /**
+     * The indicator cards code built for this technical prompt (the `indicatorResults` of the
+     * analysis, before any tier filtering); absent on every other analysis kind. For consumers
+     * that check each card against the prompt text it was built from (the replay instrument).
+     */
+    readonly indicatorCards?: readonly IndicatorGuideResult[];
+    /**
+     * The MA / MACD cycle cards code built for this technical prompt, before `id` and
+     * `confidenceWeight` are attached; absent on every other analysis kind.
+     */
+    readonly cycleCards?: readonly RawStrategyResult[];
 }
 
 /**

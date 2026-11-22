@@ -500,6 +500,8 @@ async function runAnalysisImpl(
         printedSupportPrices,
         injectedSkills,
         patternSkillNames,
+        indicatorCards,
+        cycleCards,
     } = buildAnalysisPrompt(
         symbol,
         companyName,
@@ -585,6 +587,8 @@ async function runAnalysisImpl(
                     stable,
                     dynamic: prompt,
                     promptVersion: PROMPT_TEMPLATE_VERSION,
+                    indicatorCards,
+                    cycleCards,
                 } satisfies AssembledPromptRecord,
                 '[RunAnalysis]'
             );
@@ -630,6 +634,8 @@ async function runAnalysisImpl(
             atr,
             stopCandidates: printedSupportPrices,
             allowedPatternSkills: patternSkillNames,
+            computedIndicatorResults: indicatorCards,
+            computedStrategyResults: cycleCards,
             currency: options.currency,
             locale,
             krxTickTable: options.krxTickTable,

@@ -1342,6 +1342,9 @@ function compareRuns(args: FieldsEvalArgs, set: SetData): RunComparisonData {
     const repeat = repeatRun === null ? null : armCasesOf(repeatRun);
     const comparison = compareArms({
         kindOfSkill,
+        triggersOfSkill: Object.fromEntries(
+            catalog.map(skill => [skill.name, skill.triggers])
+        ),
         taggedKinds: tagged.map(t => t.kind),
         after,
         before,

@@ -16,6 +16,7 @@ import type {
     StrategyOverlayKind,
 } from '@/domain/types';
 import type { SkillsProvider } from '@/domain/ports/skillsProvider';
+import { parseComputedCardKind } from '@/domain/analysis/computedCardKinds';
 import { USAGE_ROLE_ORDER } from '@/domain/analysis/confidenceLevel';
 import { STRATEGY_OVERLAY_KINDS } from '@/domain/overlays/constants';
 import type { LoadSkillsCachedResult } from './types';
@@ -455,6 +456,9 @@ const toSkill = (data: Record<string, unknown>, body: string): Skill => ({
     smcFullGuide: isYamlTrue(data.smc_full_guide),
     usageRoles: parseUsageRoles(data.usage_roles),
     overlayKind: parseOverlayKind(data.overlay_kind),
+    // Unknown values are dropped: the skill then has no card (the siglens validator fails the
+    // build first); `parseComputedCardKind` is the one list the validator checks against.
+    computedCard: parseComputedCardKind(data.computed_card),
 });
 
 /**

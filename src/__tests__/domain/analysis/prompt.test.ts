@@ -21,6 +21,7 @@ import {
     retracementDepthSuffix,
     distanceFromExtreme,
     COMPUTED_SECTIONS_RULES,
+    INDICATOR_CARDS_BUILT_BY_CODE_NOTE,
 } from '@/domain/analysis/prompt';
 import { INDICATOR_STATE_SECTION_HEADER } from '@/domain/analysis/indicatorState';
 import { CHART_PATTERN_CANDIDATES_SECTION_HEADER } from '@/domain/analysis/chartPatternCandidatesSection';
@@ -2013,7 +2014,7 @@ describe('prompt', () => {
             expect(result).not.toMatch(/^\s*"signals":/m);
         });
 
-        it('indicatorResults 필드가 요청에 포함된다', () => {
+        it('indicatorResults는 요청에 없다: 코드가 만들고 응답 스키마에도 없다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -2021,7 +2022,7 @@ describe('prompt', () => {
                 makeIndicators(),
                 []
             );
-            expect(result).toContain('indicatorResults');
+            expect(result).not.toContain('indicatorResults');
         });
 
         it('keyLevels 필드가 요청에 포함된다', () => {
@@ -2959,233 +2960,102 @@ describe('prompt', () => {
         });
     });
 
-    describe('분석 요청 섹션 - Indicator Guide Writing Rules', () => {
-        it('indicator_guide skill이 있을 때 indicatorResults Writing Rules for Indicator Guides 섹션이 포함된다', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).toContain(
-                'indicatorResults Writing Rules for Indicator Guides'
-            );
-        });
-
-        it('indicator_guide skill이 없을 때 indicatorResults Writing Rules for Indicator Guides 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            expect(result).not.toContain(
-                'indicatorResults Writing Rules for Indicator Guides'
-            );
-        });
-
-        it('indicator_guide skill 이름 목록이 분석 요청에 포함된다', () => {
-            const skills = [
-                makeSkill({
-                    type: 'indicator_guide',
-                    name: 'RSI Signal Guide',
-                }),
-                makeSkill({
-                    type: 'indicator_guide',
-                    name: 'MACD Signal Guide',
-                }),
-            ];
-            const result = buildAnalysisPrompt(
+    describe('분석 요청 섹션 - 코드가 만드는 지표 카드', () => {
+        const OLD_RULE_MARKERS = [
+            'indicatorResults Writing Rules for Indicator Guides',
+            'Indicator guide list (use these exact names for indicatorName):',
+            'Each signal\'s `type` MUST be exactly "skill"',
+            'The description field MUST be written in Korean',
+            'Signal strength calibration:',
+            'Signal trend assignment:',
+            'EXACTLY ONE indicator guide',
+            'simply omit that guide from indicatorResults',
+            'name that combination of indicators in the description field',
+        ];
+        const build = (skills: Skill[]) =>
+            buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
                 [],
                 makeIndicators(),
                 skills
             );
-            expect(result).toContain(
-                'Indicator guide list (use these exact names for indicatorName):'
-            );
-            expect(result).toContain('- RSI Signal Guide');
-            expect(result).toContain('- MACD Signal Guide');
+
+        it('card 태그가 붙은 indicator_guide가 주입되면 모델이 쓰지 않는다는 한 줄만 남는다', () => {
+            const result = build([
+                makeSkill({
+                    type: 'indicator_guide',
+                    name: 'RSI Signal Guide',
+                    computedCard: 'rsi',
+                }),
+            ]);
+            expect(result).toContain(INDICATOR_CARDS_BUILT_BY_CODE_NOTE);
+            for (const marker of OLD_RULE_MARKERS) {
+                expect(result).not.toContain(marker);
+            }
+            // The guide's digest stays: it interprets the values in summary and plan.
+            expect(result).toContain('### RSI Signal Guide');
         });
 
-        it('시그널 type을 "skill"로 강제하는 압축 shape guard가 유지된다 (non-forced thinking-Claude 경로 보호)', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+        it('태그가 없는 indicator_guide와 guide가 없는 카탈로그에는 그 줄도 없다', () => {
+            for (const skills of [
+                [
+                    makeSkill({
+                        type: 'indicator_guide',
+                        name: 'RSI Signal Guide',
+                    }),
+                ],
                 [],
-                makeIndicators(),
-                [skill]
-            );
-            // TECHNICAL_RESPONSE_SCHEMA's `signals[].type` (`enum: ['skill']`) is
-            // only API-enforced for forced-tool providers (Gemini/OpenAI/haiku).
-            // The thinking-Claude path (sonnet/opus, tool_choice: auto) is not
-            // schema-enforced, and extractJsonWithRepair fixes JSON syntax only —
-            // not shape — so this compact guard is retained for that path.
-            expect(result).toContain(
-                'Each signal\'s `type` MUST be exactly "skill"'
-            );
-            // The literal JSON entry skeleton (pure schema-restatement, adds no
-            // shape-enforcement beyond the compact guard above) stays gone.
-            expect(result).not.toContain('in the following exact format');
+            ]) {
+                const result = build(skills);
+                expect(result).not.toContain(
+                    INDICATOR_CARDS_BUILT_BY_CODE_NOTE
+                );
+                expect(result).not.toContain('indicatorResults');
+                for (const marker of OLD_RULE_MARKERS) {
+                    expect(result).not.toContain(marker);
+                }
+            }
         });
 
-        it('indicator_guide Writing Rules에 description 필드 작성 형식 지시가 포함된다', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).toContain(
-                'The description field MUST be written in Korean and MUST include the indicator name and specific numeric condition'
-            );
+        it('발화하지 않은 gated 카드 guide는 프롬프트에도, 그 줄에도 없다', () => {
+            const result = build([
+                makeSkill({
+                    type: 'indicator_guide',
+                    name: 'Low Confidence Guide',
+                    computedCard: 'rsi',
+                    gating: {
+                        tier: 'gated',
+                        signalKind: 'event',
+                        triggers: ['rsi_oversold'],
+                    },
+                }),
+            ]);
+            expect(result).not.toContain(INDICATOR_CARDS_BUILT_BY_CODE_NOTE);
+            expect(result).not.toContain('Low Confidence Guide');
         });
 
-        it('indicator_guide Writing Rules는 pattern Writing Rules보다 앞에 위치한다', () => {
-            const indicatorGuideSkill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const patternSkill = makeSkill({
-                type: 'pattern',
-                name: 'Head and Shoulders',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [indicatorGuideSkill, patternSkill]
-            );
-            const indicatorGuideIndex = result.indexOf(
-                'indicatorResults Writing Rules for Indicator Guides'
-            );
-            const patternWritingRulesIndex = result.indexOf(
-                'patternSummaries Writing Rules'
-            );
-            expect(indicatorGuideIndex).toBeLessThan(patternWritingRulesIndex);
-        });
-
-        it('gated-inactive indicator_guide skill은 Writing Rules 목록에 포함되지 않는다', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'Low Confidence Guide',
-                gating: {
-                    tier: 'gated',
-                    signalKind: 'event',
-                    triggers: ['rsi_oversold'],
-                },
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).not.toContain(
-                'indicatorResults Writing Rules for Indicator Guides'
-            );
-            expect(result).not.toContain('- Low Confidence Guide');
-        });
-
-        it('indicator_guide Writing Rules에 indicatorName 비어있음 금지를 명시한다', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).toContain('non-empty string');
-            expect(result).toContain('never use an empty string');
-        });
-
-        it('indicator_guide Writing Rules에 다중 인디케이터 결합을 금지한다', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).toContain('EXACTLY ONE indicator guide');
-            expect(result).toContain('Never combine multiple indicators');
-        });
-
-        it('indicator_guide Writing Rules에 신호가 없으면 entry를 생성하지 않도록 지시한다', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).toContain(
-                'simply omit that guide from indicatorResults'
-            );
-        });
-
-        it('indicator_guide Writing Rules에 signal trend 할당 가이드라인이 포함된다', () => {
-            const skill = makeSkill({
-                type: 'indicator_guide',
-                name: 'RSI Signal Guide',
-            });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
-            expect(result).toContain('Signal trend assignment:');
-            expect(result).toContain('bullish: the indicator signal suggests');
-            expect(result).toContain('bearish: the indicator signal suggests');
-            expect(result).toContain('neutral: the indicator is in');
+        it('그 줄은 pattern Writing Rules보다 앞에 위치한다', () => {
+            const result = build([
+                makeSkill({
+                    type: 'indicator_guide',
+                    name: 'RSI Signal Guide',
+                    computedCard: 'rsi',
+                }),
+                makeSkill({ type: 'pattern', name: 'Head and Shoulders' }),
+            ]);
+            expect(
+                result.indexOf(INDICATOR_CARDS_BUILT_BY_CODE_NOTE)
+            ).toBeLessThan(result.indexOf('patternSummaries Writing Rules'));
         });
 
         it('indicatorResults/trendlines의 enum placeholder 스켈레톤은 제거되었다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = build([]);
             // 스키마가 trend/direction enum을 강제하므로 placeholder 예시는 중복 → 제거.
             expect(result).not.toContain('"trend": "neutral"');
             expect(result).not.toContain('"direction": "ascending"');
         });
     });
-
     describe('분석 가이드라인 - Name Field Matching', () => {
         let result: string;
 
@@ -3213,10 +3083,10 @@ describe('prompt', () => {
             expect(result).toContain('never translate, abbreviate');
         });
 
-        it('적용 대상 필드가 명시된다 (skillName, strategyName, indicatorName)', () => {
+        it('적용 대상 필드가 명시된다 (skillName, strategyName): indicatorName은 모델이 쓰지 않는다', () => {
             expect(result).toContain('skillName');
             expect(result).toContain('strategyName');
-            expect(result).toContain('indicatorName');
+            expect(result).not.toContain('indicatorName');
         });
 
         it('skill이 없으면 entry를 omit하라는 지시가 포함된다', () => {
@@ -3225,9 +3095,13 @@ describe('prompt', () => {
             );
         });
 
-        it('skillName exact-match 예외 (미등재 chart pattern)가 명시된다', () => {
+        it('skillName exact-match에 예외가 없다: patternSummaries는 나열된 패턴만 담는다', () => {
+            expect(result).not.toContain(
+                'an unlisted chart pattern you add yourself'
+            );
+            expect(result).not.toContain('add yourself');
             expect(result).toContain(
-                'The one exception is an unlisted chart pattern you add yourself'
+                'skillName follows the same exact-match rule for every listed Skills pattern entry: patternSummaries holds only the patterns in the Skills pattern list below'
             );
         });
 
@@ -5073,7 +4947,11 @@ describe('prompt', () => {
                     Array.from({ length: barCount }, (_, i) => makeBar(i)),
                     makeIndicators(),
                     [
-                        makeSkill({ name: 'Guide', type: 'indicator_guide' }),
+                        makeSkill({
+                            name: 'Guide',
+                            type: 'indicator_guide',
+                            computedCard: 'rsi',
+                        }),
                         makeSkill({ name: 'Candle', type: 'candlestick' }),
                         makeSkill({
                             name: 'SR',
@@ -5082,9 +4960,7 @@ describe('prompt', () => {
                     ]
                 );
                 // The skill-gated instruction blocks must actually be part of what is scanned.
-                expect(result).toContain(
-                    'name that combination of indicators in the description field'
-                );
+                expect(result).toContain(INDICATOR_CARDS_BUILT_BY_CODE_NOTE);
                 expect(result).toContain(
                     'name the converging levels in the reason field'
                 );

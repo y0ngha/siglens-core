@@ -61,7 +61,6 @@ vi.mock('@/infrastructure/skills/loader', () => ({
                 name: 'State Guide',
                 type: 'indicator_guide',
                 gating: { tier: 'gated', signalKind: 'state', state: {} },
-                computedCard: 7,
             },
         ],
     }),
@@ -215,6 +214,7 @@ describe('renderWithCore', () => {
                 group: 'indicator_guide',
                 alwaysOn: false,
                 injected: true,
+                computedCard: undefined,
             },
         ]);
     });
@@ -245,14 +245,19 @@ describe('renderWithCore', () => {
             stable: 'a',
             dynamic: 'b',
             promptVersion: 'p34',
-        };
+        } satisfies AssembledPromptRecord;
+        // Typed fields of `AssembledPromptRecord`: renaming one on core breaks this build, so the
+        // instrument cannot silently read `undefined` (the pin of the typed read).
+        const indicatorCards = [
+            { indicatorName: 'MA Signal Guide', signals: [] },
+        ] satisfies AssembledPromptRecord['indicatorCards'];
         core.runAnalysis.mockImplementationOnce(
             async (_symbol, _name, _timeframe, _force, _fmp, options) => {
                 options.onPromptAssembled({
                     ...assembled,
-                    indicatorCards: [{ indicatorName: 'MA Signal Guide' }],
+                    indicatorCards,
                     cycleCards: [],
-                } as AssembledPromptRecord);
+                });
                 return { status: 'error' };
             }
         );
@@ -264,7 +269,7 @@ describe('renderWithCore', () => {
         );
         const rendered = await renderWithCore(input());
         expect(rendered.samples[0].cards).toEqual({
-            indicator: [{ indicatorName: 'MA Signal Guide' }],
+            indicator: indicatorCards,
             cycle: [],
         });
         expect(rendered.samples[1].cards).toBeNull();

@@ -125,6 +125,21 @@ export const FIELDS_EVAL_CONSTANTS = {
         williamsROversold: -80,
         buySellBullish: 0.65,
         buySellBearish: 0.35,
+        crsiOverbought: 90,
+        crsiOversold: 10,
+        macdVLevel: 150,
+        /** Bollinger %B bounds of a daily chart (the replay set is daily only). */
+        bollingerPctBHigh: 0.98,
+        bollingerPctBLow: 0.02,
+        /** Within this many ATR of a Keltner band counts as near it. */
+        keltnerNearAtr: 0.5,
+        /** Within this fraction of the Donchian range of a band counts as near it. */
+        donchianNearFraction: 0.05,
+        /** A price this many ATR from VWAP is notable (intraday only). */
+        vwapAtr: 1,
+        hurstMargin: 0.1,
+        varianceRatioMargin: 0.2,
+        regressionR2: 0.3,
         /** Bars of stage history a cycle reading looks back over. */
         cycleLookbackBars: 120,
         maCyclePeriods: [5, 20, 60],

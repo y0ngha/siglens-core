@@ -324,6 +324,8 @@ export interface RateComparison {
 export interface ComparisonInput {
     /** Card kind of a skill by name (a catalog tag, else the core-0 baseline names). */
     kindOfSkill: Readonly<Record<string, string>>;
+    /** The trigger ids of each event guide (an event card's trend comes from the signals the prompt printed). */
+    triggersOfSkill?: Readonly<Record<string, readonly string[]>>;
     /** The `computed_card` kinds the catalog tags. */
     taggedKinds: readonly string[];
     after: readonly ArmCase[];
@@ -490,7 +492,8 @@ export interface CardTrendKind {
  */
 export function cardTrendAgreement(
     cases: readonly ArmCase[],
-    kindOfSkill: Readonly<Record<string, string>>
+    kindOfSkill: Readonly<Record<string, string>>,
+    triggersOfSkill: Readonly<Record<string, readonly string[]>> = {}
 ): Record<string, CardTrendKind> {
     return cases
         .flatMap(c =>
@@ -503,7 +506,9 @@ export function cardTrendAgreement(
                               skill: row.skill,
                               kind,
                               model: row.model,
-                              rule: ruleTrendOfKind(kind, c.prompt, c.close),
+                              rule: ruleTrendOfKind(kind, c.prompt, {
+                                  triggers: triggersOfSkill[row.skill],
+                              }),
                           },
                       ];
             })
@@ -926,7 +931,11 @@ export function compareArms(input: ComparisonInput): OutputComparison {
             },
             ungroundedSummary: ungrounded,
         },
-        cardTrend: cardTrendAgreement(input.before, input.kindOfSkill),
+        cardTrend: cardTrendAgreement(
+            input.before,
+            input.kindOfSkill,
+            input.triggersOfSkill
+        ),
         unruledKinds: [...new Set(input.taggedKinds)]
             .filter(kind => !hasTrendRule(kind))
             .toSorted(),

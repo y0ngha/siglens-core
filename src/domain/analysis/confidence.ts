@@ -1,5 +1,7 @@
 import { UNMATCHED_SKILL_CONFIDENCE_WEIGHT } from '@/domain/indicators/constants';
 import type {
+    ComputedCards,
+    EnrichOptions,
     AnalysisDataAsOf,
     TrendBasis,
     AnalysisResponse,
@@ -26,6 +28,7 @@ import {
     normalizeActionRecommendation,
     normalizeCandlePatternSummary,
     normalizeChartOverlay,
+    normalizeCachedIndicatorGuideResult,
     normalizeIndicatorGuideResult,
     normalizeKeyLevels,
     normalizePatternSummary,
@@ -35,6 +38,7 @@ import {
     normalizeTrend,
     normalizeTrendline,
 } from '@/domain/analysis/normalize';
+import { normalizeCycleReading } from '@/domain/analysis/normalizeCards';
 import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
 import {
     OVERLAY_ID_PREFIX,
@@ -294,6 +298,8 @@ function buildUniqueIds(names: readonly string[]): string[] {
  *   When given, a pattern card whose skill is not one of them is dropped (the
  *   prompt allows entries for the listed patterns only); omitted keeps every
  *   card.
+ * @param options - `withoutModelCards` drops what the model wrote for the cards
+ *   core computes (see {@link EnrichOptions}); omitted keeps every entry.
  * @returns A fully-validated, weight-enriched {@link AnalysisResponse}.
  *
  * @see buildAnalysisPrompt
@@ -301,7 +307,8 @@ function buildUniqueIds(names: readonly string[]): string[] {
 export function enrichAnalysisWithConfidence(
     rawInput: unknown,
     skills: Skill[],
-    allowedPatternSkills?: readonly string[]
+    allowedPatternSkills?: readonly string[],
+    options: EnrichOptions = {}
 ): AnalysisResponse {
     // rawInput is typed `unknown` at the public boundary so consumers do not
     // need to import the internal RawAnalysisResponse shape (which mirrors the
@@ -328,9 +335,11 @@ export function enrichAnalysisWithConfidence(
     const candlePatterns = compact(
         asArray(raw.candlePatterns).map(normalizeCandlePatternSummary)
     );
-    const indicatorResults = compact(
-        asArray(raw.indicatorResults).map(normalizeIndicatorGuideResult)
-    );
+    const indicatorResults = options.withoutModelCards
+        ? []
+        : compact(
+              asArray(raw.indicatorResults).map(normalizeIndicatorGuideResult)
+          );
     const trendlines = compact(asArray(raw.trendlines).map(normalizeTrendline));
 
     // Pattern and strategy ids share one namespace: both are chart-overlay
@@ -343,16 +352,19 @@ export function enrichAnalysisWithConfidence(
     // (`resolveChartOverlays` looks strategy skills up by exact name) all see
     // the canonical name. A name matching no strategy skill — including a
     // pattern reported as a strategy — is kept as written.
-    const canonicalStrategies = strategyResults.map(r => {
-        const skill = findStrategySkill(lookup, r.strategyName);
-        return {
+    const canonicalStrategies = strategyResults
+        .map(r => ({ r, skill: findStrategySkill(lookup, r.strategyName) }))
+        .filter(
+            ({ skill }) =>
+                !options.withoutModelCards || skill?.computedCard === undefined
+        )
+        .map(({ r, skill }) => ({
             ...r,
             strategyName: skill?.name ?? r.strategyName,
             confidenceWeight:
                 (skill ?? findSkill(lookup, r.strategyName))
                     ?.confidenceWeight ?? UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
-        };
-    });
+        }));
     const cardIds = buildUniqueIds([
         ...patternSummaries.map(p => p.patternName),
         ...canonicalStrategies.map(r => r.strategyName),
@@ -408,6 +420,47 @@ export function enrichAnalysisWithConfidence(
                 id: candlePatternIds[index],
             })
         ),
+    };
+}
+
+/**
+ * @internal Adds the cards core computed to an analysis the model wrote without them
+ * ({@link EnrichOptions.withoutModelCards}): `indicatorResults` is the computed indicator
+ * cards, and each computed cycle card joins `strategyResults` after the model's entries with
+ * its skill's confidence weight and an id from the same namespace the pattern and strategy
+ * ids share (`<name>_<n>`, `n` counting earlier cards of the same name). The model's
+ * strategy entries stay where they are.
+ *
+ * Attaches to `analysis` whatever it is: the caller decides not to call it for an empty
+ * fallback reply (a card on a failed reply would stop `isFallbackAnalysis` recognising it).
+ */
+export function attachComputedCards(
+    analysis: AnalysisResponse,
+    computed: ComputedCards,
+    skills: Skill[]
+): AnalysisResponse {
+    const lookup = buildSkillLookup(skills);
+    const taken = [
+        ...analysis.patternSummaries.map(p => p.patternName),
+        ...analysis.strategyResults.map(r => r.strategyName),
+    ];
+    const ids = buildUniqueIds([
+        ...taken,
+        ...computed.strategyResults.map(r => r.strategyName),
+    ]).slice(taken.length);
+    return {
+        ...analysis,
+        indicatorResults: [...computed.indicatorResults],
+        strategyResults: [
+            ...analysis.strategyResults,
+            ...computed.strategyResults.map((r, index): StrategyResult => ({
+                ...r,
+                id: ids[index],
+                confidenceWeight:
+                    findSkill(lookup, r.strategyName)?.confidenceWeight ??
+                    UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
+            })),
+        ],
     };
 }
 
@@ -479,6 +532,8 @@ function normalizeCachedStrategyResult(
     if (!base) return null;
 
     const raw = asObject(item);
+    // Written by `buildCycleCards`, never by the model: only a stored result carries one.
+    const cycle = normalizeCycleReading(raw?.cycle);
 
     return {
         ...base,
@@ -486,6 +541,7 @@ function normalizeCachedStrategyResult(
         confidenceWeight:
             asNumber(raw?.confidenceWeight) ??
             UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
+        ...(cycle === undefined ? {} : { cycle }),
     };
 }
 
@@ -590,7 +646,9 @@ export function normalizeCachedAnalysisResponse(
         // raw-reply path never has one, but a stored result does and must keep it.
         ...(trendBasis !== undefined ? { trendBasis } : {}),
         indicatorResults: compact(
-            asArray(raw.indicatorResults).map(normalizeIndicatorGuideResult)
+            asArray(raw.indicatorResults).map(
+                normalizeCachedIndicatorGuideResult
+            )
         ),
         riskLevel: normalizeRiskLevel(raw.riskLevel),
         keyLevels: normalizeKeyLevels(raw.keyLevels),

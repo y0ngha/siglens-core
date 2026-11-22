@@ -71,8 +71,20 @@ import {
     selectLastCandlePatternEntries,
 } from '@/domain/analysis/candle-detection';
 import { selectSkills } from '@/domain/analysis/selectSkills';
+import { isCycleCardKind } from '@/domain/analysis/computedCardKinds';
+import { buildIndicatorCards } from '@/domain/analysis/indicatorCards';
+import { buildCycleCards } from '@/domain/analysis/cycleReadings';
+import {
+    detectTrend,
+    type IndicatorTrend,
+} from '@/domain/analysis/indicatorTrendTag';
 import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
 import { detectSignals } from '@/domain/signals';
+import {
+    CONFLUENCE_MIN_BARS,
+    readSignalFreshness,
+    type SignalFreshness,
+} from '@/domain/signals/confluence';
 import { screenChartPatterns } from '@/domain/patterns';
 import { qualifyPatterns } from '@/domain/patterns/qualify/qualifyPatterns';
 import type {
@@ -84,6 +96,7 @@ import type {
     CandlePriorMove,
     CandlePriorTrend,
     CurrencyCode,
+    CycleCardKind,
     FearGreedSnapshot,
     HorizonKey,
     HorizonReference,
@@ -102,6 +115,7 @@ import type {
     ReferenceLevel,
     Skill,
     QualifiedPattern,
+    Signal,
     SkillSelectionContext,
     SkillType,
     SMCEqualLevel,
@@ -212,11 +226,6 @@ export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
     },
 };
 
-// detectTrend 의 상대 임계값 비율 (윈도 내 최대 절대값의 몇 % 를 'flat' 으로 간주할지).
-const INDICATOR_TREND_THRESHOLD_RATIO = 0.01;
-// ratio × maxAbs가 0에 수렴할 때 잡음이 rising/falling으로 오분류되는 것을 방지.
-const INDICATOR_TREND_MIN_THRESHOLD = 1e-8;
-
 const SMC_MAX_ORDER_BLOCKS = 5;
 const SMC_MAX_FAIR_VALUE_GAPS = 5;
 const SMC_MAX_STRUCTURE_BREAKS = 3;
@@ -233,46 +242,6 @@ const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
     '4Hour':
         'Swing trading chart. Signals are reliable for multi-day trends. Divergences and breakouts are actionable.',
     '1Day': 'Daily chart. Indicator signals have high reliability. Overbought/oversold, divergences, and pattern completions are significant.',
-};
-
-type IndicatorTrend = 'rising' | 'falling' | 'flat';
-
-const detectTrend = (
-    values: (number | null)[],
-    sampleCount: number
-): IndicatorTrend | null => {
-    const nonNull = values
-        .slice(-sampleCount)
-        .filter((v): v is number => v !== null);
-    if (nonNull.length < 2) return null;
-
-    // 선형 회귀 slope 기반 — 극단치 whipsaw에 강하고 windowSpan은 fitted line 총 변화량.
-    const n = nonNull.length;
-    const xMean = (n - 1) / 2;
-    const yMean = nonNull.reduce((sum, v) => sum + v, 0) / n;
-    const numerator = nonNull.reduce(
-        (sum, v, i) => sum + (i - xMean) * (v - yMean),
-        0
-    );
-    const denominator = nonNull.reduce(
-        (sum, _, i) => sum + (i - xMean) ** 2,
-        0
-    );
-    if (denominator === 0) return 'flat';
-    const windowSpan = (numerator / denominator) * (n - 1);
-
-    // 지표 스케일 비례 임계값 — MACD/CCI/CMF 영점 교차 구간의 잡음 오분류 방지.
-    const windowMaxAbs = nonNull.reduce(
-        (max, v) => Math.max(max, Math.abs(v)),
-        0
-    );
-    const threshold = Math.max(
-        windowMaxAbs * INDICATOR_TREND_THRESHOLD_RATIO,
-        INDICATOR_TREND_MIN_THRESHOLD
-    );
-    if (windowSpan > threshold) return 'rising';
-    if (windowSpan < -threshold) return 'falling';
-    return 'flat';
 };
 
 interface PromptCandlePatternEntry {
@@ -1844,8 +1813,8 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '## Analysis Guidelines',
         '',
         '### Name Field Matching',
-        '- strategyName and indicatorName MUST exactly match a skill name from Writing Rules below. Copy verbatim — never translate, abbreviate, or use empty strings. Omit the entry if no matching skill exists.',
-        "- skillName follows the same exact-match rule for every listed Skills pattern entry. The one exception is an unlisted chart pattern you add yourself (see the patternSummaries section below) — for those, skillName is the pattern's catalog id as the Pattern Index lists it (e.g. cup_and_handle), or its standard English name when it is outside the catalog — never the name of the Pattern Index or of any other skill.",
+        '- strategyName MUST exactly match a skill name from Writing Rules below. Copy verbatim — never translate, abbreviate, or use empty strings. Omit the entry if no matching skill exists.',
+        '- skillName follows the same exact-match rule for every listed Skills pattern entry: patternSummaries holds only the patterns in the Skills pattern list below, never the name of the Pattern Index or of any other skill.',
         '',
         '### Skills Are Guidance, Not a Boundary',
         '- The injected skills are not an exhaustive catalog of every valid technical concept. You may use other well-established technical concepts in the summary and other prose fields when the provided data actually supports them — never invent data to justify one.',
@@ -1861,7 +1830,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '### Regular Skills Usage',
         '- Skills shown in ## Active Skills are context-only regular skills without a dedicated structured output field.',
         '- Use them only to enrich the summary with additional interpretation or market context when they are relevant.',
-        '- Do not create new top-level fields for regular skills, and do not force them into indicatorResults, patternSummaries, strategyResults, candlePatterns, or keyLevels unless another explicit rule already applies.',
+        '- Do not create new top-level fields for regular skills, and do not force them into patternSummaries, strategyResults, candlePatterns, or keyLevels unless another explicit rule already applies.',
         '',
         '### Candle Patterns vs Chart Patterns',
         '- candlePatterns: Only include candle patterns (single/multi candle) detected from bar data. Chart patterns defined in skills/*.md go in patternSummaries.',
@@ -1921,8 +1890,8 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         "  - `Price vs MA` / `Price vs EMA`: the price's distance from each average — not a gap between two averages.",
         '  - `MA spreads`: the only gaps between two MAs. Quote this figure or say nothing about an MA-to-MA gap.',
         '  - `MA stack` / `EMA stack`: the full order. Only `bullish` is a full bullish alignment (정배열) and only `bearish` a full bearish one (역배열); `mixed` is neither and its parenthesized order is the real order. The `price/EMA9/EMA20` label on ## Market Reference `Structure:` lines covers only those three values.',
-        '  - `MA cycle (MA5/MA20/MA60)`: the order and stage for the MA cycle strategy — copy both; do not read the order off the MA values yourself.',
-        '  - `MACD cycle`: the same for the MACD cycle strategy.',
+        '  - `MA cycle (MA5/MA20/MA60)`: the order and stage of the MA cycle — quote both when you mention the cycle; do not read the order off the MA values yourself.',
+        '  - `MACD cycle`: the same for the MACD cycle.',
         '  - `RSI zone`, `Stochastic` zone, `Bollinger` position: call an oscillator overbought or oversold only when its line says so.',
         '  - `Gap (last bar vs previous bar)`: whether the last bar gapped and by how much of ATR — the gap strategy quotes this verdict instead of comparing bars itself.',
         '- Other computed lines elsewhere in the prompt follow the same rule:',
@@ -2005,10 +1974,69 @@ const CRITICAL_RESPONSE_RULES = [
 ].join('\n');
 
 /**
+ * What code builds instead of the model in one prompt: whether any indicator guide that
+ * carries a card tag is injected, and which cycle strategies were selected (their cards are
+ * built from the `## Indicator State` lines, so they are not in the strategy list).
+ */
+interface ComputedCardsInPrompt {
+    readonly indicatorCardsBuilt: boolean;
+    readonly cycleKinds: readonly CycleCardKind[];
+}
+
+/**
+ * @internal The line that replaces the old indicator writing rules. It names what the code does
+ * (DOM-9: no claim about a card that may not exist — a line printed as `N/A` has none) and
+ * keeps the guides' job: they interpret the values in the summary and the plan.
+ */
+export const INDICATOR_CARDS_BUILT_BY_CODE_NOTE =
+    '- indicatorResults is not part of your answer: code builds the indicator cards from the computed lines and detected signals above. Use the Indicator Signal Guides to interpret those values in summary and in the plan.';
+
+const CYCLE_CARD_LABEL: Readonly<Record<CycleCardKind, string>> = {
+    ma_cycle: 'MA cycle',
+    macd_cycle: 'MACD cycle',
+};
+
+/**
+ * @internal The strategy-block line naming the cycle cards code builds (only the cycles this
+ * prompt selected), or `''` when none was.
+ */
+export const formatCycleCardNote = (
+    kinds: readonly CycleCardKind[]
+): string => {
+    if (kinds.length === 0) return '';
+    const names = kinds.map(kind => CYCLE_CARD_LABEL[kind]);
+    const lines = names.map(name => `\`- ${name}\``);
+    const many = kinds.length > 1;
+    return `- The ${names.join(' and ')} card${many ? 's are' : ' is'} built by code from the ${lines.join(' and ')} line${many ? 's' : ''} of ## Indicator State; do not add ${many ? 'strategyResults entries' : 'a strategyResults entry'} for ${many ? 'them' : 'it'}.`;
+};
+
+/** An indicator guide whose card code builds. */
+const isCardGuide = (skill: Skill): boolean =>
+    skill.type === 'indicator_guide' &&
+    skill.computedCard !== undefined &&
+    !isCycleCardKind(skill.computedCard);
+
+/** The cycle kind of a strategy whose card code builds, or `null`. */
+const cycleKindOf = (skill: Skill): CycleCardKind | null =>
+    skill.type === 'strategy' &&
+    skill.computedCard !== undefined &&
+    isCycleCardKind(skill.computedCard)
+        ? skill.computedCard
+        : null;
+
+/** `groups` without the cycle strategies code builds a card for (no digest, no list entry). */
+const withoutCycleStrategies = (
+    groups: Record<SkillGroupKey, Skill[]>
+): Record<SkillGroupKey, Skill[]> => ({
+    ...groups,
+    strategy: groups.strategy.filter(skill => cycleKindOf(skill) === null),
+});
+
+/**
  * Full "## Analysis Request" section — the request header, the
  * critical-response rules, the generic ask sentence, the (fully static,
  * catalog-only) field content guidance, AND the per-type writing-rule
- * instructions (patternSummaries / strategyResults / indicatorResults /
+ * instructions (patternSummaries / strategyResults / the indicator-card note /
  * candlePatterns / keyLevels / regular-skill enrichment), each ending in an
  * enumeration of the exact active skill names for that type.
  *
@@ -2028,15 +2056,17 @@ const CRITICAL_RESPONSE_RULES = [
  * preserves prompt locality/quality.
  *
  * @param patternSkills,strategySkills,... - `core ∪ selected` skills of each
- *   type (see {@link buildAnalysisPrompt}'s `combinedGroups`).
+ *   type (see {@link buildAnalysisPrompt}'s `combinedGroups`); `strategySkills` leaves
+ *   out the cycle strategies code builds a card for, which `computed` names instead.
+ * @param computed - What code builds instead of the model (see {@link ComputedCardsInPrompt}).
  */
 const buildAnalysisRequest = (
     patternSkills: Skill[],
     strategySkills: Skill[],
-    indicatorGuideSkills: Skill[],
     candlestickSkills: Skill[],
     supportResistanceSkills: Skill[],
     regularSkills: Skill[],
+    computed: ComputedCardsInPrompt,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string => {
     const patternListInstruction =
@@ -2075,6 +2105,7 @@ const buildAnalysisRequest = (
               ].join('\n')
             : '';
 
+    const cycleCardNote = formatCycleCardNote(computed.cycleKinds);
     const strategyInstruction =
         strategySkills.length > 0
             ? [
@@ -2096,48 +2127,25 @@ const buildAnalysisRequest = (
                   '  2. trend: every entry MUST include `trend` as one of bullish/bearish/neutral. Set based on the skill\'s own analysis instructions; use "neutral" when the analysis is inconclusive.',
                   "  3. summary: non-empty Korean markdown text following the skill's format.",
                   `  4. candidateIds: the ids from ${CHART_OVERLAY_CANDIDATES_SECTION_HEADER} this verdict actually relies on — divergence strategy → Divergences, fibonacci strategy → Fibonacci, Elliott wave → Elliott waves (first id = your primary count, optional second id = an alternate count). Copy ids verbatim; [] when none applies.`,
+                  ...(cycleCardNote === '' ? [] : [cycleCardNote]),
                   '',
                   'Strategy skill list to analyze:',
                   ...strategySkills.map(s => `- ${s.name}`),
               ].join('\n')
-            : '';
+            : cycleCardNote === ''
+              ? ''
+              : [
+                    '',
+                    '### strategyResults Writing Rules for Strategy Skills',
+                    cycleCardNote,
+                ].join('\n');
 
-    const indicatorGuideInstruction =
-        indicatorGuideSkills.length > 0
-            ? [
-                  '',
-                  '### indicatorResults Writing Rules for Indicator Guides',
-                  '- Use the Indicator Signal Guides above to interpret the current indicator values in ## Indicator Values.',
-                  '- For each indicator guide, evaluate whether the current values meet any signal condition described in its Signal Interpretation section.',
-                  // Schema-restatement dedup: the literal JSON entry skeleton
-                  // stays dropped — it only restated field names/nesting/types that
-                  // TECHNICAL_RESPONSE_SCHEMA already fully specifies. The `type` enum
-                  // rule is restored below (compact form): `enum: ['skill']` is only
-                  // API-enforced for forced-tool providers, not the thinking-Claude
-                  // (sonnet/opus, tool_choice: auto) path — extractJsonWithRepair fixes
-                  // JSON syntax only, not shape, so this is that path's guard.
-                  '- For every detected signal, add one entry to the indicatorResults array.',
-                  '- CRITICAL RULES (never violate):',
-                  '  1. indicatorName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST be a non-empty string — never use an empty string, a translated name, or a generic label.',
-                  '  2. Each indicatorResults entry corresponds to EXACTLY ONE indicator guide. Never combine multiple indicators (e.g., "MACD and Bollinger") into one entry. Create separate entries for separate indicators.',
-                  '  3. Each signal\'s `type` MUST be exactly "skill".',
-                  '  4. The description field MUST be written in Korean and MUST include the indicator name and specific numeric condition (e.g., "RSI 72.5 — 과매수 임계선에 근접, 단기 조정 가능").',
-                  '- Signal strength calibration:',
-                  '  - strong: value is in an extreme zone (e.g., RSI > 80 or < 20, Stochastic > 90 or < 10, CCI > +200 or < -200) OR multiple independent indicator groups confirm the same direction',
-                  '  - moderate: value is in a standard overbought/oversold zone (e.g., RSI 70–80, Stochastic 80–90, CCI ±100–200) with single-indicator confirmation',
-                  '  - weak: value is approaching a threshold but has not yet crossed, or the signal conflicts with the prevailing trend',
-                  '- Signal trend assignment:',
-                  '  - bullish: the indicator signal suggests upward price movement (e.g., RSI recovering from oversold, MACD golden cross, price above key moving average)',
-                  '  - bearish: the indicator signal suggests downward price movement (e.g., RSI entering overbought, MACD death cross, price below key moving average)',
-                  '  - neutral: the indicator is in a range-bound or indeterminate state with no clear directional bias',
-                  '- When the Key Combinations section of a guide identifies a multi-indicator combination that is currently active, increase the strength by one level AND name that combination of indicators in the description field.',
-                  "- Respect each guide's Caveats section: do not generate a signal if the caveats indicate it would be unreliable in the current market context (e.g., Stochastic overbought in a strong uptrend with ADX > 25 should not automatically produce a bearish signal).",
-                  '- If no signal conditions are met for a given indicator guide, simply omit that guide from indicatorResults. Do not create placeholder or empty entries.',
-                  '',
-                  'Indicator guide list (use these exact names for indicatorName):',
-                  ...indicatorGuideSkills.map(s => `- ${s.name}`),
-              ].join('\n')
-            : '';
+    // The model does not write indicator cards (code builds them from the computed lines), so
+    // the one thing the guides still need is the pointer saying so — otherwise a model that
+    // sees guides and no rules block would write the entries anyway.
+    const indicatorGuideInstruction = computed.indicatorCardsBuilt
+        ? ['', INDICATOR_CARDS_BUILT_BY_CODE_NOTE].join('\n')
+        : '';
 
     const candlestickInstruction =
         candlestickSkills.length > 0
@@ -2373,7 +2381,10 @@ const buildSkillSelectionContext = (
     indicators: IndicatorResult,
     timeframe: Timeframe,
     candleEntries: CandlePatternEntry[],
-    patternIds: readonly ChartPatternId[]
+    patternIds: readonly ChartPatternId[],
+    precision: PricePrecision,
+    signals: readonly Signal[],
+    freshness: SignalFreshness | null
 ): SkillSelectionContext => {
     const price = bars.length > 0 ? bars[bars.length - 1].close : 0;
     const atr = lastNonNull(indicators.atr);
@@ -2381,12 +2392,23 @@ const buildSkillSelectionContext = (
         price > 0 && atr !== null ? (atr / price) * PERCENTAGE_FACTOR : 0;
     return {
         indicators,
-        signals: detectSignals(bars, indicators),
+        signals,
+        // The one reading of "newly lit" the printed lines and the cards share; absent when
+        // the confluence section is not measurable (bars at or below its minimum).
+        newSignalTypes:
+            freshness === null
+                ? undefined
+                : [...freshness.freshBullish, ...freshness.freshBearish],
         timeframe,
         detectedCandles: collectPrintedCandleNames(candleEntries),
         patternCandidates: patternIds,
         price,
         atrPercent,
+        // The band, VWAP and Bollinger gates decide on the figures this prompt prints.
+        print: {
+            quoting: precision.price,
+            differenceDp: precision.difference,
+        },
     };
 };
 
@@ -2632,16 +2654,45 @@ export function buildAnalysisPrompt(
         timeframe
     );
 
+    const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
+    // One precision for every price-axis value in this prompt, taken from the
+    // snapshot close — see `priceDecimalPlaces` for why a fixed 2 was wrong — and
+    // a second for differences of prices, scaled by the latest ATR.
+    const quoting = priceQuoting(
+        bars.at(-1)?.close,
+        currency,
+        assetClass,
+        krxTick
+    );
+    const precision: PricePrecision = {
+        price: quoting,
+        difference: differenceDecimalPlaces(
+            lastNonNull(indicators.atr),
+            quoting.dp
+        ),
+    };
+
     // Dynamic gating (chart only): whitelist to chart skills, then split into
     // `core` (always_on, catalog-only — byte-stable across calls) and
     // `selected` (gated skills whose frontmatter fired for this chart's
     // state — chart-dependent). Untagged skills throw (fail-closed).
+    // Detected once; the previous-bar pass that says which of them are newly lit is taken once
+    // too (the confluence section's rule: more than CONFLUENCE_MIN_BARS bars) and feeds both
+    // the printed `Newly lit on this bar` lines and the cards.
+    const detectedSignals = detectSignals(bars, indicators);
+    const signalFreshness =
+        bars.length > CONFLUENCE_MIN_BARS
+            ? readSignalFreshness(bars, detectedSignals)
+            : null;
     const selectionContext = buildSkillSelectionContext(
         bars,
         indicators,
         timeframe,
         candleEntries,
-        chartPatterns.selectionIds
+        chartPatterns.selectionIds,
+        precision,
+        detectedSignals,
+        signalFreshness
     );
     const { core, selected } = selectSkills(
         skills,
@@ -2670,34 +2721,29 @@ export function buildAnalysisPrompt(
     // Bucketed independently (not merged first) so each type's `core`
     // members can be rendered into the stable digest-content sections while
     // its `selected` members render into the dynamic ones.
-    const coreGroups = bucketSkillsByType(coreSkills);
-    const selectedGroups = bucketSkillsByType(selectedSkills);
+    // The cycle strategies code builds a card for carry no digest and no list entry: their
+    // "AI instructions" order the very card the code now writes (DOM-9).
+    const coreGroups = withoutCycleStrategies(bucketSkillsByType(coreSkills));
+    const selectedGroups = withoutCycleStrategies(
+        bucketSkillsByType(selectedSkills)
+    );
     // The per-type writing-rule instructions need one checklist covering
     // BOTH buckets (the AI must judge every active skill of a type,
     // regardless of which half of the prompt its digest landed in) — see
     // buildAnalysisRequest's doc comment for why this stays merged and
     // atomic in the dynamic block.
-    const combinedGroups = bucketSkillsByType([
-        ...coreSkills,
-        ...selectedSkills,
-    ]);
-
-    const config = PROMPT_CONFIG_BY_TIMEFRAME[timeframe];
-    // One precision for every price-axis value in this prompt, taken from the
-    // snapshot close — see `priceDecimalPlaces` for why a fixed 2 was wrong — and
-    // a second for differences of prices, scaled by the latest ATR.
-    const quoting = priceQuoting(
-        bars.at(-1)?.close,
-        currency,
-        assetClass,
-        krxTick
+    const combinedGroups = withoutCycleStrategies(
+        bucketSkillsByType([...coreSkills, ...selectedSkills])
     );
-    const precision: PricePrecision = {
-        price: quoting,
-        difference: differenceDecimalPlaces(
-            lastNonNull(indicators.atr),
-            quoting.dp
-        ),
+    const injectedSkills = [...coreSkills, ...selectedSkills];
+
+    // What a card repeats of the prompt's own figures: the same precision and trend sample
+    // the indicator lines were printed with, taken once.
+    const cardPrint = {
+        quoting: precision.price,
+        differenceDp: precision.difference,
+        trendSampleCount: config.trendSampleCount,
+        barCount: bars.length,
     };
 
     const marketReference = computeMarketReference(
@@ -2741,13 +2787,20 @@ export function buildAnalysisPrompt(
     // writing-rule instructions into one atomic block (see its own doc
     // comment) — this always renders the "## Analysis Request" header, so
     // unlike the pre-fix `requestDynamicPart` it is never the empty string.
+    const cycleCards = buildCycleCards(injectedSkills, indicators, cardPrint);
     const analysisRequest = buildAnalysisRequest(
         combinedGroups.pattern,
         combinedGroups.strategy,
-        combinedGroups.indicator_guide,
         combinedGroups.candlestick,
         combinedGroups.support_resistance,
         combinedGroups.regular,
+        {
+            indicatorCardsBuilt: injectedSkills.some(isCardGuide),
+            // Only a cycle whose stage line has a stage gets a card, so only that one is named.
+            cycleKinds: cycleCards.flatMap(card =>
+                card.cycle === undefined ? [] : [card.cycle.kind]
+            ),
+        },
         locale
     );
 
@@ -2890,7 +2943,8 @@ export function buildAnalysisPrompt(
             quoting,
             marketEvents,
             earningsDates,
-            trendReading
+            trendReading,
+            signalFreshness ?? undefined
         ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups),
@@ -2945,6 +2999,11 @@ export function buildAnalysisPrompt(
             marketReference,
             quoting
         ).map(level => level.price),
-        injectedSkills: [...coreSkills, ...selectedSkills],
+        injectedSkills,
+        indicatorCards: buildIndicatorCards(injectedSkills, {
+            selection: selectionContext,
+            print: cardPrint,
+        }),
+        cycleCards,
     };
 }

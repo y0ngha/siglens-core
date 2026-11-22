@@ -1,5 +1,9 @@
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
-import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
+import {
+    attachComputedCards,
+    enrichAnalysisWithConfidence,
+    isFallbackAnalysis,
+} from '@/domain/analysis/confidence';
 import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import { normalizeIdList } from '@/domain/analysis/normalize';
 import { asObject } from '@/domain/analysis/normalizePrimitives';
@@ -12,8 +16,10 @@ import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
 import type {
     AnalysisResponse,
     CurrencyCode,
+    IndicatorGuideResult,
     OverlayCandidate,
     PatternTargetGeometry,
+    RawStrategyResult,
     ResolvedChartOverlays,
     Skill,
 } from '@/domain/types';
@@ -50,6 +56,19 @@ export interface PostProcessRawAnalysisInput {
      * that have no prompt.
      */
     readonly allowedPatternSkills?: readonly string[];
+    /**
+     * `TechnicalAssembledPrompt.indicatorCards`: the indicator cards code built from the
+     * prompt's own lines. They become `indicatorResults` after enrichment; whatever the model
+     * wrote under that name is dropped. Required, like `stopCandidates`: omitting it would
+     * leave the analysis without cards and without a trace.
+     */
+    readonly computedIndicatorResults: readonly IndicatorGuideResult[];
+    /**
+     * `TechnicalAssembledPrompt.cycleCards`: the MA and MACD cycle cards. They join
+     * `strategyResults` after the model's entries, and any model entry for a skill that
+     * carries a `computed_card` tag is dropped. Required for the same reason.
+     */
+    readonly computedStrategyResults: readonly RawStrategyResult[];
     readonly currency?: CurrencyCode;
     readonly locale?: AnalysisLocale;
     readonly krxTickTable?: KrxTickTable;
@@ -57,9 +76,9 @@ export interface PostProcessRawAnalysisInput {
 
 /**
  * @internal
- * `reconciled` is the post-processed analysis; `resolvedOverlays` the overlays the model's
- * references resolved to, which `runAnalysis` stores next to it; `modelOutput` the analysis
- * before any price rounding.
+ * `reconciled` is the post-processed analysis, with the computed cards; `resolvedOverlays`
+ * the overlays the model's references resolved to, which `runAnalysis` stores next to it;
+ * `modelOutput` the analysis before any price rounding, without the computed cards.
  */
 export interface PostProcessedRawAnalysis {
     readonly reconciled: AnalysisResponse;
@@ -67,7 +86,8 @@ export interface PostProcessedRawAnalysis {
     /**
      * The analysis as the model wrote it: enriched and with pattern geometry aligned, but
      * before any KRX tick rounding or reconciliation. The price provenance check reads
-     * this one, because rounding snaps a made-up price onto a printed-looking tick.
+     * this one, because rounding snaps a made-up price onto a printed-looking tick. It has
+     * no computed cards: their numbers are prompt values, not prices the model wrote.
      */
     readonly modelOutput: AnalysisResponse;
 }
@@ -76,7 +96,8 @@ export interface PostProcessedRawAnalysis {
  * @internal
  *
  * Everything `runAnalysis` does to a parsed model reply before it adds the computed
- * fields (`riskLevel`, `analyzedAt`, `dataAsOf`): confidence enrichment, overlay
+ * fields (`riskLevel`, `analyzedAt`, `dataAsOf`): confidence enrichment (the cards code
+ * computed are attached last, and not at all to an empty fallback reply), overlay
  * resolution, pattern-geometry alignment, KRX tick rounding, SL/TP reconciliation, the
  * plan check and the plan state (which also sets `entryRecommendation`). One function so the deterministic checks and the replay tooling run
  * the exact chain production runs, never a copy of it.
@@ -104,6 +125,8 @@ export function postProcessRawAnalysis(
         atr,
         stopCandidates,
         allowedPatternSkills,
+        computedIndicatorResults,
+        computedStrategyResults,
         currency,
         locale = DEFAULT_ANALYSIS_LOCALE,
         krxTickTable,
@@ -111,7 +134,8 @@ export function postProcessRawAnalysis(
     const enriched = enrichAnalysisWithConfidence(
         rawResult,
         skills,
-        allowedPatternSkills
+        allowedPatternSkills,
+        { withoutModelCards: true }
     );
     const resolvedOverlays = resolveChartOverlays(
         overlayCandidates,
@@ -124,7 +148,7 @@ export function postProcessRawAnalysis(
         resolvedOverlays.chartOverlays,
         patternGeometries
     );
-    const reconciled = roundAnalysisPrices(
+    const reconciledWithoutCards = roundAnalysisPrices(
         postProcessAnalysisWithReconcile(
             roundAnalysisPrices(modelOutput, currency, krxTickTable),
             lastClose,
@@ -137,5 +161,18 @@ export function postProcessRawAnalysis(
         currency,
         krxTickTable
     );
+    // A reply that is the empty fallback gets no card: with one, `isFallbackAnalysis` would
+    // no longer recognise it and the failed reply would be cached and shown as an analysis.
+    // The decision is on the model's reply (`enriched`), before the cards exist.
+    const reconciled = isFallbackAnalysis(enriched)
+        ? reconciledWithoutCards
+        : attachComputedCards(
+              reconciledWithoutCards,
+              {
+                  indicatorResults: computedIndicatorResults,
+                  strategyResults: computedStrategyResults,
+              },
+              skills
+          );
     return { reconciled, resolvedOverlays, modelOutput };
 }
