@@ -1190,7 +1190,7 @@ export interface MarketBackdropReading {
  * still adds its key suffix, though no backdrop is fetched for it.
  */
 export interface MarketBenchmark {
-    /** Symbol the provider is asked for (the benchmark's own code, e.g. `SPY`). */
+    /** Symbol the provider is asked for (the benchmark's own code, e.g. `SPY`); must not contain `:`, the cache-key segment separator. */
     readonly symbol: string;
     /** Provider-specific identifier when it differs from `symbol` (e.g. `^KS11` for `KS11`). */
     readonly fmpSymbol?: string;

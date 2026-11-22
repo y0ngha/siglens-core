@@ -2559,7 +2559,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 )
             ).toBe(undefined);
             expect(errorSpy).toHaveBeenCalledWith(
-                expect.stringContaining('FearGreed daily fetch/compute failed'),
+                expect.stringContaining('Daily history fetch failed'),
                 expect.any(Error)
             );
             errorSpy.mockRestore();

@@ -533,7 +533,7 @@ async function runAnalysisImpl(
 
     const dailyData: BarsData | null = await dailyDataPromise.catch(error => {
         console.error(
-            '[RunAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+            '[RunAnalysis] Daily history fetch failed; proceeding without Fear & Greed, higher-timeframe and backdrop context:',
             error
         );
         return null;
