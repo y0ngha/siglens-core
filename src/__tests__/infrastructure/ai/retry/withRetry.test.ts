@@ -811,6 +811,32 @@ describe('withRetry abort signal', () => {
         }
     });
 
+    it('surfaces an abort, not AI_SERVER_UNSTABLE_CODE, when a retryable error arrives after the signal aborted on the last attempt', async () => {
+        const controller = new AbortController();
+        const fn = vi.fn<() => Promise<string>>().mockImplementation(() => {
+            controller.abort();
+            // A provider error the classifier calls retryable, raised while the request is cancelled.
+            return Promise.reject({ status: 503 });
+        });
+
+        const result = await settle(
+            withRetry(fn, {
+                maxAttempts: 1,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+            })
+        );
+
+        expect(fn).toHaveBeenCalledTimes(1);
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect((result.error as Error).name).toBe('AbortError');
+            expect((result.error as Error).message).not.toBe(
+                AI_SERVER_UNSTABLE_CODE
+            );
+        }
+    });
+
     it('removes every abort listener it added on a long-lived signal (503 -> backoff expiry -> success)', async () => {
         const controller = new AbortController();
         const addSpy = vi.spyOn(controller.signal, 'addEventListener');

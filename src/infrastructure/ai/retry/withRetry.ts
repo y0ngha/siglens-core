@@ -122,19 +122,23 @@ function abortErrorOf(signal: AbortSignal): Error {
  */
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
     return new Promise((resolve, reject) => {
-        if (signal?.aborted) {
+        if (signal === undefined) {
+            setTimeout(resolve, ms);
+            return;
+        }
+        if (signal.aborted) {
             reject(abortErrorOf(signal));
             return;
         }
         const onAbort = (): void => {
             clearTimeout(timer);
-            reject(abortErrorOf(signal as AbortSignal));
+            reject(abortErrorOf(signal));
         };
         const timer = setTimeout(() => {
-            signal?.removeEventListener('abort', onAbort);
+            signal.removeEventListener('abort', onAbort);
             resolve();
         }, ms);
-        signal?.addEventListener('abort', onAbort, { once: true });
+        signal.addEventListener('abort', onAbort, { once: true });
     });
 }
 
@@ -204,6 +208,13 @@ export async function withRetry<T>(
         try {
             return await fn();
         } catch (error) {
+            // A cancelled request always surfaces as an abort, whatever the classifier says, so
+            // callers can tell cancellation apart from AI_SERVER_UNSTABLE_CODE on the last attempt.
+            if (signal?.aborted) {
+                throw error instanceof Error && error.name === 'AbortError'
+                    ? error
+                    : abortErrorOf(signal);
+            }
             const attemptMs = Date.now() - attemptStartedAt;
             const kind = classify(error);
 
