@@ -42,13 +42,6 @@ function calculateFastPercentK(
 }
 
 /**
- * Apply SMA smoothing to Fast %K to get Slow %K, then compute %D as SMA of Slow %K.
- * Slow Stochastic (14, 3, 3):
- *   - Fast %K: (close - LL14) / (HH14 - LL14) * 100
- *   - Slow %K (%K displayed): SMA(Fast %K, smoothing=3)
- *   - Slow %D (%D displayed): SMA(Slow %K, dPeriod=3)
- */
-/**
  * Clamp a value to [PERCENTAGE_LOWER_BOUND, PERCENTAGE_UPPER_BOUND].
  */
 function clampPercentage(value: number): number {
@@ -58,7 +51,15 @@ function clampPercentage(value: number): number {
     );
 }
 
-/** @internal Stochastic Oscillator — %K / %D over the high-low range. */
+/**
+ * Apply SMA smoothing to Fast %K to get Slow %K, then compute %D as SMA of Slow %K.
+ * Slow Stochastic (14, 3, 3):
+ *   - Fast %K: (close - LL14) / (HH14 - LL14) * 100
+ *   - Slow %K (%K displayed): SMA(Fast %K, smoothing=3)
+ *   - Slow %D (%D displayed): SMA(Slow %K, dPeriod=3)
+ *
+ * @internal Stochastic Oscillator — %K / %D over the high-low range.
+ */
 export function calculateStochastic(
     bars: Bar[],
     kPeriod = STOCHASTIC_K_PERIOD,

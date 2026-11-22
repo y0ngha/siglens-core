@@ -163,9 +163,9 @@ export const SQUEEZE_MOMENTUM_BB_LENGTH = 20;
 export const SQUEEZE_MOMENTUM_KC_LENGTH = 20;
 /** @internal Squeeze Momentum Keltner Channel multiplier. */
 export const SQUEEZE_MOMENTUM_KC_MULT = 1.5;
-/** @internal Squeeze Momentum minimum bars before the first valid result. */
 // Actual warmup: delta window of kcLength requires kcLength delta values,
 // each of which needs kcLength bars → first valid result at index 2*kcLength-2.
+/** @internal Squeeze Momentum minimum bars before the first valid result. */
 export const SQUEEZE_MOMENTUM_MIN_BARS = 2 * SQUEEZE_MOMENTUM_KC_LENGTH - 1;
 
 /** @internal SMC swing-point detection lookback period. */

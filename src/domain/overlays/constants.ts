@@ -13,16 +13,17 @@ const STRATEGY_OVERLAY_KIND_FLAGS: Record<StrategyOverlayKind, true> = {
     fibonacci: true,
     elliott: true,
 };
+
 /**
  * The overlay kinds a strategy card may draw — the `overlay_kind` frontmatter
  * whitelist (core's loader, and consumers that parse skills themselves) and
  * the resolver's slot when no strategy skills are passed. Public so a
  * consumer's own skill loader/validator uses this list instead of a copy.
  */
-// (a) Keys of STRATEGY_OVERLAY_KIND_FLAGS are exactly StrategyOverlayKind (the
-// Record's exhaustive key type above). (b) Object.keys' generic-erased
-// string[] return type is what forces this cast.
 export const STRATEGY_OVERLAY_KINDS: readonly StrategyOverlayKind[] =
+    // (a) Keys of STRATEGY_OVERLAY_KIND_FLAGS are exactly StrategyOverlayKind (the
+    // Record's exhaustive key type above). (b) Object.keys' generic-erased
+    // string[] return type is what forces this cast.
     Object.keys(STRATEGY_OVERLAY_KIND_FLAGS) as StrategyOverlayKind[];
 
 /**

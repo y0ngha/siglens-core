@@ -1185,6 +1185,8 @@ then documents the wrong thing and the target is left bare. Splitting a function
 JSDoc: each piece gets its own comment describing that piece. After any change that adds
 declarations, re-check adjacency.
 
+`src/__tests__/guards/jsdocPlacement.test.ts` enforces it for `src/**/*.ts`: stacked JSDoc blocks on one declaration, a JSDoc followed by a plain comment before its declaration, and (narrowly) a JSDoc opening with another export's backticked name above a differently named declaration; exceptions are listed there with a reason.
+
 ```ts
 // ❌ the new constant lands between the doc and its function
 /** Detects a bull flag. */

@@ -242,19 +242,6 @@ function formatConfluence(
 const PULLBACK_HEADER = '### Short-term sell-off check (computed, 1Day bars)';
 
 /**
- * The verdict for the washout reading, decided here rather than by the model.
- *
- * Asked to judge it, the model never chose "enter": across repeated A/B runs,
- * `entryRecommendation` was "wait" every time. It read the
- * reading's normal companions — a bearish tally, a red Elder
- * Impulse, price under the short averages — as missing confirmation, and asked for a
- * reversal candle or a close back above MA5. That confirmation is exactly what the
- * measurement found costs the edge (waiting for %R to cross back lost it in every
- * period). Rewriting the rule alone moved only some washout days to "enter"; printing the
- * verdict as a rule-engine value, like the tally, moved all of them and left
- * every near-washout day at "wait".
- */
-/**
  * Sessions, counted back from the last bar and including it, in which a company event
  * suspends the washout verdict. A drop that follows an earnings print or a guidance cut
  * usually lands the same session or the next; three covers a report released after the
@@ -345,6 +332,19 @@ export function pullbackEventCaveat(
     return `A ${event.impact}-impact ${eventCategoryLabel(event, input.earningsDates)} event (${event.sentiment}, published ${event.publishedAt.toISOString().slice(0, 10)}) landed within the last ${WASHOUT_NEWS_LOOKBACK_SESSIONS} sessions. The sell-off base rate was measured without news-driven drops, so it may not apply to this drop.`;
 }
 
+/**
+ * The verdict for the washout reading, decided here rather than by the model.
+ *
+ * Asked to judge it, the model never chose "enter": across repeated A/B runs,
+ * `entryRecommendation` was "wait" every time. It read the
+ * reading's normal companions — a bearish tally, a red Elder
+ * Impulse, price under the short averages — as missing confirmation, and asked for a
+ * reversal candle or a close back above MA5. That confirmation is exactly what the
+ * measurement found costs the edge (waiting for %R to cross back lost it in every
+ * period). Rewriting the rule alone moved only some washout days to "enter"; printing the
+ * verdict as a rule-engine value, like the tally, moved all of them and left
+ * every near-washout day at "wait".
+ */
 const WASHOUT_ENTRY_VERDICT =
     'Entry verdict (computed): enter — sell-off path. Put the entry zone at the snapshot close area so the close is inside it, and the verdict follows the Step 1 state ("enter" when the close is in the zone and a target lies at least one ATR above it); do not re-judge it. The exit reference is MA5 (or about 10 trading days), and the prose names the downside risks and where the reading fails (a close under MA200). No confirmation candle is required.';
 

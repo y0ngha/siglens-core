@@ -498,6 +498,9 @@ function koTerminologyRule(
 /**
  * @internal Builds the multi-axis overall-analysis LLM prompt.
  *
+ * This is the 4-axis canonical signature; the legacy 3-axis overload (without
+ * `companyName`) was removed once every caller used the 4-axis form.
+ *
  * Build the 4-axis overall analysis prompt, split into a stable/dynamic pair
  * ({@link AssembledPrompt}). This builder is mostly per-call data
  * (it only consumes already-computed axis summaries), so the split here is intentionally
@@ -604,10 +607,6 @@ function koTerminologyRule(
  *   ETF/ETN, `'share'` otherwise). Ignored unless `currency` is `KRW`.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
-// 4-axis canonical signature. The legacy 3-axis overload (without
-// companyName) was removed — the overall pipeline and dependencyResolver
-// both call the 4-axis form, and every test was already migrated. No remaining
-// caller depended on the old shape.
 export function buildOverallAnalysisPrompt(
     symbol: string,
     companyName: string,

@@ -34,8 +34,9 @@ const resolveLegDirection = (
  * Build retracement levels. On an up-leg, ratio 0 sits at the high and ratio 1
  * at the low (a pullback from the high); on a down-leg the anchors are mirrored
  * so the levels track a bounce from the low.
+ *
+ * @internal Exported for reuse by `domain/overlays/fibonacciCandidates.ts` — level prices must match this table exactly.
  */
-/** @internal Exported for reuse by `domain/overlays/fibonacciCandidates.ts` — level prices must match this table exactly. */
 export const buildRetracements = (
     high: number,
     low: number,
@@ -51,8 +52,9 @@ export const buildRetracements = (
 /**
  * Build extension levels projected past the measured move: in the swing's own
  * direction (above the high for an up-leg, below the low for a down-leg).
+ *
+ * @internal Exported for reuse by `domain/overlays/fibonacciCandidates.ts` — level prices must match this table exactly.
  */
-/** @internal Exported for reuse by `domain/overlays/fibonacciCandidates.ts` — level prices must match this table exactly. */
 export const buildExtensions = (
     high: number,
     low: number,

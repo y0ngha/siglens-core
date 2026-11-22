@@ -77,8 +77,8 @@ export function computeEmaSlope(
     return (last - prev) / prev;
 }
 
-/** @internal Rank-based percentile (0..1) used by squeeze detection. */
 // 표준 mean-rank 아닌 rank-based — squeeze 감지에서 min→0, max→1이 되도록 설계.
+/** @internal Rank-based percentile (0..1) used by squeeze detection. */
 export function percentileRank(value: number, xs: number[]): number | null {
     const n = xs.length;
     if (n === 0) return null;

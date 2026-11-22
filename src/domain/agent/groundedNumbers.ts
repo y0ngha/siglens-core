@@ -69,7 +69,7 @@ const INDEX_NAME_NUMBER_RE = new RegExp(
  * covers the whole token instead of only its integer part.
  */
 const DAY_PERIOD_SUFFIX_RE = /\d+(?:\.\d+)?(?=일선|-day|일 이동평균)/g;
-/**
+/*
  * "MA200" / "EMA50" need no dedicated pattern: {@link NUMBER_RE}'s own
  * `(?<![\d\p{L}])` lookbehind already refuses to start a number match right
  * after a letter, so the digits in "MA200"/"EMA50" (immediately preceded by
