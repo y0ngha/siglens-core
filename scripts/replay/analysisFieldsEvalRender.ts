@@ -16,10 +16,20 @@ import { statSync } from 'node:fs';
 import { dirname } from 'node:path';
 import type { CatalogSkill, PromptSample } from './analysisFieldsEvalSkills';
 import { runAtInstant } from './clock';
-import { marketOfSymbol, profileOf, sessionCloseInstantMs } from './markets';
+import {
+    benchmarkOf,
+    marketOfSymbol,
+    profileOf,
+    sessionCloseInstantMs,
+} from './markets';
 import { createStoredProvider } from './storedProvider';
 import type { ReplayCase, StoredBars } from './types';
-import type { AssembledPromptRecord, Skill } from '@/domain/types';
+import type {
+    AssembledPromptRecord,
+    Bar,
+    Skill,
+    Timeframe,
+} from '@/domain/types';
 
 export interface RenderInput {
     skillsDir: string;
@@ -28,6 +38,17 @@ export interface RenderInput {
     log: (line: string) => void;
     /** The tiers to render; both when absent. */
     tiers?: readonly ('free' | 'member')[];
+    /**
+     * The chart timeframe to analyse at; `1Day` when absent. A timeframe core does not know
+     * (`1Week` before WP-19 core-1) is refused by the caller's argument check, never here.
+     */
+    timeframe?: Timeframe;
+    /**
+     * Stored bars of the benchmarks (`SPY`, `KS11`, `KQ11`) by symbol. With it, the provider
+     * serves them under the case's `asOf` barrier and the call carries the `benchmark` option
+     * of the case's market, which core reads from WP-19 core-2 on and ignores before it.
+     */
+    benchmarks?: ReadonlyMap<string, readonly Bar[]>;
 }
 
 export interface Rendered {
@@ -56,6 +77,20 @@ export function cardsOf(record: AssembledPromptRecord): PromptSample['cards'] {
               indicator: record.indicatorCards ?? [],
               cycle: record.cycleCards ?? [],
           };
+}
+
+/**
+ * The `benchmark` option of a case, or nothing when the render has no benchmark bars for its
+ * market. Typed apart from `runAnalysis`'s options on purpose: the option exists from WP-19
+ * core-2, and a spread is not an excess-property position, so the same instrument measures
+ * `main` (which ignores it) and the branch that reads it.
+ */
+function benchmarkOption(
+    symbol: string,
+    input: Pick<RenderInput, 'benchmarks'>
+): { benchmark?: ReturnType<typeof benchmarkOf> } {
+    const benchmark = benchmarkOf(symbol);
+    return input.benchmarks?.has(benchmark.symbol) ? { benchmark } : {};
 }
 
 const OFFLINE_KEY = 'offline-evaluation-no-network';
@@ -145,14 +180,21 @@ export const renderWithCore: RenderSkills = async input => {
                         runAnalysis(
                             replayCase.symbol,
                             stored.companyName,
-                            '1Day',
+                            input.timeframe ?? '1Day',
                             true,
                             undefined,
                             {
+                                ...benchmarkOption(replayCase.symbol, input),
                                 modelId: DEEPSEEK_V4_1_FLASH_MODEL,
                                 marketDataProvider: createStoredProvider(
                                     stored.bars,
-                                    replayCase.asOf
+                                    replayCase.asOf,
+                                    input.benchmarks === undefined
+                                        ? undefined
+                                        : {
+                                              symbol: replayCase.symbol,
+                                              others: input.benchmarks,
+                                          }
                                 ),
                                 session: profile.session,
                                 assetClass: 'equity',

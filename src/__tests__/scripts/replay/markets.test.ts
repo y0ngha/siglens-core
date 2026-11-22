@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { US_EQUITY_SESSION } from '@/domain/session';
 import {
     CLOCK_AFTER_CLOSE_MINUTES,
+    benchmarkOf,
     KR_SESSION,
     marketOfSymbol,
     profileOf,
@@ -135,5 +136,24 @@ describe('sessionCloseInstantMs', () => {
         expect(() =>
             sessionCloseInstantMs({ kind: 'always-open' }, '2024-03-04')
         ).toThrow('scheduled session');
+    });
+});
+
+describe('benchmarkOf', () => {
+    it('is SPY for a US listing, KOSPI for .KS and KOSDAQ for .KQ', () => {
+        expect(benchmarkOf('NVDA')).toEqual({
+            symbol: 'SPY',
+            label: 'S&P 500 (SPY)',
+        });
+        expect(benchmarkOf('005930.KS')).toEqual({
+            symbol: 'KS11',
+            fmpSymbol: '^KS11',
+            label: 'KOSPI',
+        });
+        expect(benchmarkOf('086520.KQ')).toEqual({
+            symbol: 'KQ11',
+            fmpSymbol: '^KQ11',
+            label: 'KOSDAQ',
+        });
     });
 });

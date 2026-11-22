@@ -275,3 +275,94 @@ describe('renderWithCore', () => {
         expect(rendered.samples[1].cards).toBeNull();
     });
 });
+
+describe('renderWithCore: timeframe and benchmarks', () => {
+    const assembled = (options: {
+        onPromptAssembled: (r: AssembledPromptRecord) => void;
+    }): { status: string } => {
+        options.onPromptAssembled({
+            system: 's',
+            stable: 'a',
+            dynamic: 'b',
+            promptVersion: 'p',
+        });
+        return { status: 'error' };
+    };
+
+    it('analyses at 1Day unless a timeframe is given, and at the given one otherwise', async () => {
+        core.runAnalysis.mockImplementation(
+            async (_s, _n, _t, _f, _x, options) => assembled(options)
+        );
+        await renderWithCore(input());
+        expect(core.runAnalysis.mock.calls.map(c => c[2])).toEqual([
+            '1Day',
+            '1Day',
+        ]);
+        core.runAnalysis.mockClear();
+        await renderWithCore({ ...input(), timeframe: '1Hour' });
+        expect(core.runAnalysis.mock.calls.map(c => c[2])).toEqual([
+            '1Hour',
+            '1Hour',
+        ]);
+    });
+
+    it("passes the benchmark of the case's market only when its bars are held, and serves them behind the asOf barrier", async () => {
+        const served: { symbol: string; times: number[] }[] = [];
+        core.runAnalysis.mockImplementation(
+            async (_s, _n, _t, _f, _x, options) => {
+                const provider = (
+                    options as unknown as {
+                        marketDataProvider: {
+                            getBars: (o: {
+                                symbol: string;
+                                timeframe: string;
+                            }) => Promise<{ time: number }[]>;
+                        };
+                    }
+                ).marketDataProvider;
+                served.push({
+                    symbol: 'SPY',
+                    times: (
+                        await provider.getBars({
+                            symbol: 'SPY',
+                            timeframe: '1Day',
+                        })
+                    ).map(b => b.time),
+                });
+                return assembled(options);
+            }
+        );
+        const bar = (iso: string) => ({
+            time: Date.parse(`${iso}T00:00:00Z`) / 1000,
+            open: 1,
+            high: 2,
+            low: 1,
+            close: 1,
+            volume: 1,
+        });
+        const benchmarks = new Map([
+            ['SPY', [bar('2024-03-07'), bar('2024-03-08'), bar('2024-03-11')]],
+        ]);
+        await renderWithCore({ ...input(), benchmarks });
+        expect(served[0].times).toEqual([
+            bar('2024-03-07').time,
+            bar('2024-03-08').time,
+        ]);
+        const options = core.runAnalysis.mock.calls.map(
+            c => c[5] as unknown as { benchmark?: { symbol: string } }
+        );
+        expect(options.every(o => o.benchmark?.symbol === 'SPY')).toBe(true);
+        core.runAnalysis.mockClear();
+        core.runAnalysis.mockImplementation(
+            async (_s, _n, _t, _f, _x, options) => assembled(options)
+        );
+        await renderWithCore({ ...input(), benchmarks: new Map() });
+        expect(
+            core.runAnalysis.mock.calls.every(
+                c =>
+                    (c[5] as unknown as { benchmark?: unknown }).benchmark ===
+                    undefined
+            )
+        ).toBe(true);
+    });
+});

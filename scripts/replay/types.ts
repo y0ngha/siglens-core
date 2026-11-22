@@ -8,6 +8,7 @@ import type {
     Bar,
     EntryRecommendation,
     OutcomeSubject,
+    Timeframe,
 } from '@/domain/types';
 
 export type ReplayMarket = 'us' | 'kr';
@@ -52,7 +53,7 @@ export interface ReplayCase {
     /** `${symbol}|${asOf}` */
     caseId: string;
     symbol: string;
-    timeframe: '1Day';
+    timeframe: Timeframe;
     /** The analysed (closed) daily bar, `YYYY-MM-DD`. */
     asOf: string;
     regime: ReplayRegime;
@@ -80,6 +81,8 @@ export interface RunMeta {
     promptTemplateVersion: string;
     model: string;
     tier: string;
+    /** Chart timeframe the cases were analysed at; absent in runs made before WP-19 (`1Day`). */
+    timeframe?: Timeframe;
     skillsSha256: string;
     repeat: number;
     subset: 'variance' | null;

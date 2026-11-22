@@ -256,6 +256,10 @@ const baseArgs = (overrides: Partial<FieldsEvalArgs>): FieldsEvalArgs => ({
     lang: 'ko',
     restate: false,
     legacyZone: false,
+    timeframe: null,
+    benchmarkBars: null,
+    stride: 1,
+    selfCheck: false,
     ...overrides,
 });
 

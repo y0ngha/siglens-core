@@ -17,6 +17,12 @@
  *       --run <after> --before <before> [--repeat <run>] [--noise-pp <n>] [--lang ko|en]
  *   npx tsx scripts/replay/analysisFieldsEval.ts --mode zone --set <set> --out <dir> --run <run>
  *       [--before <run>] [--restate exact] [--lang ko|en]
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode htf --set <set> --skills <app>/skills --out <dir>
+ *       [--timeframe 1Day|1Week] [--tier free|member] [--limit N] [--baseline <earlier htf out dir>]
+ *       [--benchmark-bars <dir of <SYMBOL>.json>] [--run <run of this timeframe>]
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode htf-forward --set <set> --out <dir> [--stride N]
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode weekly-hygiene --set <set> --skills <app>/skills --out <dir>
+ *       [--tier free|member] [--limit N] [--run <weekly run> --before <daily run>]
  *
  * - `trend`: the shipped trend rule (EMA20 move in ATR(14)) and two reference rules
  *   recomputed from OHLC for every day from bar 300 (label distribution, day-to-day change,
@@ -44,6 +50,17 @@
  * - `zone` (WP-18): where the close sits against the entry zone, the position under the 1%
  *   tolerance and under exact edges, the pullback-cue rate of the prose and the stratified
  *   sample for the manual read (Z1, Z2, N2, N3; `--restate exact` re-derives an old run).
+ *
+ * - `htf` (WP-19): renders every case (no model call) at `--timeframe` and checks the weekly
+ *   rows and the unfinished-week tag (W1, W2), the higher-timeframe block (H1, and H1b against a
+ *   run's attached reading), the market backdrop (H4, H4k) and byte identity with an earlier
+ *   render (H2a, H2b), each against a recomputation from the set's stored bars.
+ * - `htf-forward` (WP-19): the case table (daily against weekly trend, weekly bar counts, the
+ *   unfinished week) and the M1 forward measure that decides whether the block may say that
+ *   agreement showed no measured edge. Uses the shipped trend and aggregation functions.
+ * - `weekly-hygiene` (WP-19): renders `1Week` and `1Day` and checks what a weekly prompt must
+ *   not carry from the daily one and what it must carry instead (K1), the `riskLevel` of two
+ *   runs (K2) and the per-guide injection rates (K3, reported).
  *
  * Every definition is recomputed here (`analysisFieldsEvalTypes.ts` holds the constants);
  * the stored field under test is only ever the thing compared with. Gates (WP-15 §7.3) are
@@ -115,7 +132,11 @@ import {
     type ZoneCase,
     type ZoneLanguage,
 } from './analysisFieldsEvalZone';
-import { renderWithCore, type RenderSkills } from './analysisFieldsEvalRender';
+import {
+    renderWithCore,
+    type Rendered,
+    type RenderSkills,
+} from './analysisFieldsEvalRender';
 import {
     compareLevelOverlap,
     levelOverlapPerCase,
@@ -140,6 +161,50 @@ import {
 } from './analysisFieldsEvalTypes';
 import { loadBarsDir } from './engineEval';
 import {
+    CELL_LABELS,
+    FORWARD_CONSTANTS,
+    caseRow,
+    m1Gate,
+    observationsOf,
+    summarizeCases,
+    summarizeForward,
+    type ForwardLabelers,
+} from './htfEvalForward';
+import {
+    checkBackdrop,
+    checkGate,
+    checkHigherBlock,
+    checkWeekTag,
+    checkAttachedReading,
+    checkWeeklyRows,
+    compareIdentity,
+    hashRowOf,
+    identityGate,
+    notApplicable,
+    summarizeChecks,
+    weekProgressOf,
+    type Check,
+    type CheckRow,
+    type HashRow,
+    type HtfCaseData,
+    type HtfSample,
+} from './htfEvalGates';
+import {
+    HTF_EVAL_CONSTANTS,
+    coreTimeframe,
+    usableBars,
+    type HtfTimeframe,
+} from './htfEvalCompute';
+import {
+    DAILY_ONLY_PATTERNS,
+    WEEKLY_HORIZONS,
+    checkWeeklyHygiene,
+    hygieneExtras,
+    injectionRates,
+    k1Gate,
+    k2Gate,
+} from './htfEvalWeekly';
+import {
     REPO_ROOT,
     assertOutsideRepo,
     gitOutput,
@@ -150,7 +215,7 @@ import {
 } from './fsUtil';
 import { marketOfSymbol } from './markets';
 import { bucketOf } from './reportCompute';
-import { selectRunCases } from './run';
+import { hashTree, selectRunCases } from './run';
 import { barsFingerprint, verifySetHashes } from './setIntegrity';
 import type {
     CaseResultFile,
@@ -163,6 +228,7 @@ import type {
 } from './types';
 import { buildOutcomeWindow } from '@/domain/outcomes/buildOutcomeWindow';
 import { labelAnalysisOutcome } from '@/domain/outcomes/labelAnalysisOutcome';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import type { Bar } from '@/domain/types';
 
 // ─── Arguments ────────────────────────────────────────────────────────────────
@@ -200,6 +266,14 @@ export interface FieldsEvalArgs {
      * legacy run fails by design.
      */
     legacyZone: boolean;
+    /** `htf`: render twice in one process and report whether the two renders hash alike. */
+    selfCheck: boolean;
+    /** `htf`: the chart timeframe rendered; `1Day` when absent. */
+    timeframe: HtfTimeframe | null;
+    /** `htf`: a directory of `<SYMBOL>.json` stored-bars files of benchmarks the set does not hold. */
+    benchmarkBars: string | null;
+    /** `htf-forward`: measure every `stride`-th day (1 measures all). */
+    stride: number;
 }
 
 const GATE_IDS: Record<EvalMode, readonly string[]> = {
@@ -223,6 +297,9 @@ const GATE_IDS: Record<EvalMode, readonly string[]> = {
     ],
     claims: ['C1', 'C2', 'F1', 'F2', 'L1', 'O1', 'V1'],
     zone: ['Z1', 'Z2', 'N2', 'N3'],
+    htf: ['W1', 'W2', 'H1', 'H1b', 'H2a', 'H2b', 'H4', 'H4k'],
+    'htf-forward': ['M1'],
+    'weekly-hygiene': ['K1', 'K2', 'K3'],
 };
 
 function parseMode(raw: string | undefined): EvalMode {
@@ -271,6 +348,21 @@ function parseRestate(raw: string | undefined): boolean {
     throw new Error('--restate must be "exact"');
 }
 
+/**
+ * `--timeframe`: only a timeframe core knows. `1Week` is refused, with the known list, until
+ * core builds weekly bars (WP-19 core-1): a weekly measurement must never be a daily one.
+ */
+function parseTimeframe(raw: string | undefined): HtfTimeframe | null {
+    if (raw === undefined) return null;
+    const timeframe = TIMEFRAMES.find(candidate => candidate === raw);
+    if (timeframe === undefined) {
+        throw new Error(
+            `--timeframe must be one of ${TIMEFRAMES.join(', ')} (got "${raw}")`
+        );
+    }
+    return timeframe;
+}
+
 function parseCount(raw: string | undefined, flag: string): number | null {
     if (raw === undefined) return null;
     const value = Number(raw);
@@ -306,6 +398,13 @@ export function parseFieldsEvalArgs(argv: readonly string[]): FieldsEvalArgs {
         lang: parseLang(raw.lang),
         restate: parseRestate(raw.restate),
         legacyZone: raw['legacy-zone'] === 'true',
+        selfCheck: raw['self-check'] === 'true',
+        timeframe: parseTimeframe(raw.timeframe),
+        benchmarkBars:
+            raw['benchmark-bars'] === undefined
+                ? null
+                : resolve(raw['benchmark-bars']),
+        stride: parseCount(raw.stride, 'stride') ?? 1,
     };
     if (!Number.isFinite(args.noisePp) || args.noisePp < 0) {
         throw new Error('--noise-pp must be a non-negative number');
@@ -316,8 +415,63 @@ export function parseFieldsEvalArgs(argv: readonly string[]): FieldsEvalArgs {
 
 function validateCombination(args: FieldsEvalArgs): void {
     const { mode } = args;
-    if ((args.tier !== null || args.baseline !== null) && mode !== 'gating') {
-        throw new Error(`${mode}: --tier and --baseline apply to gating only`);
+    const tierAllowed =
+        mode === 'gating' || mode === 'htf' || mode === 'weekly-hygiene';
+    const baselineAllowed = mode === 'gating' || mode === 'htf';
+    if (
+        (args.tier !== null && !tierAllowed) ||
+        (args.baseline !== null && !baselineAllowed)
+    ) {
+        throw new Error(
+            `${mode}: --tier and --baseline apply to gating only (--tier also to htf and weekly-hygiene, --baseline also to htf)`
+        );
+    }
+    if (args.selfCheck && mode !== 'htf') {
+        throw new Error(`${mode}: --self-check applies to htf only`);
+    }
+    if (args.timeframe !== null && mode !== 'htf') {
+        throw new Error(`${mode}: --timeframe applies to htf only`);
+    }
+    if (args.benchmarkBars !== null && mode !== 'htf') {
+        throw new Error(`${mode}: --benchmark-bars applies to htf only`);
+    }
+    if (mode === 'htf') {
+        if (args.set === null || args.skills === null) {
+            throw new Error('htf: --set and --skills are required');
+        }
+        if (args.before !== null || args.memberRun !== null) {
+            throw new Error('htf: --before and --member-run do not apply');
+        }
+        return;
+    }
+    if (mode === 'htf-forward') {
+        if (args.set === null)
+            throw new Error('htf-forward: --set is required');
+        if (
+            args.skills !== null ||
+            args.run !== null ||
+            args.before !== null ||
+            args.limit !== null
+        ) {
+            throw new Error(
+                'htf-forward: only --set, --out and --stride apply'
+            );
+        }
+        return;
+    }
+    if (mode === 'weekly-hygiene') {
+        if (args.set === null || args.skills === null) {
+            throw new Error('weekly-hygiene: --set and --skills are required');
+        }
+        if ((args.run === null) !== (args.before === null)) {
+            throw new Error(
+                'weekly-hygiene: --run (weekly) and --before (daily) are given together'
+            );
+        }
+        return;
+    }
+    if (args.stride !== 1) {
+        throw new Error(`${mode}: --stride applies to htf-forward only`);
     }
     if (args.repeat !== null && mode !== 'output' && mode !== 'claims') {
         throw new Error(`${mode}: --repeat applies to output and claims only`);
@@ -523,6 +677,7 @@ const PAIRED_RUN_FIELDS = [
     'subset',
     'limit',
     'repeat',
+    'timeframe',
 ] as const satisfies readonly (keyof RunMeta)[];
 
 /** Throws when two runs differ in a field that makes them incomparable. */
@@ -531,7 +686,14 @@ export function assertComparableRuns(
     b: RunData,
     fields: readonly (keyof RunMeta)[]
 ): void {
-    const differing = fields.filter(field => a.meta[field] !== b.meta[field]);
+    // A run made before WP-19 has no `timeframe` and was a `1Day` run.
+    const valueOf = (run: RunData, field: keyof RunMeta) =>
+        field === 'timeframe'
+            ? (run.meta.timeframe ?? '1Day')
+            : run.meta[field];
+    const differing = fields.filter(
+        field => valueOf(a, field) !== valueOf(b, field)
+    );
     if (differing.length > 0) {
         throw new Error(
             `${a.dir} and ${b.dir} are not comparable: ${differing.join(', ')} differ`
@@ -688,7 +850,37 @@ interface ModeOutput {
     rows: readonly unknown[];
     /** Rows that could not be located on bars; they fail a gated run unless allowed. */
     skipped: number;
+    /**
+     * What `--gate all` resolves to for this input, and the gates it left out with the reason.
+     * Absent: every gate of the mode.
+     */
+    scope?: GateScope;
 }
+
+/** The gates `--gate all` selects for one input, and those it leaves out (and why). */
+export interface GateScope {
+    ids: readonly string[];
+    deferred: readonly { id: string; reason: string }[];
+}
+
+/** Splits the gates of a mode into those this input can decide and those it cannot, by input. */
+export function resolveGateScope(
+    all: readonly string[],
+    conditions: Readonly<Record<string, string | null>>
+): GateScope {
+    const reasonOf = (id: string): string | null => conditions[id] ?? null;
+    return {
+        ids: all.filter(id => reasonOf(id) === null),
+        deferred: all.flatMap(id => {
+            const reason = reasonOf(id);
+            return reason === null ? [] : [{ id, reason }];
+        }),
+    };
+}
+
+/** Why `H4k` is deferred without Korean index bars (orchestrator decision 2026-11-22). */
+export const H4K_DEFERRED_REASON =
+    'no KR index bars (orchestrator decision 2026-11-22; final combined A/B)';
 
 function trendMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
     const set = args.set === null ? null : loadSetData(args.set);
@@ -1621,6 +1813,697 @@ function zoneMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
     };
 }
 
+// ─── WP-19: weekly bars and the higher-timeframe block ───────────────────────
+
+/** Stored bars of every symbol of the set and of every `<SYMBOL>.json` in `dir`. */
+export function benchmarkBarsOf(
+    set: SetData,
+    dir: string | null
+): ReadonlyMap<string, readonly Bar[]> {
+    const own = [...set.storedOf].map(
+        ([symbol, stored]) => [symbol, stored.bars] as const
+    );
+    const extra =
+        dir === null
+            ? []
+            : readdirSync(dir)
+                  .filter(name => name.endsWith('.json'))
+                  .toSorted()
+                  .map(name => {
+                      const symbol = name.slice(0, -'.json'.length);
+                      const stored = readJson<StoredBars>(join(dir, name));
+                      if (
+                          !Array.isArray(stored.bars) ||
+                          stored.bars.length === 0
+                      ) {
+                          throw new Error(`${join(dir, name)} has no bars`);
+                      }
+                      if (set.storedOf.has(symbol)) {
+                          throw new Error(
+                              `${join(dir, name)}: ${symbol} is already a symbol of the set; remove the file so the benchmark has one source`
+                          );
+                      }
+                      return [symbol, stored.bars] as const;
+                  });
+    return new Map([...own, ...extra]);
+}
+
+/** What produced a render: the code, its uncommitted diff and the skills the prompts were built from. */
+export interface RenderIdentity {
+    coreGitSha: string;
+    dirtyDiffSha256: string | null;
+    skillsSha256: string;
+}
+
+const describeIdentity = (id: RenderIdentity): string =>
+    `${id.coreGitSha}${id.dirtyDiffSha256 === null ? '' : ` (diff ${id.dirtyDiffSha256.slice(0, 12)})`}, skills ${id.skillsSha256.slice(0, 12)}`;
+
+/**
+ * The hash rows of an earlier `htf` output, refused unless it is the same measurement made by
+ * other code: an identity gate against a render of the very same code compares a render with
+ * itself and passes whatever the change did. Returns the baseline's own identity so the gates
+ * can print it beside the current one.
+ */
+export function readHtfBaseline(
+    dir: string,
+    expected: {
+        fingerprint: string;
+        timeframe: HtfTimeframe;
+        tiers: readonly string[];
+        limit: number | null;
+        current: RenderIdentity;
+    }
+): { rows: readonly HashRow[]; identity: RenderIdentity } {
+    const run = readJson<{
+        tool?: unknown;
+        mode?: unknown;
+        coreGitSha?: unknown;
+        dirtyDiffSha256?: unknown;
+        inputs?: Record<string, unknown>;
+    }>(join(dir, 'run.json'));
+    if (run.tool !== 'analysisFieldsEval' || run.mode !== 'htf') {
+        throw new Error(`${dir} is not an analysisFieldsEval htf output`);
+    }
+    const same =
+        run.inputs?.fingerprint === expected.fingerprint &&
+        run.inputs?.timeframe === expected.timeframe &&
+        run.inputs?.limit === expected.limit &&
+        JSON.stringify(run.inputs?.tiers) === JSON.stringify(expected.tiers);
+    if (!same) {
+        throw new Error(
+            `${dir} is not comparable: set, timeframe, tiers and limit must match`
+        );
+    }
+    const skillsSha256 = asRec(run.inputs?.identity)?.skillsSha256;
+    if (
+        typeof run.coreGitSha !== 'string' ||
+        typeof skillsSha256 !== 'string' ||
+        (run.dirtyDiffSha256 !== null &&
+            typeof run.dirtyDiffSha256 !== 'string')
+    ) {
+        throw new Error(
+            `${dir} records no code identity (coreGitSha, dirtyDiffSha256, skillsSha256)`
+        );
+    }
+    const identity: RenderIdentity = {
+        coreGitSha: run.coreGitSha,
+        dirtyDiffSha256: run.dirtyDiffSha256,
+        skillsSha256,
+    };
+    if (
+        identity.coreGitSha === expected.current.coreGitSha &&
+        identity.dirtyDiffSha256 === expected.current.dirtyDiffSha256 &&
+        identity.skillsSha256 === expected.current.skillsSha256
+    ) {
+        throw new Error(
+            `${dir} was made by the same code as this run (${describeIdentity(identity)}): an identity check against it compares a render with itself`
+        );
+    }
+    const rows = readFileSync(join(dir, 'rows.jsonl'), 'utf-8')
+        .split('\n')
+        .filter(line => line !== '')
+        .map((line): HashRow => {
+            const row = asRec(JSON.parse(line));
+            const tier = SKILL_TIERS.find(t => t === row?.tier);
+            if (
+                typeof row?.caseId !== 'string' ||
+                tier === undefined ||
+                typeof row.stableSha256 !== 'string' ||
+                typeof row.dynamicSha256 !== 'string' ||
+                typeof row.strippedSha256 !== 'string'
+            ) {
+                throw new Error(`${dir}/rows.jsonl has a row without hashes`);
+            }
+            return {
+                caseId: row.caseId,
+                tier,
+                stableSha256: row.stableSha256,
+                dynamicSha256: row.dynamicSha256,
+                strippedSha256: row.strippedSha256,
+            };
+        });
+    return { rows, identity };
+}
+
+/** The set's stored bars of each case's symbol, as the checks read them. */
+function caseDataOf(
+    set: SetData,
+    cases: readonly ReplayCase[],
+    benchmarks: ReadonlyMap<string, readonly Bar[]>
+): ReadonlyMap<string, HtfCaseData> {
+    return new Map(
+        cases.map(replayCase => {
+            const stored = set.storedOf.get(replayCase.symbol);
+            if (stored === undefined) {
+                throw new Error(`no bars for ${replayCase.symbol}`);
+            }
+            return [
+                replayCase.caseId,
+                { replayCase, bars: stored.bars, benchmarks },
+            ];
+        })
+    );
+}
+
+const dataFor = (
+    data: ReadonlyMap<string, HtfCaseData>,
+    caseId: string
+): HtfCaseData => {
+    const found = data.get(caseId);
+    if (found === undefined) throw new Error(`no case data for ${caseId}`);
+    return found;
+};
+
+/** The timeframe a run was made at (`1Day` for a run made before WP-19). */
+function runTimeframe(run: RunData): HtfTimeframe {
+    return run.meta.timeframe ?? '1Day';
+}
+
+/** H1b: a run's attached `higherTimeframe` reading against the recomputation. */
+function attachedReadingChecks(
+    run: RunData,
+    timeframe: HtfTimeframe,
+    data: ReadonlyMap<string, HtfCaseData>
+): readonly CheckRow[] {
+    return run.results
+        .filter(r => r.repeat === 1)
+        .flatMap(result => {
+            const caseData = data.get(result.caseId);
+            if (caseData === undefined) return [];
+            const reading = asRec(
+                asRec(result.unfilteredResult)?.higherTimeframe
+            );
+            return [
+                {
+                    caseId: result.caseId,
+                    tier: tierOf(run.meta.tier),
+                    check: checkAttachedReading(reading, caseData, timeframe),
+                },
+            ];
+        });
+}
+
+async function htfMode(
+    args: FieldsEvalArgs,
+    deps: FieldsEvalDeps
+): Promise<ModeOutput> {
+    const set = loadSetData(args.set ?? '');
+    const timeframe: HtfTimeframe = args.timeframe ?? '1Day';
+    const cases = selectRunCases(set.manifest, {
+        subset: null,
+        limit: args.limit,
+    });
+    if (cases.length === 0) throw new Error('no case to render');
+    const tiers = args.tier === null ? SKILL_TIERS : [args.tier];
+    const benchmarks = benchmarkBarsOf(set, args.benchmarkBars);
+    const data = caseDataOf(set, cases, benchmarks);
+    deps.log(
+        `htf: rendering ${cases.length} cases at ${timeframe} for ${tiers.join(' and ')}`
+    );
+    const renderInput = {
+        skillsDir: args.skills ?? '',
+        cases,
+        tiers,
+        timeframe: coreTimeframe(timeframe),
+        benchmarks,
+        storedOf: (symbol: string): StoredBars => {
+            const stored = set.storedOf.get(symbol);
+            if (stored === undefined) throw new Error(`no bars for ${symbol}`);
+            return stored;
+        },
+        log: deps.log,
+    };
+    const rendered = await deps.render(renderInput);
+    const samples: readonly HtfSample[] = rendered.samples;
+    // Reported, not a gate: does the same code in the same process render the same bytes twice?
+    // A difference means an identity gate against another process's render would be noisy.
+    const selfCheck = args.selfCheck
+        ? selfCheckOf(samples, (await deps.render(renderInput)).samples)
+        : null;
+    if (selfCheck !== null) {
+        deps.log(
+            `htf self-check: ${selfCheck.identical}/${selfCheck.samples} samples hash alike across two renders in one process (${selfCheck.differing.length} differ)`
+        );
+    }
+    const rowsOf = (check: (s: HtfSample, d: HtfCaseData) => Check) =>
+        samples.map((s): CheckRow => ({
+            caseId: s.caseId,
+            tier: s.tier,
+            check: check(s, dataFor(data, s.caseId)),
+        }));
+    const kr = (s: HtfSample): boolean =>
+        marketOfSymbol(dataFor(data, s.caseId).replayCase.symbol) === 'kr';
+    const weekly = timeframe === '1Week';
+    const w1 = rowsOf((s, d) =>
+        weekly ? checkWeeklyRows(s, d) : notApplicable('W1 reads 1Week prompts')
+    );
+    const w2 = rowsOf((s, d) =>
+        weekly ? checkWeekTag(s, d) : notApplicable('W2 reads 1Week prompts')
+    );
+    const h1 = rowsOf((s, d) => checkHigherBlock(s, d, timeframe));
+    const h4All = rowsOf((s, d) => checkBackdrop(s, d));
+    const h4 = h4All.filter((_, i) => !kr(samples[i]));
+    const h4k = h4All.filter((_, i) => kr(samples[i]));
+    const hashes = samples.map(hashRowOf);
+    const current: RenderIdentity = {
+        coreGitSha: deps.gitSha(),
+        dirtyDiffSha256: deps.dirtyDiffSha256(),
+        skillsSha256: (deps.skillsSha256 ?? hashTree)(args.skills ?? ''),
+    };
+    const baseline =
+        args.baseline === null
+            ? null
+            : readHtfBaseline(args.baseline, {
+                  fingerprint: set.fingerprint,
+                  timeframe,
+                  tiers,
+                  limit: args.limit,
+                  current,
+              });
+    const identity =
+        baseline === null ? null : compareIdentity(hashes, baseline.rows);
+    const identityNote =
+        baseline === null
+            ? ''
+            : `current: ${describeIdentity(current)}; baseline: ${describeIdentity(baseline.identity)}`;
+    if (baseline !== null) deps.log(`htf identity: ${identityNote}`);
+    const carriesBlocks = hashes.some(
+        h => h.strippedSha256 !== h.dynamicSha256
+    );
+    const baselineCarriesBlocks =
+        baseline?.rows.some(
+            r =>
+                r.strippedSha256 !== undefined &&
+                r.strippedSha256 !== r.dynamicSha256
+        ) ?? false;
+    const scope = resolveGateScope(GATE_IDS.htf, {
+        W1: weekly ? null : 'applies to 1Week renders only',
+        W2: weekly ? null : 'applies to 1Week renders only',
+        H1b: args.run === null ? 'no --run' : null,
+        // One of the two applies, by stage: a render that carries the registered blocks is
+        // judged by H2b (cut and compare); one that does not, by H2a (compare as is). Both
+        // gates would otherwise fail one of the two stages by design.
+        H2a:
+            args.baseline === null
+                ? 'no --baseline'
+                : carriesBlocks
+                  ? 'render carries the registered blocks: H2b applies'
+                  : null,
+        H2b:
+            args.baseline === null
+                ? 'no --baseline'
+                : carriesBlocks
+                  ? null
+                  : 'identical to H2a before the blocks exist',
+        H4k:
+            benchmarks.has('KS11') && benchmarks.has('KQ11')
+                ? null
+                : H4K_DEFERRED_REASON,
+    });
+    const run = args.run === null ? null : loadRunData(args.run, set);
+    if (run !== null && runTimeframe(run) !== timeframe) {
+        throw new Error(
+            `${run.dir} is a ${runTimeframe(run)} run, not ${timeframe}`
+        );
+    }
+    const h1b =
+        run === null ? null : attachedReadingChecks(run, timeframe, data);
+    const summaries = {
+        W1: summarizeChecks(w1),
+        W2: summarizeChecks(w2),
+        H1: summarizeChecks(h1),
+        H1b: h1b === null ? null : summarizeChecks(h1b),
+        H4: summarizeChecks(h4),
+        H4k: summarizeChecks(h4k),
+    };
+    const progress = weekly
+        ? cases.map(c => weekProgressOf(dataFor(data, c.caseId)))
+        : null;
+    const gates: GateResult[] = [
+        checkGate(
+            'W1',
+            'printed weekly rows equal the own ISO-week aggregation',
+            w1
+        ),
+        checkGate(
+            'W2',
+            'printed in-progress tag and session counts equal the recomputation',
+            w2
+        ),
+        checkGate(
+            'H1',
+            'printed higher-timeframe block equals the recomputation',
+            h1
+        ),
+        h1b === null
+            ? {
+                  id: 'H1b',
+                  description:
+                      'attached higherTimeframe reading equals the recomputation',
+                  pass: null,
+                  value: 'no --run',
+                  threshold: '100% of the population',
+              }
+            : checkGate(
+                  'H1b',
+                  'attached higherTimeframe reading equals the recomputation',
+                  h1b
+              ),
+        identityGate(
+            'H2a',
+            'render is byte-identical to the earlier render',
+            identity,
+            samples.length,
+            identityNote
+        ),
+        identityGate(
+            'H2b',
+            'render with the registered blocks cut is byte-identical to the earlier render',
+            identity,
+            samples.length,
+            identityNote,
+            baselineCarriesBlocks
+        ),
+        checkGate(
+            'H4',
+            'printed US market backdrop equals the recomputation from stored bars',
+            h4
+        ),
+        checkGate(
+            'H4k',
+            'printed Korean market backdrop equals the recomputation from stored index bars',
+            h4k
+        ),
+    ];
+    return {
+        inputs: {
+            fingerprint: set.fingerprint,
+            skillsDir: args.skills,
+            limit: args.limit,
+            tiers,
+            timeframe,
+            baseline: args.baseline,
+            benchmarkBars: args.benchmarkBars,
+            identity: current,
+            baselineIdentity: baseline?.identity ?? null,
+            benchmarkSymbols: [...benchmarks.keys()].filter(
+                symbol => !set.storedOf.has(symbol)
+            ),
+            run: run === null ? null : { dir: run.dir, ...run.meta },
+        },
+        summary: {
+            htf: {
+                timeframe,
+                ...summaries,
+                identity,
+                selfCheck,
+                carriesBlocks,
+                baselineCarriesBlocks,
+                weekProgress:
+                    progress === null
+                        ? null
+                        : {
+                              inProgress: progress.filter(
+                                  p => p?.inProgress === true
+                              ).length,
+                              finished: progress.filter(
+                                  p => p?.inProgress === false
+                              ).length,
+                              undetermined: progress.filter(p => p === null)
+                                  .length,
+                          },
+            },
+        },
+        gates,
+        rows: samples.map((s, i) => ({
+            timeframe,
+            ...hashes[i],
+            dynamicChars: s.dynamic.length,
+            failures: {
+                W1: w1[i].check.failures,
+                W2: w2[i].check.failures,
+                H1: h1[i].check.failures,
+                H4: h4All[i].check.failures,
+            },
+            notComputable: {
+                W1: w1[i].check.notComputable,
+                W2: w2[i].check.notComputable,
+                H1: h1[i].check.notComputable,
+                H4: h4All[i].check.notComputable,
+            },
+        })),
+        skipped: 0,
+        scope,
+    };
+}
+
+/** Two renders of the same input in one process: how many samples hash alike. */
+function selfCheckOf(
+    first: readonly HtfSample[],
+    second: readonly HtfSample[]
+): { samples: number; identical: number; differing: readonly string[] } {
+    const hashOf = (s: HtfSample): string =>
+        sha256Hex(`${s.stable}\0${s.dynamic}`);
+    const again = new Map(
+        second.map(s => [`${s.caseId}#${s.tier}`, hashOf(s)])
+    );
+    const differing = first
+        .filter(s => again.get(`${s.caseId}#${s.tier}`) !== hashOf(s))
+        .map(s => `${s.caseId}#${s.tier}`);
+    return {
+        samples: first.length,
+        identical: first.length - differing.length,
+        differing: differing.slice(0, 5),
+    };
+}
+
+/** The `weekly-hygiene` mode (K1 to K3): renders `1Week` and `1Day`, then checks each weekly sample. */
+async function weeklyHygieneMode(
+    args: FieldsEvalArgs,
+    deps: FieldsEvalDeps
+): Promise<ModeOutput> {
+    const set = loadSetData(args.set ?? '');
+    const cases = selectRunCases(set.manifest, {
+        subset: null,
+        limit: args.limit,
+    });
+    if (cases.length === 0) throw new Error('no case to render');
+    const tiers = args.tier === null ? SKILL_TIERS : [args.tier];
+    const data = caseDataOf(set, cases, new Map());
+    const input = {
+        skillsDir: args.skills ?? '',
+        cases,
+        tiers,
+        storedOf: (symbol: string): StoredBars => {
+            const stored = set.storedOf.get(symbol);
+            if (stored === undefined) throw new Error(`no bars for ${symbol}`);
+            return stored;
+        },
+        log: deps.log,
+    };
+    deps.log(
+        `weekly-hygiene: rendering ${cases.length} cases at 1Week and 1Day`
+    );
+    const weeklyRender = await deps.render({
+        ...input,
+        timeframe: coreTimeframe('1Week'),
+    });
+    const dailyRender = await deps.render({ ...input, timeframe: '1Day' });
+    const key = (s: { caseId: string; tier: string }): string =>
+        `${s.caseId}#${s.tier}`;
+    const dailyOf = new Map(dailyRender.samples.map(s => [key(s), s]));
+    const paired = weeklyRender.samples.map(weekly => {
+        const daily = dailyOf.get(key(weekly));
+        if (daily === undefined) {
+            throw new Error(`${key(weekly)}: no daily render to pair with`);
+        }
+        return { weekly, daily, data: dataFor(data, weekly.caseId) };
+    });
+    const k1 = paired.map((p): CheckRow => ({
+        caseId: p.weekly.caseId,
+        tier: p.weekly.tier,
+        check: checkWeeklyHygiene(p.weekly, p.daily, p.data),
+    }));
+    const skillsOf = (render: Rendered): Map<string, readonly string[]> =>
+        new Map(
+            skillRows(render.catalog, render.samples).map(r => [
+                key(r),
+                r.skills,
+            ])
+        );
+    const k3 = {
+        weekly: injectionRates(skillsOf(weeklyRender), weeklyRender.samples),
+        daily: injectionRates(skillsOf(dailyRender), dailyRender.samples),
+    };
+    const weeklyRun = args.run === null ? null : loadRunData(args.run, set);
+    const dailyRun =
+        args.before === null ? null : loadRunData(args.before, set);
+    if (weeklyRun !== null && dailyRun !== null) {
+        assertComparableRuns(
+            weeklyRun,
+            dailyRun,
+            PAIRED_RUN_FIELDS.filter(field => field !== 'timeframe')
+        );
+        if (
+            runTimeframe(weeklyRun) !== '1Week' ||
+            runTimeframe(dailyRun) !== '1Day'
+        ) {
+            throw new Error(
+                '--run must be a 1Week run and --before a 1Day run'
+            );
+        }
+    }
+    const riskOf = (run: RunData): Map<string, unknown> =>
+        new Map(
+            run.results
+                .filter(r => r.repeat === 1)
+                .map(r => [r.caseId, asRec(r.unfilteredResult)?.riskLevel])
+        );
+    const k2Pairs =
+        weeklyRun === null || dailyRun === null
+            ? null
+            : [...riskOf(weeklyRun)].map(([caseId, weekly]) => ({
+                  caseId,
+                  weekly,
+                  daily: riskOf(dailyRun).get(caseId),
+              }));
+    const k1Summary = summarizeChecks(k1);
+    return {
+        inputs: {
+            fingerprint: set.fingerprint,
+            skillsDir: args.skills,
+            limit: args.limit,
+            tiers,
+            run:
+                weeklyRun === null
+                    ? null
+                    : { dir: weeklyRun.dir, ...weeklyRun.meta },
+            before:
+                dailyRun === null
+                    ? null
+                    : { dir: dailyRun.dir, ...dailyRun.meta },
+            registered: {
+                dailyOnlyPatterns: DAILY_ONLY_PATTERNS.map(p => ({
+                    name: p.name,
+                    pattern: p.pattern.source,
+                })),
+                weeklyHorizons: WEEKLY_HORIZONS,
+            },
+        },
+        summary: {
+            k1: k1Summary,
+            extras: hygieneExtras(paired),
+            k3,
+        },
+        gates: [
+            k1Gate(k1),
+            k2Gate(k2Pairs, cases.length),
+            {
+                id: 'K3',
+                description:
+                    'per-guide injection rates and qualified-pattern counts, weekly against daily (reported)',
+                pass:
+                    paired.length === cases.length * tiers.length ? true : null,
+                value: `${k3.weekly.n} weekly and ${k3.daily.n} daily samples`,
+                threshold: 'computed for every sample (no threshold)',
+            },
+        ],
+        rows: paired.map((p, i) => ({
+            caseId: p.weekly.caseId,
+            tier: p.weekly.tier,
+            weeklyChars: p.weekly.dynamic.length,
+            dailyChars: p.daily.dynamic.length,
+            failures: k1[i].check.failures,
+            notComputable: k1[i].check.notComputable,
+        })),
+        skipped: 0,
+        scope: resolveGateScope(GATE_IDS['weekly-hygiene'], {
+            K2: k2Pairs === null ? 'no --run and --before' : null,
+        }),
+    };
+}
+
+/** The `htf-forward` mode: the case table and the M1 forward measure. */
+async function htfForwardMode(
+    args: FieldsEvalArgs,
+    deps: FieldsEvalDeps
+): Promise<ModeOutput> {
+    const set = loadSetData(args.set ?? '');
+    const [
+        { computeAnalysisTrend },
+        { calculateIndicators },
+        { aggregateBarsToWeekly },
+    ] = await Promise.all([
+        import('@/domain/analysis/analysisTrend'),
+        import('@/domain/indicators'),
+        import('@/domain/analysis/aggregateBarsToWeekly'),
+    ]);
+    const labelOf = (bars: Bar[]): TrendLabel | null =>
+        computeAnalysisTrend(bars, calculateIndicators(bars))?.trend ?? null;
+    const labelers: ForwardLabelers = {
+        daily: bars => labelOf([...bars]),
+        weekly: bars => labelOf(aggregateBarsToWeekly(bars)),
+    };
+    const caseRows = set.manifest.cases.map(replayCase => {
+        const stored = set.storedOf.get(replayCase.symbol);
+        if (stored === undefined)
+            throw new Error(`no bars for ${replayCase.symbol}`);
+        return caseRow(replayCase, stored.bars);
+    });
+    const table = summarizeCases(caseRows);
+    deps.log(`htf-forward: ${table.cases} cases; measuring forward returns`);
+    const observations = set.symbols.flatMap(symbol =>
+        observationsOf(usableBars(symbol.bars), labelers, args.stride)
+    );
+    const forward = summarizeForward(observations);
+    const brief = FORWARD_CONSTANTS.brief;
+    const find = (d: TrendLabel, w: TrendLabel) =>
+        forward.cells.find(c => c.daily === d && c.weekly === w);
+    return {
+        inputs: {
+            fingerprint: set.fingerprint,
+            stride: args.stride,
+            forward: FORWARD_CONSTANTS,
+            htf: HTF_EVAL_CONSTANTS,
+        },
+        summary: {
+            caseTable: table,
+            forward,
+            reproduction: {
+                note: "The brief measured with approximate full-series EMA and ATR seeds; this run uses the shipped functions on each day's own window, so cell excesses differ (aligned bearish +0.31 here against +0.00 there).",
+                differentLabelShare: {
+                    measured: table.different / table.cases,
+                    brief: brief.differentLabelShare,
+                },
+                oppositeShare: {
+                    measured: table.opposite / table.cases,
+                    brief: brief.oppositeShare,
+                },
+                casesInProgress: {
+                    measured: table.inProgress,
+                    brief: brief.casesInProgress,
+                },
+                weeklyMa200Computable: {
+                    measured: table.weeklyMa200Computable,
+                    brief: brief.weeklyMa200Computable,
+                },
+                alignedBullishExcessPp: {
+                    measured: find('bullish', 'bullish')?.excessPp ?? null,
+                    brief: brief.alignedBullishExcessPp,
+                },
+                alignedBearishExcessPp: {
+                    measured: find('bearish', 'bearish')?.excessPp ?? null,
+                    brief: brief.alignedBearishExcessPp,
+                },
+            },
+            cellLabels: CELL_LABELS,
+        },
+        gates: [m1Gate(forward)],
+        rows: caseRows,
+        skipped: 0,
+    };
+}
+
 // ─── Command ──────────────────────────────────────────────────────────────────
 
 export interface FieldsEvalDeps {
@@ -1630,6 +2513,8 @@ export interface FieldsEvalDeps {
     render: RenderSkills;
     /** Whether the technical response schema still lists `indicatorResults` (D9). */
     schemaAsksIndicatorResults: () => Promise<boolean>;
+    /** sha256 of a skills directory (`hashTree` when absent); part of an `htf` output's code identity. */
+    skillsSha256?: (dir: string) => string;
 }
 
 export const defaultDeps: FieldsEvalDeps = {
@@ -1672,10 +2557,12 @@ export const defaultDeps: FieldsEvalDeps = {
 function selectedGates(
     gates: readonly GateResult[],
     selection: FieldsEvalArgs['gate'],
-    mode: EvalMode
+    mode: EvalMode,
+    scope: GateScope | undefined
 ): readonly GateResult[] {
     if (selection === null) return [];
-    const ids = selection === 'all' ? GATE_IDS[mode] : selection;
+    const ids =
+        selection === 'all' ? (scope?.ids ?? GATE_IDS[mode]) : selection;
     return ids.map(
         id =>
             gates.find(g => g.id === id) ?? {
@@ -1710,7 +2597,13 @@ export async function runFieldsEval(
                     ? claimsMode(args, deps)
                     : args.mode === 'zone'
                       ? zoneMode(args, deps)
-                      : await skillsMode(args, deps);
+                      : args.mode === 'htf'
+                        ? await htfMode(args, deps)
+                        : args.mode === 'htf-forward'
+                          ? await htfForwardMode(args, deps)
+                          : args.mode === 'weekly-hygiene'
+                            ? await weeklyHygieneMode(args, deps)
+                            : await skillsMode(args, deps);
     if (output.rows.length === 0)
         throw new Error('the evaluation measured no row');
     output.gates.forEach(g => deps.log(describeGate(g)));
@@ -1725,6 +2618,7 @@ export async function runFieldsEval(
                 dirtyDiffSha256: deps.dirtyDiffSha256(),
                 inputs: output.inputs,
                 gate: args.gate,
+                deferred: output.scope?.deferred ?? [],
                 constants: { ...C, derived: FIELDS_EVAL_CORE_DERIVED },
             },
             null,
@@ -1733,19 +2627,29 @@ export async function runFieldsEval(
     );
     writeFileAtomic(
         join(args.out, 'summary.json'),
-        `${JSON.stringify({ summary: output.summary, gates: output.gates }, null, 2)}\n`
+        `${JSON.stringify({ summary: output.summary, gates: output.gates, deferred: output.scope?.deferred ?? [] }, null, 2)}\n`
     );
     writeFileAtomic(
         join(args.out, 'rows.jsonl'),
         output.rows.map(row => `${JSON.stringify(row)}\n`).join('')
     );
     deps.log(`wrote ${args.out}`);
+    if (args.gate === 'all' && (output.scope?.deferred.length ?? 0) > 0) {
+        deps.log(
+            `--gate all left out: ${output.scope?.deferred.map(d => `${d.id} (${d.reason})`).join('; ')}`
+        );
+    }
     if (args.gate === null) {
         deps.log(
             'NOTICE: no --gate given, so no gate decides the exit code (0 whatever the gates above say). Pass --gate all or --gate <ids> to gate.'
         );
     }
-    const decided = selectedGates(output.gates, args.gate, args.mode);
+    const decided = selectedGates(
+        output.gates,
+        args.gate,
+        args.mode,
+        output.scope
+    );
     const failed = decided.filter(g => g.pass !== true);
     const skippedFails =
         args.gate !== null && !args.allowSkippedCases && output.skipped > 0;
