@@ -20,6 +20,7 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
 } from '@/infrastructure/cache/config';
 import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
+import { tierCapKeyPart } from '@/infrastructure/skills/sampling';
 
 /**
  * `true` when a normalized analysis carries no analytical content — i.e. an
@@ -145,7 +146,7 @@ export async function peekAnalysisCache(
         symbol,
         timeframe,
         effectiveModelId,
-        tier,
+        tierCapKeyPart(tier),
         reasoning,
         positionBucket,
         locale

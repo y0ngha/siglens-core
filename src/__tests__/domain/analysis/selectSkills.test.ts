@@ -511,3 +511,117 @@ describe('selectSkills — worst cases', () => {
         });
     });
 });
+
+describe('selectSkills — gatedPerGroupCap', () => {
+    const SIGNALS = ['rsi_oversold', 'golden_cross'] as const;
+    const ctx = makeCtx({ signalTypes: [...SIGNALS] });
+    const nameOf = (skill: Skill): string => skill.name;
+    const groupSkills = (
+        prefix: string,
+        count: number,
+        type: Skill['type']
+    ): Skill[] =>
+        Array.from({ length: count }, (_, i) =>
+            eventSkill(`${prefix}-${i}`, ['rsi_oversold'], { type })
+        );
+    const catalog: Skill[] = [
+        ...groupSkills('guide', 5, 'indicator_guide'),
+        ...groupSkills('pattern', 4, 'pattern'),
+        // Two triggers match, so this one outranks every skill above.
+        eventSkill('guide-top', [...SIGNALS], { type: 'indicator_guide' }),
+        alwaysOnSkill('always-a'),
+        alwaysOnSkill('always-b'),
+        alwaysOnSkill('always-c'),
+        alwaysOnSkill('always-d'),
+        alwaysOnSkill('always-e'),
+    ];
+
+    it('캡이 없으면(생략·null) 발화한 게이트 스킬을 모두 남긴다', () => {
+        const uncapped = selectSkills(catalog, ctx, 'technical');
+
+        expect(uncapped.selected).toHaveLength(10);
+        expect(
+            selectSkills(catalog, ctx, 'technical', { gatedPerGroupCap: null })
+        ).toEqual(uncapped);
+    });
+
+    it('그룹마다 관련도 순서의 앞에서 cap개만 남긴다', () => {
+        const capped = selectSkills(catalog, ctx, 'technical', {
+            gatedPerGroupCap: 3,
+        });
+        const full = selectSkills(catalog, ctx, 'technical');
+        const firstOfGroup = (group: Skill['type']) =>
+            full.selected.filter(skill => skill.type === group).slice(0, 3);
+
+        expect(
+            capped.selected.filter(skill => skill.type === 'indicator_guide')
+        ).toEqual(firstOfGroup('indicator_guide'));
+        expect(
+            capped.selected.filter(skill => skill.type === 'pattern')
+        ).toEqual(firstOfGroup('pattern'));
+        expect(capped.selected).toHaveLength(6);
+    });
+
+    it('가장 관련도 높은 스킬이 캡에서 살아남고, 나머지는 이름순 꼬리표가 잘린다', () => {
+        const capped = selectSkills(catalog, ctx, 'technical', {
+            gatedPerGroupCap: 3,
+        });
+
+        expect(capped.selected.map(nameOf)).toEqual(
+            expect.arrayContaining(['guide-top', 'guide-0', 'guide-1'])
+        );
+        expect(capped.selected.map(nameOf)).not.toContain('guide-2');
+        expect(capped.selected.map(nameOf)).not.toContain('pattern-3');
+    });
+
+    it('always-on 스킬은 캡의 영향을 받지 않는다', () => {
+        const capped = selectSkills(catalog, ctx, 'technical', {
+            gatedPerGroupCap: 1,
+        });
+
+        expect(capped.core.map(nameOf)).toEqual([
+            'always-a',
+            'always-b',
+            'always-c',
+            'always-d',
+            'always-e',
+        ]);
+    });
+
+    it('cap이 0이면 게이트 스킬이 없고 core는 그대로다', () => {
+        const capped = selectSkills(catalog, ctx, 'technical', {
+            gatedPerGroupCap: 0,
+        });
+
+        expect(capped.selected).toEqual([]);
+        expect(capped.core).toHaveLength(5);
+    });
+
+    it('type이 없는 스킬은 category별로 따로 센다', () => {
+        // The technical context admits type-less skills of the chart direction
+        // categories, which are two distinct groups. A single shared key would
+        // keep only one skill of the four at cap 1.
+        const typeless = (name: string, category: Skill['category']): Skill =>
+            eventSkill(name, ['rsi_oversold'], { type: undefined, category });
+        const result = selectSkills(
+            [
+                typeless('bull-a', 'reversal_bullish'),
+                typeless('bull-b', 'reversal_bullish'),
+                typeless('bear-a', 'reversal_bearish'),
+                typeless('bear-b', 'reversal_bearish'),
+            ],
+            ctx,
+            'technical',
+            { gatedPerGroupCap: 1 }
+        );
+
+        expect(result.selected.map(nameOf)).toEqual(['bear-a', 'bull-a']);
+    });
+
+    it('입력 배열을 바꾸지 않는다', () => {
+        const input = [...catalog];
+        selectSkills(input, ctx, 'technical', { gatedPerGroupCap: 2 });
+
+        expect(input).toEqual(catalog);
+    });
+});

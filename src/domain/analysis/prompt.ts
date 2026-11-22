@@ -2450,9 +2450,9 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   {@link buildSkillContentSections}). The Intent + Guidelines head is
  *   byte-identical across every call with the same locale — no symbol,
  *   timeframe, skill, or per-call value — and sits ahead of the skill
- *   digests on purpose: the free tier samples its `always_on` skills per
- *   symbol, so the digests differ across symbols, and anything placed after
- *   them would fall outside the cross-symbol common prefix. The whole value
+ *   digests on purpose: the head is the part that never changes with the
+ *   catalog, so a catalog edit moves only the bytes after it and the
+ *   provider's prefix cache keeps the head. The whole value
  *   is folded into the system message at the worker/provider layer (see
  *   `scripts/ab-harness/buildPrompts.ts`'s `--fold-stable-into-system`),
  *   making system = persona → intent → guidelines → skill digests. Never
@@ -2551,6 +2551,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   it lets the pivot block use the last bar once its session has closed (instead of
  *   always the bar before). Omitted, daily pivots use the bar before the last, as they
  *   did before the parameter existed.
+ * @param gatedSkillCap - The most fired gated skills one injection group may keep, after
+ *   relevance ordering (see {@link selectSkills}). The free tier passes
+ *   `gatedSkillCapForTier('free')`; omitted or `null` keeps every fired skill. Always-on
+ *   skills are never capped.
  * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries, trend }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
@@ -2572,7 +2576,8 @@ export function buildAnalysisPrompt(
     currency: CurrencyCode = 'USD',
     krxTick: KrxTickTable = 'share',
     earningsDates?: readonly string[],
-    marketClock?: MarketReferenceClock
+    marketClock?: MarketReferenceClock,
+    gatedSkillCap?: number | null
 ): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -2610,7 +2615,8 @@ export function buildAnalysisPrompt(
     const { core, selected } = selectSkills(
         skills,
         selectionContext,
-        'technical'
+        'technical',
+        { gatedPerGroupCap: gatedSkillCap }
     );
     // The SMC full guide is never injected (fabrication source); it is replaced
     // by the deterministic SMC data section + a compressed concept note. Drop it
@@ -2706,11 +2712,12 @@ export function buildAnalysisPrompt(
     // blocks (Analysis Intent, Analysis Guidelines — ~20k chars, no
     // symbol/timeframe/skill/per-call interpolation beyond the locale) come
     // FIRST, then the always_on skill digests. The timeframe label and its
-    // interpretation text live in `dynamic`, not here. Fixed text must precede
-    // the skill digests because the free tier samples its always_on skills per
-    // symbol (`sampleSkillsForTier`): any per-symbol bytes ahead of the
-    // Guidelines would end the common prefix right there, and the provider's
-    // automatic prefix cache would miss on every symbol's first call.
+    // interpretation text live in `dynamic`, not here. The always_on set
+    // depends only on the catalog (the free-tier cap trims gated skills, never
+    // these), so for one catalog and locale `stable` is identical across
+    // symbols and tiers and the provider's automatic prefix cache serves it
+    // after the first call. Fixed text still leads the digests, so a catalog
+    // change moves only the bytes after the Guidelines.
     // Only the position of these two blocks moved — their text is unchanged,
     // and the Analysis Request stays at the tail of `dynamic` (moving the
     // output rules forward degraded actionability; see buildAnalysisRequest).
@@ -2894,5 +2901,6 @@ export function buildAnalysisPrompt(
             marketReference,
             quoting
         ).map(level => level.price),
+        injectedSkills: [...coreSkills, ...selectedSkills],
     };
 }

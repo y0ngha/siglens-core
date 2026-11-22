@@ -190,6 +190,9 @@ validates before comparing).
   you edited, and give each bumped constant a key-format test.
   ❌ Bump `OVERALL_*` only because its file was edited while financials/options prompts also
   changed through the shared base. ✅ Bump every template whose rendered output differs.
+- A new input that changes the rendered bytes (a tier cap, a skill set) joins every key built
+  from the same inputs together: the writer and reader, and the primary and the peek/pointer
+  keys. Grep each `build*Key` caller for the sibling key before reporting done.
 - A read path that rebuilds a key tests each key argument with a case where a mismatch on
   that argument alone misses (`CONVENTIONS.md#TE-5`).
 - A second reader of an existing cache entry applies the same validity guards as the first

@@ -110,8 +110,9 @@ domain builder and dispatch it as **two separate fields**, not one combined user
   non-empty; otherwise just `aiSystemPrompt(locale)`) — the `always_on` skill digests live
   in the **system** prompt so providers (Gemini/OpenAI/Claude) cache the stable prefix.
   For technical analysis `stable` leads with the fixed Analysis Intent + Guidelines
-  blocks — ahead of the per-symbol-sampled free-tier skill digests — so
-  `persona → Intent → Guidelines` is byte-identical across symbols.
+  blocks — ahead of the always-on skill digests — so
+  `persona → Intent → Guidelines` is byte-identical across symbols; the always-on set is
+  tier-independent, so the whole system message is also identical across tiers.
 - `prompt = assembled.dynamic` — the per-call half (symbol framing, fetched data,
   gated skills, request block), followed by the output-language reminder for the locale.
 - `seed = analysisSeed(system + '\n\n' + prompt)` — computed over the full assembled
@@ -193,10 +194,10 @@ gating decisions diverge.
 #### APP-5 — Options that change model output flow into the key, the seed and every sub-call
 
 `reasoning`, `skipEnqueueIfMiss` and similar options change what the model returns. Fold
-them into the cache key and the sampling seed, and force them into every sub-axis option
+them into the cache key, and force them into every sub-axis option
 object. Otherwise on/off variants collide on one cache entry and the first caller decides
 the output for everyone until the TTL expires. Copy the pattern of the sibling use-case
-(`buildNewsCacheKey(..., reasoning)` plus `reasoningSeedPart`); see
+(`buildNewsCacheKey(..., reasoning)`); see
 `src/infrastructure/CLAUDE.md#INF-4`.
 
 <a id="APP-6"></a>

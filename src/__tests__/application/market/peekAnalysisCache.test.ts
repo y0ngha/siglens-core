@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Mock } from 'vitest';
 import type { AnalysisResponse, TierConfig, Timeframe } from '@/domain/types';
+import { tierCapKeyPart } from '@/infrastructure/skills/sampling';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 
 vi.mock('@/infrastructure/cache/redis');
@@ -82,7 +83,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER
+                tierCapKeyPart(DEFAULT_TIER)
             )
         );
     });
@@ -103,7 +104,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER,
+                tierCapKeyPart(DEFAULT_TIER),
                 true
             )
         );
@@ -124,7 +125,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER
+                tierCapKeyPart(DEFAULT_TIER)
             )
         );
     });
@@ -148,7 +149,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER,
+                tierCapKeyPart(DEFAULT_TIER),
                 undefined,
                 'profit'
             )
@@ -170,7 +171,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER
+                tierCapKeyPart(DEFAULT_TIER)
             )
         );
     });
@@ -194,7 +195,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER,
+                tierCapKeyPart(DEFAULT_TIER),
                 true,
                 'deep-loss'
             )
@@ -221,7 +222,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER,
+                tierCapKeyPart(DEFAULT_TIER),
                 undefined,
                 undefined,
                 'en'
@@ -244,7 +245,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 'gemini-3.6-flash',
-                DEFAULT_TIER,
+                tierCapKeyPart(DEFAULT_TIER),
                 undefined,
                 undefined,
                 'ko'
@@ -262,7 +263,7 @@ describe('peekAnalysisCache 함수는', () => {
                 SYMBOL,
                 TIMEFRAME,
                 DEFAULT_ANALYSIS_MODEL_ID,
-                DEFAULT_TIER
+                tierCapKeyPart(DEFAULT_TIER)
             )
         );
     });
@@ -285,7 +286,7 @@ describe('peekAnalysisCache 함수는', () => {
                     SYMBOL,
                     TIMEFRAME,
                     DEFAULT_ANALYSIS_MODEL_ID,
-                    'free'
+                    tierCapKeyPart('free')
                 )
         ) as [string];
         const [memberKey] = mockCacheGet.mock.calls.find(
@@ -431,7 +432,7 @@ describe('peekAnalysisCache 함수는', () => {
                     SYMBOL,
                     TIMEFRAME,
                     'gemini-3.6-flash',
-                    DEFAULT_TIER,
+                    tierCapKeyPart(DEFAULT_TIER),
                     undefined,
                     undefined,
                     undefined

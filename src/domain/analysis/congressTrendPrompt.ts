@@ -7,6 +7,7 @@ import {
     type AnalysisLocale,
 } from './outputLocale';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
+import { capGatedPerGroup } from '@/domain/analysis/skillTierCap';
 import type {
     AssembledPrompt,
     CongressTrade,
@@ -24,8 +25,27 @@ const MAX_TRADES_IN_PROMPT = 50;
  * filtered out — matching the same pattern used by `filterFundamentalSkills`
  * in `financialsPrompt.ts`.
  */
-function filterCongressSkills(skills: readonly Skill[]): Skill[] {
-    return skills.filter(s => s.category === 'congress');
+function filterCongressSkills(
+    skills: readonly Skill[],
+    gatedSkillCap: number | null | undefined
+): Skill[] {
+    const inCategory = skills.filter(s => s.category === 'congress');
+    if (gatedSkillCap === null || gatedSkillCap === undefined) {
+        return inCategory;
+    }
+    // This prompt has no chart and no relevance score, so the gated skills it
+    // injects are capped in name order (the tie-break of `selectSkills`);
+    // always-on skills are never capped.
+    const isGated = (skill: Skill): boolean => skill.gating?.tier === 'gated';
+    const keptGated = new Set(
+        capGatedPerGroup(
+            inCategory
+                .filter(isGated)
+                .toSorted((a, b) => a.name.localeCompare(b.name, 'en')),
+            gatedSkillCap
+        )
+    );
+    return inCategory.filter(skill => !isGated(skill) || keptGated.has(skill));
 }
 
 /** Format up to MAX_TRADES_IN_PROMPT trades as a bullet list for LLM consumption. */
@@ -73,6 +93,8 @@ function formatTrades(trades: readonly CongressTrade[]): string {
  * @param trades - Normalized congress trades for the symbol (newest first).
  * @param stats  - Pre-computed count-based statistics from `summarizeCongressTrades`.
  * @param skills - All loaded skills; non-congress entries are filtered out.
+ * @param gatedSkillCap - The most gated skills one injection group may keep (name order);
+ *   omitted or `null` keeps all. Always-on skills are never capped.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildCongressTrendPrompt(
@@ -80,9 +102,10 @@ export function buildCongressTrendPrompt(
     trades: readonly CongressTrade[],
     stats: CongressTradeStats,
     skills: readonly Skill[],
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    gatedSkillCap?: number | null
 ): AssembledPrompt {
-    const qualifiedSkills = filterCongressSkills(skills);
+    const qualifiedSkills = filterCongressSkills(skills, gatedSkillCap);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

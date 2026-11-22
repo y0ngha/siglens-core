@@ -48,11 +48,15 @@ const FRACTION_TO_PERCENT = 100;
  * via the shared selection engine — whitelist + fail-closed gating, with the
  * chartless context so only `always_on` skills qualify.
  */
-function selectFundamentalSkills(skills: readonly Skill[]): Skill[] {
+function selectFundamentalSkills(
+    skills: readonly Skill[],
+    gatedSkillCap: number | null | undefined
+): Skill[] {
     const { core, selected } = selectSkills(
         skills,
         NO_CHART_SELECTION_CONTEXT,
-        'fundamental'
+        'fundamental',
+        { gatedPerGroupCap: gatedSkillCap }
     );
     return [...core, ...selected];
 }
@@ -288,6 +292,8 @@ function formatCashFlowGrowthSection(rows: CashFlowGrowthRow[]): string {
  * @param snapshot  - Normalized financial statement data for the symbol.
  * @param scorecard - Pre-computed 4-axis scorecard from `computeFinancialsScorecard`.
  * @param skills    - All loaded skills; non-fundamental entries are filtered out.
+ * @param gatedSkillCap - The most gated skills one injection group may keep, by relevance
+ *   (see {@link selectSkills}); omitted or `null` keeps all. Always-on skills are never capped.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildFinancialsAnalysisPrompt(
@@ -295,9 +301,10 @@ export function buildFinancialsAnalysisPrompt(
     snapshot: FinancialsSnapshot,
     scorecard: FinancialsScorecard,
     skills: readonly Skill[],
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
+    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
+    gatedSkillCap?: number | null
 ): AssembledPrompt {
-    const qualifiedSkills = selectFundamentalSkills(skills);
+    const qualifiedSkills = selectFundamentalSkills(skills, gatedSkillCap);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

@@ -57,11 +57,15 @@ const PEER_METRIC_DECIMAL_PLACES = 1;
  * has no chart state to fire against). Confidence is a display weight, not an
  * inclusion gate.
  */
-function selectFundamentalSkills(skills: readonly Skill[]): Skill[] {
+function selectFundamentalSkills(
+    skills: readonly Skill[],
+    gatedSkillCap: number | null | undefined
+): Skill[] {
     const { core, selected } = selectSkills(
         skills,
         NO_CHART_SELECTION_CONTEXT,
-        'fundamental'
+        'fundamental',
+        { gatedPerGroupCap: gatedSkillCap }
     );
     return [...core, ...selected];
 }
@@ -301,6 +305,9 @@ function formatDerivedMetricsSection(
  * @param now - Reference clock for `## Derived Metrics`'s days-to-earnings line. Optional without a wall-clock default — the domain
  *   never reads the clock itself; production callers pass it, and without it
  *   the days-to-earnings line reads `N/A`.
+ * @param gatedSkillCap - The most gated skills one injection group may keep, by relevance
+ *   (see {@link selectSkills}); `gatedSkillCapForTier(tier)` from the caller. Omitted or
+ *   `null` keeps all. Always-on skills are never capped.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildFundamentalAnalysisPrompt(
@@ -309,7 +316,8 @@ export function buildFundamentalAnalysisPrompt(
     skills: readonly Skill[],
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     currency: CurrencyCode = 'USD',
-    now?: Date
+    now?: Date,
+    gatedSkillCap?: number | null
 ): AssembledPrompt {
     const {
         profile,
@@ -322,7 +330,7 @@ export function buildFundamentalAnalysisPrompt(
         sectorDirection,
     } = snapshot;
 
-    const qualifiedSkills = selectFundamentalSkills(skills);
+    const qualifiedSkills = selectFundamentalSkills(skills, gatedSkillCap);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

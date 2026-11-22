@@ -75,12 +75,44 @@ describe('resolveMarketNewsDigestCacheKey 함수는', () => {
         expect(a.cacheKey).toBe(b.cacheKey);
     });
 
-    it('tier-샘플링된 skills를 반환한다', () => {
-        const result = resolveMarketNewsDigestCacheKey({
+    it('티어와 무관하게 받은 skills 전체를 그대로 돌려준다(free도 줄이지 않는다)', () => {
+        const free = resolveMarketNewsDigestCacheKey({
+            ...baseArgs(),
+            skills: [SKILL],
+            tier: 'free',
+        });
+        const pro = resolveMarketNewsDigestCacheKey({
             ...baseArgs(),
             skills: [SKILL],
             tier: 'pro',
         });
-        expect(result.skills).toEqual([SKILL]);
+        expect(free.skills).toEqual([SKILL]);
+        expect(pro.skills).toEqual([SKILL]);
+    });
+
+    it('free와 member는 같은 skills여도 다른 키를 만든다', () => {
+        const free = resolveMarketNewsDigestCacheKey({
+            ...baseArgs(),
+            skills: [SKILL],
+            tier: 'free',
+        });
+        const member = resolveMarketNewsDigestCacheKey({
+            ...baseArgs(),
+            skills: [SKILL],
+            tier: 'member',
+        });
+        expect(free.cacheKey).not.toBe(member.cacheKey);
+    });
+
+    it('카탈로그에 스킬이 추가되면 키가 바뀐다', () => {
+        const without = resolveMarketNewsDigestCacheKey({
+            ...baseArgs(),
+            skills: [SKILL],
+        });
+        const withExtra = resolveMarketNewsDigestCacheKey({
+            ...baseArgs(),
+            skills: [SKILL, { ...SKILL, name: 'news-flow-2' }],
+        });
+        expect(withExtra.cacheKey).not.toBe(without.cacheKey);
     });
 });

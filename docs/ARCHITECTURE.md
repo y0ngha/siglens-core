@@ -247,7 +247,7 @@ consumer(DB 저장소, 시세·뉴스·재무 등 데이터 provider)가 소유�
 - `fmp/` — FMP 환경변수 reader (시세 호출은 consumer가 주입한 `MarketDataProvider`가 수행).
 - `hash/` — 분석 입력·skill 카탈로그·API key scope 해시 helper (캐시 키와 시드 계산용)
 - `market/` — 재분석 쿨다운 헬퍼 (`SET NX EX`, Upstash)
-- `skills/` — Skills 파일 로더·샘플링 (filesystem → `Skill[]`)
+- `skills/` — Skills 파일 로더·카탈로그 지문 (filesystem → `Skill[]`)
 - `upstash/` — Upstash Redis 환경변수 reader (`readUpstashConfig`)
 - `usage/` — `hashUsageIp` 같은 분석 사용량 보조 함수, 기간 카운터 `createCounterStore`(Upstash)
 

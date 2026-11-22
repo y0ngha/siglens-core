@@ -1,4 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import {
+    FREE_TIER_GATED_SKILLS_PER_GROUP,
+    gatedSkillCapForTier,
+} from '@/domain/analysis/skillTierCap';
+import {
+    ALWAYS_ON_COUNT,
+    GATED_COUNT,
+    tierCapCatalog,
+} from '@/__tests__/helpers/tierCapSkills';
 import { buildCongressTrendPrompt as buildCongressTrendPromptRaw } from '@/domain/analysis/congressTrendPrompt';
 import type { CongressTrade, CongressTradeStats, Skill } from '@/domain/types';
 
@@ -123,5 +132,52 @@ describe('buildCongressTrendPrompt — 출력 로케일', () => {
         expect(
             buildCongressTrendPrompt('AAPL', trades, stats, [], 'ko')
         ).toContain('Korean (존댓말)');
+    });
+});
+
+describe('buildCongressTrendPrompt — 티어 상한', () => {
+    const { catalog, alwaysOnNames, gatedNames } = tierCapCatalog(
+        'congress',
+        'Cng'
+    );
+    const render = (tier: 'free' | 'member' | 'pro'): string =>
+        buildCongressTrendPrompt(
+            'AAPL',
+            trades,
+            stats,
+            catalog,
+            'ko',
+            gatedSkillCapForTier(tier)
+        );
+    const present = (text: string, names: readonly string[]) =>
+        names.filter(name => text.includes(name));
+
+    it('free는 always-on을 모두 남기고 gated는 이름순으로 상한까지만 남긴다', () => {
+        const text = render('free');
+
+        expect(alwaysOnNames).toHaveLength(ALWAYS_ON_COUNT);
+        expect(present(text, alwaysOnNames)).toEqual(alwaysOnNames);
+        expect(GATED_COUNT).toBeGreaterThan(FREE_TIER_GATED_SKILLS_PER_GROUP);
+        expect(present(text, gatedNames)).toEqual(
+            gatedNames
+                .toSorted((a, b) => a.localeCompare(b, 'en'))
+                .slice(0, FREE_TIER_GATED_SKILLS_PER_GROUP)
+        );
+    });
+
+    it.each(['member', 'pro'] as const)(
+        '%s는 always-on과 gated를 모두 남긴다',
+        tier => {
+            const text = render(tier);
+
+            expect(present(text, alwaysOnNames)).toEqual(alwaysOnNames);
+            expect(present(text, gatedNames)).toEqual(gatedNames);
+        }
+    );
+
+    it('상한을 생략하면 예전과 같은 프롬프트다', () => {
+        expect(buildCongressTrendPrompt('AAPL', trades, stats, catalog)).toBe(
+            render('member')
+        );
     });
 });

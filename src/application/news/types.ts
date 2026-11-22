@@ -48,10 +48,10 @@ export interface SubmitNewsAnalysisOptions
      * Renders a `## Macro Calendar` section when non-empty and folds a
      * fingerprint of every rendered field
      * (`date|event|impact|actual|estimate|previous|unit`) into the
-     * cache-input hash and skill-sampling seed, so any change to a rendered
+     * cache-input hash, so any change to a rendered
      * row (a filled-in `actual`, a revised `estimate`/`previous`) invalidates
-     * the cached analysis. Defaults to `[]`, which keeps the prompt, cache key, and
-     * sampling seed byte-identical to every call site that predates this
+     * the cached analysis. Defaults to `[]`, which keeps the prompt and cache key
+     * byte-identical to every call site that predates this
      * option.
      */
     macroCalendar?: readonly EconomicCalendarEvent[];
@@ -116,7 +116,7 @@ export interface SubmitNewsAnalysisOptions
     /**
      * Company or fund framing for an equity-class symbol (see
      * {@link NewsInstrumentKind}). Defaults to `'company'`; ignored for
-     * crypto. `'fund'` is folded into the input hash and skill-sampling seed,
+     * crypto. `'fund'` is folded into the input hash,
      * so company and fund framings never share a cache entry; `'company'`
      * adds nothing and keeps existing keys.
      */

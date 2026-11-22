@@ -1,9 +1,22 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
     buildFundamentalAnalysisPrompt as buildFundamentalAnalysisPromptRaw,
     DERIVED_METRICS_SECTION_HEADER,
 } from '@/domain/analysis/fundamentalPrompt';
 import type { FundamentalSnapshot, Skill } from '@/domain/types';
+
+import { selectSkills } from '@/domain/analysis/selectSkills';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
+import {
+    ALWAYS_ON_COUNT,
+    tierCapCatalog,
+} from '@/__tests__/helpers/tierCapSkills';
+
+vi.mock('@/domain/analysis/selectSkills', async importOriginal => {
+    const actual =
+        await importOriginal<typeof import('@/domain/analysis/selectSkills')>();
+    return { ...actual, selectSkills: vi.fn(actual.selectSkills) };
+});
 
 // `buildFundamentalAnalysisPrompt` now returns `{ stable, dynamic }` (assembly
 // split) — this file's call sites predate the split and assert
@@ -894,4 +907,42 @@ describe('buildFundamentalAnalysisPrompt — missing and degenerate inputs', () 
         });
         expect(prompt).toContain('- Analyst Grades Buy Share: N/A');
     });
+});
+
+describe('buildFundamentalAnalysisPrompt — 티어 상한', () => {
+    const { catalog, alwaysOnNames, gatedNames } = tierCapCatalog(
+        'fundamental',
+        'Fnd'
+    );
+    const tiers = ['free', 'member', 'pro'] as const;
+
+    it.each(tiers)(
+        '%s: always-on 스킬은 모두 프롬프트에 들어가고 상한이 selectSkills에 전달된다',
+        tier => {
+            vi.mocked(selectSkills).mockClear();
+            const { stable, dynamic } = buildFundamentalAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_SNAPSHOT,
+                catalog,
+                'ko',
+                'USD',
+                undefined,
+                gatedSkillCapForTier(tier)
+            );
+            const text = `${stable}\n${dynamic}`;
+
+            expect(alwaysOnNames).toHaveLength(ALWAYS_ON_COUNT);
+            alwaysOnNames.forEach(name => expect(text).toContain(name));
+            // A chartless context fires no gated skill (see
+            // NO_CHART_SELECTION_CONTEXT), so none can reach the prompt on any
+            // tier; the cap is still handed to the selection step.
+            gatedNames.forEach(name => expect(text).not.toContain(name));
+            expect(selectSkills).toHaveBeenLastCalledWith(
+                expect.anything(),
+                expect.anything(),
+                'fundamental',
+                { gatedPerGroupCap: gatedSkillCapForTier(tier) }
+            );
+        }
+    );
 });

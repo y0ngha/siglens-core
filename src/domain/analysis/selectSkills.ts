@@ -1,4 +1,5 @@
 import { isStateNotable } from '@/domain/analysis/skillGatingPredicates';
+import { capGatedPerGroup } from '@/domain/analysis/skillTierCap';
 import {
     isSkillAllowedInContext,
     type PromptSkillContext,
@@ -60,8 +61,8 @@ export const NO_CHART_SELECTION_CONTEXT: SkillSelectionContext = Object.freeze({
  * - gated `state` → `1` when the textbook `state` predicate is notable, else `0`.
  *
  * A score of `0` means the gate did not fire; a higher score ranks the skill
- * closer to the data sections in the assembled prompt (ordering only — there
- * is no inclusion cap).
+ * closer to the data sections in the assembled prompt (ordering only — the
+ * only inclusion cap is the optional per-tier one of {@link selectSkills}).
  *
  * `SkillGating` is a discriminated union (the loader only ever produces a
  * valid variant or `undefined`), so narrowing on `signalKind` is exhaustive.
@@ -95,6 +96,19 @@ const byNameEn = (a: Skill, b: Skill): number =>
 
 /**
  * @internal
+ * Options of {@link selectSkills}.
+ *
+ * - `gatedPerGroupCap` — the most fired gated skills one injection group
+ *   (`type ?? category ?? 'regular'`) may keep, taken from the front of the
+ *   relevance order. `null`/omitted keeps all of them. Always-on skills are
+ *   never capped.
+ */
+export interface SelectSkillsOptions {
+    gatedPerGroupCap?: number | null;
+}
+
+/**
+ * @internal
  * Select which skills to inject into a prompt for the given chart context and
  * prompt family.
  *
@@ -114,19 +128,24 @@ const byNameEn = (a: Skill, b: Skill): number =>
  *    gap loudly instead of silently re-inflating the prompt.
  * 3. **Split & order** — `always_on` → `core` (name-sorted, stable);
  *    fired gated skills → `selected` (relevance desc, name-asc tie-break).
+ * 4. **Tier cap** — with `options.gatedPerGroupCap` set, `selected` keeps at
+ *    most that many skills per injection group, from the front of the
+ *    relevance order. `core` is never capped.
  *
  * @param skills - Candidate skills (already loaded, with frontmatter gating).
  * @param ctx - Read-only chart selection context (signals, indicators, …).
  *   Chartless builders pass {@link NO_CHART_SELECTION_CONTEXT}.
  * @param promptContext - Which prompt family is selecting (technical /
  *   fundamental / news); drives the category/type whitelist.
+ * @param options - Optional {@link SelectSkillsOptions} (the free-tier cap).
  * @returns `{ core, selected }` — see {@link SkillSelection}.
  * @throws {Error} when a whitelisted skill carries no `gating` metadata.
  */
 export function selectSkills(
     skills: readonly Skill[],
     ctx: SkillSelectionContext,
-    promptContext: PromptSkillContext
+    promptContext: PromptSkillContext,
+    options: SelectSkillsOptions = {}
 ): SkillSelection {
     const core: Skill[] = [];
     const fired: { skill: Skill; score: number }[] = [];
@@ -156,5 +175,10 @@ export function selectSkills(
     // Relevance desc, then name asc — a deterministic total order.
     fired.sort((a, b) => b.score - a.score || byNameEn(a.skill, b.skill));
 
-    return { core, selected: fired.map(f => f.skill) };
+    const ordered = fired.map(f => f.skill);
+    const cap = options.gatedPerGroupCap ?? null;
+    return {
+        core,
+        selected: cap === null ? ordered : capGatedPerGroup(ordered, cap),
+    };
 }

@@ -20,6 +20,11 @@ import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FUNDAMENTAL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { fingerprintSkillCatalog } from '@/infrastructure/skills/sampling';
+import {
+    FREE_TIER_GATED_SKILLS_PER_GROUP,
+    gatedSkillCapForTier,
+} from '@/domain/analysis/skillTierCap';
 import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
@@ -78,6 +83,18 @@ const mockDataProvider: FundamentalDataProvider = {
     getHistoricalSectorPerformance: vi.fn().mockResolvedValue([]),
 };
 
+const FINGERPRINT_CATALOG: Skill[] = [
+    {
+        name: 'Fingerprint Guide',
+        description: 'd',
+        category: 'fundamental',
+        indicators: [],
+        confidenceWeight: 1,
+        content: 'c',
+        gating: { tier: 'always_on' },
+    },
+];
+
 describe('runFundamentalAnalysis', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -115,6 +132,47 @@ describe('runFundamentalAnalysis', () => {
         (
             mockDataProvider.getHistoricalSectorPerformance as Mock
         ).mockResolvedValue([]);
+    });
+
+    describe('캐시 키의 스킬 지문', () => {
+        const keyFor = async (tier: 'free' | 'member'): Promise<string> => {
+            mockLoadSkillsCached.mockResolvedValue({
+                skills: FINGERPRINT_CATALOG,
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockClear();
+            await runFundamentalAnalysis({
+                symbol: mockSymbol,
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                tier,
+            });
+            return mockCacheGet.mock.calls.at(-1)?.[0] as string;
+        };
+
+        it('free 키에는 상한과 카탈로그 전체 지문이, member 키에는 예전 그대로 `member:지문`이 들어간다', async () => {
+            const fingerprint = fingerprintSkillCatalog(FINGERPRINT_CATALOG);
+            const freeKey = await keyFor('free');
+            const memberKey = await keyFor('member');
+
+            expect(freeKey).toContain(
+                `free-c${FREE_TIER_GATED_SKILLS_PER_GROUP}:${fingerprint}`
+            );
+            expect(memberKey).toContain(`member:${fingerprint}`);
+            expect(freeKey).not.toBe(memberKey);
+        });
+
+        it('프롬프트 빌더에 티어의 gated 스킬 상한을 넘긴다', async () => {
+            await keyFor('free');
+            expect(mockBuildFundamentalAnalysisPrompt.mock.lastCall?.[6]).toBe(
+                gatedSkillCapForTier('free')
+            );
+
+            await keyFor('member');
+            expect(
+                mockBuildFundamentalAnalysisPrompt.mock.lastCall?.[6]
+            ).toBeNull();
+        });
     });
 
     describe('options.cache 주입', () => {

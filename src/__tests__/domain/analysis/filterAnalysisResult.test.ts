@@ -171,7 +171,7 @@ describe('filterAnalysisResult', () => {
         expect(filtered.lockedInfoDepth).toContain('partial_detail');
     });
 
-    it('keeps direction, summary, and sampled skill detections for free tier when restrictions are enabled', () => {
+    it('keeps direction, summary, and capped skill detections for free tier when restrictions are enabled', () => {
         const filtered = filterAnalysisResult(
             makeAnalysisResponse(),
             'free',
@@ -185,8 +185,8 @@ describe('filterAnalysisResult', () => {
         expect(result.riskLevel).toBeNull();
         expect(result.keyLevels).toBeNull();
         expect(result.priceTargets).toBeNull();
-        // Free now sees the detection output of its <=3-per-group sampled
-        // skills. confidenceWeight is a separate paid ('confidence') fragment,
+        // Free now sees the detection output of its skills (every always-on one plus a capped number of
+        // fired gated ones per group). confidenceWeight is a separate paid ('confidence') fragment,
         // so it is masked to 0 while the pattern/strategy itself is visible.
         expect(result.patternSummaries).toEqual([
             {

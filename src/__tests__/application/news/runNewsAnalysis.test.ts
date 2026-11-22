@@ -4,27 +4,24 @@ import type { Mock } from 'vitest';
 vi.mock('@/application/analysis/callAnalysisAi');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
-// Passthrough spy: keeps the REAL sampling
-// behavior (so every other test's skill selection is unaffected) while
-// recording the exact `seedParts` array `runNewsAnalysis` builds — the only
-// way to assert on that array's content, since it never appears in any
-// return value or side effect.
-vi.mock('@/infrastructure/skills/sampling', async () => {
-    const actual = await vi.importActual<
-        typeof import('@/infrastructure/skills/sampling')
-    >('@/infrastructure/skills/sampling');
+vi.mock('@/domain/analysis/newsPrompt', async importOriginal => {
+    const actual =
+        await importOriginal<typeof import('@/domain/analysis/newsPrompt')>();
     return {
         ...actual,
-        createSkillSamplingPlan: vi.fn(actual.createSkillSamplingPlan),
+        buildNewsAnalysisPrompt: vi.fn(actual.buildNewsAnalysisPrompt),
     };
 });
 
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
+import { buildNewsAnalysisPrompt } from '@/domain/analysis/newsPrompt';
 import { runNewsAnalysis } from '@/application/news/runNewsAnalysis';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import { createSkillSamplingPlan } from '@/infrastructure/skills/sampling';
+import { hashAnalysisInput } from '@/infrastructure/hash/analysisInput';
+import { FREE_TIER_GATED_SKILLS_PER_GROUP } from '@/domain/analysis/skillTierCap';
 import { TEST_TIER_CONFIG } from '@/__tests__/helpers/testTierConfig';
 import type {
     EarningsCalendarItem,
@@ -38,24 +35,6 @@ import type {
 const mockCallAnalysisAi = callAnalysisAi as Mock;
 const mockCreateCacheProvider = createCacheProvider as Mock;
 const mockLoadSkillsCached = loadSkillsCached as Mock;
-const mockCreateSkillSamplingPlan = createSkillSamplingPlan as Mock;
-
-/**
- * Finds this call's `seedParts` (3rd positional arg) by content — never by
- * a fixed `mock.calls` index, which can silently pick up a stale call left
- * over from another invocation in the same test.
- */
-function findSeedParts(symbol: string): readonly string[] {
-    const call = mockCreateSkillSamplingPlan.mock.calls.find(c =>
-        (c[2] as readonly string[]).includes(symbol)
-    );
-    if (call === undefined) {
-        throw new Error(
-            `No createSkillSamplingPlan call found for symbol ${symbol}`
-        );
-    }
-    return call[2] as readonly string[];
-}
 
 const mockCacheGet = vi.fn();
 const mockCacheSet = vi.fn();
@@ -146,6 +125,22 @@ describe('runNewsAnalysis', () => {
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
         mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+    });
+
+    describe('프롬프트 빌더에 넘기는 gated 스킬 상한', () => {
+        const capFor = async (tier: 'free' | 'member'): Promise<unknown> => {
+            vi.mocked(buildNewsAnalysisPrompt).mockClear();
+            await runNewsAnalysis({ ...baseArgs(), tier });
+            const call = vi
+                .mocked(buildNewsAnalysisPrompt)
+                .mock.calls.find(c => c[0] === baseArgs().symbol);
+            return call?.[11];
+        };
+
+        it('free는 상한을, member는 null을 넘긴다', async () => {
+            expect(await capFor('free')).toBe(gatedSkillCapForTier('free'));
+            expect(await capFor('member')).toBeNull();
+        });
     });
 
     describe('empty news guard', () => {
@@ -602,8 +597,25 @@ describe('runNewsAnalysis', () => {
             await runNewsAnalysis(baseArgs());
 
             expect(mockCacheGet).toHaveBeenCalledWith(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:3fc13d9bc9585d20'
             );
+        });
+
+        it('free 키는 상한이 들어간 티어 부분을, member 키는 예전 형식 그대로를 해시한다', async () => {
+            const keyFor = async (tier: 'free' | 'member') => {
+                mockCacheGet.mockClear();
+                await runNewsAnalysis({ ...baseArgs(), tier });
+                return mockCacheGet.mock.calls.at(-1)![0] as string;
+            };
+            const keyOf = (tierPart: string) =>
+                `v1:analysis:news:AAPL:gemini-3.6-flash:p12:${hashAnalysisInput(
+                    `${tierPart}|news-001|2026-07-25|[]`
+                )}`;
+
+            expect(await keyFor('free')).toBe(
+                keyOf(`free-c${FREE_TIER_GATED_SKILLS_PER_GROUP}`)
+            );
+            expect(await keyFor('member')).toBe(keyOf('member'));
         });
 
         it('추정 실적일(dateConfirmed:false)은 캐시 키를 바꾸고, 확정되면 원래 키로 돌아간다', async () => {
@@ -619,13 +631,13 @@ describe('runNewsAnalysis', () => {
             };
             const estimated = await keyFor(false);
             expect(estimated).not.toBe(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:3fc13d9bc9585d20'
             );
             expect(await keyFor(true)).toBe(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:3fc13d9bc9585d20'
             );
             expect(await keyFor(undefined)).toBe(
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154'
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:3fc13d9bc9585d20'
             );
         });
 
@@ -652,66 +664,12 @@ describe('runNewsAnalysis', () => {
                 return mockCacheGet.mock.calls.at(-1)![0] as string;
             };
             const base =
-                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:719732b6711a0154';
+                'v1:analysis:news:AAPL:gemini-3.6-flash:p12:3fc13d9bc9585d20';
             expect(await keyFor({ instrumentKind: 'company' })).toBe(base);
             expect(await keyFor({ instrumentKind: 'fund' })).not.toBe(base);
             expect(
                 await keyFor({ assetClass: 'crypto', instrumentKind: 'fund' })
             ).toBe(await keyFor({ assetClass: 'crypto' }));
-        });
-
-        it('macroCalendar 생략 시 seedParts가 이 옵션이 생기기 전 목록과 정확히 같다', async () => {
-            await runNewsAnalysis(baseArgs());
-
-            expect(findSeedParts('AAPL')).toEqual([
-                'news',
-                'AAPL',
-                mockModelId,
-                'reasoning-off',
-                'free',
-                'news-ids',
-                'news-001',
-                'earnings-dates',
-                '2026-07-25',
-            ]);
-        });
-
-        it('fund면 seedParts 끝에 fund가 붙고, company는 붙지 않는다', async () => {
-            await runNewsAnalysis({ ...baseArgs(), instrumentKind: 'fund' });
-            expect(findSeedParts('AAPL').at(-1)).toBe('fund');
-
-            mockCreateSkillSamplingPlan.mockClear();
-            await runNewsAnalysis({ ...baseArgs(), instrumentKind: 'company' });
-            expect(findSeedParts('AAPL')).not.toContain('fund');
-        });
-
-        it('macroCalendar가 있으면 seedParts에 macro-calendar 지문이 추가된다', async () => {
-            await runNewsAnalysis({
-                ...baseArgs(),
-                macroCalendar: [makeMacroEvent()],
-            });
-
-            expect(findSeedParts('AAPL')).toEqual([
-                'news',
-                'AAPL',
-                mockModelId,
-                'reasoning-off',
-                'free',
-                'news-ids',
-                'news-001',
-                'earnings-dates',
-                '2026-07-25',
-                'macro-calendar',
-                JSON.stringify([
-                    '2026-07-30 12:00:00',
-                    'CPI MoM',
-                    'High',
-                    null,
-                    0.3,
-                    0.2,
-                    '%',
-                ]),
-            ]);
         });
 
         it('생략과 명시적 빈 배열은 동일한 캐시 키를 쓴다 (바이트 동일성)', async () => {

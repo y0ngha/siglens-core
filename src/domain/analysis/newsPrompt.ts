@@ -40,11 +40,15 @@ import { citationMarker } from './newsCitations';
  * chart, so only `always_on` skills can qualify. Confidence is a display
  * weight, not an inclusion gate.
  */
-function selectNewsSkills(skills: readonly Skill[]): Skill[] {
+function selectNewsSkills(
+    skills: readonly Skill[],
+    gatedSkillCap: number | null | undefined
+): Skill[] {
     const { core, selected } = selectSkills(
         skills,
         NO_CHART_SELECTION_CONTEXT,
-        'news'
+        'news',
+        { gatedPerGroupCap: gatedSkillCap }
     );
     return [...core, ...selected];
 }
@@ -468,7 +472,8 @@ export function buildNewsAnalysisPrompt(
     currency?: CurrencyCode,
     now?: Date,
     macroCalendar?: readonly EconomicCalendarEvent[],
-    instrumentKind?: NewsInstrumentKind
+    instrumentKind?: NewsInstrumentKind,
+    gatedSkillCap?: number | null
 ): AssembledPrompt;
 export function buildNewsAnalysisPrompt(
     symbol: string,
@@ -493,7 +498,9 @@ export function buildNewsAnalysisPrompt(
      */
     macroCalendar: readonly EconomicCalendarEvent[] = [],
     /** Company or fund framing for equity symbols; ignored for crypto. */
-    instrumentKind: NewsInstrumentKind = 'company'
+    instrumentKind: NewsInstrumentKind = 'company',
+    /** Gated skills one injection group may keep, by relevance; omitted or `null` keeps all. Always-on skills are never capped. */
+    gatedSkillCap?: number | null
 ): AssembledPrompt {
     const companyName =
         typeof companyNameOrNews === 'string' ? companyNameOrNews : symbol;
@@ -509,7 +516,7 @@ export function buildNewsAnalysisPrompt(
         typeof companyNameOrNews === 'string'
             ? (maybeSkills ?? [])
             : (calendarOrSkills as readonly Skill[]);
-    const qualifiedSkills = selectNewsSkills(skills);
+    const qualifiedSkills = selectNewsSkills(skills, gatedSkillCap);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

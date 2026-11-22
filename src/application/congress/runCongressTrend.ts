@@ -21,6 +21,7 @@ import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt'
 import { CONGRESS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { congressSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     ActiveModelId,
@@ -35,10 +36,7 @@ import {
 import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
-} from '@/infrastructure/skills/sampling';
+import { skillCatalogKeyPart } from '@/infrastructure/skills/sampling';
 
 /** Default number of trade records fetched per chamber when `limit` is omitted. */
 const DEFAULT_LIMIT = 50;
@@ -87,7 +85,7 @@ async function fetchProviderData(
  * after the cache read and before the trade fetch.
  *
  * Skills are loaded once via {@link loadSkillsCached} and used for both the
- * sampling plan (cache-key fingerprint + prompt assembly) — a single load
+ * cache-key fingerprint and prompt assembly — a single load
  * replaces the split across submit and poll.
  *
  * Concurrent calls sharing the same in-flight key are deduplicated via
@@ -114,21 +112,15 @@ export async function runCongressTrend(
     const tier = options.tier ?? DEFAULT_TIER;
     const limit = options.limit ?? DEFAULT_LIMIT;
 
-    // Skills are loaded once; the same load serves both the sampling plan
-    // (cache-key fingerprint + prompt assembly) — replaces the split across
+    // Skills are loaded once; the same load serves both the catalog fingerprint
+    // (cache key) and prompt assembly — replaces the split across
     // submit (which loaded skills) and poll (which did not).
     const skillsResult = await loadSkillsCached();
-    const skillSampling = createSkillSamplingPlan(skillsResult.skills, tier, [
-        'congress',
-        symbol,
-        modelId,
-        reasoningSeedPart(options.reasoning),
-        tier,
-    ]);
+    const skillKeyPart = skillCatalogKeyPart(tier, skillsResult.skills);
     const cacheKey = buildCongressTrendCacheKey(
         symbol,
         modelId,
-        `${tier}:${skillSampling.fingerprint}`,
+        skillKeyPart,
         options.reasoning,
         options.locale
     );
@@ -174,8 +166,9 @@ export async function runCongressTrend(
         symbol,
         trades,
         stats,
-        skillSampling.skills,
-        locale
+        skillsResult.skills,
+        locale,
+        gatedSkillCapForTier(tier)
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

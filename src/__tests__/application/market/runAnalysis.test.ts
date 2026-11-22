@@ -27,6 +27,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternGeometries: new Map(),
         trend: null,
         printedSupportPrices: [],
+        injectedSkills: [],
     })),
 }));
 vi.mock('@/domain/indicators/fearGreed', async () => ({
@@ -56,16 +57,6 @@ vi.mock('@/infrastructure/cache/config', async () => {
     >('@/infrastructure/cache/config');
     return { ...actual, computeEffectiveTtl: vi.fn().mockReturnValue(3600) };
 });
-vi.mock('@/infrastructure/skills/sampling', async importOriginal => {
-    const actual =
-        await importOriginal<
-            typeof import('@/infrastructure/skills/sampling')
-        >();
-    return {
-        ...actual,
-        createSkillSamplingPlan: vi.fn(actual.createSkillSamplingPlan),
-    };
-});
 
 import {
     runAnalysis,
@@ -82,7 +73,13 @@ import {
     DEFAULT_ANALYSIS_MODEL_ID,
     PROMPT_TEMPLATE_VERSION,
 } from '@/infrastructure/cache/config';
+import { tierCapKeyPart } from '@/infrastructure/skills/sampling';
 import { DEFAULT_TIER } from '@/domain/tier';
+import {
+    FREE_TIER_GATED_SKILLS_PER_GROUP,
+    gatedSkillCapForTier,
+} from '@/domain/analysis/skillTierCap';
+import { fingerprintSkillCatalog } from '@/infrastructure/skills/sampling';
 import {
     TREND_EMA_PERIOD,
     TREND_SLOPE_LOOKBACK,
@@ -174,6 +171,28 @@ const restrictedTierConfig = {
     },
     featureFlags: { enableTierRestrictions: true },
 } as const;
+
+/**
+ * Positions of `buildAnalysisPrompt`'s parameters, which the mocked builder
+ * records as a plain array. Reading them by name keeps a test from silently
+ * reading the wrong argument when the signature gains a parameter.
+ */
+const PROMPT_ARG = {
+    skills: 4,
+    fearGreed: 6,
+    priorAnalyses: 10,
+    marketEvents: 11,
+    currency: 12,
+    krxTick: 13,
+    earningsDates: 14,
+    marketClock: 15,
+    gatedSkillCap: 16,
+} as const;
+
+const promptArg = (
+    call: readonly unknown[] | undefined,
+    name: keyof typeof PROMPT_ARG
+): unknown => call?.[PROMPT_ARG[name]];
 
 describe('runAnalysis', () => {
     beforeEach(() => {
@@ -478,6 +497,7 @@ describe('runAnalysis', () => {
                 patternGeometries: new Map(),
                 trend,
                 printedSupportPrices: [],
+                injectedSkills: [],
             });
 
             it("overwrites the model's trend with the computed one and attaches trendBasis", async () => {
@@ -815,6 +835,166 @@ describe('runAnalysis', () => {
         });
     });
 
+    describe('tier별 스킬 선택', () => {
+        const catalog: Skill[] = [
+            {
+                name: 'Always Guide',
+                description: 'd',
+                type: 'indicator_guide',
+                indicators: [],
+                confidenceWeight: 1,
+                content: 'c',
+                gating: { tier: 'always_on' },
+            },
+            {
+                name: 'Gated Guide',
+                description: 'd',
+                type: 'indicator_guide',
+                indicators: [],
+                confidenceWeight: 1,
+                content: 'c',
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['rsi_oversold'],
+                },
+            },
+        ];
+        const runAs = async (
+            tier: 'free' | 'member' | 'pro',
+            symbol: string
+        ) => {
+            mockCacheGet.mockClear();
+            mockBuildAnalysisPrompt.mockClear();
+            await runAnalysis(
+                symbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier },
+                }
+            );
+            return {
+                key: mockCacheGet.mock.calls.at(-1)?.[0] as string,
+                promptArgs: mockBuildAnalysisPrompt.mock.calls.at(-1) ?? [],
+            };
+        };
+        const fingerprintOf = (key: string): string =>
+            key.slice(key.indexOf(':', key.indexOf('free-c')) + 1);
+
+        beforeEach(() => {
+            mockLoadSkillsCached.mockResolvedValue({
+                skills: catalog,
+                skillsDegraded: false,
+            });
+        });
+
+        it('free는 카탈로그 전체와 free 캡을, member는 카탈로그 전체와 캡 없음(null)을 프롬프트에 넘긴다', async () => {
+            const free = await runAs('free', 'AAPL');
+            const member = await runAs('member', 'AAPL');
+
+            expect(promptArg(free.promptArgs, 'skills')).toEqual(catalog);
+            expect(promptArg(free.promptArgs, 'gatedSkillCap')).toBe(
+                gatedSkillCapForTier('free')
+            );
+            expect(promptArg(member.promptArgs, 'skills')).toEqual(catalog);
+            expect(promptArg(member.promptArgs, 'gatedSkillCap')).toBeNull();
+        });
+
+        it('후처리는 카탈로그 전체가 아니라 프롬프트가 실은 스킬로만 신뢰도를 보강한다', async () => {
+            const injected = catalog.slice(0, 1);
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: [],
+                patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
+                patternGeometries: new Map(),
+                trend: null,
+                printedSupportPrices: [],
+                injectedSkills: injected,
+            });
+            mockEnrichAnalysisWithConfidence.mockClear();
+
+            await runAs('free', 'AAPL');
+
+            const enrichCall = mockEnrichAnalysisWithConfidence.mock.lastCall;
+            expect(enrichCall?.[1]).toEqual(injected);
+            expect(enrichCall?.[1]).not.toEqual(catalog);
+        });
+
+        it('member 후처리는 발화하지 않은 gated 스킬이 있어도 카탈로그 전체로 보강한다', async () => {
+            // The gated skill does not fire, so what the prompt carries
+            // (`injectedSkills`) is a strict subset of the catalog.
+            const injected = catalog.slice(0, 1);
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: [],
+                patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
+                patternGeometries: new Map(),
+                trend: null,
+                printedSupportPrices: [],
+                injectedSkills: injected,
+            });
+            mockEnrichAnalysisWithConfidence.mockClear();
+
+            await runAs('member', 'AAPL');
+
+            const enrichCall = mockEnrichAnalysisWithConfidence.mock.lastCall;
+            expect(enrichCall?.[1]).toEqual(catalog);
+            expect(enrichCall?.[1]).not.toEqual(injected);
+        });
+
+        it('peek 키는 free에만 상한이 들어가고 member·pro는 예전 키 그대로다', async () => {
+            const peekKeyFor = async (tier: 'free' | 'member' | 'pro') => {
+                mockCacheSet.mockClear();
+                await runAs(tier, 'AAPL');
+                return mockCacheSet.mock.calls
+                    .map(call => call[0] as string)
+                    .find(key => key.startsWith('analysis:peek:'));
+            };
+            const peekOf = (tierPart: string) =>
+                buildAnalysisPeekCacheKey(
+                    'AAPL',
+                    mockTimeframe,
+                    DEFAULT_ANALYSIS_MODEL_ID,
+                    tierPart
+                );
+
+            expect(await peekKeyFor('free')).toBe(
+                peekOf(`free-c${FREE_TIER_GATED_SKILLS_PER_GROUP}`)
+            );
+            expect(await peekKeyFor('member')).toBe(peekOf('member'));
+            expect(await peekKeyFor('pro')).toBe(peekOf('pro'));
+        });
+
+        it('free와 member의 캐시 키는 티어·상한 접두어로 갈리고, 둘 다 같은 카탈로그 지문을 쓴다', async () => {
+            const free = await runAs('free', 'AAPL');
+            const member = await runAs('member', 'AAPL');
+            const fingerprint = fingerprintSkillCatalog(catalog);
+
+            expect(free.key).toContain(
+                `free-c${FREE_TIER_GATED_SKILLS_PER_GROUP}:${fingerprint}`
+            );
+            expect(member.key).toContain(`member:${fingerprint}`);
+            expect(free.key).not.toBe(member.key);
+        });
+
+        it('free의 서로 다른 두 종목은 같은 카탈로그 지문을 공유한다', async () => {
+            const aapl = await runAs('free', 'AAPL');
+            const msft = await runAs('free', 'MSFT');
+
+            expect(fingerprintOf(aapl.key)).toBe(fingerprintOf(msft.key));
+        });
+    });
+
     describe('cache write', () => {
         it('result is written to cache with TTL from computeEffectiveTtl', async () => {
             await runAnalysis(
@@ -901,7 +1081,7 @@ describe('runAnalysis', () => {
                 mockSymbol,
                 mockTimeframe,
                 DEFAULT_ANALYSIS_MODEL_ID,
-                DEFAULT_TIER
+                tierCapKeyPart(DEFAULT_TIER)
             );
             expect(mockCacheSet).toHaveBeenCalledTimes(2);
             expect(mockCacheSet).toHaveBeenCalledWith(
@@ -1156,7 +1336,7 @@ describe('runAnalysis', () => {
             expect(keyArg).toContain(':hist=');
 
             const promptArgs = mockBuildAnalysisPrompt.mock.calls[0]!;
-            expect(promptArgs[10]).toEqual([oldEntry]);
+            expect(promptArg(promptArgs, 'priorAnalyses')).toEqual([oldEntry]);
         });
 
         // M2: KRX 마감 후(19:30 KST)에 쓴 행은 같은 마감 세션 동안 키에 들어오면 안
@@ -1273,7 +1453,7 @@ describe('marketEvents 주입', () => {
      * `marketEventsSection.test.ts`가 검증한다.
      */
     const eventsArg = () =>
-        mockBuildAnalysisPrompt.mock.calls.at(-1)?.[11] as unknown;
+        promptArg(mockBuildAnalysisPrompt.mock.calls.at(-1), 'marketEvents');
 
     it('이벤트가 프롬프트 빌더의 12번째 인자로 전달된다', async () => {
         await runAnalysis(
@@ -1418,9 +1598,9 @@ describe('marketEvents 시간 상한', () => {
     it('프롬프트에는 상한 안의 후보만 전달된다 — 키와 프롬프트가 같은 집합을 본다', async () => {
         await run([fridayEvent, weekendEvent]);
 
-        expect(mockBuildAnalysisPrompt.mock.calls.at(-1)?.[11]).toEqual([
-            fridayEvent,
-        ]);
+        expect(
+            promptArg(mockBuildAnalysisPrompt.mock.calls.at(-1), 'marketEvents')
+        ).toEqual([fridayEvent]);
     });
 
     it('상한 직전(금요일 밤) 이벤트가 추가되면 키가 바뀌어 다시 분석한다', async () => {
@@ -1768,9 +1948,12 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             expect(result.status).toBe('done');
             expect(mockComputeFearGreedIndex).not.toHaveBeenCalled();
             // 7번째 인자 = fearGreed 스냅샷
-            expect(mockBuildAnalysisPrompt.mock.calls.at(-1)?.[6]).toBe(
-                undefined
-            );
+            expect(
+                promptArg(
+                    mockBuildAnalysisPrompt.mock.calls.at(-1),
+                    'fearGreed'
+                )
+            ).toBe(undefined);
             expect(errorSpy).toHaveBeenCalledWith(
                 expect.stringContaining('FearGreed daily fetch/compute failed'),
                 expect.any(Error)
@@ -1791,6 +1974,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternGeometries: new Map(),
                 trend: null,
                 printedSupportPrices: [],
+                injectedSkills: [],
             });
 
             await runAnalysis(
@@ -1838,6 +2022,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternGeometries: new Map(),
                 trend: null,
                 printedSupportPrices: [],
+                injectedSkills: [],
             });
             const reconciledWithCandidate: AnalysisResponse = {
                 ...mockRawResult,
@@ -1964,6 +2149,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternGeometries: new Map(),
                 trend: null,
                 printedSupportPrices: [],
+                injectedSkills: [],
             });
             const reconciledWithUnknownId: AnalysisResponse = {
                 ...mockRawResult,
@@ -2033,6 +2219,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternGeometries: new Map(),
                 trend: null,
                 printedSupportPrices: [],
+                injectedSkills: [],
             });
             const citedByStrategy: AnalysisResponse = {
                 ...mockRawResult,
@@ -2101,6 +2288,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternGeometries: new Map(),
                 trend: null,
                 printedSupportPrices: printed,
+                injectedSkills: [],
             });
             await runAnalysis(
                 mockSymbol,
@@ -2129,12 +2317,13 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 }
             );
 
-            expect(mockBuildAnalysisPrompt.mock.lastCall?.slice(-4)).toEqual([
-                'KRW',
-                'etp',
-                undefined,
-                undefined,
-            ]);
+            const lastCall = mockBuildAnalysisPrompt.mock.lastCall;
+            expect([
+                promptArg(lastCall, 'currency'),
+                promptArg(lastCall, 'krxTick'),
+                promptArg(lastCall, 'earningsDates'),
+                promptArg(lastCall, 'marketClock'),
+            ]).toEqual(['KRW', 'etp', undefined, undefined]);
             const postArgs =
                 mockPostProcessAnalysisWithReconcile.mock.lastCall!;
             expect(postArgs[4]).toBe('KRW');
@@ -2150,7 +2339,10 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 undefined,
                 { marketDataProvider: fakeProvider, session: US_EQUITY_SESSION }
             );
-            const withSession = mockBuildAnalysisPrompt.mock.lastCall?.at(-1);
+            const withSession = promptArg(
+                mockBuildAnalysisPrompt.mock.lastCall,
+                'marketClock'
+            );
             expect(withSession).toMatchObject({ session: US_EQUITY_SESSION });
             expect(
                 (withSession as { now: unknown } | undefined)?.now
@@ -2165,7 +2357,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 { marketDataProvider: fakeProvider }
             );
             expect(
-                mockBuildAnalysisPrompt.mock.lastCall?.at(-1)
+                promptArg(mockBuildAnalysisPrompt.mock.lastCall, 'marketClock')
             ).toBeUndefined();
         });
 
@@ -2180,6 +2372,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternGeometries: new Map(),
                 trend: null,
                 printedSupportPrices: [],
+                injectedSkills: [],
             });
             const warnSpy = vi
                 .spyOn(console, 'warn')
@@ -2451,7 +2644,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             mockSymbol,
             mockTimeframe,
             DEFAULT_ANALYSIS_MODEL_ID,
-            DEFAULT_TIER,
+            tierCapKeyPart(DEFAULT_TIER),
             undefined,
             undefined,
             undefined
@@ -2600,7 +2793,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 mockSymbol,
                 mockTimeframe,
                 DEFAULT_ANALYSIS_MODEL_ID,
-                DEFAULT_TIER,
+                tierCapKeyPart(DEFAULT_TIER),
                 true,
                 undefined,
                 'en'
