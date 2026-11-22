@@ -3086,7 +3086,6 @@ export type TierInfoDepth =
 /** AI provider that hosts a model. */
 export type AIProvider = 'claude' | 'gemini' | 'chatgpt' | 'deepseek';
 
-/** Effort level shared by Claude adaptive thinking and ChatGPT reasoning. */
 /**
  * Adaptive-thinking effort levels accepted by Claude models.
  *
@@ -3116,6 +3115,8 @@ export type ChatGptEffortLevel =
     'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh';
 
 /**
+ * Effort level shared by Claude adaptive thinking and ChatGPT reasoning.
+ *
  * @deprecated Use {@link ClaudeEffortLevel} or {@link ChatGptEffortLevel}.
  * The shared union cannot express GPT's `'none'`, and widening it would let
  * Claude specs hold a value the Anthropic API rejects.
@@ -5779,7 +5780,6 @@ export interface RsiDivergencePair {
 /** @internal */
 export type RsiDivergenceKind = 'bullish' | 'bearish';
 
-/** {@link resolveChartOverlays} output. */
 /** @internal {@link buildOverlayCandidates} output: the candidates plus the kinds whose builder threw. */
 export interface OverlayCandidateBuild {
     candidates: OverlayCandidate[];
@@ -5793,7 +5793,7 @@ export interface MisplacedOverlayId {
     sourceRef: string;
 }
 
-/** @internal */
+/** @internal {@link resolveChartOverlays} output. */
 export interface ResolvedChartOverlays {
     chartOverlays: ChartOverlay[];
     /** Trendlines derived from resolved trendline overlays (legacy `trendlines` field). */

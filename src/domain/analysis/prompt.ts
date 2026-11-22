@@ -1419,12 +1419,6 @@ export const PRO_INDICATOR_SECTION_HEADER = '## Pro-Indicator Agreement';
 const REGIME_INSUFFICIENT_DATA_LINE =
     '- Regime: insufficient data (regime indicators still in warm-up)';
 
-/**
- * @internal Build the `- Regime: …` line from the latest regime reads. Pulled
- * out of {@link formatRegimeContextSection} (was an inline IIFE) so the
- * trend/mean-revert classification + R² narrative live in one named place.
- * Called only when at least one of Hurst / VR (the verdict voters) is non-null.
- */
 /** @internal Directional suffix for the R² narrative from a regression slope. */
 const slopeDirLabel = (slope: number | null): string => {
     if (slope === null) return '';
@@ -1433,6 +1427,12 @@ const slopeDirLabel = (slope: number | null): string => {
     return ', slope flat';
 };
 
+/**
+ * @internal Build the `- Regime: …` line from the latest regime reads. Pulled
+ * out of {@link formatRegimeContextSection} (was an inline IIFE) so the
+ * trend/mean-revert classification + R² narrative live in one named place.
+ * Called only when at least one of Hurst / VR (the verdict voters) is non-null.
+ */
 const computeRegimeLine = (
     lastHurst: number | null,
     lastVR: number | null,

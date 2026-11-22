@@ -36,8 +36,8 @@ export function rollingLowest(values: number[], period: number): number | null {
     return minOf(values.slice(-period));
 }
 
-/** @internal O(N) sliding-window maximum via monotone deque. */
 // Each index is pushed/popped at most once, so the whole pass stays O(N).
+/** @internal O(N) sliding-window maximum via monotone deque. */
 export function slidingMax(
     values: number[],
     period: number
@@ -55,8 +55,8 @@ export function slidingMax(
     return result;
 }
 
-/** @internal O(N) sliding-window minimum via monotone deque. */
 // Each index is pushed/popped at most once, so the whole pass stays O(N).
+/** @internal O(N) sliding-window minimum via monotone deque. */
 export function slidingMin(
     values: number[],
     period: number
@@ -79,8 +79,8 @@ export function lastNonNull(arr: readonly (number | null)[]): number | null {
     return findLast(arr, (v): v is number => v !== null) ?? null;
 }
 
-/** @internal Linear-regression endpoint value over the last `period` values. */
 // Equivalent to PineScript linreg(source, length, 0).
+/** @internal Linear-regression endpoint value over the last `period` values. */
 export function linreg(values: number[], period: number): number | null {
     if (values.length < period) return null;
     const vals = values.slice(-period);
