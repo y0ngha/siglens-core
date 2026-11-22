@@ -15,7 +15,7 @@
  * `insufficient_sample` and no share is stored.
  *
  * Set: replay-v1, bars fingerprint 0ba4d6a50b731f880777cd867c6e472903d9c7311b2a2476fc588a3d87ec9f0e
- * Core: d9bf7b2f2af06e74f632b3478bfddacba50a96e1+dirty (DIRTY checkout: do not commit)
+ * Core: 3bcfabdceefba3d270a42298eb61fd7f74b02add (clean checkout)
  * Definitions: outcome labels v1, horizons 1/5/10/20, constants 3e3986423792
  * Generated: 2026-11-23
  * Command: npx tsx scripts/replay/signalBaseRateTable.ts --set <replay-v1 set dir> --date 2026-11-23
