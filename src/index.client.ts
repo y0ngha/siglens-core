@@ -385,6 +385,9 @@ export type {
     BaseRateVerdict,
     MeasuredBaseRate,
 } from './domain/analysis/measuredBaseRates';
+// Canonical JSON text (sorted keys, no whitespace): the serialization behind
+// `BacktestBenchmarks.tradesSha256`, exported so a consumer hashes the same text (WP-26).
+export { canonicalJson } from './domain/canonicalJson';
 // The measured past record of each confirmed signal type on the daily replay set (WP-32
 // G14): the share of directional moves after the signal against a matched placebo at 1, 5,
 // 10 and 20 bars, with n, a verdict and the pooled scope. Shares only, never a return.
@@ -711,6 +714,8 @@ export type {
     FilteredAnalysisResult,
     AnalysisSignal,
     SignalStrength,
+    BacktestBenchmarks,
+    BacktestDistribution,
     BacktestEntryType,
     BacktestLegExitReason,
     BacktestRunData,
