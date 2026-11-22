@@ -26,6 +26,9 @@ import {
 } from '@/index.client';
 import * as clientApi from '@/index.client';
 import type {
+    MeasuredSignalBaseRate,
+    MeasuredSignalHorizon,
+    MeasuredSignalScope,
     InvestorFlowsDataProvider,
     InvestorFlowsScorecard,
     FinancialSignal,
@@ -65,6 +68,23 @@ describe('browser public API exports', () => {
                 'double_bottom',
                 '1Hour'
             )
+        ).toBeNull();
+    });
+
+    it('exports the measured signal base rates and their lookup (WP-32 G14, API-1: both entrypoints)', () => {
+        expect(typeof clientApi.measuredSignalBaseRateFor).toBe('function');
+        expect(Object.keys(clientApi.MEASURED_SIGNAL_BASE_RATES)).toContain(
+            'golden_cross'
+        );
+        const entry: MeasuredSignalBaseRate | null =
+            clientApi.measuredSignalBaseRateFor('golden_cross', '1Day');
+        expect(entry).toBe(clientApi.MEASURED_SIGNAL_BASE_RATES.golden_cross);
+        const scope: MeasuredSignalScope | undefined = entry?.scope;
+        const horizon: MeasuredSignalHorizon | undefined = entry?.horizons[0];
+        expect(scope?.timeframe).toBe('1Day');
+        expect(horizon?.h).toBe(1);
+        expect(
+            clientApi.measuredSignalBaseRateFor('golden_cross', '1Hour')
         ).toBeNull();
     });
 
