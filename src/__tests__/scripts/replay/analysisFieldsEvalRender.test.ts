@@ -40,6 +40,7 @@ vi.mock('@/infrastructure/skills/loader', () => ({
                 name: 'Core A',
                 type: 'indicator_guide',
                 gating: { tier: 'always_on' },
+                computedCard: 'ma',
             },
             {
                 name: 'Smc Full',
@@ -50,7 +51,17 @@ vi.mock('@/infrastructure/skills/loader', () => ({
             {
                 name: 'G1',
                 category: 'reversal_bullish',
-                gating: { tier: 'gated' },
+                gating: {
+                    tier: 'gated',
+                    signalKind: 'event',
+                    triggers: ['doji', 'hammer'],
+                },
+            },
+            {
+                name: 'State Guide',
+                type: 'indicator_guide',
+                gating: { tier: 'gated', signalKind: 'state', state: {} },
+                computedCard: 7,
             },
         ],
     }),
@@ -184,6 +195,7 @@ describe('renderWithCore', () => {
                 group: 'indicator_guide',
                 alwaysOn: true,
                 injected: true,
+                computedCard: 'ma',
             },
             {
                 name: 'Smc Full',
@@ -196,7 +208,65 @@ describe('renderWithCore', () => {
                 group: 'reversal_bullish',
                 alwaysOn: false,
                 injected: true,
+                triggers: ['doji', 'hammer'],
+            },
+            {
+                name: 'State Guide',
+                group: 'indicator_guide',
+                alwaysOn: false,
+                injected: true,
             },
         ]);
+    });
+
+    it('renders only the tiers asked for', async () => {
+        core.runAnalysis.mockImplementation(
+            async (_symbol, _name, _timeframe, _force, _fmp, options) => {
+                options.onPromptAssembled({
+                    system: 's',
+                    stable: 'a',
+                    dynamic: 'b',
+                    promptVersion: 'p34',
+                });
+                return { status: 'error' };
+            }
+        );
+        const rendered = await renderWithCore({
+            ...input(),
+            tiers: ['member'],
+        });
+        expect(rendered.samples.map(s => s.tier)).toEqual(['member']);
+        expect(core.runAnalysis).toHaveBeenCalledTimes(1);
+    });
+
+    it('carries the computed cards of an assembled prompt, and none when it has none', async () => {
+        const assembled = {
+            system: 's',
+            stable: 'a',
+            dynamic: 'b',
+            promptVersion: 'p34',
+        };
+        core.runAnalysis.mockImplementationOnce(
+            async (_symbol, _name, _timeframe, _force, _fmp, options) => {
+                options.onPromptAssembled({
+                    ...assembled,
+                    indicatorCards: [{ indicatorName: 'MA Signal Guide' }],
+                    cycleCards: [],
+                } as AssembledPromptRecord);
+                return { status: 'error' };
+            }
+        );
+        core.runAnalysis.mockImplementationOnce(
+            async (_symbol, _name, _timeframe, _force, _fmp, options) => {
+                options.onPromptAssembled(assembled);
+                return { status: 'error' };
+            }
+        );
+        const rendered = await renderWithCore(input());
+        expect(rendered.samples[0].cards).toEqual({
+            indicator: [{ indicatorName: 'MA Signal Guide' }],
+            cycle: [],
+        });
+        expect(rendered.samples[1].cards).toBeNull();
     });
 });

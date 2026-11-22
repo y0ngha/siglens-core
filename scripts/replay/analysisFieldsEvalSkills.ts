@@ -33,6 +33,10 @@ export interface CatalogSkill {
     alwaysOn: boolean;
     /** `false` for a skill the prompt never carries as a digest (the SMC full guide). */
     injected: boolean;
+    /** The signal and candle ids that select a gated skill (`gating.triggers`). */
+    triggers?: readonly string[];
+    /** The `computed_card` kind of a card-producing skill (WP-16); absent on a core without it. */
+    computedCard?: string;
 }
 
 export interface PromptSample {
@@ -40,6 +44,11 @@ export interface PromptSample {
     tier: SkillTier;
     stable: string;
     dynamic: string;
+    /**
+     * The computed cards the assembled prompt carries (WP-16 core-2 on), as stored; absent
+     * or `null` on a core that computes none.
+     */
+    cards?: { indicator: unknown; cycle: unknown } | null;
 }
 
 /** Index of a skill's digest heading in `text`, or `-1`. */

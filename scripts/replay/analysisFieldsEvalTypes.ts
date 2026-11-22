@@ -24,7 +24,13 @@ export const TREND_LABELS: readonly TrendLabel[] = [
     'neutral',
 ];
 
-export const EVAL_MODES = ['trend', 'skills', 'plan'] as const;
+export const EVAL_MODES = [
+    'trend',
+    'skills',
+    'plan',
+    'gating',
+    'output',
+] as const;
 export type EvalMode = (typeof EVAL_MODES)[number];
 
 export type EvalMarket = 'us' | 'kr';
@@ -82,7 +88,46 @@ export const FIELDS_EVAL_CONSTANTS = {
         skillsFreeGatedPerGroup: 3,
         skillsMaxUncachedInputGrowth: 1.5,
         skillsMaxLatencyGrowth: 0.2,
+        /** WP-16 §9.3 (pre-registered). */
+        cardTrendMinN: 30,
+        cardTrendMaxOpposite: 0.05,
+        outputMaxRatioMember: 0.75,
+        outputMaxRatioFree: 0.8,
+        outputCiHighMember: 0.8,
+        outputCiHighFree: 0.85,
+        latencyMaxRatio: 0.8,
+        msPerTokenBand: 0.1,
+        rateMarginPp: 0.01,
+        /** Share of the cases a gate needs paired measurements for; below it the gate is undecided. */
+        minPairedShare: 0.9,
+        levelMargin: -0.03,
+        positionMargin: -0.05,
+        summaryRatioMin: 0.85,
+        summaryRatioMax: 1.25,
+        strategyEntryRatioMin: 0.85,
+        candidateCoverageMargin: 0.02,
+        detectedCandidateMargin: -0.03,
+        panelItemsMargin: 0.1,
     },
+    /** WP-16 card rules the instrument recomputes from the printed lines (WP-16 §3.3, §4). */
+    cards: {
+        adxTrending: 25,
+        adxWeak: 20,
+        stochasticOverbought: 80,
+        stochasticOversold: 20,
+        stochRsiOverbought: 0.8,
+        stochRsiOversold: 0.2,
+        williamsROverbought: -20,
+        williamsROversold: -80,
+        buySellBullish: 0.65,
+        buySellBearish: 0.35,
+        /** Bars of stage history a cycle reading looks back over. */
+        cycleLookbackBars: 120,
+        maCyclePeriods: [5, 20, 60],
+        macdCycleEmaPeriods: [9, 21, 60],
+    },
+    /** Bootstrap of the paired comparisons of the `output` mode. */
+    bootstrap: { replicates: 2000, seed: 20261122 },
     /** 95% interval of a paired mean (normal approximation). */
     ciZ: 1.96,
     /** Cases per position in the P7 reading sample. */

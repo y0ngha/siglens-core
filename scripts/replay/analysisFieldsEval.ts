@@ -9,6 +9,10 @@
  *       [--limit N] [--run <free after> --before <free before> [--member-run <member run>]]
  *   npx tsx scripts/replay/analysisFieldsEval.ts --mode plan --set <set> --run <run dir> --out <dir>
  *       [--before <run dir>] [--noise-pp <n>]
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode gating --set <set> --skills <app>/skills --out <dir>
+ *       [--tier free|member] [--limit N] [--baseline <earlier gating out dir>]
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode output --set <set> --skills <app>/skills --out <dir>
+ *       --run <after> --before <before> [--repeat <run>] [--noise-pp <n>]
  *
  * - `trend`: the shipped trend rule (EMA20 move in ATR(14)) and two reference rules
  *   recomputed from OHLC for every day from bar 300 (label distribution, day-to-day change,
@@ -21,6 +25,14 @@
  *   position, an independent recomputation of the plan state and verdict, the stop-band and
  *   target-room checks, the volatility grade against the next 10 sessions and the outcomes
  *   by position; with `--before`, the paired comparison of two runs.
+ *
+ * - `gating` (WP-16): renders every case (no model call) and reads which pattern and candle
+ *   guides reach the prompt against the chart patterns and candles the same prompt prints
+ *   (D1 to D4), the prompt's indicator-card instructions (D9) and, when the assembled prompt
+ *   carries computed cards, the cards against the printed lines and OHLC (D5, D6, D8).
+ * - `output` (WP-16): per-case pairs of an after and a before run (and a repeat run, the noise
+ *   floor): output tokens, latency, what the model wrote per field, failures, levels, plan
+ *   position, strategies and patterns, with bootstrap 95% intervals (O1 to V5, D7).
  *
  * Every definition is recomputed here (`analysisFieldsEvalTypes.ts` holds the constants);
  * the stored field under test is only ever the thing compared with. Gates (WP-15 §7.3) are
@@ -53,12 +65,32 @@ import {
     type PlanMeasure,
     type StoredPlanState,
 } from './analysisFieldsEvalPlan';
+import {
+    CARD_TREND_SKILLS,
+    CYCLE_STRATEGY_SKILLS,
+} from './analysisFieldsEvalCards';
+import { readSkillCatalog } from './analysisFieldsEvalCatalog';
+import {
+    gatingGates,
+    summarizeGating,
+    type BaselineRow,
+    type CardContext,
+} from './analysisFieldsEvalGating';
+import {
+    compareArms,
+    outputGates,
+    readArmCase,
+    type ArmCase,
+    type PatternSkill,
+} from './analysisFieldsEvalOutput';
 import { renderWithCore, type RenderSkills } from './analysisFieldsEvalRender';
 import {
     compareLevelOverlap,
     levelOverlapPerCase,
     skillRows,
     skillsGates,
+    SKILL_TIERS,
+    type SkillTier,
     type SkillsGateInput,
     summarizeSkills,
     type LevelCase,
@@ -120,12 +152,33 @@ export interface FieldsEvalArgs {
     allowSkippedCases: boolean;
     /** Noise floor in percentage points, added to the side-effect margin of P6 and S5. */
     noisePp: number;
+    /** `gating`: render this tier only. */
+    tier: SkillTier | null;
+    /** `gating`: an earlier gating output directory whose hashes D3 compares with. */
+    baseline: string | null;
+    /** `output`: a second run of the before arm, the noise floor. */
+    repeat: string | null;
 }
 
 const GATE_IDS: Record<EvalMode, readonly string[]> = {
     trend: ['T1', 'T2', 'T3', 'T4', 'T5'],
     plan: ['P1', 'P2', 'P3', 'P4', 'P5', 'P6'],
     skills: ['S1', 'S2', 'S3', 'S5', 'S6'],
+    gating: ['D1', 'D2', 'D3', 'D5', 'D6', 'D8', 'D9'],
+    output: [
+        'D7',
+        'O1',
+        'O2',
+        'F1',
+        'F2',
+        'L1',
+        'L2',
+        'V1',
+        'V2',
+        'V3',
+        'V4',
+        'V5',
+    ],
 };
 
 function parseMode(raw: string | undefined): EvalMode {
@@ -150,6 +203,13 @@ function parseGate(
         );
     }
     return ids;
+}
+
+function parseTier(raw: string | undefined): SkillTier | null {
+    if (raw === undefined) return null;
+    const tier = SKILL_TIERS.find(t => t === raw);
+    if (tier === undefined) throw new Error('--tier must be free or member');
+    return tier;
 }
 
 function parseCount(raw: string | undefined, flag: string): number | null {
@@ -181,6 +241,9 @@ export function parseFieldsEvalArgs(argv: readonly string[]): FieldsEvalArgs {
         gate: parseGate(raw.gate, mode),
         allowSkippedCases: raw['allow-skipped-cases'] === 'true',
         noisePp: raw['noise-pp'] === undefined ? 0 : Number(raw['noise-pp']),
+        tier: parseTier(raw.tier),
+        baseline: raw.baseline === undefined ? null : resolve(raw.baseline),
+        repeat: raw.repeat === undefined ? null : resolve(raw.repeat),
     };
     if (!Number.isFinite(args.noisePp) || args.noisePp < 0) {
         throw new Error('--noise-pp must be a non-negative number');
@@ -191,6 +254,12 @@ export function parseFieldsEvalArgs(argv: readonly string[]): FieldsEvalArgs {
 
 function validateCombination(args: FieldsEvalArgs): void {
     const { mode } = args;
+    if ((args.tier !== null || args.baseline !== null) && mode !== 'gating') {
+        throw new Error(`${mode}: --tier and --baseline apply to gating only`);
+    }
+    if (args.repeat !== null && mode !== 'output') {
+        throw new Error(`${mode}: --repeat applies to output only`);
+    }
     if (mode === 'trend') {
         if ((args.set === null) === (args.bars === null)) {
             throw new Error(
@@ -214,6 +283,31 @@ function validateCombination(args: FieldsEvalArgs): void {
         throw new Error(
             `${mode}: --set is required; --bars and --labels do not apply`
         );
+    }
+    if (mode === 'gating') {
+        if (args.skills === null)
+            throw new Error('gating: --skills is required');
+        if (
+            args.run !== null ||
+            args.before !== null ||
+            args.memberRun !== null
+        ) {
+            throw new Error(
+                'gating: --run, --before and --member-run do not apply'
+            );
+        }
+        return;
+    }
+    if (mode === 'output') {
+        if (args.run === null || args.before === null || args.skills === null) {
+            throw new Error(
+                'output: --run, --before and --skills are required'
+            );
+        }
+        if (args.memberRun !== null || args.limit !== null) {
+            throw new Error('output: --member-run and --limit do not apply');
+        }
+        return;
     }
     if (mode === 'plan') {
         if (args.run === null) throw new Error('plan: --run is required');
@@ -983,6 +1077,248 @@ async function skillsMode(
     };
 }
 
+const SECONDS_PER_DAY = 86_400;
+
+/** The closes of the bars a replay prompt saw at `asOf`: the lookback window up to that day. */
+function promptWindowCloses(
+    bars: readonly Bar[],
+    asOf: string
+): readonly number[] {
+    const last = Date.parse(`${asOf}T00:00:00Z`) / 1000;
+    const first =
+        last - (FIELDS_EVAL_CORE_DERIVED.lookbackDays - 1) * SECONDS_PER_DAY;
+    return bars
+        .filter(bar => bar.time >= first && bar.time <= last)
+        .map(bar => bar.close);
+}
+
+/** The hashes of an earlier gating output (`rows.jsonl`), after checking it is a gating run of this set. */
+export function readBaselineRows(
+    dir: string,
+    fingerprint: string
+): readonly BaselineRow[] {
+    const run = readJson<{
+        tool?: unknown;
+        mode?: unknown;
+        inputs?: { fingerprint?: unknown };
+    }>(join(dir, 'run.json'));
+    if (run.tool !== 'analysisFieldsEval' || run.mode !== 'gating') {
+        throw new Error(`${dir} is not an analysisFieldsEval gating output`);
+    }
+    if (run.inputs?.fingerprint !== fingerprint) {
+        throw new Error(
+            `${dir} was made on a different set (fingerprint differs)`
+        );
+    }
+    return readFileSync(join(dir, 'rows.jsonl'), 'utf-8')
+        .split('\n')
+        .filter(line => line !== '')
+        .map((line): BaselineRow => {
+            const row = asRec(JSON.parse(line));
+            const tier = SKILL_TIERS.find(t => t === row?.tier);
+            if (
+                typeof row?.caseId !== 'string' ||
+                tier === undefined ||
+                typeof row.strippedSha256 !== 'string' ||
+                typeof row.stableSha256 !== 'string'
+            ) {
+                throw new Error(`${dir}/rows.jsonl has a row without hashes`);
+            }
+            return {
+                caseId: row.caseId,
+                tier,
+                strippedSha256: row.strippedSha256,
+                ...(typeof row.remainderSha256 === 'string'
+                    ? { remainderSha256: row.remainderSha256 }
+                    : {}),
+                stableSha256: row.stableSha256,
+            };
+        });
+}
+
+async function gatingMode(
+    args: FieldsEvalArgs,
+    deps: FieldsEvalDeps
+): Promise<ModeOutput> {
+    const set = loadSetData(args.set ?? '');
+    const cases: readonly ReplayCase[] = selectRunCases(set.manifest, {
+        subset: null,
+        limit: args.limit,
+    });
+    if (cases.length === 0) throw new Error('no case to render');
+    const tiers = args.tier === null ? SKILL_TIERS : [args.tier];
+    deps.log(
+        `gating: rendering ${cases.length} cases for ${tiers.join(' and ')}`
+    );
+    const rendered = await deps.render({
+        skillsDir: args.skills ?? '',
+        cases,
+        tiers,
+        storedOf: symbol => {
+            const stored = set.storedOf.get(symbol);
+            if (stored === undefined) throw new Error(`no bars for ${symbol}`);
+            return stored;
+        },
+        log: deps.log,
+    });
+    const asOfOf = new Map(cases.map(c => [c.caseId, c]));
+    const cardContext = (caseId: string): CardContext | null => {
+        const replayCase = asOfOf.get(caseId);
+        const bars = replayCase && set.storedOf.get(replayCase.symbol)?.bars;
+        return replayCase === undefined || bars === undefined
+            ? null
+            : { closes: promptWindowCloses(bars, replayCase.asOf) };
+    };
+    const baseline =
+        args.baseline === null
+            ? null
+            : readBaselineRows(args.baseline, set.fingerprint);
+    const { rows, summary } = summarizeGating({
+        catalog: rendered.catalog,
+        samples: rendered.samples,
+        cardContext,
+        baseline,
+        schemaAsksIndicatorResults: await deps.schemaAsksIndicatorResults(),
+    });
+    return {
+        inputs: {
+            fingerprint: set.fingerprint,
+            skillsDir: args.skills,
+            limit: args.limit,
+            tiers,
+            baseline: args.baseline,
+        },
+        summary: { gating: summary },
+        gates: gatingGates(summary),
+        rows,
+        skipped: 0,
+    };
+}
+
+/**
+ * The first-repeat results of a run as arm cases. A repeat run whose catalog differs from the
+ * before run's may only be paired when every prompt is the same (the tags change nothing the
+ * model is sent).
+ */
+function armCasesOf(run: RunData): readonly ArmCase[] {
+    return run.results.filter(r => r.repeat === 1).map(readArmCase);
+}
+
+function assertSamePrompts(before: RunData, repeat: RunData): void {
+    if (before.meta.skillsSha256 === repeat.meta.skillsSha256) return;
+    const hashOf = new Map(
+        before.results
+            .filter(r => r.repeat === 1)
+            .map(r => [r.caseId, r.promptHashes?.full ?? null])
+    );
+    const differing = repeat.results.filter(
+        r =>
+            r.repeat === 1 &&
+            (hashOf.get(r.caseId) === null ||
+                hashOf.get(r.caseId) !== (r.promptHashes?.full ?? null))
+    );
+    if (differing.length > 0) {
+        throw new Error(
+            `${before.dir} and ${repeat.dir} have different skillsSha256 and ${differing.length} case(s) with different prompts: they are not a repeat pair`
+        );
+    }
+}
+
+/** The run's tier; a run of an unknown tier is not one of the two the thresholds are set for. */
+function tierOf(tier: string): 'free' | 'member' {
+    if (tier === 'free' || tier === 'member') return tier;
+    throw new Error(`the run's tier "${tier}" is neither free nor member`);
+}
+
+function outputMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
+    const set = loadSetData(args.set ?? '');
+    const afterRun = loadRunData(args.run ?? '', set);
+    const beforeRun = loadRunData(args.before ?? '', set);
+    assertComparableRuns(afterRun, beforeRun, PAIRED_RUN_FIELDS);
+    const repeatRun =
+        args.repeat === null ? null : loadRunData(args.repeat, set);
+    if (repeatRun !== null) {
+        assertComparableRuns(beforeRun, repeatRun, PAIRED_RUN_FIELDS);
+        assertSamePrompts(beforeRun, repeatRun);
+    }
+    const catalog = readSkillCatalog(args.skills ?? '');
+    const patterns: readonly PatternSkill[] = catalog
+        .filter(skill => skill.type === 'pattern')
+        .map(skill => ({ name: skill.name, triggers: skill.triggers }));
+    const tagged = catalog.flatMap(skill =>
+        skill.computedCard === null
+            ? []
+            : [{ name: skill.name, kind: skill.computedCard }]
+    );
+    // The tag names a skill's kind; the core-0 baseline names stand in for an untagged catalog.
+    const kindOfSkill: Record<string, string> = {
+        ...CARD_TREND_SKILLS,
+        ...CYCLE_STRATEGY_SKILLS,
+        ...Object.fromEntries(tagged.map(t => [t.name, t.kind])),
+    };
+    const [after, before] = [armCasesOf(afterRun), armCasesOf(beforeRun)];
+    const repeat = repeatRun === null ? null : armCasesOf(repeatRun);
+    const comparison = compareArms({
+        kindOfSkill,
+        taggedKinds: tagged.map(t => t.kind),
+        after,
+        before,
+        repeat,
+        patterns,
+        levels: {
+            after: levelCasesOf(afterRun, set),
+            before: levelCasesOf(beforeRun, set),
+            repeat: repeatRun === null ? null : levelCasesOf(repeatRun, set),
+        },
+        calls: {
+            after: runCallStats(afterRun.results, afterRun.labels),
+            before: runCallStats(beforeRun.results, beforeRun.labels),
+            repeat:
+                repeatRun === null
+                    ? null
+                    : runCallStats(repeatRun.results, repeatRun.labels),
+        },
+        noiseFloor: args.noisePp / 100,
+        tier: tierOf(afterRun.meta.tier),
+    });
+    deps.log(
+        `output: ${comparison.n} paired cases${repeat === null ? ', no repeat run (noise floor unknown)' : `, repeat ${repeat.length}`}`
+    );
+    const beforeBy = new Map(before.map(c => [c.caseId, c]));
+    const pick = (c: ArmCase | undefined) =>
+        c === undefined
+            ? null
+            : {
+                  failed: c.failed,
+                  outputTokens: c.outputTokens,
+                  latencyMs: c.latencyMs,
+                  modelChars: c.modelChars,
+                  summaryChars: c.summaryChars,
+                  planPosition: c.planPosition,
+              };
+    return {
+        inputs: {
+            fingerprint: set.fingerprint,
+            skillsDir: args.skills,
+            run: { dir: afterRun.dir, ...afterRun.meta },
+            before: { dir: beforeRun.dir, ...beforeRun.meta },
+            repeat:
+                repeatRun === null
+                    ? null
+                    : { dir: repeatRun.dir, ...repeatRun.meta },
+            noisePp: args.noisePp,
+        },
+        summary: { output: comparison },
+        gates: outputGates(comparison),
+        rows: after.map(c => ({
+            caseId: c.caseId,
+            after: pick(c),
+            before: pick(beforeBy.get(c.caseId)),
+        })),
+        skipped: 0,
+    };
+}
+
 // ─── Command ──────────────────────────────────────────────────────────────────
 
 export interface FieldsEvalDeps {
@@ -990,6 +1326,8 @@ export interface FieldsEvalDeps {
     gitSha: () => string;
     dirtyDiffSha256: () => string | null;
     render: RenderSkills;
+    /** Whether the technical response schema still lists `indicatorResults` (D9). */
+    schemaAsksIndicatorResults: () => Promise<boolean>;
 }
 
 export const defaultDeps: FieldsEvalDeps = {
@@ -1015,6 +1353,13 @@ export const defaultDeps: FieldsEvalDeps = {
         );
     },
     render: renderWithCore,
+    schemaAsksIndicatorResults: async () => {
+        const { TECHNICAL_RESPONSE_SCHEMA } =
+            await import('@/domain/analysis/responseSchemas');
+        return JSON.stringify(TECHNICAL_RESPONSE_SCHEMA).includes(
+            '"indicatorResults"'
+        );
+    },
 };
 
 /**
@@ -1055,7 +1400,11 @@ export async function runFieldsEval(
             ? trendMode(args, deps)
             : args.mode === 'plan'
               ? planMode(args, deps)
-              : await skillsMode(args, deps);
+              : args.mode === 'gating'
+                ? await gatingMode(args, deps)
+                : args.mode === 'output'
+                  ? outputMode(args, deps)
+                  : await skillsMode(args, deps);
     if (output.rows.length === 0)
         throw new Error('the evaluation measured no row');
     output.gates.forEach(g => deps.log(describeGate(g)));
