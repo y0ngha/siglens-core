@@ -47,6 +47,7 @@ two checkouts.
 | `levelEval.ts` | Price-level evaluation CLI (WP-18): held rate of the printed levels against a date-transplant placebo, the score fit with a time split, the structural-ratio anchors and the non-positive-level count (gates L0, L-gate, G42). |
 | `levelEvalCompute.ts`, `levelEvalTypes.ts` | The pure parts of `levelEval.ts` and its pre-registered constants. |
 | `baseRateTable.ts`, `baseRateTableCompute.ts`, `baseRateTableRender.ts` | Generator of `src/domain/analysis/measuredBaseRates.ts` from the engine and level evaluations of one set (WP-18 §4.1). |
+| `signalBaseRateTable.ts`, `signalBaseRateCompute.ts` | Generator of `src/domain/signals/measuredSignalBaseRates.ts` straight from the bars of the set (WP-32 G14): per confirmed signal type, the share of episodes that moved in the signal's direction after 1, 5, 10 and 20 bars against a matched same-symbol placebo (the 55 US and 10 KR symbols pooled, never split), with `n`, the WP-18 verdict and the scope. Exit 2 on a dirty checkout, an unknown set, a type without episodes or an uncomputable horizon. `SIGNAL_BASE_RATE_SET=<set dir> yarn test src/__tests__/scripts/replay/signalBaseRateTable.test.ts` is the reproduction gate. |
 
 ## The set
 

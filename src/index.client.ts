@@ -385,6 +385,18 @@ export type {
     BaseRateVerdict,
     MeasuredBaseRate,
 } from './domain/analysis/measuredBaseRates';
+// The measured past record of each confirmed signal type on the daily replay set (WP-32
+// G14): the share of directional moves after the signal against a matched placebo at 1, 5,
+// 10 and 20 bars, with n, a verdict and the pooled scope. Shares only, never a return.
+export {
+    MEASURED_SIGNAL_BASE_RATES,
+    measuredSignalBaseRateFor,
+} from './domain/signals/measuredSignalBaseRates';
+export type {
+    MeasuredSignalBaseRate,
+    MeasuredSignalHorizon,
+    MeasuredSignalScope,
+} from './domain/signals/measuredSignalBaseRates';
 
 // Dashboard helpers
 export {

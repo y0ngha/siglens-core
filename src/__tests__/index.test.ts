@@ -1,4 +1,7 @@
 import type {
+    MeasuredSignalBaseRate,
+    MeasuredSignalHorizon,
+    MeasuredSignalScope,
     InvestorFlowsDataProvider,
     InvestorFlowsScorecard,
     InvestorFlowsSnapshot,
@@ -112,6 +115,23 @@ describe('public API exports', () => {
                 'double_bottom',
                 '1Hour'
             )
+        ).toBeNull();
+    });
+
+    it('exports the measured signal base rates and their lookup (WP-32 G14, API-1: both entrypoints)', () => {
+        expect(typeof coreApi.measuredSignalBaseRateFor).toBe('function');
+        expect(Object.keys(coreApi.MEASURED_SIGNAL_BASE_RATES)).toContain(
+            'golden_cross'
+        );
+        const entry: MeasuredSignalBaseRate | null =
+            coreApi.measuredSignalBaseRateFor('golden_cross', '1Day');
+        expect(entry).toBe(coreApi.MEASURED_SIGNAL_BASE_RATES.golden_cross);
+        const scope: MeasuredSignalScope | undefined = entry?.scope;
+        const horizon: MeasuredSignalHorizon | undefined = entry?.horizons[0];
+        expect(scope?.timeframe).toBe('1Day');
+        expect(horizon?.h).toBe(1);
+        expect(
+            coreApi.measuredSignalBaseRateFor('golden_cross', '1Hour')
         ).toBeNull();
     });
 
