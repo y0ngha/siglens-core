@@ -186,6 +186,146 @@ function collectInventoryRowIdentifiers(inventory: string): string[] {
         .flatMap(leadingRowIdentifiers);
 }
 
+type EntryScope = 'server-only' | 'both';
+
+interface ScopedRows {
+    readonly label: string;
+    readonly scope: EntryScope;
+    readonly identifiers: readonly string[];
+}
+
+/** Phrases that put every row of a block on `src/index.ts` only. */
+const SERVER_ONLY_SCOPE =
+    /서버 entry 전용|서버 전용|\(서버\) 전용|`src\/index\.ts`에만 export/;
+/** Phrases that put every row of a block on both entry points. */
+const BOTH_ENTRIES_SCOPE =
+    /양 entrypoint|양쪽 노출|양 진입점|`index\.client\.ts`에도 노출/;
+/**
+ * A row whose description ends with the both-entries sentence right before its
+ * Source cell (`… 양 entrypoint. | \`file.ts\` |`) overrides the section
+ * scope for that row alone.
+ */
+const ROW_BOTH_ENTRIES = /양 entrypoint\.?\s*\|[^|]*\|\s*$/;
+/** Any wording that talks about entry points — if it is not one of the forms above, the guard must not skip it. */
+const SCOPE_VOCABULARY =
+    /entry ?points?|서버 entry|양 entry|entry (전용|only)|진입점|index\.client|서버 전용/i;
+
+/**
+ * Every backticked identifier in the row's first cell: the text before the
+ * ` — ` description, or before the trailing Source column when there is no
+ * description. `` `Foo`·`Bar(x)` / `Baz`(3) `` yields Foo, Bar and Baz;
+ * identifiers inside the description prose are not collected.
+ */
+function firstCellIdentifiers(row: string): string[] {
+    const body = row.slice('| '.length);
+    const dash = body.indexOf(' — ');
+    const end = dash >= 0 ? dash : body.lastIndexOf(' | ');
+    const head = end >= 0 ? body.slice(0, end) : body;
+    return [...head.matchAll(/`([A-Za-z_$][\w$]*)/g)].map(match => match[1]);
+}
+
+/** The scope one sentence states, `null` when it states none; throws on a self-contradiction. */
+function sentenceScope(text: string): EntryScope | null {
+    const server = SERVER_ONLY_SCOPE.test(text);
+    const both = BOTH_ENTRIES_SCOPE.test(text);
+    if (server && both) {
+        throw new Error(`sentence claims both server-only and both — ${text}`);
+    }
+    if (server) return 'server-only';
+    return both ? 'both' : null;
+}
+
+/**
+ * Splits the inventory into scope blocks. A block opens at a bold label line
+ * (`**…**`) or a `### ` heading and runs to the next one. Its scope sentence is
+ * the label line and/or the first prose line after it (before the table); the
+ * two must not conflict. Blocks without table rows are ignored, and a block
+ * with rows whose label or prose talks about entry points in a form this guard
+ * does not recognise throws — a silent skip would let a new wording defeat the
+ * check.
+ */
+function collectScopedRows(inventory: string): ScopedRows[] {
+    const blocks: { label: string; prose: string | null; rows: string[] }[] =
+        [];
+    for (const line of inventory.split('\n')) {
+        if (line.startsWith('**') || line.startsWith('### ')) {
+            blocks.push({ label: line, prose: null, rows: [] });
+            continue;
+        }
+        const block = blocks.at(-1);
+        if (!block) continue;
+        if (line.startsWith('| `')) {
+            block.rows.push(line);
+        } else if (
+            line.trim() !== '' &&
+            !line.startsWith('|') &&
+            block.rows.length === 0 &&
+            block.prose === null
+        ) {
+            block.prose = line;
+        }
+    }
+    const scoped: ScopedRows[] = [];
+    for (const { label, prose, rows } of blocks) {
+        if (rows.length === 0) continue;
+        const labelScope = sentenceScope(label);
+        const proseScope = prose === null ? null : sentenceScope(prose);
+        if (labelScope && proseScope && labelScope !== proseScope) {
+            throw new Error(
+                `label says ${labelScope} but its prose says ${proseScope} — ${label}`
+            );
+        }
+        const scope = labelScope ?? proseScope;
+        if (!scope) {
+            if (
+                SCOPE_VOCABULARY.test(label) ||
+                SCOPE_VOCABULARY.test(prose ?? '')
+            ) {
+                throw new Error(
+                    `unrecognised entry-scope sentence — ${label} / ${prose ?? ''}`
+                );
+            }
+            continue;
+        }
+        scoped.push({
+            label,
+            scope,
+            identifiers: rows
+                .filter(row => !ROW_BOTH_ENTRIES.test(row))
+                .flatMap(firstCellIdentifiers),
+        });
+        const overridden = rows.filter(row => ROW_BOTH_ENTRIES.test(row));
+        if (overridden.length > 0) {
+            scoped.push({
+                label: `${label} (row override: 양 entrypoint)`,
+                scope: 'both',
+                identifiers: overridden.flatMap(firstCellIdentifiers),
+            });
+        }
+    }
+    return scoped;
+}
+
+/** `name (label)` for each row identifier whose real export contradicts its block's scope sentence. */
+function scopeViolations(
+    blocks: readonly ScopedRows[],
+    serverExports: ReadonlySet<string>,
+    clientExports: ReadonlySet<string>
+): string[] {
+    return blocks.flatMap(({ label, scope, identifiers }) =>
+        identifiers
+            .filter(name =>
+                scope === 'server-only'
+                    ? clientExports.has(name)
+                    : !clientExports.has(name) || !serverExports.has(name)
+            )
+            .map(
+                name =>
+                    `${name} is ${scope === 'server-only' ? 'exported from index.client.ts' : 'missing from an entry point'} but the section says ${scope}: ${label.slice(0, 80)}`
+            )
+    );
+}
+
 describe('docs/PUBLIC_API.md inventory', () => {
     const doc = readRepoFile('docs/PUBLIC_API.md');
     const entryExports = collectEntryExports();
@@ -233,5 +373,133 @@ describe('docs/PUBLIC_API.md inventory', () => {
                 .map(name => `${name} (${serverOnly ? 'server only' : 'both'})`)
         );
         expect(mismatched).toEqual([]);
+    });
+
+    it('keeps each inventory section scope sentence consistent with index.client.ts', () => {
+        const blocks = collectScopedRows(inventory);
+        expect(blocks.length).toBeGreaterThan(10);
+        expect(blocks.some(b => b.scope === 'server-only')).toBe(true);
+        expect(blocks.some(b => b.scope === 'both')).toBe(true);
+        expect(scopeViolations(blocks, serverExports, clientExports)).toEqual(
+            []
+        );
+    });
+
+    it('names a symbol documented as server-only that the client entry exports', () => {
+        const fixture = [
+            '**테스트 — 서버 entry 전용 (1)**',
+            '| Symbol | Source |',
+            '|---|---|',
+            '| `calculateMA(bars, period)` — x | `domain/indicators/ma.ts` |',
+        ].join('\n');
+        const violations = scopeViolations(
+            collectScopedRows(fixture),
+            serverExports,
+            clientExports
+        );
+        expect(violations).toHaveLength(1);
+        expect(violations[0]).toContain('calculateMA');
+    });
+
+    it('names a symbol documented as on both entry points that the client entry lacks', () => {
+        const fixture = [
+            '**테스트 — 양 entrypoint (1)**',
+            '| Symbol | Source |',
+            '|---|---|',
+            '| `findMaCrosses(bars)` — x | `domain/indicators/maCrosses.ts` |',
+        ].join('\n');
+        const violations = scopeViolations(
+            collectScopedRows(fixture),
+            serverExports,
+            clientExports
+        );
+        expect(violations).toHaveLength(1);
+        expect(violations[0]).toContain('findMaCrosses');
+    });
+
+    it('fails loudly on an unrecognised entry-scope sentence', () => {
+        const fixture = [
+            '**테스트 — 브라우저에서도 쓴다 (entrypoint 둘 다)**',
+            '| Symbol | Source |',
+            '| `calculateMA` — x | `a.ts` |',
+        ].join('\n');
+        expect(() => collectScopedRows(fixture)).toThrow(
+            /unrecognised entry-scope sentence/
+        );
+    });
+
+    it('classifies the Tier 1 heading from its prose sentence', () => {
+        const tier1 = collectScopedRows(inventory).find(block =>
+            block.label.startsWith('### Tier 1')
+        );
+        expect(tier1?.scope).toBe('server-only');
+        expect(tier1?.identifiers).toContain('runAnalysis');
+    });
+
+    it('checks every identifier of a multi-symbol first cell', () => {
+        const fixture = [
+            '**테스트 — 서버 entry 전용 (2)**',
+            '| Symbol | Source |',
+            '|---|---|',
+            '| `findMaCrosses`·`calculateMA` — x | `a.ts` |',
+            '| `findMaCrosses` / `rsiZone`(3), `calculateMA` | `a.ts` |',
+        ].join('\n');
+        const violations = scopeViolations(
+            collectScopedRows(fixture),
+            serverExports,
+            clientExports
+        );
+        expect(violations.map(v => v.split(' ')[0])).toEqual([
+            'calculateMA',
+            'rsiZone',
+            'calculateMA',
+        ]);
+    });
+
+    it('does not collect identifiers from the description prose', () => {
+        const fixture = [
+            '**테스트 — 서버 entry 전용 (1)**',
+            '| Symbol | Source |',
+            '|---|---|',
+            '| `findMaCrosses` — `calculateMA`와 같은 입력 | `a.ts` |',
+        ].join('\n');
+        expect(collectScopedRows(fixture)[0].identifiers).toEqual([
+            'findMaCrosses',
+        ]);
+    });
+
+    it('reads the scope from the first prose line and rejects a conflicting label', () => {
+        const prose = [
+            '### 테스트',
+            '',
+            '이 함수는 모두 서버 전용이다.',
+            '| `calculateMA` — x | `a.ts` |',
+        ].join('\n');
+        expect(collectScopedRows(prose)[0].scope).toBe('server-only');
+        const conflict = [
+            '**테스트 — 양 entrypoint (1)**',
+            '이 함수는 모두 서버 전용이다.',
+            '| `calculateMA` — x | `a.ts` |',
+        ].join('\n');
+        expect(() => collectScopedRows(conflict)).toThrow(/prose says/);
+    });
+
+    it('treats entry-point vocabulary case-insensitively', () => {
+        const fixture = [
+            '### Tier 9 — Some Entry Points',
+            '| `calculateMA` — x | `a.ts` |',
+        ].join('\n');
+        expect(() => collectScopedRows(fixture)).toThrow(
+            /unrecognised entry-scope sentence/
+        );
+    });
+
+    it('does not read a trading "entry" heading as an entry-scope sentence', () => {
+        const fixture = [
+            '**Entry/Exit signals (1)**',
+            'data entry 시점의 구간을 돌려준다.',
+            '| `calculateMA` — x | `a.ts` |',
+        ].join('\n');
+        expect(() => collectScopedRows(fixture)).not.toThrow();
     });
 });
