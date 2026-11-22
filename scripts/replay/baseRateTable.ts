@@ -7,7 +7,7 @@
  *       --candles <engineEval dir (gate c9)> --levels <levelEval dir> --date <YYYY-MM-DD> \
  *       --out <file> [--json <file>]
  *
- * It refuses (exit 2, TE-16) inputs it cannot trust: a run made on a dirty checkout, runs of
+ * It refuses (exit 2, CONVENTIONS.md#TE-16) inputs it cannot trust: a run made on a dirty checkout, runs of
  * different sets or different core commits, a run whose own gate did not pass or was not
  * the one this table needs, a level run that is not the whole reference population, and
  * events that do not match their summary; the refusal is a `FailClosedError`, reported as
@@ -23,15 +23,17 @@ import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { parseArgs } from '../ab-harness/cliArgs';
-import { FailClosedError } from './signalBaseRateTable';
+import { FailClosedError } from './failClosed';
 import {
     candleTable,
     patternTable,
+    priceLevelFamilyTable,
     priceLevelRow,
     type BaseRateScope,
     type LevelSummaryInput,
     type SubjectTable,
 } from './baseRateTableCompute';
+import { KIND_FAMILY } from './levelEvalTypes';
 import { renderBaseRateTable } from './baseRateTableRender';
 import {
     isCandleEvent,
@@ -370,6 +372,11 @@ export async function generateTable(
         scopeOf(candles, candleEvents)
     );
     const priceLevel = priceLevelRow(levels.summary, levels.summary.scope);
+    const priceLevelFamilies = priceLevelFamilyTable(
+        levels.summary,
+        levels.summary.scope,
+        [...new Set(Object.values(KIND_FAMILY))]
+    );
     const definitions = `outcome labels v${OUTCOME_LABEL_VERSION}, constants ${sha256Hex(
         JSON.stringify({
             engine: engine.run.constants,
@@ -392,6 +399,7 @@ export async function generateTable(
         patterns,
         candles: candleRows,
         priceLevel: priceLevel.row,
+        priceLevelFamilies,
     });
     const config = (await resolveConfig(TABLE_PATH)) ?? {};
     return {
@@ -402,6 +410,7 @@ export async function generateTable(
             chartPatterns: patterns,
             candles: candleRows,
             priceLevel,
+            priceLevelFamilies,
         },
     };
 }

@@ -397,7 +397,9 @@ unavailable"): the caller that knows passes an explicit flag, and the renderer r
 Name the flag after the fact proven, not the conclusion you hope for. A measured claim
 (a hit rate, a reliability sentence) carries the scope it was measured on (daily bars, one
 market), so it is not rendered on a prompt outside that scope, and a figure measured on a
-pooled sample is worded as pooled, never as per-market or per-cell. An unknown input
+pooled sample is worded as pooled, never as per-market or per-cell (a published table
+whose fallback rows hold other data is read only through an accessor that returns null for
+them, and a figure derived by approximation says so). An unknown input
 states nothing (never "0 of N"), and a total is rendered only together with the data that
 proves it (a session count needs the holiday calendar, else "N so far").
 

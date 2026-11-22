@@ -1378,6 +1378,250 @@ export const PRICE_LEVEL_BASE_RATE: MeasuredBaseRate = {
 };
 
 /**
+ * The same measurement per kind family of the printed price levels (fib, vp, swing, ma,
+ * round, pivot, ichimoku, band, supertrend, vwap, avwap), pooled across the symbols of the set
+ * (see `scope`), both markets and every period: a claim made from a row must say so and
+ * give its `n` (resolved touches). Read it through `priceLevelFamilyBaseRateFor`: a family
+ * with fewer than BASE_RATE_MIN_N touches, or none, carries the pooled figures of
+ * `PRICE_LEVEL_BASE_RATE` under `key: 'pooled'` with `insufficient_sample`, and such a
+ * row is NOT the family's measurement. A family's p is reconstructed from its stored interval
+ * (normal approximation), not the bootstrap p, and its split by market and half is not
+ * measured, so no family can read `beats_placebo`. Never a statement about a single level of
+ * a report.
+ */
+export const PRICE_LEVEL_FAMILY_BASE_RATES: Readonly<
+    Record<string, MeasuredBaseRate>
+> = {
+    avwap: {
+        subject: 'price_level',
+        key: 'avwap',
+        n: 29082,
+        eventShare: 0.504676,
+        placeboShare: 0.498721,
+        difference: {
+            mean: 0.005956,
+            low: -0.004489,
+            high: 0.016474,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    band: {
+        subject: 'price_level',
+        key: 'band',
+        n: 48734,
+        eventShare: 0.476177,
+        placeboShare: 0.488409,
+        difference: {
+            mean: -0.012232,
+            low: -0.022539,
+            high: -0.001454,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    fib: {
+        subject: 'price_level',
+        key: 'fib',
+        n: 77097,
+        eventShare: 0.495986,
+        placeboShare: 0.496136,
+        difference: {
+            mean: -0.00015,
+            low: -0.008793,
+            high: 0.00813,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    ichimoku: {
+        subject: 'price_level',
+        key: 'ichimoku',
+        n: 9962,
+        eventShare: 0.492371,
+        placeboShare: 0.500382,
+        difference: {
+            mean: -0.008011,
+            low: -0.024939,
+            high: 0.008448,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    ma: {
+        subject: 'price_level',
+        key: 'ma',
+        n: 46235,
+        eventShare: 0.504488,
+        placeboShare: 0.499528,
+        difference: {
+            mean: 0.00496,
+            low: -0.005516,
+            high: 0.014976,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    pivot: {
+        subject: 'price_level',
+        key: 'pivot',
+        n: 147569,
+        eventShare: 0.498621,
+        placeboShare: 0.497286,
+        difference: {
+            mean: 0.001335,
+            low: -0.00582,
+            high: 0.008689,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    round: {
+        subject: 'price_level',
+        key: 'round',
+        n: 79295,
+        eventShare: 0.498039,
+        placeboShare: 0.491789,
+        difference: {
+            mean: 0.00625,
+            low: -0.00164,
+            high: 0.014249,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    supertrend: {
+        subject: 'price_level',
+        key: 'supertrend',
+        n: 6763,
+        eventShare: 0.506728,
+        placeboShare: 0.495292,
+        difference: {
+            mean: 0.011436,
+            low: -0.009352,
+            high: 0.032464,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    swing: {
+        subject: 'price_level',
+        key: 'swing',
+        n: 55613,
+        eventShare: 0.496269,
+        placeboShare: 0.503344,
+        difference: {
+            mean: -0.007075,
+            low: -0.017743,
+            high: 0.003536,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    vp: {
+        subject: 'price_level',
+        key: 'vp',
+        n: 49821,
+        eventShare: 0.495935,
+        placeboShare: 0.499593,
+        difference: {
+            mean: -0.003657,
+            low: -0.013136,
+            high: 0.005778,
+        },
+        verdict: 'no_edge',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+    vwap: {
+        subject: 'price_level',
+        key: 'pooled',
+        n: 550171,
+        eventShare: 0.496498,
+        placeboShare: 0.496668,
+        difference: {
+            mean: -0.000169,
+            low: -0.007411,
+            high: 0.006806,
+        },
+        verdict: 'insufficient_sample',
+        scope: {
+            timeframe: '1Day',
+            symbols: 65,
+            from: '2018-03-14',
+            to: '2026-10-23',
+        },
+    },
+};
+
+/**
+ * The measured base rate of a price-level kind family, or `null` when the family has no
+ * measurement of its own: it is not in the table, or its row is the pooled figures under
+ * `insufficient_sample` (too few touches, or none).
+ */
+export function priceLevelFamilyBaseRateFor(
+    family: string
+): MeasuredBaseRate | null {
+    const row = Object.entries(PRICE_LEVEL_FAMILY_BASE_RATES).find(
+        ([key]) => key === family
+    )?.[1];
+    return row === undefined ||
+        row.key !== family ||
+        row.verdict === 'insufficient_sample'
+        ? null
+        : row;
+}
+
+/**
  * The measured base rate of a detected pattern or candle; `null` off daily bars (nothing
  * was measured there). A key without an own row of enough events gets the pooled row.
  */

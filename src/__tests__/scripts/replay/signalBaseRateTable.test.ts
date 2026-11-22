@@ -4,8 +4,8 @@ import { format, resolveConfig } from 'prettier';
 import { ModuleKind, transpileModule } from 'typescript';
 import { afterEach, describe, expect, it } from 'vitest';
 import { writeSet } from '../../../../scripts/replay/buildSet';
+import { FailClosedError } from '../../../../scripts/replay/failClosed';
 import {
-    FailClosedError,
     KNOWN_SET_FINGERPRINTS,
     SIGNAL_TABLE_PATH,
     generateSignalTable,
@@ -354,7 +354,7 @@ describe('generateSignalTable and runSignalBaseRateTable', () => {
 // ─── Reproduction gate ────────────────────────────────────────────────────────
 
 /**
- * The reproduction gate (TE-16): regenerates the table from the frozen replay set and
+ * The reproduction gate (CONVENTIONS.md#TE-16): regenerates the table from the frozen replay set and
  * compares it with the committed file, everything below the header (the header carries the
  * commit the table was made on). The set lives outside the repository, so this runs only
  * when `SIGNAL_BASE_RATE_SET` names it:

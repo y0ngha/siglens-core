@@ -40,10 +40,12 @@ import { priorBucket, eligiblePlaceboDates } from './engineEvalCandles';
 import {
     BASE_RATE_ALPHA,
     BASE_RATE_MIN_N,
-    verdictOf,
     type BaseRateVerdict,
-    type VerdictInputs,
 } from './baseRateTableCompute';
+import {
+    verdictOf,
+    type VerdictInputs,
+} from '@/domain/analysis/baseRateVerdict';
 import {
     edgeStat,
     makeResamplings,

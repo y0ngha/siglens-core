@@ -52,6 +52,11 @@ describe('browser public API exports', () => {
         expect(typeof clientApi.measuredBaseRateFor).toBe('function');
         expect(clientApi.BASE_RATE_MIN_N).toBe(100);
         expect(clientApi.PRICE_LEVEL_BASE_RATE.subject).toBe('price_level');
+        expect(Object.keys(clientApi.PRICE_LEVEL_FAMILY_BASE_RATES)).toContain(
+            'fib'
+        );
+        expect(clientApi.priceLevelFamilyBaseRateFor('fib')?.key).toBe('fib');
+        expect(clientApi.priceLevelFamilyBaseRateFor('vwap')).toBeNull();
         expect(Object.keys(clientApi.PATTERN_BASE_RATES)).toContain(
             'double_bottom'
         );
