@@ -53,6 +53,12 @@ describe('classifyError', () => {
         expect(classifyError({ retryable: false })).toBe('none');
     });
 
+    it('classifies an AbortError as none (the default for the Claude, ChatGPT and Gemini wrappers)', () => {
+        expect(classifyError(new DOMException('aborted', 'AbortError'))).toBe(
+            'none'
+        );
+    });
+
     it('classifies a primitive / non-object as none', () => {
         expect(classifyError(null)).toBe('none');
         expect(classifyError(undefined)).toBe('none');
@@ -642,5 +648,224 @@ describe('withRetry — classify 옵션', () => {
             withRetry(fn, { maxAttempts: 3, baseDelayMs: 1000 })
         ).rejects.toEqual({ status: 408 });
         expect(fn).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('withRetry abort signal', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        vi.runOnlyPendingTimers();
+        vi.useRealTimers();
+        vi.restoreAllMocks();
+    });
+
+    const settle = <T>(promise: Promise<T>) =>
+        promise.then(
+            value => ({ ok: true as const, value }),
+            (error: unknown) => ({ ok: false as const, error })
+        );
+
+    it('rejects with an AbortError the moment the signal aborts during the backoff wait', async () => {
+        const controller = new AbortController();
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockRejectedValue({ status: 503 });
+
+        const settled = settle(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: 10_000,
+                signal: controller.signal,
+            })
+        );
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(fn).toHaveBeenCalledTimes(1);
+        expect(vi.getTimerCount()).toBe(1);
+
+        controller.abort();
+        const result = await settled;
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect((result.error as Error).name).toBe('AbortError');
+        }
+        // 대기가 끝날 시각을 지나도 다음 시도는 없다.
+        await vi.advanceTimersByTimeAsync(600_000);
+        expect(fn).toHaveBeenCalledTimes(1);
+    });
+
+    it('clears the backoff timer when aborted (no leaked timer)', async () => {
+        const controller = new AbortController();
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockRejectedValue({ status: 503 });
+
+        const settled = settle(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: 10_000,
+                signal: controller.signal,
+            })
+        );
+        await vi.advanceTimersByTimeAsync(1_000);
+        expect(vi.getTimerCount()).toBe(1);
+
+        controller.abort();
+        await settled;
+
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('rejects before the first attempt when the signal is already aborted', async () => {
+        const controller = new AbortController();
+        controller.abort();
+        const fn = vi.fn<() => Promise<string>>().mockResolvedValue('ok');
+
+        const result = await settle(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+            })
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect((result.error as Error).name).toBe('AbortError');
+        }
+        expect(fn).not.toHaveBeenCalled();
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('wraps a custom abort reason in an AbortError and keeps it as the cause', async () => {
+        const controller = new AbortController();
+        const reason = new Error('deadline');
+        controller.abort(reason);
+
+        const result = await settle(
+            withRetry(vi.fn<() => Promise<string>>(), {
+                maxAttempts: 2,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+            })
+        );
+
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect((result.error as Error).name).toBe('AbortError');
+            expect((result.error as Error).cause).toBe(reason);
+        }
+    });
+
+    it('keeps the existing behaviour when a signal is given but never aborted', async () => {
+        const controller = new AbortController();
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockRejectedValueOnce({ status: 503 })
+            .mockResolvedValue('recovered');
+
+        const settled = settle(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+            })
+        );
+        await vi.advanceTimersByTimeAsync(1000);
+        const result = await settled;
+
+        expect(result).toEqual({ ok: true, value: 'recovered' });
+        expect(fn).toHaveBeenCalledTimes(2);
+        expect(vi.getTimerCount()).toBe(0);
+    });
+
+    it('does not retry when fn itself rejects with an AbortError while the signal is aborted', async () => {
+        const controller = new AbortController();
+        const aborted = new DOMException('aborted', 'AbortError');
+        const fn = vi.fn<() => Promise<string>>().mockImplementation(() => {
+            controller.abort();
+            return Promise.reject(aborted);
+        });
+        const setTimeoutSpy = vi.spyOn(global, 'setTimeout');
+
+        const result = await settle(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+            })
+        );
+
+        expect(fn).toHaveBeenCalledTimes(1);
+        expect(setTimeoutSpy).not.toHaveBeenCalled();
+        // 재시도 경로(`[Retry] ... Retrying`)를 타지 않았다.
+        expect(console.warn).not.toHaveBeenCalled();
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect(result.error).toBe(aborted);
+            expect((result.error as Error).name).toBe('AbortError');
+        }
+    });
+
+    it('surfaces an abort, not AI_SERVER_UNSTABLE_CODE, when a retryable error arrives after the signal aborted on the last attempt', async () => {
+        const controller = new AbortController();
+        const fn = vi.fn<() => Promise<string>>().mockImplementation(() => {
+            controller.abort();
+            // A provider error the classifier calls retryable, raised while the request is cancelled.
+            return Promise.reject({ status: 503 });
+        });
+
+        const result = await settle(
+            withRetry(fn, {
+                maxAttempts: 1,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+            })
+        );
+
+        expect(fn).toHaveBeenCalledTimes(1);
+        expect(result.ok).toBe(false);
+        if (!result.ok) {
+            expect((result.error as Error).name).toBe('AbortError');
+            expect((result.error as Error).message).not.toBe(
+                AI_SERVER_UNSTABLE_CODE
+            );
+        }
+    });
+
+    it('removes every abort listener it added on a long-lived signal (503 -> backoff expiry -> success)', async () => {
+        const controller = new AbortController();
+        const addSpy = vi.spyOn(controller.signal, 'addEventListener');
+        const removeSpy = vi.spyOn(controller.signal, 'removeEventListener');
+        const fn = vi
+            .fn<() => Promise<string>>()
+            .mockRejectedValueOnce({ status: 503 })
+            .mockResolvedValue('recovered');
+
+        const settled = settle(
+            withRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+            })
+        );
+        await vi.advanceTimersByTimeAsync(1000);
+        const result = await settled;
+
+        expect(result).toEqual({ ok: true, value: 'recovered' });
+        const added = addSpy.mock.calls.filter(([type]) => type === 'abort');
+        const removed = removeSpy.mock.calls.filter(
+            ([type]) => type === 'abort'
+        );
+        expect(added.length).toBeGreaterThan(0);
+        expect(removed).toHaveLength(added.length);
+        // 같은 핸들러를 떼어야 실제로 제거된다.
+        expect(removed.map(([, handler]) => handler)).toEqual(
+            added.map(([, handler]) => handler)
+        );
     });
 });

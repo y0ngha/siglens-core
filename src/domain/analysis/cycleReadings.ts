@@ -1,8 +1,10 @@
 import { detectTrend } from '@/domain/analysis/indicatorTrendTag';
 import {
     CYCLE_LOOKBACK_BARS,
-    lastValueOf,
     MA_CYCLE_PERIODS,
+} from '@/domain/analysis/cycleConstants';
+import {
+    lastValueOf,
     MACD_CYCLE_EMA_LONG,
     MACD_CYCLE_EMA_MID,
     MACD_CYCLE_EMA_SHORT,
@@ -51,7 +53,9 @@ const CYCLE_STAGE_NAME: Readonly<Record<CycleStage, string>> = {
 };
 
 const CYCLE_TITLE: Readonly<Record<CycleCardKind, string>> = {
-    ma_cycle: 'MA cycle (MA5/MA20/MA60)',
+    ma_cycle: `MA cycle (${Object.values(MA_CYCLE_PERIODS)
+        .map(period => `MA${period}`)
+        .join('/')})`,
     macd_cycle: 'MACD cycle (EMA9/21/60)',
 };
 

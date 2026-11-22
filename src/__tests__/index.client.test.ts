@@ -234,6 +234,12 @@ describe('browser public API exports', () => {
         expect(clientApi.COMPUTED_CARD_KINDS).toHaveLength(38);
         expect(clientApi.COMPUTED_CARD_KINDS).toContain('ma_cycle');
         expect(clientApi.COMPUTED_CARD_KINDS).toContain('rsi');
+        expect(clientApi.MA_CYCLE_PERIODS).toEqual({
+            short: 5,
+            medium: 20,
+            long: 60,
+        });
+        expect(clientApi.CYCLE_LOOKBACK_BARS).toBe(120);
         // Consumers round displayed KRX prices with the same rule core uses.
         expect(clientApi.roundToKrxTick(205_325)).toBe(205_500);
         expect(clientApi.krxTickSize(215_000)).toBe(500);

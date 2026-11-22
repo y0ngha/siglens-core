@@ -840,7 +840,7 @@ a definition (guideline line names, overlay labels), assert that parity.
 #### TE-15 — Concurrency fixes get regression tests
 
 Lock ownership, generation binding and similar coordination fixes need tests that fail
-without the fix. In-memory stubs honour TTL, or the test cannot see expiry bugs.
+without the fix. In-memory stubs honour TTL, or the test cannot see expiry bugs. The same holds for cancellation: a behaviour an issue names as must-not (no retry after abort, listener left attached) gets its own test that fails when reverted.
 
 <a id="TE-16"></a>
 #### TE-16 — Evaluation and replay scripts fail closed

@@ -53,6 +53,7 @@ export async function callChatGPTWithRetry(
             maxAttempts,
             baseDelayMs: AI_RETRY_DELAY_MS,
             abortIfCumulativeDelayReachesMs,
+            signal,
         }
     );
 }

@@ -151,6 +151,7 @@ export async function callGeminiWithRetry(
             maxAttempts,
             baseDelayMs: AI_RETRY_DELAY_MS,
             abortIfCumulativeDelayReachesMs,
+            signal,
         }
     );
 }

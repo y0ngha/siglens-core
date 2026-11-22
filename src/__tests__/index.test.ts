@@ -181,6 +181,13 @@ describe('public API exports', () => {
         expect(coreApi.COMPUTED_CARD_KINDS).toHaveLength(38);
         expect(coreApi.COMPUTED_CARD_KINDS).toContain('ma_cycle');
         expect(coreApi.COMPUTED_CARD_KINDS).toContain('rsi');
+        // Renderers read the MA-cycle periods and the observation window from here (API-1: both entrypoints).
+        expect(coreApi.MA_CYCLE_PERIODS).toEqual({
+            short: 5,
+            medium: 20,
+            long: 60,
+        });
+        expect(coreApi.CYCLE_LOOKBACK_BARS).toBe(120);
     });
 
     it('exports the new-signal and extreme-zone-entry rules from package entrypoint', () => {
