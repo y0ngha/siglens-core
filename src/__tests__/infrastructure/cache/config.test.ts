@@ -450,6 +450,39 @@ describe('new analysis cache keys', () => {
         expect(ko).toBe(omitted);
     });
 
+    it('buildAnalysisCacheKey and buildAnalysisPeekCacheKey: the benchmark symbol is the last segment, absent without one', () => {
+        const exact = (benchmark?: string) =>
+            buildAnalysisCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-3.6-flash',
+                'a1b2',
+                true,
+                'profit',
+                'en',
+                'c3d4',
+                'e5f6',
+                benchmark
+            );
+        const peek = (benchmark?: string) =>
+            buildAnalysisPeekCacheKey(
+                'AAPL',
+                '1Day',
+                'gemini-3.6-flash',
+                'free',
+                true,
+                'profit',
+                'en',
+                benchmark
+            );
+        expect(exact('SPY')).toBe(`${exact()}:bm=SPY`);
+        expect(peek('SPY')).toBe(`${peek()}:bm=SPY`);
+        expect(exact()).not.toContain(':bm=');
+        expect(peek()).not.toContain(':bm=');
+        expect(new Set([exact(), exact('SPY'), exact('KS11')]).size).toBe(3);
+        expect(new Set([peek(), peek('SPY'), peek('KS11')]).size).toBe(3);
+    });
+
     it('buildAnalysisPeekCacheKey: en은 :lang=en suffix를 붙인다', () => {
         const base = buildAnalysisPeekCacheKey(
             'AAPL',

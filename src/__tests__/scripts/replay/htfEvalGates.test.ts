@@ -20,6 +20,7 @@ import {
     aggregateWeeks,
     higherReading,
     isoWeekStart,
+    monthStart,
     periodProgress,
     windowBars,
 } from '../../../../scripts/replay/htfEvalCompute';
@@ -467,6 +468,158 @@ describe('H4: the printed market backdrop', () => {
         expect(checkBackdrop(sample(kr, text), kr).notComputable).toMatch(
             /KS11/
         );
+    });
+});
+
+describe('H1: a week or month a closure cut short, in a market with no holiday calendar', () => {
+    /** KR bars with one weekday removed (a closure the stored bars show and core cannot know). */
+    const withoutDay = (removeAt: number): typeof KR =>
+        KR.filter((_, k) => k !== removeAt);
+
+    // The Friday of a week is closed: the case is that week's Thursday, its stored week has four sessions.
+    const week = (() => {
+        const thursday = KR.findIndex(
+            (b, k) => k > 520 && new Date(b.time * 1000).getUTCDay() === 4
+        );
+        const bars = withoutDay(thursday + 1);
+        return dataOf('005930.KS', bars, thursday);
+    })();
+    const weekText = higherBlockText(week, '1Day');
+    const failuresOfWeek = (line: string) =>
+        checkHigherBlock(sample(week, `${weekText}\n${line}`), week, '1Day')
+            .failures;
+
+    it('accepts the observed count with no total, which is what core prints without a calendar', () => {
+        expect(
+            failuresOfWeek(
+                'The last weekly bar is the current week (4 sessions so far).'
+            )
+        ).toEqual([]);
+    });
+
+    it('still fails a count that is not the observed one, and a total core cannot prove', () => {
+        expect(
+            failuresOfWeek(
+                'The last weekly bar is the current week (3 sessions so far).'
+            )
+        ).toContain('progressPrintedButFinished');
+        expect(
+            failuresOfWeek(
+                'The last weekly bar is the current week (4 of 4 sessions so far).'
+            )
+        ).toContain('progressPrintedButFinished');
+    });
+
+    it('does not excuse a market with a calendar', () => {
+        const printed = checkHigherBlock(
+            sample(
+                fridayCase,
+                `${higherBlockText(fridayCase, '1Day')}\nThe last weekly bar is the current week (5 sessions so far).`
+            ),
+            fridayCase,
+            '1Day'
+        );
+        expect(printed.failures).toContain('progressPrintedButFinished');
+    });
+
+    it('does not excuse a full week of a market with no calendar', () => {
+        const friday = KR.findIndex(
+            (b, k) => k > 520 && new Date(b.time * 1000).getUTCDay() === 5
+        );
+        const full = dataOf('005930.KS', KR, friday);
+        const printed = checkHigherBlock(
+            sample(
+                full,
+                `${higherBlockText(full, '1Day')}\nThe last weekly bar is the current week (5 sessions so far).`
+            ),
+            full,
+            '1Day'
+        );
+        expect(printed.failures).toContain('progressPrintedButFinished');
+    });
+
+    it('lets the attached reading say the cut-short week is forming, and fails it for a market with a calendar', () => {
+        const long = windowBars(
+            week.bars,
+            week.replayCase.asOf,
+            C.longWindowDays
+        );
+        const own = higherReading({
+            kind: 'weekly',
+            analysisBars: windowBars(
+                week.bars,
+                week.replayCase.asOf,
+                C.dailyWindowDays
+            ),
+            higherBars: aggregateWeeks(long),
+            progress: periodProgress(
+                week.bars,
+                week.replayCase.asOf,
+                isoWeekStart
+            ),
+        });
+        const reading = {
+            kind: 'weekly',
+            trend: own.trend?.trend ?? null,
+            slopeAtr: own.trend?.slopeAtr ?? null,
+            rsi14: Math.round((own.rsi14 ?? 0) * 10) / 10,
+            closeVsMa50Pct: Math.round((own.closeVsMa50Pct ?? 0) * 10) / 10,
+            bars: own.bars,
+            alignment: own.alignment,
+        };
+        expect(
+            checkAttachedReading(
+                { ...reading, lastBarInProgress: true },
+                week,
+                '1Day'
+            ).failures
+        ).toEqual([]);
+        expect(
+            checkAttachedReading(
+                { ...reading, lastBarInProgress: false },
+                week,
+                '1Day'
+            ).failures
+        ).toEqual([]);
+        // A calendar market's finished week is never forming.
+        expect(
+            checkAttachedReading(
+                { ...reading, lastBarInProgress: true },
+                fridayCase,
+                '1Day'
+            ).failures
+        ).toContain('lastBarInProgress');
+    });
+
+    it('applies to a month the closure cut short, on a weekly chart', () => {
+        // The last weekday of a month is closed; the case is the session before it.
+        const lastWeekday = KR.findIndex((b, k) => {
+            const d = new Date(b.time * 1000);
+            const next = KR[k + 1];
+            return (
+                k > 520 &&
+                next !== undefined &&
+                new Date(next.time * 1000).getUTCMonth() !== d.getUTCMonth()
+            );
+        });
+        const bars = withoutDay(lastWeekday);
+        const month = dataOf('005930.KS', bars, lastWeekday - 1);
+        const text = higherBlockText(month, '1Week');
+        const sessions = periodProgress(
+            bars,
+            month.replayCase.asOf,
+            monthStart
+        )?.sessionsSoFar;
+        expect(
+            checkHigherBlock(
+                sample(
+                    month,
+                    `${text}\nThe last monthly bar is the current month (${sessions} sessions so far).`
+                ),
+                month,
+                '1Week'
+            ).failures
+        ).toEqual([]);
     });
 });
 

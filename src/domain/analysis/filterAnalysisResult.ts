@@ -233,6 +233,17 @@ export function filterAnalysisResult(
         ...(result.trendBasis !== undefined
             ? { trendBasis: allowDirection ? result.trendBasis : null }
             : {}),
+        // Code facts about the trend, not plan detail: they ride `direction` with `trend`.
+        ...(result.higherTimeframe !== undefined
+            ? {
+                  higherTimeframe: allowDirection
+                      ? result.higherTimeframe
+                      : null,
+              }
+            : {}),
+        ...(result.marketBackdrop !== undefined
+            ? { marketBackdrop: allowDirection ? result.marketBackdrop : null }
+            : {}),
         indicatorResults: allowPartialDetail ? result.indicatorResults : null,
         riskLevel: allowPartialDetail ? result.riskLevel : null,
         keyLevels: allowPartialDetail ? result.keyLevels : null,

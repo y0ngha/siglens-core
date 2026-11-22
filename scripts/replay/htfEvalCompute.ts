@@ -247,20 +247,46 @@ export function hasHolidayCalendar(symbol: string): boolean {
     );
 }
 
+/** Sessions of an ordinary ISO week: what a shorter, fully stored week of a market with no calendar shows. */
+const NOMINAL_WEEK_SESSIONS = 5;
+
+/** Weekdays (Monday to Friday) of the UTC month starting at `monthStartSeconds`. */
+export function weekdaysInMonth(monthStartSeconds: number): number {
+    const start = new Date(monthStartSeconds * 1000);
+    const days = new Date(
+        Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 1, 0)
+    ).getUTCDate();
+    return Array.from({ length: days }, (_, i) =>
+        new Date(
+            Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), i + 1)
+        ).getUTCDay()
+    ).filter(day => day !== 0 && day !== 6).length;
+}
+
 /**
- * A period the stored bars show as short of a full week (a holiday or closure), for a market
- * with no holiday calendar: neither "still in progress" nor the pivot source can be proven there.
+ * A period the stored bars show as short of its nominal sessions (a holiday or closure), for
+ * a market with no holiday calendar: neither "still in progress" nor the pivot source can be
+ * proven there.
  */
-export function holidayAffectedWeek(
+export function holidayAffectedPeriod(
     symbol: string,
-    progress: { sessionsTotal: number; totalKnown: boolean } | null
+    progress: { sessionsTotal: number; totalKnown: boolean } | null,
+    nominalSessions: number
 ): boolean {
     return (
         !hasHolidayCalendar(symbol) &&
         progress !== null &&
         progress.totalKnown &&
-        progress.sessionsTotal < 5
+        progress.sessionsTotal < nominalSessions
     );
+}
+
+/** {@link holidayAffectedPeriod} for an ISO week (five sessions). */
+export function holidayAffectedWeek(
+    symbol: string,
+    progress: { sessionsTotal: number; totalKnown: boolean } | null
+): boolean {
+    return holidayAffectedPeriod(symbol, progress, NOMINAL_WEEK_SESSIONS);
 }
 
 /** Where the last higher-timeframe bar stands: in progress or finished, and the session counts. */

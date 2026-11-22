@@ -1,4 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import type { HigherTimeframeComputation } from '@/domain/analysis/higherTimeframe';
+import {
+    formatHigherTimeframeBlock,
+    formatMarketBackdropBlock,
+} from '@/domain/analysis/higherTimeframeSection';
+import type {
+    HigherTimeframeKind,
+    MarketBackdropReading,
+} from '@/domain/types';
 import {
     blockOf,
     fearGreedOf,
@@ -7,6 +16,8 @@ import {
     printedBarRows,
     printedHigherBlock,
     printedWeekTag,
+    INTRO_AFTER,
+    INTRO_BEFORE,
     withoutHtfBlocks,
 } from '../../../../scripts/replay/htfEvalPrompt';
 
@@ -197,6 +208,27 @@ describe('sections and cutting', () => {
         expect(withoutHtfBlocks('## A\nx')).toBe('## A\nx');
     });
 
+    it('puts the metrics intro back only when a block was cut, and only from its exact registered text', () => {
+        const withBlock = [
+            '## M',
+            INTRO_AFTER,
+            HIGHER.replace('\n### Next', ''),
+        ].join('\n');
+        expect(withoutHtfBlocks(withBlock)).toBe(
+            ['## M', INTRO_BEFORE].join('\n')
+        );
+        // No block: the intro is not touched, so a prompt that never had one is compared as it is.
+        expect(withoutHtfBlocks(`## M\n${INTRO_AFTER}`)).toBe(
+            `## M\n${INTRO_AFTER}`
+        );
+        // A reworded intro is not forgiven: the hash would differ.
+        const reworded = withBlock.replace(
+            'except the blocks',
+            'except some blocks'
+        );
+        expect(withoutHtfBlocks(reworded)).toContain('except some blocks');
+    });
+
     it('finds blocks and sections by their heading', () => {
         expect(blockOf('a\n### H1 x\nl1\n### H2\nl2', '### H1')).toEqual([
             '### H1 x',
@@ -209,5 +241,143 @@ describe('sections and cutting', () => {
         expect(fearGreedOf('## Fear & Greed Index (Reference)\nfg')).toContain(
             'fg'
         );
+    });
+});
+
+// The readers are the registered text of the blocks (htfEvalPrompt.ts); these run the text the
+// shipped formatters write through them, so a wording change in core fails here, not at a gate.
+describe('the readers read what the formatters write', () => {
+    const measured = (
+        kind: HigherTimeframeKind,
+        progress: HigherTimeframeComputation['progress']
+    ): HigherTimeframeComputation => ({
+        reading: {
+            kind,
+            trend: 'bullish',
+            slopeAtr: 1.62,
+            rsi14: 61.2,
+            closeVsMa50Pct: -12.4,
+            lastBarInProgress: progress !== null || kind === 'daily',
+            bars: 260,
+            alignment: 'aligned',
+        },
+        trend: {
+            trend: 'bullish',
+            slopeAtr: 1.62,
+            emaFrom: 212.4,
+            emaLast: 228.1,
+            close: 231.55,
+        },
+        progress,
+    });
+    const text = (computation: HigherTimeframeComputation): string =>
+        formatHigherTimeframeBlock(
+            computation,
+            'bullish',
+            {
+                dp: 2,
+                krxTick: null,
+            },
+            true
+        ).join('\n');
+
+    it.each([
+        ['weekly', { sessionsSoFar: 3, sessionsTotal: 5 }],
+        ['weekly', { sessionsSoFar: 3, sessionsTotal: null }],
+        ['monthly', { sessionsSoFar: 5, sessionsTotal: 22 }],
+        ['daily', null],
+    ] as const)(
+        'a %s block with progress %j has no unparsed line',
+        (kind, progress) => {
+            const block = printedHigherBlock(text(measured(kind, progress)));
+            expect(block?.kind).toBe(kind);
+            expect(block?.unparsed).toEqual([]);
+            expect(block?.trend?.slopeAtr).toBe('+1.62');
+            expect(block?.rsi14).toBe('61.2');
+            expect(block?.closeVsMa50).toEqual({ pct: '12.4', side: 'below' });
+            expect(block?.alignment).toEqual({
+                analysisTrend: 'bullish',
+                label: 'aligned',
+            });
+            expect(block?.progress).toEqual(
+                progress === null
+                    ? null
+                    : {
+                          sessionsSoFar: progress.sessionsSoFar,
+                          sessionsTotal: progress.sessionsTotal,
+                      }
+            );
+        }
+    );
+
+    it('the not-measurable form reads with the bars received', () => {
+        const block = printedHigherBlock(
+            text({
+                reading: {
+                    ...measured('weekly', null).reading,
+                    trend: null,
+                    slopeAtr: null,
+                    alignment: null,
+                    bars: 12,
+                },
+                trend: null,
+                progress: null,
+            })
+        );
+        expect(block?.trend).toBeNull();
+        expect(block?.receivedBars).toBe(12);
+        expect(block?.unparsed).toEqual([]);
+    });
+
+    const backdrop: MarketBackdropReading = {
+        label: 'S&P 500 (SPY)',
+        trend: 'bullish',
+        closeVsMa200Pct: 6.2,
+        endDate: '2026-11-20',
+        relative: [
+            { sessions: 20, symbolPct: 4.1, benchmarkPct: 1.3 },
+            { sessions: 60, symbolPct: null, benchmarkPct: 5 },
+        ],
+    };
+
+    it('the backdrop block reads, an n/a window included, with no unitless number', () => {
+        const block = printedBackdrop(
+            formatMarketBackdropBlock(backdrop, '005930.KS').join('\n')
+        );
+        expect(block).toMatchObject({
+            label: 'S&P 500 (SPY)',
+            trend: 'bullish',
+            closeVsMa200: { pct: '6.2', side: 'above' },
+            endDate: '2026-11-20',
+            unitlessNumbers: [],
+            unparsed: [],
+        });
+        expect(block?.relative).toEqual([
+            {
+                symbol: '005930.KS',
+                sessions: 20,
+                symbolPct: '+4.1',
+                benchmarkPct: '+1.3',
+            },
+            {
+                symbol: '005930.KS',
+                sessions: 60,
+                symbolPct: 'n/a',
+                benchmarkPct: '+5.0',
+            },
+        ]);
+    });
+
+    it('a backdrop with no trend reads as not measurable', () => {
+        const block = printedBackdrop(
+            formatMarketBackdropBlock(
+                { ...backdrop, trend: null, closeVsMa200Pct: null },
+                'AAPL'
+            ).join('\n')
+        );
+        expect(block?.trend).toBe('not measurable');
+        expect(block?.closeVsMa200).toBeNull();
+        expect(block?.unparsed).toEqual([]);
+        expect(block?.unitlessNumbers).toEqual([]);
     });
 });

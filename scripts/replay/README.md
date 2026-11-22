@@ -610,8 +610,8 @@ Which gates a PR runs, and what each can compute today:
 | M1 (wording gate of "no measured forward edge") | `htf-forward` | now |
 | W1, W2, K1, K3 (weekly bars, unfinished week, hygiene) | core-1 | now (core-1). W2 and the pivot clause of K1 use the replay's KR session, which has no KRX holiday calendar (N3/N24), so a KR week with a holiday or the year-end closure fails them; the US cases are the exact check |
 | K2 (`riskLevel` equals the daily one) | a weekly and a daily **run** (a render has no model answer); `--run`/`--before` | after core-1 and a run |
-| H1, H4 (block values, US backdrop), H2b (renders with the two registered blocks cut equal the core-1 render) | core-2; H2b needs `--baseline` = a core-1 `htf` output with the same `--skills` | after core-2 |
-| H1b (the attached `higherTimeframe` reading) | a run of the timeframe | after core-2 and a run |
+| H1, H4 (block values, US backdrop), H2b (renders with the two registered blocks cut equal the core-1 render) | core-2; H2b needs `--baseline` = a core-1 `htf` output with the same `--skills` | now (core-2) |
+| H1b (the attached `higherTimeframe` reading) | a run of the timeframe | now (core-2) with a run |
 | H4k (Korean backdrop) | `--benchmark-bars <dir>` with `KS11.json` **and** `KQ11.json` stored-bars files | only when those exist (none are fetched: decision of 2026-11-22) |
 
 **`--gate all` resolves per input.** It selects the gates this input can decide: W1 and W2 only at
@@ -643,6 +643,13 @@ daily bars in `runAnalysis` for every analysis timeframe and lists H4 for `1Day`
 renders; nothing there omits it on weekly. A weekly analysis prints the same backdrop block (the
 symbol's daily series comes from `fearGreedBars`), so H4 is computed on whatever timeframe is
 rendered and tested at `1Week`.
+
+**H1 and H1b accept a closure core cannot know, as W2 does.** In a market with no holiday calendar
+(the replay's KR session, N3/N24) a week or month the stored bars show cut short by a closure may still
+read as forming to core. H1 then accepts the observed count with no total (`(4 sessions so far)`, never
+`(4 of 4 ...)` and never another count) and H1b accepts `lastBarInProgress: true`; a market with a calendar,
+and a full period, get no such allowance. The daily block of an intraday chart has no session count: its
+last bar is `The last daily bar is the current session, still open.`, which the reader knows.
 
 `htf --self-check` renders twice in one process and reports how many samples hash alike
 (`summary.htf.selfCheck`, and a log line). It is a reported figure, never a gate: a difference means
@@ -684,7 +691,7 @@ How the gates are built (TE-16):
 - H2a compares raw hashes. H2b strips exactly the two registered blocks and compares the stripped
   hash with the earlier render's raw hash; `rows.jsonl` holds the raw and the stripped hash of
   every sample, and the stable half is compared separately and must be identical.
-- M1 gates **two cells**: aligned bullish and aligned bearish, each against the all-day mean, with
+- M1 is **pooled across both markets** (U.S. and Korean symbols together, no crypto, no per-market split) and gates **two cells**: aligned bullish and aligned bearish, each against the all-day mean, with
   a week-clustered 95% interval; it passes when neither interval clears 1 pp in the textbook
   direction (a bound of exactly 1 pp is inside). This is narrower than "agreement has no edge".
   The other seven cells and two paired contrasts (daily bullish: weekly bullish minus weekly

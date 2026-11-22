@@ -2,7 +2,16 @@ import type { AnalysisLocale } from '@/domain/analysis/outputLocale';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Mock } from 'vitest';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
-import type { AnalysisResponse, Skill, Timeframe } from '@/domain/types';
+import type {
+    AnalysisResponse,
+    Bar,
+    BarsData,
+    HigherTimeframeReading,
+    MarketBackdropReading,
+    Skill,
+    Timeframe,
+} from '@/domain/types';
+import type { HigherContextInput } from '@/domain/analysis/higherTimeframe';
 import {
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
@@ -27,6 +36,8 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternArbitration: { kept: [], dropped: [] },
         patternGeometries: new Map(),
         trend: null,
+        higherTimeframe: null,
+        marketBackdrop: null,
         printedSupportPrices: [],
         injectedSkills: [],
         indicatorCards: [],
@@ -191,6 +202,7 @@ const PROMPT_ARG = {
     marketClock: 15,
     gatedSkillCap: 16,
     dailyBars: 17,
+    higherContext: 18,
 } as const;
 
 const promptArg = (
@@ -218,6 +230,395 @@ describe('runAnalysis', () => {
 
     afterEach(() => {
         vi.useRealTimers();
+    });
+
+    describe('higher timeframe and market backdrop', () => {
+        const dailyBar = (i: number, close: number): Bar => ({
+            time: Date.UTC(2026, 0, 5 + i) / 1000,
+            open: close,
+            high: close + 1,
+            low: close - 1,
+            close,
+            volume: 1000,
+        });
+        const dailyBars: Bar[] = Array.from({ length: 5 }, (_, i) =>
+            dailyBar(i, 100 + i)
+        );
+        const weeklyOfRun: BarsData = {
+            ...mockBarsData,
+            fearGreedBars: dailyBars,
+        };
+        const benchmarkData: BarsData = {
+            bars: dailyBars.map(bar => ({ ...bar, close: bar.close * 4 })),
+            indicators: mockBarsData.indicators,
+        };
+        const spy = { symbol: 'SPY', label: 'S&P 500 (SPY)' };
+        const contextOf = (): HigherContextInput | undefined =>
+            promptArg(
+                mockBuildAnalysisPrompt.mock.lastCall,
+                'higherContext'
+            ) as HigherContextInput | undefined;
+        const run = (
+            timeframe: Timeframe,
+            options: Parameters<typeof runAnalysis>[5] = {}
+        ) =>
+            runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                timeframe,
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'member' },
+                    ...options,
+                }
+            );
+        const higherReading: HigherTimeframeReading = {
+            kind: 'weekly',
+            trend: 'bullish',
+            slopeAtr: 1.62,
+            rsi14: 61.2,
+            closeVsMa50Pct: 12.4,
+            lastBarInProgress: true,
+            bars: 260,
+            alignment: 'aligned',
+        };
+        const backdropReading: MarketBackdropReading = {
+            label: 'S&P 500 (SPY)',
+            trend: 'bullish',
+            closeVsMa200Pct: 6.2,
+            endDate: '2026-11-20',
+            relative: [
+                { sessions: 20, symbolPct: 4.1, benchmarkPct: 1.3 },
+                { sessions: 60, symbolPct: 9.8, benchmarkPct: 5 },
+            ],
+        };
+        const promptWithReadings = (
+            higherTimeframe: HigherTimeframeReading | null,
+            marketBackdrop: MarketBackdropReading | null
+        ) => ({
+            stable: 'mock-stable',
+            dynamic: 'mock-dynamic',
+            overlayCandidates: [],
+            overlayBuildFailures: [],
+            patternScreenFailure: null,
+            patternArbitration: { kept: [], dropped: [] },
+            patternGeometries: new Map(),
+            trend: null,
+            higherTimeframe,
+            marketBackdrop,
+            printedSupportPrices: [],
+            injectedSkills: [],
+            indicatorCards: [],
+            cycleCards: [],
+        });
+
+        it('builds the weekly series of a daily chart from its own daily history, with no extra fetch', async () => {
+            mockFetchBarsWithIndicators.mockResolvedValue(weeklyOfRun);
+
+            await run('1Day');
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            expect(contextOf()?.higher?.kind).toBe('weekly');
+            expect(contextOf()?.higher?.dailyBars).toBe(dailyBars);
+            expect(contextOf()?.backdrop).toBeNull();
+        });
+
+        it('builds the daily series of an intraday chart from the daily fetch Fear & Greed already makes', async () => {
+            const dailyData: BarsData = { ...mockBarsData };
+            mockFetchBarsWithIndicators
+                .mockResolvedValueOnce(mockBarsData)
+                .mockResolvedValueOnce(dailyData);
+
+            await run('1Hour');
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
+            expect(contextOf()?.higher?.kind).toBe('daily');
+            expect(contextOf()?.higher?.bars).toBe(dailyData.bars);
+        });
+
+        it('builds the monthly series of a weekly chart from its daily source', async () => {
+            mockFetchBarsWithIndicators.mockResolvedValue(weeklyOfRun);
+
+            await run('1Week');
+
+            expect(contextOf()?.higher?.kind).toBe('monthly');
+            expect(contextOf()?.higher?.dailyBars).toBe(dailyBars);
+        });
+
+        it('has no higher series when the daily data could not be read', async () => {
+            const errorSpy = vi
+                .spyOn(console, 'error')
+                .mockImplementation(() => undefined);
+            mockFetchBarsWithIndicators
+                .mockResolvedValueOnce(mockBarsData)
+                .mockRejectedValueOnce(new Error('daily 503'));
+
+            const result = await run('1Hour', { benchmark: spy });
+
+            expect(result.status).toBe('done');
+            expect(contextOf()?.higher).toBeNull();
+            // The backdrop compares with the symbol's daily series, so it goes too.
+            expect(contextOf()?.backdrop).toBeNull();
+            errorSpy.mockRestore();
+        });
+
+        describe('benchmark', () => {
+            it('reads the benchmark daily bars through the same provider and passes them with the symbol daily history', async () => {
+                mockFetchBarsWithIndicators
+                    .mockResolvedValueOnce(weeklyOfRun)
+                    .mockResolvedValueOnce(benchmarkData);
+
+                await run('1Day', { benchmark: spy });
+
+                expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(2);
+                expect(mockFetchBarsWithIndicators).toHaveBeenLastCalledWith(
+                    fakeProvider,
+                    'SPY',
+                    '1Day',
+                    undefined,
+                    expect.any(Date)
+                );
+                expect(contextOf()?.backdrop).toEqual({
+                    label: 'S&P 500 (SPY)',
+                    symbolDaily: dailyBars,
+                    benchmark: benchmarkData,
+                });
+            });
+
+            it('asks the provider for the benchmark under its own provider symbol when it has one', async () => {
+                mockFetchBarsWithIndicators
+                    .mockResolvedValueOnce(weeklyOfRun)
+                    .mockResolvedValueOnce(benchmarkData);
+
+                await run('1Day', {
+                    benchmark: {
+                        symbol: 'KS11',
+                        fmpSymbol: '^KS11',
+                        label: 'KOSPI',
+                    },
+                });
+
+                expect(mockFetchBarsWithIndicators).toHaveBeenLastCalledWith(
+                    fakeProvider,
+                    'KS11',
+                    '1Day',
+                    '^KS11',
+                    expect.any(Date)
+                );
+            });
+
+            it('reads it with the same instant as the other fetches', async () => {
+                mockFetchBarsWithIndicators
+                    .mockResolvedValueOnce(weeklyOfRun)
+                    .mockResolvedValueOnce(benchmarkData);
+
+                await run('1Day', { benchmark: spy });
+
+                const instants = mockFetchBarsWithIndicators.mock.calls.map(
+                    call => call[4]
+                );
+                expect(instants[1]).toBe(instants[0]);
+            });
+
+            it('compares an intraday chart with its daily history, not its intraday bars', async () => {
+                const dailyData: BarsData = {
+                    ...mockBarsData,
+                    fearGreedBars: dailyBars,
+                };
+                mockFetchBarsWithIndicators
+                    .mockResolvedValueOnce(mockBarsData)
+                    .mockResolvedValueOnce(dailyData)
+                    .mockResolvedValueOnce(benchmarkData);
+
+                await run('1Hour', { benchmark: spy });
+
+                expect(contextOf()?.backdrop?.symbolDaily).toBe(dailyBars);
+            });
+
+            it('is skipped when the benchmark is the analysed symbol', async () => {
+                mockFetchBarsWithIndicators.mockResolvedValue(weeklyOfRun);
+
+                await runAnalysis(
+                    'SPY',
+                    'SPDR S&P 500',
+                    '1Day',
+                    false,
+                    undefined,
+                    {
+                        marketDataProvider: fakeProvider,
+                        tierContext: { userId: 'u1', tier: 'member' },
+                        benchmark: spy,
+                    }
+                );
+
+                expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+                expect(contextOf()?.backdrop).toBeNull();
+            });
+
+            it('is not read when no benchmark is given', async () => {
+                mockFetchBarsWithIndicators.mockResolvedValue(weeklyOfRun);
+
+                await run('1Day');
+
+                expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            });
+
+            it('a failed read only drops the backdrop and logs it', async () => {
+                const errorSpy = vi
+                    .spyOn(console, 'error')
+                    .mockImplementation(() => undefined);
+                mockFetchBarsWithIndicators
+                    .mockResolvedValueOnce(weeklyOfRun)
+                    .mockRejectedValueOnce(new Error('SPY 503'));
+
+                const result = await run('1Day', { benchmark: spy });
+
+                expect(result.status).toBe('done');
+                expect(contextOf()?.backdrop).toBeNull();
+                expect(contextOf()?.higher?.kind).toBe('weekly');
+                expect(errorSpy).toHaveBeenCalledWith(
+                    expect.stringContaining('Benchmark daily fetch failed'),
+                    expect.any(Error)
+                );
+                errorSpy.mockRestore();
+            });
+
+            it('is part of the cache key: two benchmarks, and one against none, read different entries', async () => {
+                mockFetchBarsWithIndicators.mockResolvedValue(weeklyOfRun);
+                const keyOf = async (
+                    benchmark?: NonNullable<
+                        Parameters<typeof runAnalysis>[5]
+                    >['benchmark']
+                ) => {
+                    mockCacheGet.mockClear();
+                    await run('1Day', { benchmark });
+                    return mockCacheGet.mock.calls[0]?.[0];
+                };
+                const none = await keyOf();
+                const spyKey = await keyOf(spy);
+                const kospi = await keyOf({ symbol: 'KS11', label: 'KOSPI' });
+                expect(spyKey).toBe(`${none}:bm=SPY`);
+                expect(kospi).toBe(`${none}:bm=KS11`);
+                expect(new Set([none, spyKey, kospi]).size).toBe(3);
+            });
+
+            it('the peek pointer it writes carries the benchmark too', async () => {
+                mockFetchBarsWithIndicators.mockResolvedValue(weeklyOfRun);
+                await run('1Day', { benchmark: spy });
+                const peekKeys = mockCacheSet.mock.calls
+                    .map(call => call[0])
+                    .filter((key: string) => key.startsWith('analysis:peek:'));
+                expect(peekKeys).toHaveLength(1);
+                expect(peekKeys[0]).toMatch(/:bm=SPY$/);
+            });
+        });
+
+        describe('the readings on the result', () => {
+            it('attaches what the prompt printed to the result and to the cache entry', async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(
+                    promptWithReadings(higherReading, backdropReading)
+                );
+
+                const result = await run('1Day');
+
+                expect(result.status).toBe('done');
+                if (result.status !== 'done') return;
+                expect(result.unfilteredResult.higherTimeframe).toEqual(
+                    higherReading
+                );
+                expect(result.unfilteredResult.marketBackdrop).toEqual(
+                    backdropReading
+                );
+                const stored = mockCacheSet.mock.calls
+                    .map(call => call[1])
+                    .find(value => value?.higherTimeframe !== undefined);
+                expect(stored?.higherTimeframe).toEqual(higherReading);
+                expect(stored?.marketBackdrop).toEqual(backdropReading);
+            });
+
+            it('attaches only the reading the prompt printed', async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(
+                    promptWithReadings(higherReading, null)
+                );
+
+                const result = await run('1Day');
+
+                if (result.status !== 'done') throw new Error('not done');
+                expect(result.unfilteredResult.higherTimeframe).toEqual(
+                    higherReading
+                );
+                expect('marketBackdrop' in result.unfilteredResult).toBe(false);
+            });
+
+            it('attaches neither when the prompt printed neither', async () => {
+                const result = await run('1Day');
+
+                if (result.status !== 'done') throw new Error('not done');
+                expect('higherTimeframe' in result.unfilteredResult).toBe(
+                    false
+                );
+                expect('marketBackdrop' in result.unfilteredResult).toBe(false);
+            });
+
+            it('does not attach them to the empty fallback', async () => {
+                const fallbackResult: AnalysisResponse = {
+                    ...mockRawResult,
+                    summary: EMPTY_ANALYSIS_FALLBACK_SUMMARY,
+                };
+                mockEnrichAnalysisWithConfidence.mockReturnValueOnce(
+                    fallbackResult
+                );
+                mockPostProcessAnalysisWithReconcile.mockReturnValueOnce(
+                    fallbackResult
+                );
+                mockBuildAnalysisPrompt.mockReturnValueOnce(
+                    promptWithReadings(higherReading, backdropReading)
+                );
+                const warnSpy = vi
+                    .spyOn(console, 'warn')
+                    .mockImplementation(() => undefined);
+
+                const result = await run('1Day');
+
+                if (result.status !== 'done') throw new Error('not done');
+                expect('higherTimeframe' in result.unfilteredResult).toBe(
+                    false
+                );
+                expect('marketBackdrop' in result.unfilteredResult).toBe(false);
+                warnSpy.mockRestore();
+            });
+
+            it('free sees them: they ride the direction depth with the trend', async () => {
+                mockBuildAnalysisPrompt.mockReturnValueOnce(
+                    promptWithReadings(higherReading, backdropReading)
+                );
+
+                const result = await run('1Day', {
+                    tierContext: { userId: null, tier: 'free' },
+                });
+
+                if (result.status !== 'done') throw new Error('not done');
+                expect(result.result.higherTimeframe).toEqual(higherReading);
+                expect(result.result.marketBackdrop).toEqual(backdropReading);
+            });
+
+            it('a cache hit serves a stored reading and drops a corrupt one', async () => {
+                mockCacheGet.mockResolvedValueOnce({
+                    ...mockRawResult,
+                    higherTimeframe: higherReading,
+                    marketBackdrop: { label: '', relative: [] },
+                });
+
+                const result = await run('1Day');
+
+                expect(result.status).toBe('cached');
+                if (result.status !== 'cached') return;
+                expect(result.result.higherTimeframe).toEqual(higherReading);
+                expect('marketBackdrop' in result.result).toBe(false);
+            });
+        });
     });
 
     describe('tier gate', () => {
@@ -2158,7 +2559,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 )
             ).toBe(undefined);
             expect(errorSpy).toHaveBeenCalledWith(
-                expect.stringContaining('FearGreed daily fetch/compute failed'),
+                expect.stringContaining('Daily history fetch failed'),
                 expect.any(Error)
             );
             errorSpy.mockRestore();

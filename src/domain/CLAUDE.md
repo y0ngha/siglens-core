@@ -396,7 +396,8 @@ established. Do not infer a cause from absence (null metrics do not prove "sourc
 unavailable"): the caller that knows passes an explicit flag, and the renderer reads it.
 Name the flag after the fact proven, not the conclusion you hope for. A measured claim
 (a hit rate, a reliability sentence) carries the scope it was measured on (daily bars, one
-market), so it is not rendered on a prompt outside that scope. An unknown input
+market), so it is not rendered on a prompt outside that scope, and a figure measured on a
+pooled sample is worded as pooled, never as per-market or per-cell. An unknown input
 states nothing (never "0 of N"), and a total is rendered only together with the data that
 proves it (a session count needs the holiday calendar, else "N so far").
 
@@ -663,7 +664,8 @@ A calculation whose result can be undefined (warm-up, division by zero) returns 
 `NaN` in a cached result or prompt corrupts parsing, sorting and rendering downstream.
 
 - Financial inputs get range guards, not just `Number.isFinite`: prices `> 0`, a take-profit
-  that equals the entry yields no ratio, `tp <= entry` on a long cannot produce a reward.
+  that equals the entry yields no ratio, `tp <= entry` on a long cannot produce a reward;
+  a percent change over a base price checks the base `> 0` first (a zero base prints `Infinity`).
 - Public numeric options that index arrays or define windows (horizons, periods) are
   filtered to valid integers (`Number.isInteger(n) && n > 0`) before use; derived values
   pass `Number.isFinite` before aggregation.

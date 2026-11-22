@@ -5,6 +5,8 @@ import { TIER_CONFIG } from '@/domain/tier';
 import type {
     AnalysisResponse,
     FilteredAnalysisResponse,
+    HigherTimeframeReading,
+    MarketBackdropReading,
     TierConfig,
 } from '@/domain/types';
 
@@ -832,6 +834,73 @@ describe('trendBasis tier gating', () => {
         );
 
         expect('trendBasis' in result).toBe(false);
+    });
+});
+
+describe('higherTimeframe and marketBackdrop tier gating', () => {
+    const higherTimeframe: HigherTimeframeReading = {
+        kind: 'weekly',
+        trend: 'bullish',
+        slopeAtr: 1.62,
+        rsi14: 61.2,
+        closeVsMa50Pct: 12.4,
+        lastBarInProgress: true,
+        bars: 260,
+        alignment: 'aligned',
+    };
+    const marketBackdrop: MarketBackdropReading = {
+        label: 'S&P 500 (SPY)',
+        trend: 'bullish',
+        closeVsMa200Pct: 6.2,
+        endDate: '2026-11-20',
+        relative: [
+            { sessions: 20, symbolPct: 4.1, benchmarkPct: 1.3 },
+            { sessions: 60, symbolPct: 9.8, benchmarkPct: 5 },
+        ],
+    };
+    const withoutDirection: TierConfig = {
+        ...restrictedConfig,
+        infoDepth: { ...restrictedConfig.infoDepth, free: ['summary'] },
+    };
+
+    it('hands both readings to a tier that sees the direction (they are code facts, not plan detail)', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse({ higherTimeframe, marketBackdrop }),
+            'free',
+            restrictedConfig
+        );
+
+        expect(result.higherTimeframe).toEqual(higherTimeframe);
+        expect(result.marketBackdrop).toEqual(marketBackdrop);
+    });
+
+    it('withholds both (null, like trend) from a tier without the direction depth', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse({ higherTimeframe, marketBackdrop }),
+            'free',
+            withoutDirection
+        );
+
+        expect(result.trend).toBeNull();
+        expect(result.higherTimeframe).toBeNull();
+        expect(result.marketBackdrop).toBeNull();
+    });
+
+    it('omits each key when the source analysis carries none (an old entry, the empty fallback, no benchmark)', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse({ higherTimeframe }),
+            'free',
+            restrictedConfig
+        );
+
+        expect('higherTimeframe' in result).toBe(true);
+        expect('marketBackdrop' in result).toBe(false);
+        const none = filterAnalysisResult(
+            makeAnalysisResponse(),
+            'free',
+            restrictedConfig
+        ).result;
+        expect('higherTimeframe' in none).toBe(false);
     });
 });
 

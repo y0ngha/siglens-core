@@ -210,6 +210,9 @@ export function printedHigherBlock(prompt: string): PrintedHigherBlock | null {
     );
     const progressRe =
         /The last \w+ bar is the current \w+ \((\d+)(?: of (\d+))? sessions so far\)/;
+    // A daily block (an intraday chart) has no session count: its last bar is the open session.
+    const openSessionRe =
+        /^The last daily bar is the current session, still open\.$/;
     const alignRe =
         /^Alignment with this chart's trend \((bullish|bearish|neutral)\): (aligned|opposed|mixed)\./;
     const body = lines.slice(1);
@@ -227,9 +230,15 @@ export function printedHigherBlock(prompt: string): PrintedHigherBlock | null {
     }));
     const receivedBars = read(missingRe, m => Number(m[1]));
     const known = (line: string): boolean =>
-        [trendRe, missingRe, rsiRe, maRe, progressRe, alignRe].some(re =>
-            re.test(line)
-        ) ||
+        [
+            trendRe,
+            missingRe,
+            rsiRe,
+            maRe,
+            progressRe,
+            openSessionRe,
+            alignRe,
+        ].some(re => re.test(line)) ||
         line.startsWith('Descriptive only') ||
         line.startsWith('Rule:') ||
         line.trim() === '';
@@ -278,7 +287,7 @@ export function printedBackdrop(prompt: string): PrintedBackdrop | null {
         )
         .find(m => m !== null);
     const relRe = new RegExp(
-        `^(\\S+) vs (.+?), last 20 sessions: (${NUM}|n/a)% vs (${NUM}|n/a)%; last 60 sessions: (${NUM}|n/a)% vs (${NUM}|n/a)% \\(both to (\\d{4}-\\d{2}-\\d{2})\\)`
+        `^(\\S+) vs (.+?), last 20 sessions: (${NUM}|n/a)%? vs (${NUM}|n/a)%?; last 60 sessions: (${NUM}|n/a)%? vs (${NUM}|n/a)%? \\(both to (\\d{4}-\\d{2}-\\d{2})\\)`
     );
     const rel = body.map(line => relRe.exec(line)).find(m => m !== null);
     // The benchmark's name ("S&P 500") and the symbol ("005930.KS") may carry digits; they are
@@ -330,13 +339,25 @@ export function printedBackdrop(prompt: string): PrintedBackdrop | null {
 }
 
 /**
+ * The two-line wording of the `## Deterministic Metrics` intro before and after the blocks:
+ * with a block present core says the blocks name their own bars (DOM-9). The identity gate
+ * restores the old line from the new one, exactly, so the only difference it forgives besides
+ * the blocks is this one registered line; any other difference fails the hash.
+ */
+export const INTRO_BEFORE =
+    'Computed from the same bars given to you. These are arithmetic facts about this chart — cite them, do not recompute or override them.';
+export const INTRO_AFTER =
+    'Computed from the same bars given to you, except the blocks that name their own bars (Higher Timeframe, Market Backdrop). These are arithmetic facts about this chart — cite them, do not recompute or override them.';
+
+/**
  * The prompt with the two WP-19 core-2 blocks (`### Higher Timeframe (computed` and
- * `### Market Backdrop (computed`) cut out: the registered parts the scoped identity gate
- * (H2b) strips. Nothing else is touched; a block is cut from its heading to the line before
- * the next `##` or `###` heading, with the blank line that followed it.
+ * `### Market Backdrop (computed`) cut out and the metrics intro put back to its earlier
+ * wording: the registered parts the scoped identity gate (H2b) strips. Nothing else is touched;
+ * a block is cut from its heading to the line before the next `##` or `###` heading. The intro
+ * is restored only when a block was cut and only if its line is present exactly as registered.
  */
 export function withoutHtfBlocks(dynamic: string): string {
-    return [
+    const cut = [
         '### Higher Timeframe (computed',
         '### Market Backdrop (computed',
     ].reduce((text, prefix) => {
@@ -350,6 +371,7 @@ export function withoutHtfBlocks(dynamic: string): string {
         const stop = end < 0 ? lines.length : start + 1 + end;
         return [...lines.slice(0, start), ...lines.slice(stop)].join('\n');
     }, dynamic);
+    return cut === dynamic ? dynamic : cut.replace(INTRO_AFTER, INTRO_BEFORE);
 }
 
 /** Section text helpers re-exported for the gates: one place that knows the header strings. */

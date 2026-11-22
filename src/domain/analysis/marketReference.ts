@@ -128,8 +128,10 @@ export interface MarketReferenceClock {
  * or after that day's close (the exchange calendar's half-day close counts). Without a clock
  * — or on a 24/7 session, whose daily bar closes at the UTC boundary and is never "done" at
  * an arbitrary instant — it reports `false`, the prior behaviour.
+ *
+ * @internal
  */
-function isLastDailyBarFinished(
+export function isLastDailyBarFinished(
     lastBar: Bar,
     clock: MarketReferenceClock | undefined
 ): boolean {

@@ -448,6 +448,21 @@ function formatEntryZoneRule(
     ];
 }
 
+/** @internal The line under `## Deterministic Metrics`: every figure below it is computed from this chart's bars. */
+export const METRICS_INTRO =
+    'Computed from the same bars given to you. These are arithmetic facts about this chart — cite them, do not recompute or override them.';
+
+/**
+ * The same line once the higher-timeframe or market-backdrop block is present: those blocks name
+ * their own bars, so "the same bars" would no longer be true (DOM-9). It is printed only then,
+ * so a prompt without them keeps its bytes. The replay's H2b gate (`withoutHtfBlocks`) restores
+ * {@link METRICS_INTRO} from this exact text.
+ *
+ * @internal
+ */
+export const METRICS_INTRO_WITH_CONTEXT_BLOCKS =
+    'Computed from the same bars given to you, except the blocks that name their own bars (Higher Timeframe, Market Backdrop). These are arithmetic facts about this chart — cite them, do not recompute or override them.';
+
 const TREND_HEADER = '### Trend (computed)';
 
 /**
@@ -497,6 +512,11 @@ function formatTrendBlock(
  * `trend` is `buildAnalysisPrompt`'s one computation of the trend reading: a reading prints
  * the `### Trend (computed)` block and `null` prints its "not measurable" form. It is required
  * on purpose: a caller that omitted it would silently leave the model's own trend unframed.
+ *
+ * `contextBlocks` are the lines of the higher-timeframe and market-backdrop blocks
+ * (`higherTimeframeSection.ts`), printed right after the trend block they refer to; empty (the
+ * default) leaves the section byte-identical to what it printed without them. They are
+ * descriptive and never reach the confluence gate below.
  */
 export function formatDeterministicMetricsSection(
     bars: readonly Bar[],
@@ -506,17 +526,18 @@ export function formatDeterministicMetricsSection(
     events: readonly MarketEvent[] = [],
     earningsDates: readonly string[] | undefined,
     trend: AnalysisTrendReading | null,
-    freshness?: SignalFreshness
+    freshness?: SignalFreshness,
+    contextBlocks: readonly string[] = []
 ): string {
     const { min, expectedWeight } = CONFLUENCE_PARAMS_BY_TIMEFRAME[timeframe];
     // `exitMin` is deliberately not raised alongside `min` on the daily chart. Raising the
     // entry bar is the intent; raising the exit bar with it is the defect that principle
     // guards against — a missed entry costs opportunity, a missed exit costs money. The
     // asymmetry it leaves on `1Day` (entry 3, exit 2.5) is the correct direction.
-    // No higher-timeframe bars are fetched for the prompt, so the alignment gate stays
-    // off. That is the intended configuration on `1Day` (there is no natural timeframe
-    // above it for the backtested rule) and an accepted looseness on intraday charts,
-    // where the gate would otherwise need a second fetch this layer must not perform.
+    // The alignment gate stays off: `### Higher Timeframe (computed)` is descriptive (the
+    // daily-and-weekly agreement showed no forward edge), so it never reaches this backtested
+    // rule. That is the intended configuration on `1Day` (there is no natural timeframe above
+    // it for the backtested rule) and an accepted looseness on intraday charts.
     const snapshot = evaluateConfluence(bars, {
         timeframe,
         min,
@@ -548,8 +569,11 @@ export function formatDeterministicMetricsSection(
 
     return [
         DETERMINISTIC_METRICS_HEADER,
-        'Computed from the same bars given to you. These are arithmetic facts about this chart — cite them, do not recompute or override them.',
+        contextBlocks.length === 0
+            ? METRICS_INTRO
+            : METRICS_INTRO_WITH_CONTEXT_BLOCKS,
         ...formatTrendBlock(trend, bars.length, quoting),
+        ...contextBlocks,
         ...confluence,
         ...pullback,
         ...spacing,
