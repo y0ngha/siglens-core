@@ -4,7 +4,7 @@
  *
  * Usage:
  *   npx tsx scripts/replay/run.ts --set <set-dir> --out <run-dir> [--skills <path ending in /skills>]
- *     [--tier free|member] [--subset variance] [--repeat N] [--limit N] [--concurrency 4]
+ *     [--tier free|member] [--timeframe 1Day] [--subset variance] [--repeat N] [--limit N] [--concurrency 4]
  *     [--keep-raw] [--retry-errors] [--execute --approved-calls <n>]
  *
  * The default is a dry run: it checks the set's hashes, counts the calls still to make
@@ -65,7 +65,8 @@ import type {
     StoredBars,
 } from './types';
 import { AI_RETRY_MAX_ATTEMPTS } from '@/infrastructure/ai/retry/withRetry';
-import type { AssembledPromptRecord, Tier } from '@/domain/types';
+import { TIMEFRAMES } from '@/domain/constants/market';
+import type { AssembledPromptRecord, Tier, Timeframe } from '@/domain/types';
 
 // ─── Cost estimate ────────────────────────────────────────────────────────────
 /** Measured mean call size and price of a daily technical analysis (flash, reasoning off). */
@@ -149,12 +150,30 @@ function parseTier(raw: string | undefined): RunTier {
     return tier;
 }
 
+/**
+ * `--timeframe`: the chart timeframe every case is analysed at (default `1Day`, the set's own).
+ * Only a timeframe core knows is accepted: `1Week` is refused with the list of known ones until
+ * core builds weekly bars (WP-19 core-1), so a weekly run can never silently become a daily one.
+ */
+function parseTimeframe(raw: string | undefined): Timeframe {
+    if (raw === undefined) return '1Day';
+    const timeframe = TIMEFRAMES.find(candidate => candidate === raw);
+    if (timeframe === undefined) {
+        throw new Error(
+            `--timeframe must be one of ${TIMEFRAMES.join(', ')} (got "${raw}")`
+        );
+    }
+    return timeframe;
+}
+
 export interface RunArgs {
     set: string;
     out: string;
     skills: string | null;
     /** The tier the analyses run as; part of the run identity. */
     tier: RunTier;
+    /** The chart timeframe the cases are analysed at; part of the run identity. */
+    timeframe: Timeframe;
     subset: 'variance' | null;
     repeat: number;
     limit: number | null;
@@ -199,6 +218,7 @@ export function parseRunArgs(argv: readonly string[]): RunArgs {
         out: resolve(raw.out),
         skills: raw.skills === undefined ? null : resolve(raw.skills),
         tier: parseTier(raw.tier),
+        timeframe: parseTimeframe(raw.timeframe),
         subset: raw.subset === 'variance' ? 'variance' : null,
         repeat: parsePositiveIntArg(raw.repeat, 'repeat'),
         limit:
@@ -377,7 +397,8 @@ export interface RunDeps {
     loadExecuteDeps: (
         skillsDir: string,
         log: (line: string) => void,
-        tier: RunTier
+        tier: RunTier,
+        timeframe: Timeframe
     ) => Promise<ExecuteDeps>;
 }
 
@@ -594,6 +615,7 @@ const IDENTITY_FIELDS = [
     'promptTemplateVersion',
     'model',
     'tier',
+    'timeframe',
     'skillsSha256',
     'repeat',
     'subset',
@@ -606,8 +628,11 @@ const IDENTITY_FIELDS = [
  * skills, repeat count or selection (subset and limit).
  */
 export function assertSameRun(existing: RunMeta, next: RunMeta): void {
+    // A run made before WP-19 has no `timeframe` and was a `1Day` run.
+    const valueOf = (meta: RunMeta, field: (typeof IDENTITY_FIELDS)[number]) =>
+        field === 'timeframe' ? (meta.timeframe ?? '1Day') : meta[field];
     const differing = IDENTITY_FIELDS.filter(
-        field => existing[field] !== next[field]
+        field => valueOf(existing, field) !== valueOf(next, field)
     );
     if (differing.length > 0) {
         throw new Error(
@@ -697,11 +722,17 @@ async function executeApproved(
     split: JobSplit,
     skills: string
 ): Promise<number> {
-    const executeDeps = await deps.loadExecuteDeps(skills, deps.log, args.tier);
+    const executeDeps = await deps.loadExecuteDeps(
+        skills,
+        deps.log,
+        args.tier,
+        args.timeframe
+    );
     const meta: RunMeta = {
         setId: manifest.setId,
         setBarsSha256: barsFingerprint(manifest),
         ...executeDeps.identity,
+        timeframe: args.timeframe,
         skillsSha256: hashTree(skills),
         repeat: args.repeat,
         subset: args.subset,
@@ -777,7 +808,8 @@ export async function assertSkillsLoaded(
 export async function loadCoreExecuteDeps(
     skillsDir: string,
     log: (line: string) => void,
-    tier: RunTier
+    tier: RunTier,
+    timeframe: Timeframe = '1Day'
 ): Promise<ExecuteDeps> {
     if (!statSync(skillsDir).isDirectory()) {
         throw new Error(`${skillsDir} is not a directory`);
@@ -817,7 +849,7 @@ export async function loadCoreExecuteDeps(
                     runAnalysis(
                         input.case.symbol,
                         input.stored.companyName,
-                        '1Day',
+                        timeframe,
                         true,
                         undefined,
                         {

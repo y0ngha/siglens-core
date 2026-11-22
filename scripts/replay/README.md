@@ -36,12 +36,14 @@ two checkouts.
 | `engineEvalCandles.ts`, `engineEvalPatterns.ts` | The candle and chart-pattern passes (pure). |
 | `engineEvalCompute.ts`, `engineEvalStats.ts`, `engineEvalTypes.ts` | Pools, bootstrap, seeded randomness and the pre-registered constants. |
 | `engineEvalCompare.ts` | Before/after comparison of two evaluation runs (G2). |
-| `analysisFieldsEval.ts` | Analysis-fields evaluation CLI: `trend`, `skills` and `plan` modes (WP-15, gates T1-T5, P1-P6, S1-S3, S5, S6), `gating` and `output` modes (WP-16, gates D1-D3, D5, D6, D8, D9 and D7, O1, O2, F1, F2, L1, L2, V1-V5) and `claims` and `zone` modes (WP-18, gates C1, C2, F1, F2, L1, O1, V1 and Z1, Z2, N2, N3). |
+| `analysisFieldsEval.ts` | Analysis-fields evaluation CLI (also the `htf`, `htf-forward` and `weekly-hygiene` modes of WP-19): `trend`, `skills` and `plan` modes (WP-15, gates T1-T5, P1-P6, S1-S3, S5, S6), `gating` and `output` modes (WP-16, gates D1-D3, D5, D6, D8, D9 and D7, O1, O2, F1, F2, L1, L2, V1-V5) and `claims` and `zone` modes (WP-18, gates C1, C2, F1, F2, L1, O1, V1 and Z1, Z2, N2, N3). |
 | `analysisFieldsEvalCompute.ts`, `analysisFieldsEvalPlan.ts`, `analysisFieldsEvalSkills.ts`, `analysisFieldsEvalTypes.ts` | The pure parts per mode and the pre-registered constants. |
 | `analysisFieldsEvalGating.ts`, `analysisFieldsEvalCards.ts`, `analysisFieldsEvalPrompt.ts` | `gating` mode: which pattern and candle guides reach a prompt against what it prints, the card checks recomputed from the printed lines and OHLC, and the readers of the prompt text. |
 | `analysisFieldsEvalOutput.ts`, `analysisFieldsEvalCatalog.ts` | `output` mode: paired comparison of an after, a before and a repeat run with bootstrap intervals, and the skill-file frontmatter reader it matches pattern names with. |
 | `analysisFieldsEvalRender.ts` | Renders the technical prompt of a case for both tiers through `runAnalysis` without a model call (the `skills` and `gating` modes). |
 | `analysisFieldsEvalClaims.ts`, `analysisFieldsEvalZone.ts` | `claims` and `zone` modes (WP-18): positive reliability claims and strong-level wording (C1, C2), and where the close sits against the entry zone under the 1% tolerance and under exact edges (Z1, Z2, N2, N3). |
+| `htfEvalCompute.ts`, `htfEvalPrompt.ts` | WP-19 pure parts: the instrument's own ISO-week and month aggregation, trend, RSI, SMA, unfinished-period and market-backdrop recomputation, and the readers of the weekly rows, the higher-timeframe block and the backdrop block a prompt prints. |
+| `htfEvalGates.ts`, `htfEvalWeekly.ts`, `htfEvalForward.ts` | WP-19 gates: `htf` mode (W1, W2, H1, H1b, H2a, H2b, H4, H4k), `weekly-hygiene` mode (K1 to K3) and `htf-forward` mode (the case table and M1). |
 | `levelEval.ts` | Price-level evaluation CLI (WP-18): held rate of the printed levels against a date-transplant placebo, the score fit with a time split, the structural-ratio anchors and the non-positive-level count (gates L0, L-gate, G42). |
 | `levelEvalCompute.ts`, `levelEvalTypes.ts` | The pure parts of `levelEval.ts` and its pre-registered constants. |
 | `baseRateTable.ts`, `baseRateTableCompute.ts`, `baseRateTableRender.ts` | Generator of `src/domain/analysis/measuredBaseRates.ts` from the engine and level evaluations of one set (WP-18 §4.1). |
@@ -578,3 +580,122 @@ npx tsx scripts/replay/analysisFieldsEval.ts --mode zone --set <set> --run <run>
   `--before`) the share of plans whose first target is at least 1 ATR above the zone top does not fall by
   more than 5 pp. `n1Sample` lists the 40 cases the manual read (N1) takes: 15 `in_zone`, 15 `above_zone`
   within 0.5 ATR, 10 others, by smallest `sha256(caseId|group)`.
+
+## Weekly bars and the higher-timeframe block (WP-19)
+
+`run.ts --timeframe <tf>` analyses every case at `tf` (default `1Day`, the set's own); the
+timeframe is part of the run identity and `run.json` records it (a run made before WP-19 has none
+and counts as `1Day`). `--timeframe` accepts only what core's `TIMEFRAMES` lists, so
+`--timeframe 1Week` is refused until core builds weekly bars (WP-19 core-1) and never silently
+becomes a daily run. The modes below take the same `--timeframe` and fail the same way.
+
+```bash
+# gates of the weekly and higher-timeframe work, all offline (no model call, no network)
+npx tsx scripts/replay/analysisFieldsEval.ts --mode htf --set <set> --skills <app>/skills --out <dir> \
+  --timeframe 1Day|1Week [--tier free|member] [--limit N] [--baseline <earlier htf out dir>] \
+  [--benchmark-bars <dir>] [--run <run of this timeframe>] --gate W1,W2,H1,H4
+npx tsx scripts/replay/analysisFieldsEval.ts --mode weekly-hygiene --set <set> --skills <app>/skills --out <dir> \
+  [--run <weekly run> --before <daily run>] --gate K1,K2,K3
+npx tsx scripts/replay/analysisFieldsEval.ts --mode htf-forward --set <set> --out <dir> [--stride N] --gate M1
+```
+
+Which gates a PR runs, and what each can compute today:
+
+| Gate | Needs | Computable |
+|---|---|---|
+| H2a (`1Day` render byte-identical to `main`) | `--baseline` = an `htf --timeframe 1Day` output made by other code (a differing code diff or skills is enough) | now |
+| M1 (wording gate of "no measured forward edge") | `htf-forward` | now |
+| W1, W2, K1, K3 (weekly bars, unfinished week, hygiene) | core-1 | after core-1 |
+| K2 (`riskLevel` equals the daily one) | a weekly and a daily **run** (a render has no model answer); `--run`/`--before` | after core-1 and a run |
+| H1, H4 (block values, US backdrop), H2b (renders with the two registered blocks cut equal the core-1 render) | core-2; H2b needs `--baseline` = a core-1 `htf` output with the same `--skills` | after core-2 |
+| H1b (the attached `higherTimeframe` reading) | a run of the timeframe | after core-2 and a run |
+| H4k (Korean backdrop) | `--benchmark-bars <dir>` with `KS11.json` **and** `KQ11.json` stored-bars files | only when those exist (none are fetched: decision of 2026-11-22) |
+
+**`--gate all` resolves per input.** It selects the gates this input can decide: W1 and W2 only at
+`--timeframe 1Week`, H1b only with `--run`, H2a and H2b only with `--baseline`, H4k only when both
+index files are supplied, K2 only with `--run` and `--before`. What it leaves out is printed and
+written as `deferred: [{id, reason}]` to `run.json` and `summary.json`; H4k reads
+`no KR index bars (orchestrator decision 2026-11-22; final combined A/B)` and rejoins `all` by
+itself once `--benchmark-bars` supplies both files. Naming a gate in `--gate H4k` still computes it
+and exits 2 when it cannot.
+
+**H2a and H2b are chosen by stage.** A render that carries the two registered blocks (any sample
+whose stripped hash differs from its raw hash) is judged by H2b and H2a is deferred
+(`render carries the registered blocks: H2b applies`); a render without them is judged by H2a and
+H2b is deferred (`identical to H2a before the blocks exist`). Otherwise one of the two would fail
+every correct run. H2b is also not computable (`null`) against a baseline that already carries the
+blocks, since a cut render cannot equal it; `rows.jsonl` records the stripped hash of every sample
+so the baseline's stage can be read back.
+
+**A baseline is refused when it was made by the same code.** `htf` records `coreGitSha`,
+`dirtyDiffSha256` and `skillsSha256` in `run.json`. `--baseline` reads them back, refuses an output
+whose whole identity (`coreGitSha`, `dirtyDiffSha256` and `skillsSha256`) equals the current run's
+(an identity check of a render against itself passes whatever the change did) or that records none;
+a change of the skills alone is a different identity and is allowed, and prints both identities beside H2a and H2b (in the
+log and in the gate's `value`). The stable half is compared byte for byte and fails on its own when
+the skills differ.
+
+**H4 applies at `1Week` too.** The brief (§4.3, §9.2) builds the backdrop from the benchmark's
+daily bars in `runAnalysis` for every analysis timeframe and lists H4 for `1Day` and `1Week`
+renders; nothing there omits it on weekly. A weekly analysis prints the same backdrop block (the
+symbol's daily series comes from `fearGreedBars`), so H4 is computed on whatever timeframe is
+rendered and tested at `1Week`.
+
+`htf --self-check` renders twice in one process and reports how many samples hash alike
+(`summary.htf.selfCheck`, and a log line). It is a reported figure, never a gate: a difference means
+an identity gate against another process's render would be noisy.
+
+How the gates are built (TE-16):
+
+- Every figure is recomputed in `htfEvalCompute.ts` from the set's stored bars with the
+  instrument's own aggregation, EMA, ATR, RSI and SMA. `computeAnalysisTrend`,
+  `aggregateBarsToWeekly` and the prompt builders are never called to produce a reference; the
+  tests cross-check the instrument's functions against them on seeded series (all three trend
+  labels, weekly and monthly OHLCV). The one exception is M1, which asks whether the claim holds
+  for what the engine prints, so it injects the shipped functions.
+- A gate over a population (every case at both tiers) is not computable until every sample was
+  judged: a case with no later stored bar, a period still open at the end of the stored bars (its
+  session total is unknown: this includes a short stored month), a prompt whose block cannot be
+  found or has a line the readers do not know, a missing baseline row. It exits 2.
+- W1 checks the printed rows (the last 26 weeks) and the figures that depend on the whole weekly
+  series in `## Long-term Context`: the bar count, the period high and low with their bar dates and
+  the first-to-last return. A Korean price must equal the instrument's own tick-rounded value
+  exactly, not lie within a tick of it.
+- The prompt forms the readers expect are the design's registered text (WP-19 §3.4, §4.4;
+  `htfEvalPrompt.ts`). A core PR that words a block differently changes the reader in the same
+  PR.
+- K1 registers the daily-only sentences in `htfEvalWeekly.ts` (`DAILY_ONLY_PATTERNS`), including
+  the WP-18 core-3 base-rate text: `- Measured on this engine (`, `[Measured: ...]`,
+  `[Measured over every ...]`, `[Not measured on intraday bars]`, `- Not measured on intraday bars.`,
+  the two base-rate writing-rule sentences and the two level-hold framing sentences. It also fails
+  any weekly prompt that says `intraday` at all (`intradayWording`): 662 of the set's 838 daily
+  prompts carry the word, and core says "intraday" for every unmeasured case. **Core-1 must decide
+  the weekly wording** (a weekly chart is not an intraday one); until it does, K1 fails on that
+  clause by design. The pivot clause compares every printed pivot with the last finished week and K1
+  is not computable when no pivot was printed anywhere (the lists are filtered by distance). Fear &
+  Greed must be printed and equal the daily render's; its absence is allowed only below 260 daily
+  bars of history (the set's own selection rule; every case of set v1 prints one).
+- H2a compares raw hashes. H2b strips exactly the two registered blocks and compares the stripped
+  hash with the earlier render's raw hash; `rows.jsonl` holds the raw and the stripped hash of
+  every sample, and the stable half is compared separately and must be identical.
+- M1 gates **two cells**: aligned bullish and aligned bearish, each against the all-day mean, with
+  a week-clustered 95% interval; it passes when neither interval clears 1 pp in the textbook
+  direction (a bound of exactly 1 pp is inside). This is narrower than "agreement has no edge".
+  The other seven cells and two paired contrasts (daily bullish: weekly bullish minus weekly
+  bearish; daily bearish: weekly bearish minus weekly bullish) are reported, not gated. On set v1
+  the aligned-bearish excess is +0.31 pp against the brief's +0.00 pp: the brief's script used
+  approximate full-series EMA and ATR seeds, this run uses the shipped functions on each day's own
+  window.
+- `--benchmark-bars <dir>` adds `<SYMBOL>.json` stored-bars files (`KS11`, `KQ11`) next to the
+  set's own SPY. The renderer serves them to the call behind the same `asOf` barrier and passes
+  the `benchmark` option of the case's market; core ignores the option until WP-19 core-2. With
+  benchmarks the stored provider serves the case's own bars only for the case's own symbol and
+  throws for any other symbol it was not given.
+- Unfinished week: the set keeps 20 bars after every case, so whether a later session of the
+  week exists and how many sessions the week had are read from those bars, not from a calendar.
+  A week with an unscheduled closure the calendar does not know (a special closure day) has fewer
+  stored sessions than core's calendar total: W2 can report a mismatch for that class of week, and
+  the instrument counts what traded. The Korean exchange's special days (N3/N24) are the known
+  case.
+- Set v1 has 131 Korean cases (106 `.KS`, 25 `.KQ`) of 838, not 167; the brief's figure counted
+  differently. H4k's population is those 131 cases at both tiers.

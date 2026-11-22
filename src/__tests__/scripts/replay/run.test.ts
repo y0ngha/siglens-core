@@ -228,6 +228,17 @@ describe('replay runner', () => {
             );
         });
 
+        it('takes the chart timeframe of the run, 1Day by default, and refuses one core does not list', () => {
+            const base = ['--set', '/s', '--out', '/o'];
+            expect(parseRunArgs(base).timeframe).toBe('1Day');
+            expect(
+                parseRunArgs([...base, '--timeframe', '1Hour']).timeframe
+            ).toBe('1Hour');
+            expect(() =>
+                parseRunArgs([...base, '--timeframe', '2Week'])
+            ).toThrow(/--timeframe must be one of .*1Day/);
+        });
+
         it('rejects a tier that is not measured', () => {
             const base = ['--set', '/s', '--out', '/o'];
             expect(() => parseRunArgs([...base, '--tier', 'pro'])).toThrow(
@@ -851,6 +862,18 @@ describe('replay runner', () => {
             ).not.toThrow();
         });
 
+        it('treats a run made before the timeframe was recorded as a 1Day run', () => {
+            expect(() =>
+                assertSameRun(meta, { ...meta, timeframe: '1Day' })
+            ).not.toThrow();
+            expect(() =>
+                assertSameRun({ ...meta, timeframe: '1Hour' }, meta)
+            ).toThrow('timeframe');
+            expect(() =>
+                assertSameRun(meta, { ...meta, timeframe: '1Hour' })
+            ).toThrow('timeframe');
+        });
+
         it('refuses to resume with a different subset or limit', () => {
             expect(() =>
                 assertSameRun(meta, { ...meta, subset: 'variance' })
@@ -1064,7 +1087,8 @@ describe('replay runner', () => {
             expect(loadExecuteDeps).toHaveBeenCalledWith(
                 f.skillsDir,
                 expect.any(Function),
-                'member'
+                'member',
+                '1Day'
             );
             expect(resultFiles(f)).toHaveLength(planned);
             const meta = JSON.parse(
@@ -1076,9 +1100,43 @@ describe('replay runner', () => {
                 repeat: 1,
                 subset: null,
                 limit: null,
+                timeframe: '1Day',
             });
             expect(meta.skillsSha256).toBe(hashTree(f.skillsDir));
             expect(meta.startedAt).toBe('2026-11-21T12:00:00.000Z');
+        });
+
+        it('passes the requested timeframe to the loader, records it in run.json and refuses to resume under another', async () => {
+            const f = makeFixture();
+            const planned = f.manifest.cases.length;
+            const run = (timeframe: string) =>
+                argsFor(f, [
+                    '--timeframe',
+                    timeframe,
+                    '--limit',
+                    '2',
+                    '--execute',
+                    '--approved-calls',
+                    '2',
+                ]);
+            const { deps, loadExecuteDeps } = makeDeps();
+            await runReplay(run('1Hour'), deps);
+            expect(loadExecuteDeps).toHaveBeenCalledWith(
+                f.skillsDir,
+                expect.any(Function),
+                'member',
+                '1Hour'
+            );
+            const meta = JSON.parse(
+                readFileSync(join(f.outDir, 'run.json'), 'utf-8')
+            ) as RunMeta;
+            expect(meta.timeframe).toBe('1Hour');
+            expect(planned).toBeGreaterThanOrEqual(2);
+            // Pending again, so the run reaches the identity check.
+            rmSync(join(f.outDir, 'results'), { recursive: true });
+            await expect(
+                runReplay(run('1Day'), makeDeps().deps)
+            ).rejects.toThrow('timeframe differ from the run already');
         });
 
         it('passes the requested tier to the loader and records it in run.json', async () => {
@@ -1101,7 +1159,8 @@ describe('replay runner', () => {
             expect(loadExecuteDeps).toHaveBeenCalledWith(
                 f.skillsDir,
                 expect.any(Function),
-                'free'
+                'free',
+                '1Day'
             );
             const meta = JSON.parse(
                 readFileSync(join(f.outDir, 'run.json'), 'utf-8')

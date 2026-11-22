@@ -89,3 +89,25 @@ export function sessionCloseInstantMs(
     }
     return instant;
 }
+
+/** The consumer's market benchmark of a symbol (design WP-19 §4.3): a name, a stored-bars key and a label. */
+export interface ReplayBenchmark {
+    readonly symbol: string;
+    readonly fmpSymbol?: string;
+    readonly label: string;
+}
+
+/**
+ * US listings use SPY, `.KS` KOSPI (`^KS11`) and `.KQ` KOSDAQ (`^KQ11`). The instrument's own
+ * copy of the consumer's choice: the replay passes it as the `benchmark` option once core
+ * reads one, and recomputes the backdrop against the same series.
+ */
+export function benchmarkOf(symbol: string): ReplayBenchmark {
+    if (symbol.endsWith('.KS')) {
+        return { symbol: 'KS11', fmpSymbol: '^KS11', label: 'KOSPI' };
+    }
+    if (symbol.endsWith('.KQ')) {
+        return { symbol: 'KQ11', fmpSymbol: '^KQ11', label: 'KOSDAQ' };
+    }
+    return { symbol: 'SPY', label: 'S&P 500 (SPY)' };
+}

@@ -32,6 +32,9 @@ export const EVAL_MODES = [
     'output',
     'claims',
     'zone',
+    'htf',
+    'htf-forward',
+    'weekly-hygiene',
 ] as const;
 export type EvalMode = (typeof EVAL_MODES)[number];
 
