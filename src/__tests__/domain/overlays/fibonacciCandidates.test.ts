@@ -252,4 +252,51 @@ describe('buildFibonacciCandidates', () => {
             'above',
         ]);
     });
+
+    it('draws no extension level at or below zero (the Fib table prints N/A there)', () => {
+        // Down-leg 120 → 10: 127.2% and 161.8% extensions land at -19.92 and
+        // -57.98, 100% would be 10. Retracements stay above the low.
+        const deepDown: FibonacciProjection = {
+            ...fib(20, 10),
+            high: 120,
+            low: 10,
+        };
+        const out = buildFibonacciCandidates(
+            {
+                short: horizon(deepDown),
+                medium: horizon(null),
+                long: horizon(null),
+            } as MarketReference,
+            bars,
+            FMT
+        );
+        const levels = out.flatMap(c => c.levels);
+        expect(levels.length).toBeGreaterThan(0);
+        expect(levels.every(l => l.price > 0)).toBe(true);
+        expect(levels.map(l => l.label)).not.toContain('ext 161.8%');
+        expect(levels.map(l => l.label)).not.toContain('ext 127.2%');
+    });
+
+    it('draws no ABC extension level at or below zero', () => {
+        const abc: AbcExtensionProjection = {
+            ...abcDown(),
+            extensions: [
+                { ratio: 1.0, price: 55 },
+                { ratio: 1.272, price: -3.5 },
+                { ratio: 1.618, price: 0 },
+            ],
+        };
+        const out = buildFibonacciCandidates(
+            {
+                short: abcHorizon(abc),
+                medium: horizon(null),
+                long: horizon(null),
+            } as MarketReference,
+            bars,
+            FMT
+        );
+        expect(out.flatMap(c => c.levels.map(l => l.label))).toEqual([
+            'ABC 100%',
+        ]);
+    });
 });

@@ -1,5 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
+import { calculateIndicators } from '@/domain/indicators';
 import { computeMarketReference } from '@/domain/analysis/marketReference';
+import { printedLevelsOnSide } from '@/domain/analysis/printedReferenceLevels';
+import { buildFibonacciCandidates } from '@/domain/overlays/fibonacciCandidates';
+import { chartFixture } from '@/__tests__/domain/patterns/fixtures/chartFixture';
+import usdDeepDownLeg from '@/__tests__/fixtures/charts/daily-deep-down-leg-negative-fib-extension.json';
+import krwDeepDownLeg from '@/__tests__/fixtures/charts/daily-deep-down-leg-negative-fib-extension-krw.json';
 import { HORIZON_WINDOWS_BY_TIMEFRAME } from '@/domain/analysis/marketReferenceConstants';
 import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
 import * as pivotLevels from '@/domain/analysis/pivotLevels';
@@ -891,5 +897,112 @@ describe('computeMarketReference Fibonacci anchor per horizon', () => {
         );
         expect(ref.short.fibProjection).toEqual(ref.medium.fibProjection);
         expect(ref.medium.fibProjection).toEqual(ref.long.fibProjection);
+    });
+});
+
+describe('computeMarketReference never lists a non-positive level', () => {
+    const HORIZONS = ['short', 'medium', 'long'] as const;
+    const referenceOf = (
+        file: typeof usdDeepDownLeg,
+        currency: 'USD' | 'KRW'
+    ) => {
+        const { bars } = chartFixture(file);
+        const last = bars[bars.length - 1];
+        const ref = computeMarketReference(
+            bars,
+            calculateIndicators(bars),
+            '1Day',
+            {
+                assetClass: 'equity',
+                currency,
+                clock: {
+                    session: US_EQUITY_SESSION,
+                    now: new Date((last.time + 3 * 86400) * 1000),
+                },
+            }
+        );
+        return { bars, ref };
+    };
+    const listed = (ref: ReturnType<typeof referenceOf>['ref']) =>
+        HORIZONS.flatMap(h => [
+            ...ref[h].levels.support,
+            ...ref[h].levels.resistance,
+        ]);
+    const projectedPrices = (ref: ReturnType<typeof referenceOf>['ref']) =>
+        HORIZONS.flatMap(h => [
+            ...(ref[h].fibProjection?.extensions ?? []),
+            ...(ref[h].abcExtension?.extensions ?? []),
+        ]).map(e => e.price);
+
+    // Anonymized real-shape charts (prices scaled, dates shifted): the last bar is the
+    // day the unfiltered reference listed `Fib ext 161.8%` / `Fib ext 200%` as support.
+    it.each([
+        ['USD deep down-leg', usdDeepDownLeg, 'USD'],
+        ['KRW deep down-leg', krwDeepDownLeg, 'KRW'],
+    ] as const)(
+        '%s: no horizon list, printed list or fib overlay carries it',
+        (_name, file, currency) => {
+            const { bars, ref } = referenceOf(file, currency);
+            // The extension is still projected (the `Fib table:` prints it as N/A);
+            // it just is not a level.
+            expect(projectedPrices(ref).some(p => p <= 0)).toBe(true);
+            expect(listed(ref).length).toBeGreaterThan(0);
+            expect(listed(ref).every(l => l.price > 0)).toBe(true);
+            const quoting = { dp: currency === 'KRW' ? 0 : 2, krxTick: null };
+            for (const side of ['support', 'resistance'] as const) {
+                expect(
+                    printedLevelsOnSide(ref, side, quoting).every(
+                        l => l.price > 0
+                    )
+                ).toBe(true);
+            }
+            const overlay = buildFibonacciCandidates(ref, bars, {
+                timeframe: '1Day',
+                quoting,
+            });
+            expect(overlay.flatMap(c => c.levels).every(l => l.price > 0)).toBe(
+                true
+            );
+        }
+    );
+
+    it('keeps the positive levels of the same reference', () => {
+        const { ref } = referenceOf(usdDeepDownLeg, 'USD');
+        const longLabels = [
+            ...ref.long.levels.support,
+            ...ref.long.levels.resistance,
+        ].map(l => l.label);
+        expect(longLabels.some(l => l.startsWith('Fib '))).toBe(true);
+        // The long leg's 161.8% and 200% extensions are below zero on this chart.
+        expect(longLabels).not.toContain('Fib ext 161.8%');
+        expect(longLabels).not.toContain('Fib ext 200%');
+    });
+
+    it("drops a wide-range prior bar's negative pivot support", () => {
+        // Prior session 10 → 100 closing at 20: the standard pivot's S3 is below zero.
+        const bars: Bar[] = makeBars(250).map((b, i, all) =>
+            i === all.length - 2
+                ? {
+                      ...b,
+                      time: b.time * 86400,
+                      open: 20,
+                      high: 100,
+                      low: 10,
+                      close: 20,
+                  }
+                : {
+                      ...b,
+                      time: b.time * 86400,
+                      open: 20,
+                      high: 22,
+                      low: 18,
+                      close: 20,
+                  }
+        );
+        const ref = computeMarketReference(bars, makeInd(), '1Day');
+        const levels = listed(ref);
+        expect(levels.length).toBeGreaterThan(0);
+        expect(levels.every(l => l.price > 0)).toBe(true);
+        expect(ref.pivots?.standard?.s3 ?? 1).toBeLessThan(0);
     });
 });

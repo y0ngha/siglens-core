@@ -56,7 +56,9 @@ function legCandidate(
     const levels = FIB_OVERLAY_RATIOS.flatMap(ratio => {
         const retracement = retracementByRatio.get(ratio);
         const price = retracement ?? extensionByRatio.get(ratio);
-        if (price === undefined) return [];
+        // A deep down-leg's extension can go below zero; the `Fib table:` prints
+        // `N/A` there, so nothing is drawn.
+        if (price === undefined || !(price > 0)) return [];
         const percent = formatFibRatio(ratio);
         const label = retracement === undefined ? `ext ${percent}` : percent;
         return [{ price, fromTime: to.time, label }];
@@ -89,7 +91,7 @@ function abcCandidate(
     );
     const levels = FIB_ABC_OVERLAY_RATIOS.flatMap(ratio => {
         const price = extensionByRatio.get(ratio);
-        return price === undefined
+        return price === undefined || !(price > 0)
             ? []
             : [
                   {

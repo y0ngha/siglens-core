@@ -1145,6 +1145,12 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * enriches the result with only the skills its prompt carried; member and pro keep
  * enriching with the full catalog, as before.
  *
+ * A non-positive reference level (a Fibonacci or ABC extension below zero on a deep
+ * down-leg) is no longer a level: it is not listed as support, not a stop candidate and
+ * not drawn as a Fibonacci overlay line, and the `Fib table:` keeps printing `N/A` for
+ * it. Bytes change only for the daily charts that carried such a line (4 of 838 in the
+ * replay set).
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p34' as const;
