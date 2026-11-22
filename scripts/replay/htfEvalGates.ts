@@ -21,7 +21,9 @@ import {
     aggregateMonths,
     aggregateWeeks,
     backdropReading,
+    hasHolidayCalendar,
     higherReading,
+    holidayAffectedWeek,
     isoWeekStart,
     roundToKrxTick,
     matchesPrinted,
@@ -211,17 +213,31 @@ export function checkWeekTag(sample: HtfSample, data: HtfCaseData): Check {
     const rows = printedBarRows(sample.dynamic).rows;
     if (rows.length === 0) return cannot('no bar row could be read');
     const tag = printedWeekTag(rows);
+    const symbol = sample.caseId.split('|')[0];
+    const calendar = hasHolidayCalendar(symbol);
     const expectedTag = progress.inProgress
         ? {
               sessionsSoFar: progress.sessionsSoFar,
-              sessionsTotal: progress.sessionsTotal,
+              // No holiday data: core prints no total, so none is expected (N only).
+              sessionsTotal: calendar ? progress.sessionsTotal : null,
           }
         : null;
+    // A week the stored bars show cut short (holiday, closure) in a market with no holiday
+    // calendar: core cannot know the week ended, so a tag with the observed N is accepted too.
+    const mayBeTagged = holidayAffectedWeek(symbol, progress);
+    const tagOk =
+        JSON.stringify(tag.onLastRow) === JSON.stringify(expectedTag) ||
+        (mayBeTagged &&
+            !progress.inProgress &&
+            JSON.stringify(tag.onLastRow) ===
+                JSON.stringify({
+                    sessionsSoFar: progress.sessionsSoFar,
+                    sessionsTotal: null,
+                }));
     const failures = [
-        ...(JSON.stringify(tag.onLastRow) === JSON.stringify(expectedTag)
-            ? []
-            : ['lastRowTag']),
-        ...(tag.rowsWithTag === (progress.inProgress ? 1 : 0)
+        ...(tagOk ? [] : ['lastRowTag']),
+        ...(tag.rowsWithTag === (progress.inProgress ? 1 : 0) ||
+        (mayBeTagged && tag.rowsWithTag <= 1)
             ? []
             : ['taggedRows']),
     ];
@@ -337,7 +353,11 @@ export function checkHigherBlock(
                     (own.closeVsMa50Pct >= 0 ? 'above' : 'below')
               ? []
               : ['closeVsMa50']),
-        ...progressFailures(block.progress, own.lastBarProgress),
+        ...progressFailures(
+            block.progress,
+            own.lastBarProgress,
+            hasHolidayCalendar(symbol)
+        ),
         ...(own.alignment === null
             ? block.alignment === null
                 ? []
@@ -352,15 +372,16 @@ export function checkHigherBlock(
 }
 
 function progressFailures(
-    printed: { sessionsSoFar: number; sessionsTotal: number } | null,
-    own: ReturnType<typeof periodProgress>
+    printed: { sessionsSoFar: number; sessionsTotal: number | null } | null,
+    own: ReturnType<typeof periodProgress>,
+    calendar: boolean
 ): readonly string[] {
     if (own === null || !own.inProgress) {
         return printed === null ? [] : ['progressPrintedButFinished'];
     }
     return printed !== null &&
         printed.sessionsSoFar === own.sessionsSoFar &&
-        printed.sessionsTotal === own.sessionsTotal
+        printed.sessionsTotal === (calendar ? own.sessionsTotal : null)
         ? []
         : ['progress'];
 }

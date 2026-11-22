@@ -1,10 +1,10 @@
-import type { Timeframe } from '@/domain/types';
+import type { ProviderTimeframe, Timeframe } from '@/domain/types';
 
 /** @internal */
 export const DEFAULT_TIMEFRAME: Timeframe = '1Day';
 
-/** @internal */
-export const TIMEFRAMES: readonly Timeframe[] = [
+/** @internal Timeframes a provider serves, in display order (the pre-`1Week` list). */
+export const PROVIDER_TIMEFRAMES: readonly ProviderTimeframe[] = [
     '5Min',
     '15Min',
     '30Min',
@@ -12,6 +12,26 @@ export const TIMEFRAMES: readonly Timeframe[] = [
     '4Hour',
     '1Day',
 ];
+
+/** @internal Every analysis timeframe: the provider ones plus the core-built `1Week`. */
+export const TIMEFRAMES: readonly Timeframe[] = [
+    ...PROVIDER_TIMEFRAMES,
+    '1Week',
+];
+
+/**
+ * @internal `'1Day'` or `'1Week'`: bars are dated sessions or weeks rather than
+ * clock times. Use this where `=== '1Day'` meant "not intraday"; keep
+ * `=== '1Day'` only where the rule is measured on daily bars alone.
+ */
+export function isDailyOrLonger(timeframe: Timeframe): boolean {
+    return timeframe === '1Day' || timeframe === '1Week';
+}
+
+/** @internal Clock-time bars (`5Min` .. `4Hour`). */
+export function isIntraday(timeframe: Timeframe): boolean {
+    return !isDailyOrLonger(timeframe);
+}
 
 /** @internal */
 export function isValidTimeframe(
@@ -29,6 +49,8 @@ export const TIMEFRAME_BARS_LIMIT: Record<Timeframe, number> = {
     '1Hour': 200,
     '4Hour': 200,
     '1Day': 500,
+    // Documentation of the expected size (5 years of weeks); providers ignore `limit`.
+    '1Week': 260,
 };
 
 /** @internal */
@@ -42,6 +64,7 @@ export const TIMEFRAME_MINUTES: Record<Timeframe, number> = {
     '1Hour': 60,
     '4Hour': 240,
     '1Day': 1_440,
+    '1Week': 10_080,
 };
 
 /**
@@ -64,4 +87,7 @@ export const TIMEFRAME_LOOKBACK_DAYS: Record<Timeframe, number> = {
     '1Hour': 60,
     '4Hour': 200,
     '1Day': 730,
+    // Weekly bars are built from the same 5-year daily history Fear & Greed
+    // already fetches, so the provider call (and its cache entry) is shared.
+    '1Week': FEAR_GREED_LOOKBACK_DAYS,
 };

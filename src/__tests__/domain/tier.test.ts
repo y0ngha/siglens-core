@@ -90,6 +90,15 @@ describe('tier', () => {
             expect(getAllowedTimeframes('free')).toEqual(['1Day']);
         });
 
+        it('closes the weekly timeframe to free and opens it to member and pro', () => {
+            expect(getAllowedTimeframes('free')).not.toContain('1Week');
+            expect(getAllowedTimeframes('member')).toContain('1Week');
+            expect(getAllowedTimeframes('pro')).toContain('1Week');
+            expect(isTimeframeAllowed('free', '1Week')).toBe(false);
+            expect(isTimeframeAllowed('member', '1Week')).toBe(true);
+            expect(isTimeframeAllowed('pro', '1Week')).toBe(true);
+        });
+
         it('returns every timeframe for member and pro tiers', () => {
             expect(getAllowedTimeframes('member')).toEqual([...TIMEFRAMES]);
             expect(getAllowedTimeframes('pro')).toEqual([...TIMEFRAMES]);

@@ -14,6 +14,7 @@ import {
     wilderAtrSeries,
 } from './analysisFieldsEvalCompute';
 import type { TrendLabel } from './analysisFieldsEvalTypes';
+import { marketOfSymbol, profileOf } from './markets';
 import { TIMEFRAMES } from '@/domain/constants/market';
 import type { Bar, Timeframe } from '@/domain/types';
 
@@ -46,9 +47,9 @@ export const HTF_EVAL_CONSTANTS = {
 const C = HTF_EVAL_CONSTANTS;
 
 /**
- * The timeframes the instrument measures: core's own plus `1Week`, so the same instrument
- * builds before core knows `1Week` (WP-19 core-1) and measures it after. `coreTimeframe` is the
- * only way a value reaches `runAnalysis`: it refuses what core's `TIMEFRAMES` does not list.
+ * The timeframes the instrument measures: core's own (`1Week` is one since WP-19 core-1; the
+ * explicit member keeps the type readable). `coreTimeframe` is the only way a value reaches
+ * `runAnalysis`: it refuses what core's `TIMEFRAMES` does not list.
  */
 export type HtfTimeframe = Timeframe | '1Week';
 
@@ -232,6 +233,34 @@ export function alignmentOf(
     if (analysis === higher && analysis !== 'neutral') return 'aligned';
     if (analysis !== 'neutral' && higher !== 'neutral') return 'opposed';
     return 'mixed';
+}
+
+/**
+ * Whether the replay's session of a market carries holiday data (core's capability: a
+ * `closeMinuteFor`, or a 24/7 session). Without it core cannot prove a period's session total
+ * or tell a holiday week from an ordinary one, so it prints no total (DOM-12).
+ */
+export function hasHolidayCalendar(symbol: string): boolean {
+    const { session } = profileOf(marketOfSymbol(symbol));
+    return (
+        session.kind === 'always-open' || session.closeMinuteFor !== undefined
+    );
+}
+
+/**
+ * A period the stored bars show as short of a full week (a holiday or closure), for a market
+ * with no holiday calendar: neither "still in progress" nor the pivot source can be proven there.
+ */
+export function holidayAffectedWeek(
+    symbol: string,
+    progress: { sessionsTotal: number; totalKnown: boolean } | null
+): boolean {
+    return (
+        !hasHolidayCalendar(symbol) &&
+        progress !== null &&
+        progress.totalKnown &&
+        progress.sessionsTotal < 5
+    );
 }
 
 /** Where the last higher-timeframe bar stands: in progress or finished, and the session counts. */

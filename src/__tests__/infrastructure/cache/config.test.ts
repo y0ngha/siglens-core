@@ -84,6 +84,8 @@ describe('cache config constants', () => {
         expect(ANALYSIS_CACHE_TTL['1Hour']).toBe(SECONDS_PER_HOUR);
         expect(ANALYSIS_CACHE_TTL['4Hour']).toBe(4 * SECONDS_PER_HOUR);
         expect(ANALYSIS_CACHE_TTL['1Day']).toBe(SECONDS_PER_DAY);
+        // A weekly analysis expires at the daily session boundary, like `1Day`.
+        expect(ANALYSIS_CACHE_TTL['1Week']).toBe(SECONDS_PER_DAY);
     });
 
     it('CACHE_EXPIRY_HOUR_KST', () => {
@@ -116,6 +118,19 @@ describe('computeEffectiveTtl', () => {
         const now = new Date('2026-04-24T19:59:00.000Z');
         const result = computeEffectiveTtl('1Day', now);
         expect(result).toBe(SECONDS_TO_EXPIRY);
+    });
+});
+
+describe('computeEffectiveTtl — 1Week', () => {
+    it.each([
+        ['KST 05:00 경계 직전', '2026-04-24T19:59:00.000Z', undefined],
+        ['US 세션 마감 전', '2026-07-06T19:00:00Z', US_EQUITY_SESSION],
+        ['US 마감 직후 정착 버퍼', '2026-07-06T20:10:00Z', US_EQUITY_SESSION],
+    ] as const)('%s: 1Day와 같은 만료 경계를 쓴다', (_label, iso, session) => {
+        const now = new Date(iso);
+        expect(computeEffectiveTtl('1Week', now, session)).toBe(
+            computeEffectiveTtl('1Day', now, session)
+        );
     });
 });
 

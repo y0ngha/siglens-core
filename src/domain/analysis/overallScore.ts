@@ -133,6 +133,15 @@ export const OVERALL_AXIS_WEIGHTS: Record<
         fundamental: 8,
         financials: 7,
     },
+    // The daily weights: the overall tab follows the chart timeframe, and no weekly
+    // weighting was measured.
+    '1Week': {
+        technical: 8,
+        news: 6,
+        options: 5,
+        fundamental: 8,
+        financials: 7,
+    },
 };
 
 /**

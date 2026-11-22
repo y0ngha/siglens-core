@@ -26,14 +26,6 @@ import {
 } from './htfFixtures';
 import { makeTempDir, tradingBars, writeBarsDir } from './replayFixtures';
 
-// The weekly timeframe is not a member of core's list before WP-19 core-1; the instrument is
-// built to measure it as soon as it is, so the suite adds it to the list it reads.
-vi.mock('@/domain/constants/market', async importOriginal => {
-    const original =
-        await importOriginal<typeof import('@/domain/constants/market')>();
-    return { ...original, TIMEFRAMES: [...original.TIMEFRAMES, '1Week'] };
-});
-
 const temps = new Set<() => void>();
 afterEach(() => {
     [...temps].forEach(remove => remove());

@@ -1040,6 +1040,50 @@ describe('runOverallAnalysis', () => {
             expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
         });
 
+        it("timeframe이 '1Week'이면 일봉 한 번으로 F&G와 주봉 이력을 모두 채운다 (주봉 페치 없음)", async () => {
+            // 주봉은 core가 이미 받은 일봉(fearGreedBars)에서 묶는다 — provider에 다시 묻지 않는다.
+            const generatedAt = new Date('2026-01-07T00:00:00.000Z');
+            const day0 = Math.floor(
+                Date.parse('2025-12-01T00:00:00.000Z') / 1000
+            );
+            const dailyBars = Array.from({ length: 60 }, (_, i) => ({
+                time: day0 + i * 86_400,
+                open: 100,
+                high: 101,
+                low: 99,
+                close: 100,
+                volume: 1000,
+            }));
+            mockFetchBarsWithIndicators.mockResolvedValue({
+                bars: [],
+                fearGreedBars: dailyBars,
+                indicators: { buySellVolume: [] },
+            });
+
+            await runOverallAnalysis({
+                ...baseOptions(),
+                timeframe: '1Week',
+                tier: 'pro',
+                priorAnalyses: [
+                    { generatedAt, trend: 'bullish', riskLevel: 'medium' },
+                ],
+            });
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.any(String),
+                '1Day',
+                undefined
+            );
+            const prompt = (
+                mockCallAnalysisAi.mock.calls.at(-1)![0] as { prompt: string }
+            ).prompt;
+            expect(prompt).toContain('## Prior Analyses');
+            // The weekly bar (Monday 2026-01-05) the analysis anchors to.
+            expect(prompt).toContain('2026-01-05');
+        });
+
         it('timeframe이 1Day가 아니면 이력용 봉을 따로 한 번 더 페치한다', async () => {
             // pro tier를 명시해야 장중 타임프레임이 티어 게이트에 막히지 않는다 —
             // 막히면 봉 페치 지점에 도달하기도 전에 리턴돼 이 테스트가 무의미해진다.

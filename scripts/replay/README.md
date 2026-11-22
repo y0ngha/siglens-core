@@ -585,9 +585,11 @@ npx tsx scripts/replay/analysisFieldsEval.ts --mode zone --set <set> --run <run>
 
 `run.ts --timeframe <tf>` analyses every case at `tf` (default `1Day`, the set's own); the
 timeframe is part of the run identity and `run.json` records it (a run made before WP-19 has none
-and counts as `1Day`). `--timeframe` accepts only what core's `TIMEFRAMES` lists, so
-`--timeframe 1Week` is refused until core builds weekly bars (WP-19 core-1) and never silently
-becomes a daily run. The modes below take the same `--timeframe` and fail the same way.
+and counts as `1Day`). `--timeframe` accepts only what core's `TIMEFRAMES` lists (`1Week` since
+WP-19 core-1), so a value core does not know is refused and a weekly run never silently becomes a
+daily one. The modes below take the same `--timeframe` and fail the same way. A render at a
+timeframe a tier may not open (free at `1Week`) turns the timeframe gate off for that tier only, so
+the free prompt (skill cap) is still measured.
 
 ```bash
 # gates of the weekly and higher-timeframe work, all offline (no model call, no network)
@@ -605,7 +607,7 @@ Which gates a PR runs, and what each can compute today:
 |---|---|---|
 | H2a (`1Day` render byte-identical to `main`) | `--baseline` = an `htf --timeframe 1Day` output made by other code (a differing code diff or skills is enough) | now |
 | M1 (wording gate of "no measured forward edge") | `htf-forward` | now |
-| W1, W2, K1, K3 (weekly bars, unfinished week, hygiene) | core-1 | after core-1 |
+| W1, W2, K1, K3 (weekly bars, unfinished week, hygiene) | core-1 | now (core-1). W2 and the pivot clause of K1 use the replay's KR session, which has no KRX holiday calendar (N3/N24), so a KR week with a holiday or the year-end closure fails them; the US cases are the exact check |
 | K2 (`riskLevel` equals the daily one) | a weekly and a daily **run** (a render has no model answer); `--run`/`--before` | after core-1 and a run |
 | H1, H4 (block values, US backdrop), H2b (renders with the two registered blocks cut equal the core-1 render) | core-2; H2b needs `--baseline` = a core-1 `htf` output with the same `--skills` | after core-2 |
 | H1b (the attached `higherTimeframe` reading) | a run of the timeframe | after core-2 and a run |
@@ -667,11 +669,14 @@ How the gates are built (TE-16):
 - K1 registers the daily-only sentences in `htfEvalWeekly.ts` (`DAILY_ONLY_PATTERNS`), including
   the WP-18 core-3 base-rate text: `- Measured on this engine (`, `[Measured: ...]`,
   `[Measured over every ...]`, `[Not measured on intraday bars]`, `- Not measured on intraday bars.`,
-  the two base-rate writing-rule sentences and the two level-hold framing sentences. It also fails
-  any weekly prompt that says `intraday` at all (`intradayWording`): 662 of the set's 838 daily
-  prompts carry the word, and core says "intraday" for every unmeasured case. **Core-1 must decide
-  the weekly wording** (a weekly chart is not an intraday one); until it does, K1 fails on that
-  clause by design. The pivot clause compares every printed pivot with the last finished week and K1
+  the two base-rate writing-rule sentences and the two level-hold framing sentences. Core-1 decided
+  the weekly wording: one label (`unmeasuredBarsLabel`) makes the same sentences say `weekly` on a
+  weekly chart and `intraday` elsewhere, so K1 also fails any "not measured on X bars" sentence
+  whose X is not weekly (`unmeasuredNamesOtherBars`) and the intraday confluence reliability
+  sentence. A bare `intraday` match was dropped: 1,056 weekly prompts carry the word inside the
+  siglens skills' own prose, which core does not write. The VWAP clause matches the session VWAP
+  (`\bVWAP\b`), not the anchored `AVWAP (swing high|low)` levels, and the pullback clause matches
+  the printed block header at a line start, not a skill's prose that names it. The pivot clause compares every printed pivot with the last finished week and K1
   is not computable when no pivot was printed anywhere (the lists are filtered by distance). Fear &
   Greed must be printed and equal the daily render's; its absence is allowed only below 260 daily
   bars of history (the set's own selection rule; every case of set v1 prints one).

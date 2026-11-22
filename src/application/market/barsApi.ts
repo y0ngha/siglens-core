@@ -1,13 +1,15 @@
 import { hasUsablePrices } from '@/domain/analysis/analysisUtils';
+import { aggregateBarsToWeekly } from '@/domain/analysis/aggregateBarsToWeekly';
+import { standardDailyWindow } from '@/domain/analysis/standardDailyWindow';
 import { calculateIndicators } from '@/domain/indicators';
-import type { BarsData, Timeframe } from '@/domain/types';
+import type { BarsData, ProviderTimeframe, Timeframe } from '@/domain/types';
 import {
     FEAR_GREED_LOOKBACK_DAYS,
     TIMEFRAME_BARS_LIMIT,
     TIMEFRAME_LOOKBACK_DAYS,
 } from '@/domain/constants/market';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
-import { MS_PER_SECOND } from '@/domain/constants/time';
+import { SECONDS_PER_DAY } from '@/domain/constants/time';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
 
 function computeFromDay(lookbackDays: number, now: Date): string {
@@ -32,6 +34,16 @@ function computeFromDay(lookbackDays: number, now: Date): string {
  * `Bar.time` with the standard `from` date at UTC midnight, so daily bars must
  * be stamped at UTC-midnight seconds (every current provider does; the
  * provider's own `from` is inclusive and so is the re-cut).
+ *
+ * For `1Week` the provider is asked for `1Day` over the same
+ * `FEAR_GREED_LOOKBACK_DAYS` window (so the consumer's daily-history cache
+ * entry is shared and no weekly endpoint is ever called). The usable daily
+ * bars are aggregated into ISO weeks (Monday 00:00 UTC, see
+ * `aggregateBarsToWeekly`); `bars` and `indicators` are the weekly series and
+ * `fearGreedBars` is the daily source, so Fear & Greed and the daily-series
+ * consumers read the same history a `1Day` request carries. Daily bars must be
+ * stamped at UTC midnight; a bar that is not is counted and warned once per
+ * call, because its week bucket may shift.
  *
  * @param provider - Market data provider injected by the consumer (siglens app).
  * @param symbol - U.S. equity ticker used as the canonical identifier (e.g. `"AAPL"`).
@@ -67,16 +79,23 @@ export async function fetchBarsWithIndicators(
         TIMEFRAME_LOOKBACK_DAYS[timeframe],
         now
     );
+    const weekly = timeframe === '1Week';
     const withFearGreedHistory = timeframe === '1Day';
+    // Providers never serve `1Week`: it is built from their daily bars.
+    const providerTimeframe: ProviderTimeframe = weekly ? '1Day' : timeframe;
     // One provider call either way — the daily endpoint is date-ranged, so a
     // longer window costs payload, not an extra request.
-    const fromDay = withFearGreedHistory
-        ? computeFromDay(FEAR_GREED_LOOKBACK_DAYS, now)
-        : standardFrom;
-    const limit = TIMEFRAME_BARS_LIMIT[timeframe];
+    const fromDay =
+        withFearGreedHistory || weekly
+            ? computeFromDay(FEAR_GREED_LOOKBACK_DAYS, now)
+            : standardFrom;
+    // Weekly bars are built from daily ones, so the provider is asked for the daily limit.
+    // Providers ignore `limit` on the date-ranged daily endpoint (the window is `from`), so
+    // this is documentation of the expected size, for `1Day` and `1Week` alike.
+    const limit = TIMEFRAME_BARS_LIMIT[providerTimeframe];
     const rawBars = await provider.getBars({
         symbol: fmpSymbol ?? symbol,
-        timeframe,
+        timeframe: providerTimeframe,
         limit,
         from: fromDay,
     });
@@ -92,6 +111,23 @@ export async function fetchBarsWithIndicators(
         });
     }
 
+    if (weekly) {
+        const offMidnight = usableBars.filter(
+            bar => bar.time % SECONDS_PER_DAY !== 0
+        ).length;
+        if (offMidnight > 0) {
+            console.warn(
+                '[barsApi] daily bar not at UTC midnight; weekly buckets may shift',
+                { symbol, count: offMidnight }
+            );
+        }
+        const weeklyBars = aggregateBarsToWeekly(usableBars);
+        return {
+            bars: weeklyBars,
+            indicators: calculateIndicators(weeklyBars),
+            fearGreedBars: usableBars,
+        };
+    }
     if (!withFearGreedHistory) {
         return {
             bars: usableBars,
@@ -101,8 +137,7 @@ export async function fetchBarsWithIndicators(
     // Re-cut the standard window so charts, indicators and analysis prompts
     // see exactly what a standard-window fetch returns — only Fear & Greed
     // reads the longer history.
-    const standardFromSec = Date.parse(standardFrom) / MS_PER_SECOND;
-    const bars = usableBars.filter(bar => bar.time >= standardFromSec);
+    const bars = standardDailyWindow(usableBars, now);
     return {
         bars,
         indicators: calculateIndicators(bars),

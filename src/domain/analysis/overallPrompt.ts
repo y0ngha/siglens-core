@@ -91,6 +91,11 @@ const TIMEFRAME_CONFIG: Record<Timeframe, { label: string; context: string }> =
             context:
                 'Daily positional chart. Fundamental valuation and news catalysts carry high weight alongside technical signals. Use for medium- to long-term position analysis.',
         },
+        '1Week': {
+            label: 'Weekly',
+            context:
+                'Weekly positional chart built from daily bars (the last bar may be the current, unfinished week). Fundamental valuation and news catalysts carry high weight alongside technical signals. Use for multi-month position analysis.',
+        },
     };
 
 /**

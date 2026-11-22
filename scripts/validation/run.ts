@@ -25,6 +25,7 @@ const HORIZONS: Record<Timeframe, number[]> = {
     '5Min': [],
     '30Min': [],
     '4Hour': [],
+    '1Week': [],
 };
 // ~2 years of history: the 50/200 golden cross (and slow indicators) need a long
 // warmup, so a wider window yields enough signals for a meaningful forward-edge n.

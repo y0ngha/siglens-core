@@ -55,8 +55,15 @@ describe('formatLevelHoldFraming', () => {
         }
     );
 
+    it('says the levels are not measured on weekly bars, with no number and no "intraday"', () => {
+        const text = formatLevelHoldFraming('1Week');
+        expect(text).toMatch(/^Not measured on weekly bars\./);
+        expect(text).not.toMatch(/\d/);
+        expect(text).not.toMatch(/intraday/i);
+    });
+
     it('tells the model not to call a level strong because references coincide, on every timeframe', () => {
-        for (const timeframe of ['1Day', '1Hour'] as const) {
+        for (const timeframe of ['1Day', '1Hour', '1Week'] as const) {
             expect(formatLevelHoldFraming(timeframe)).toContain(
                 'a map of where price may pause or react, not as levels that hold; do not call a level strong, firm or key because several references coincide there'
             );

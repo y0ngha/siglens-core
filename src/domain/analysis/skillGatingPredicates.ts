@@ -1,4 +1,5 @@
 import { lastOf } from '@/domain/analysis/analysisUtils';
+import { isIntraday } from '@/domain/constants/market';
 import {
     formatNullableNumber,
     formatQuotedPrice,
@@ -112,8 +113,6 @@ const VOL_REGIME_HIGH_MULT = 1.5;
 const VOL_REGIME_LOW_MULT = 0.5;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
-
-const INTRADAY_VWAP_DISABLED_TIMEFRAME: Timeframe = '1Day';
 
 /** Latest finite value of a per-bar oscillator series, or null. */
 const lastNumber = (series: (number | null)[]): number | null => {
@@ -376,8 +375,8 @@ export const readVwapDistance = (
     ctx: SkillSelectionContext
 ): StateRead<IndicatorCardStates['vwap'], 'vwap' | 'atr'> | null => {
     // VWAP resets each session, so a "distance from VWAP" reading is only
-    // meaningful intraday; on a daily chart it is never notable.
-    if (ctx.timeframe === INTRADAY_VWAP_DISABLED_TIMEFRAME) return null;
+    // meaningful intraday; on a daily or weekly chart it is never notable.
+    if (!isIntraday(ctx.timeframe)) return null;
     const rawVwap = lastNumber(ctx.indicators.vwap);
     if (!isFiniteNumber(rawVwap)) return null;
     const rawAtr = lastNumber(ctx.indicators.atr);

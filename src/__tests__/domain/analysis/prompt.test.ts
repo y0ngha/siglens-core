@@ -7,6 +7,7 @@ import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
 import {
+    ATR_EXTREME_PERCENT_WEEKLY,
     buildAnalysisPrompt as buildAnalysisPromptRaw,
     formatAbcTableLine,
     formatFibTableLine,
@@ -84,6 +85,7 @@ import type {
     FearGreedSnapshot,
     IndicatorResult,
     MarketEvent,
+    MarketSessionSpec,
     PositionBucket,
     PriorAnalysis,
     Skill,
@@ -7249,5 +7251,265 @@ describe('buildAnalysisPrompt — horizon blocks', () => {
         expect(build(new Date('2026-09-09T15:00:00Z'))).toContain(
             'Standard PP 103.67'
         );
+    });
+});
+
+describe('buildAnalysisPrompt — 1Week', () => {
+    const WEEK_SEC = 7 * 86_400;
+    // 2026-01-05 is a Monday; 40 weekly bars end on the week of 2026-10-05.
+    const FIRST_MONDAY = Date.UTC(2026, 0, 5) / 1000;
+    const WEEKS = 40;
+    const weeklyBars = (count = WEEKS): Bar[] =>
+        Array.from({ length: count }, (_, i) => {
+            const close = 100 + i + 3 * Math.sin(i / 3);
+            return {
+                time: FIRST_MONDAY + i * WEEK_SEC,
+                open: close - 1,
+                high: close + 4,
+                low: close - 4,
+                close,
+                volume: 1_000_000 + i,
+            };
+        });
+    const dayBar = (isoDate: string): Bar => ({
+        time: Date.parse(`${isoDate}T00:00:00Z`) / 1000,
+        open: 100,
+        high: 102,
+        low: 99,
+        close: 101,
+        volume: 1000,
+    });
+    const lastWeek = (bars: Bar[]) => bars[bars.length - 1].time;
+    const render = (
+        timeframe: Timeframe,
+        bars: Bar[] = weeklyBars(),
+        skills: Skill[] = [],
+        marketClock?: { session: MarketSessionSpec; now: Date },
+        dailyBars?: Bar[]
+    ): string => {
+        const { stable, dynamic } = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            bars,
+            calculateIndicators(bars),
+            skills,
+            timeframe,
+            undefined,
+            'equity',
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'USD',
+            'share',
+            undefined,
+            marketClock,
+            undefined,
+            dailyBars
+        );
+        return `${stable}\n\n${dynamic}`;
+    };
+
+    it('labels the chart Weekly and says what a weekly bar is, with no reliability claim', () => {
+        const out = render('1Week');
+        expect(out).toContain('Timeframe: Weekly');
+        expect(out).toContain(
+            'Timeframe interpretation: Weekly chart built by SIGLENS from daily bars: each bar is one ISO week (Monday start).'
+        );
+        expect(out).not.toContain('Indicator signals have high reliability');
+        expect(out).not.toContain('Timeframe: Daily');
+    });
+
+    it('prints the weekly horizons: 20, 52 and 156 bars', () => {
+        const out = render('1Week', weeklyBars(WEEKS));
+        expect(out).toContain('### Short-term — ~5 months (20 bars)');
+        expect(out).not.toContain('~1 month (20 bars)');
+        const long = render('1Week', weeklyBars(160));
+        expect(long).toContain('### Medium-term — ~1 year (52 bars)');
+        expect(long).toContain('### Long-term — ~3 years (156 bars)');
+    });
+
+    it('prints every row date-only at midnight on a Monday, and no session VWAP', () => {
+        const out = render('1Week');
+        const rows = out.split('\n').filter(line => line.startsWith('[ts:'));
+        expect(rows).toHaveLength(26);
+        rows.forEach(row => {
+            const ts = Number(/^\[ts:(\d+)\]/.exec(row)?.[1]);
+            expect(new Date(ts * 1000).getUTCDay()).toBe(1);
+            expect(row).toMatch(/\] \d{4}-\d{2}-\d{2} 00:00 \|/);
+        });
+        expect(out).not.toMatch(/^- VWAP:/m);
+    });
+
+    it('prints the weekly reliability line and none of the daily-only measurements', () => {
+        const out = render('1Week', weeklyBars(160));
+        expect(out).toContain(
+            'Reliability: Weekly, not measured: descriptive only.'
+        );
+        expect(out).not.toContain('measured 2000');
+        expect(out).not.toContain('### Short-term sell-off check (computed');
+        expect(out).not.toContain('Measured in a two-year daily backtest');
+        expect(out).not.toContain('on daily bars, candle labels showed');
+    });
+
+    it('says "not measured on weekly bars" where an intraday chart says intraday', () => {
+        for (const type of ['pattern', 'candlestick'] as const) {
+            const skill = makeSkill({ type, name: 'Some Guide' });
+            const weekly = render('1Week', weeklyBars(), [skill]);
+            expect(weekly).toContain(
+                '### Some Guide [Not measured on weekly bars]'
+            );
+            expect(weekly).toContain(
+                '; reliability was not measured on weekly bars, so do not state any.'
+            );
+            const hourly = render('1Hour', weeklyBars(), [skill]);
+            expect(hourly).toContain(
+                '### Some Guide [Not measured on intraday bars]'
+            );
+            expect(hourly).toContain(
+                '; reliability was not measured on intraday bars, so do not state any.'
+            );
+        }
+        expect(render('1Week')).toContain(formatLevelHoldFraming('1Week'));
+        expect(formatLevelHoldFraming('1Week')).toContain('on weekly bars');
+    });
+
+    it('uses the weekly extreme-volatility line (13%), not the daily or intraday one', () => {
+        const bars = weeklyBars().map(bar => ({
+            ...bar,
+            open: 100,
+            high: 100,
+            low: 100,
+            close: 100,
+        }));
+        const withAtr = (atr: number) => {
+            const { dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                {
+                    ...calculateIndicators(bars),
+                    atr: [...new Array(bars.length - 1).fill(null), atr],
+                },
+                [],
+                '1Week'
+            );
+            return dynamic;
+        };
+        expect(ATR_EXTREME_PERCENT_WEEKLY).toBe(13);
+        expect(withAtr(ATR_EXTREME_PERCENT_WEEKLY)).toContain(
+            '## Extreme Volatility'
+        );
+        expect(withAtr(ATR_EXTREME_PERCENT_WEEKLY - 0.5)).not.toContain(
+            '## Extreme Volatility'
+        );
+    });
+
+    describe('the unfinished week', () => {
+        const bars = weeklyBars();
+        // The last bar is the week of 2026-10-05 (a Monday); the case clocks are its Wed and Sat.
+        const week = new Date(lastWeek(bars) * 1000).toISOString().slice(0, 10);
+        const wednesday = new Date('2026-10-07T22:00:00Z');
+        const saturday = new Date('2026-10-10T15:00:00Z');
+        const dailyBars = [
+            dayBar('2026-10-05'),
+            dayBar('2026-10-06'),
+            dayBar('2026-10-07'),
+        ];
+        const TAG =
+            '(week in progress: 3 of 5 sessions so far; its close is the latest price)';
+
+        it('tags only the last row, counting observed daily bars against the calendar', () => {
+            expect(week).toBe('2026-10-05');
+            const out = render(
+                '1Week',
+                bars,
+                [],
+                { session: US_EQUITY_SESSION, now: wednesday },
+                dailyBars
+            );
+            const rows = out
+                .split('\n')
+                .filter(line => line.startsWith('[ts:'));
+            expect(
+                rows.filter(row => row.includes('week in progress'))
+            ).toEqual([expect.stringContaining(TAG)]);
+            expect(rows[rows.length - 1]).toContain(TAG);
+        });
+
+        it('prints the tag without a total when the session has no holiday data', () => {
+            const { closeMinuteFor: _calendar, ...weekdayOnly } =
+                US_EQUITY_SESSION as Extract<
+                    MarketSessionSpec,
+                    { kind: 'scheduled' }
+                >;
+            const out = render(
+                '1Week',
+                bars,
+                [],
+                { session: weekdayOnly, now: wednesday },
+                dailyBars
+            );
+            expect(out).toContain(
+                '(week in progress: 3 sessions so far; its close is the latest price)'
+            );
+            expect(out).not.toMatch(/\d of \d sessions/);
+        });
+
+        it('prints no tag once the week is over, without a clock and without the daily bars', () => {
+            const finished = render(
+                '1Week',
+                bars,
+                [],
+                { session: US_EQUITY_SESSION, now: saturday },
+                dailyBars
+            );
+            const noClock = render('1Week', bars, [], undefined, dailyBars);
+            const noDaily = render('1Week', bars, [], {
+                session: US_EQUITY_SESSION,
+                now: wednesday,
+            });
+            [finished, noClock].forEach(out =>
+                expect(out).not.toContain('week in progress')
+            );
+            // No daily series: unknown is not "0 observed", so nothing is printed.
+            expect(noDaily).not.toContain('week in progress');
+        });
+
+        it('never tags a daily chart', () => {
+            const out = render(
+                '1Day',
+                bars,
+                [],
+                { session: US_EQUITY_SESSION, now: wednesday },
+                dailyBars
+            );
+            expect(out).not.toContain('week in progress');
+        });
+
+        it('takes the pivots from the last finished week: the bar before while the week is open, the last bar once it is over', () => {
+            const open = render(
+                '1Week',
+                bars,
+                [],
+                { session: US_EQUITY_SESSION, now: wednesday },
+                dailyBars
+            );
+            const over = render(
+                '1Week',
+                bars,
+                [],
+                { session: US_EQUITY_SESSION, now: saturday },
+                dailyBars
+            );
+            const ppOf = (b: Bar) =>
+                ((b.high + b.low + b.close) / 3).toFixed(2);
+            expect(open).toContain(
+                `Standard PP ${ppOf(bars[bars.length - 2])}`
+            );
+            expect(over).toContain(
+                `Standard PP ${ppOf(bars[bars.length - 1])}`
+            );
+        });
     });
 });

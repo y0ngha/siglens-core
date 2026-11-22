@@ -7,7 +7,7 @@ import {
 } from './outputLocale';
 import type { KrxTickTable } from '@/domain/analysis/krxTick';
 import { TIMEFRAME_MINUTES } from '@/domain/constants/market';
-import { MS_PER_SECOND } from '@/domain/constants/time';
+import { DAYS_PER_WEEK, MS_PER_SECOND } from '@/domain/constants/time';
 import {
     ATR_DEFAULT_PERIOD,
     CCI_DEFAULT_PERIOD,
@@ -171,6 +171,10 @@ import {
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatMarketEventsSection } from '@/domain/analysis/marketEventsSection';
+import {
+    lastWeekProgress,
+    type WeekProgress,
+} from '@/domain/analysis/barPeriods';
 import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
@@ -185,6 +189,7 @@ import {
     priceQuoting,
     spellSmallInteger,
     TIMEFRAME_LABEL,
+    unmeasuredBarsLabel,
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { formatLevelHoldFraming } from '@/domain/analysis/priceLevelBaseRate';
@@ -235,6 +240,12 @@ export const PROMPT_CONFIG_BY_TIMEFRAME: Record<Timeframe, PromptConfig> = {
         recentBarsCount: 30,
         squeezeZeroCrossLookback: 10,
     },
+    // Half a year of weekly rows; the squeeze look-back matches the daily chart's.
+    '1Week': {
+        trendSampleCount: 7,
+        recentBarsCount: 26,
+        squeezeZeroCrossLookback: 10,
+    },
 };
 
 const SMC_MAX_ORDER_BLOCKS = 5;
@@ -253,6 +264,9 @@ const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
     '4Hour':
         'Swing trading chart. Signals are reliable for multi-day trends. Divergences and breakouts are actionable.',
     '1Day': 'Daily chart. Indicator signals have high reliability. Overbought/oversold, divergences, and pattern completions are significant.',
+    // No reliability claim: nothing was measured on weekly bars (DOM-12).
+    '1Week':
+        'Weekly chart built by SIGLENS from daily bars: each bar is one ISO week (Monday start). Readings describe a multi-week to multi-month picture; the last bar may be the current, unfinished week (it is stated when the last row of ## Recent Bar Data carries a week-in-progress tag; no tag means its progress is unknown).',
 };
 
 interface PromptCandlePatternEntry {
@@ -465,6 +479,17 @@ const isCandleReliabilityMeasured = (
     assetClass: AssetClass
 ): boolean => timeframe === '1Day' && assetClass === 'equity';
 
+/**
+ * The tag on the last row of a weekly chart's `## Recent Bar Data` while the week is still
+ * going (DOM-9: it says what code measured). "So far" is the number of daily bars observed
+ * in the week, the total the sessions the exchange calendar schedules for it. A listing whose
+ * session spec has no holiday data prints no total: it could not be proven (DOM-12).
+ */
+const formatWeekProgressTag = (progress: WeekProgress): string =>
+    progress.sessionsTotal === null
+        ? `(week in progress: ${progress.sessionsSoFar} sessions so far; its close is the latest price)`
+        : `(week in progress: ${progress.sessionsSoFar} of ${progress.sessionsTotal} sessions so far; its close is the latest price)`;
+
 const formatRecentBarsSection = (
     bars: Bar[],
     recentBarsCount: number,
@@ -472,7 +497,8 @@ const formatRecentBarsSection = (
     quoting: PriceQuoting,
     atrSeries: readonly (number | null)[],
     timeframe: Timeframe,
-    assetClass: AssetClass
+    assetClass: AssetClass,
+    weekProgress: WeekProgress | null
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -491,13 +517,17 @@ const formatRecentBarsSection = (
     return [
         `## Recent Bar Data (Last ${recentBars.length} bars)`,
         'Format: Date/Time(UTC) | O:Open H:High L:Low C:Close V:Volume [CandlePattern]',
-        ...recentBars.map((bar, i) =>
-            formatBarRow(
+        ...recentBars.map((bar, i) => {
+            const row = formatBarRow(
                 bar,
                 quoting,
                 candlePriorMove(bars, firstRecentIndex + i, candleAtr).trend
-            )
-        ),
+            );
+            // Only the newest bar can be the unfinished week.
+            return weekProgress !== null && i === recentBars.length - 1
+                ? `${row} ${formatWeekProgressTag(weekProgress)}`
+                : row;
+        }),
         ...(patternEntries.length > 0
             ? [
                   CANDLE_PATTERNS_HEADER,
@@ -1056,11 +1086,11 @@ const HORIZON_SPAN_BY_TIMEFRAME: Record<
     '1Hour': { short: '~4 trading days', medium: '~2 weeks', long: '~6 weeks' },
     '4Hour': { short: '~2-3 weeks', medium: '~2 months', long: '~5 months' },
     '1Day': { short: '~1 month', medium: '~1 quarter', long: '~9-12 months' },
+    '1Week': { short: '~5 months', medium: '~1 year', long: '~3 years' },
 };
 
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
-const DAYS_PER_WEEK = 7;
 /** Crypto spans below this many hours read in hours, then days, then weeks. */
 const CRYPTO_SPAN_HOURS_LIMIT = 48;
 const CRYPTO_SPAN_DAYS_LIMIT = 14;
@@ -1748,7 +1778,7 @@ const skillHeaderLabel = (skill: Skill, timeframe: Timeframe): string => {
               ? CANDLE_POOLED_BASE_RATE
               : null;
     return row === null
-        ? '[Not measured on intraday bars]'
+        ? `[Not measured on ${unmeasuredBarsLabel(timeframe)} bars]`
         : row.key === 'pooled'
           ? `[Measured over every ${skill.type === 'pattern' ? 'chart pattern' : 'candle'}: ${baseRateVerdictLabel(pooledVerdictOf(skill, row))}, n=${row.n.toLocaleString('en-US')}]`
           : `[Measured: ${baseRateVerdictLabel(row.verdict)}, n=${row.n.toLocaleString('en-US')}]`;
@@ -2105,7 +2135,7 @@ const baseRateWritingRule = (
 ): string => {
     const forbidden = `- Do not call a ${subject} reliable, high-confidence or likely to ${subject === 'pattern' ? 'reach its target' : 'play out'}`;
     if (timeframe !== '1Day') {
-        return `${forbidden}; reliability was not measured on intraday bars, so do not state any.`;
+        return `${forbidden}; reliability was not measured on ${unmeasuredBarsLabel(timeframe)} bars, so do not state any.`;
     }
     return subject === 'pattern'
         ? `${forbidden}; when you mention reliability, cite the Measured label on its guide or the Measured line of its candidate instead.`
@@ -2324,12 +2354,20 @@ const buildAnalysisRequest = (
 /** @internal Exported only so the boundary test reads this exact threshold. */
 export const ATR_EXTREME_PERCENT_DAILY = 6;
 const ATR_EXTREME_PERCENT_INTRADAY = 2;
+/**
+ * @internal Weekly ATR% above which volatility reads as extreme: the daily 6% scaled by
+ * the square root of time (6 x sqrt(5) = 13.4, rounded to 13). Not measured on weekly
+ * bars: a judgement call, stated as such (DOM-12).
+ */
+export const ATR_EXTREME_PERCENT_WEEKLY = 13;
 const DAILY_TIMEFRAME: Timeframe = '1Day';
 
-const atrExtremeThreshold = (timeframe: Timeframe): number =>
-    timeframe === DAILY_TIMEFRAME
+const atrExtremeThreshold = (timeframe: Timeframe): number => {
+    if (timeframe === '1Week') return ATR_EXTREME_PERCENT_WEEKLY;
+    return timeframe === DAILY_TIMEFRAME
         ? ATR_EXTREME_PERCENT_DAILY
         : ATR_EXTREME_PERCENT_INTRADAY;
+};
 
 const ATR_EXTREME_VOLATILITY_NOTE = [
     '## Extreme Volatility',
@@ -2693,6 +2731,10 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   relevance ordering (see {@link selectSkills}). The free tier passes
  *   `gatedSkillCapForTier('free')`; omitted or `null` keeps every fired skill. Always-on
  *   skills are never capped.
+ * @param dailyBars - The daily series a `1Week` chart was aggregated from (`BarsData.fearGreedBars`).
+ *   With `marketClock` it lets the last weekly row say how far the current week is (observed
+ *   daily bars against the calendar's sessions); ignored on every other timeframe, and with
+ *   no clock the weekly bar is treated as still forming, with no tag.
  * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries, trend }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
@@ -2715,7 +2757,8 @@ export function buildAnalysisPrompt(
     krxTick: KrxTickTable = 'share',
     earningsDates?: readonly string[],
     marketClock?: MarketReferenceClock,
-    gatedSkillCap?: number | null
+    gatedSkillCap?: number | null,
+    dailyBars?: readonly Bar[]
 ): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -2964,7 +3007,10 @@ export function buildAnalysisPrompt(
             quoting,
             indicators.atr,
             timeframe,
-            assetClass
+            assetClass,
+            timeframe === '1Week'
+                ? lastWeekProgress(bars.at(-1), dailyBars, marketClock)
+                : null
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),

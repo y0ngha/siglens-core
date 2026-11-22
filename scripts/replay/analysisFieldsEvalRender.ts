@@ -39,8 +39,9 @@ export interface RenderInput {
     /** The tiers to render; both when absent. */
     tiers?: readonly ('free' | 'member')[];
     /**
-     * The chart timeframe to analyse at; `1Day` when absent. A timeframe core does not know
-     * (`1Week` before WP-19 core-1) is refused by the caller's argument check, never here.
+     * The chart timeframe to analyse at; `1Day` when absent. A timeframe core does not know is
+     * refused by the caller's argument check, never here. A tier the timeframe is closed to
+     * (free at `1Week`) is rendered with the timeframe gate off.
      */
     timeframe?: Timeframe;
     /**
@@ -126,12 +127,15 @@ export const renderWithCore: RenderSkills = async input => {
         { DEEPSEEK_V4_1_FLASH_MODEL },
         { loadSkillsCached },
         { isSkillAllowedInContext },
+        { TIER_CONFIG, isTimeframeAllowed },
     ] = await Promise.all([
         import('@/application/market/runAnalysis'),
         import('@/application/chat/constants'),
         import('@/infrastructure/skills/loader'),
         import('@/domain/analysis/skillWhitelist'),
+        import('@/domain/tier'),
     ]);
+    const timeframe = input.timeframe ?? '1Day';
     const loaded = await loadSkillsCached();
     const technical = loaded.skills.filter(s =>
         isSkillAllowedInContext(s, 'technical')
@@ -171,6 +175,18 @@ export const renderWithCore: RenderSkills = async input => {
             const profile = profileOf(marketOfSymbol(replayCase.symbol));
             for (const tier of input.tiers ?? (['free', 'member'] as const)) {
                 const controller = new AbortController();
+                // A tier that may not open this timeframe (free at `1Week`) is rendered with the
+                // timeframe gate off, so the instrument sees the prompt that tier's skills would
+                // get. Only the timeframe flag changes; skill capping follows the tier as always.
+                const tierConfig = isTimeframeAllowed(tier, timeframe)
+                    ? undefined
+                    : {
+                          ...TIER_CONFIG,
+                          featureFlags: {
+                              ...TIER_CONFIG.featureFlags,
+                              enableTimeframeRestrictions: false,
+                          },
+                      };
                 const captured: { prompt: AssembledPromptRecord | null } = {
                     prompt: null,
                 };
@@ -180,7 +196,7 @@ export const renderWithCore: RenderSkills = async input => {
                         runAnalysis(
                             replayCase.symbol,
                             stored.companyName,
-                            input.timeframe ?? '1Day',
+                            timeframe,
                             true,
                             undefined,
                             {
@@ -201,6 +217,9 @@ export const renderWithCore: RenderSkills = async input => {
                                 currency: profile.currency,
                                 krxTickTable: profile.krxTickTable,
                                 tierContext: { userId: null, tier },
+                                ...(tierConfig === undefined
+                                    ? {}
+                                    : { tierConfig }),
                                 reasoning: false,
                                 cache: null,
                                 signal: controller.signal,

@@ -16,6 +16,7 @@ import {
     trendOf,
     windowBars,
     type HtfTimeframe,
+    hasHolidayCalendar,
 } from '../../../../scripts/replay/htfEvalCompute';
 import {
     benchmarkOf,
@@ -25,6 +26,10 @@ import type { HtfCaseData } from '../../../../scripts/replay/htfEvalGates';
 
 const fixed = (n: number, d = 2): string => n.toFixed(d);
 /** A price as the prompt prints it: a Korean one at its KRX tick, whole won. */
+/** ` of M` for a market whose calendar has holiday data, nothing for one that has none. */
+const totalOf = (symbol: string, total: number): string =>
+    hasHolidayCalendar(symbol) ? ` of ${total}` : '';
+
 const quoted = (symbol: string, n: number): string =>
     marketOfSymbol(symbol) === 'kr' ? String(roundToKrxTick(n)) : fixed(n);
 const signed = (n: number, d: number): string =>
@@ -65,7 +70,7 @@ export function weeklyRowsSection(data: HtfCaseData): string {
         ...weeks.map((w, i) => {
             const tag =
                 i === weeks.length - 1 && progress?.inProgress
-                    ? ` (week in progress: ${progress.sessionsSoFar} of ${progress.sessionsTotal} sessions so far; its close is the latest price)`
+                    ? ` (week in progress: ${progress.sessionsSoFar}${totalOf(symbol, progress.sessionsTotal)} sessions so far; its close is the latest price)`
                     : '';
             return `[ts:${w.time}] ${dateOf(w.time)} 00:00 | O:${quoted(symbol, w.open)} H:${quoted(symbol, w.high)} L:${quoted(symbol, w.low)} C:${quoted(symbol, w.close)} V:${grouped(w.volume)} [음봉]${tag}`;
         }),
@@ -110,7 +115,7 @@ export function higherBlockText(
               ]),
         ...(progress?.inProgress
             ? [
-                  `The last ${kind} bar is the current ${word} (${progress.sessionsSoFar} of ${progress.sessionsTotal} sessions so far).`,
+                  `The last ${kind} bar is the current ${word} (${progress.sessionsSoFar}${totalOf(data.replayCase.symbol, progress.sessionsTotal)} sessions so far).`,
               ]
             : []),
         ...(r.alignment === null

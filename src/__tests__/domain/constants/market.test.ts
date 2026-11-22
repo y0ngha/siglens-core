@@ -3,9 +3,14 @@ import type { Timeframe } from '@/domain/types';
 import {
     DEFAULT_BARS_LIMIT,
     DEFAULT_TIMEFRAME,
+    FEAR_GREED_LOOKBACK_DAYS,
+    isDailyOrLonger,
+    isIntraday,
     isValidTimeframe,
+    PROVIDER_TIMEFRAMES,
     TIMEFRAME_BARS_LIMIT,
     TIMEFRAME_LOOKBACK_DAYS,
+    TIMEFRAME_MINUTES,
     TIMEFRAMES,
 } from '@/domain/constants/market';
 
@@ -35,6 +40,7 @@ describe('TIMEFRAME_BARS_LIMIT', () => {
         '1Hour',
         '4Hour',
         '1Day',
+        '1Week',
     ];
 
     describe('모든 Timeframe 값에 대한 항목이 존재할 때', () => {
@@ -75,6 +81,10 @@ describe('TIMEFRAME_BARS_LIMIT', () => {
         it("'1Day'에 대해 500을 반환한다", () => {
             expect(TIMEFRAME_BARS_LIMIT['1Day']).toBe(500);
         });
+
+        it("'1Week'은 5년치 주봉 수(260)를 문서화한다", () => {
+            expect(TIMEFRAME_BARS_LIMIT['1Week']).toBe(260);
+        });
     });
 });
 
@@ -86,12 +96,51 @@ describe('TIMEFRAMES', () => {
         '1Hour',
         '4Hour',
         '1Day',
+        '1Week',
     ];
 
     it('Timeframe 유니언의 모든 값을 포함한다', () => {
         expect([...TIMEFRAMES].sort()).toEqual(
             [...ALL_TIMEFRAME_VALUES].sort()
         );
+    });
+});
+
+describe('PROVIDER_TIMEFRAMES', () => {
+    it('1Week 이전의 여섯 값을 같은 순서로 유지한다', () => {
+        expect(PROVIDER_TIMEFRAMES).toEqual([
+            '5Min',
+            '15Min',
+            '30Min',
+            '1Hour',
+            '4Hour',
+            '1Day',
+        ]);
+    });
+
+    it('TIMEFRAMES는 그 뒤에 1Week을 붙인 목록이다', () => {
+        expect(TIMEFRAMES).toEqual([...PROVIDER_TIMEFRAMES, '1Week']);
+    });
+});
+
+describe('isDailyOrLonger / isIntraday', () => {
+    it.each(['1Day', '1Week'] as const)("'%s'는 일봉 이상이다", tf => {
+        expect(isDailyOrLonger(tf)).toBe(true);
+        expect(isIntraday(tf)).toBe(false);
+    });
+
+    it.each(['5Min', '15Min', '30Min', '1Hour', '4Hour'] as const)(
+        "'%s'는 분·시간봉이다",
+        tf => {
+            expect(isDailyOrLonger(tf)).toBe(false);
+            expect(isIntraday(tf)).toBe(true);
+        }
+    );
+});
+
+describe('TIMEFRAME_MINUTES', () => {
+    it("'1Week'은 7일 분량이다", () => {
+        expect(TIMEFRAME_MINUTES['1Week']).toBe(7 * TIMEFRAME_MINUTES['1Day']);
     });
 });
 
@@ -111,6 +160,10 @@ describe('isValidTimeframe', () => {
 
         it("'4Hour'에 대해 true를 반환한다", () => {
             expect(isValidTimeframe('4Hour')).toBe(true);
+        });
+
+        it("'1Week'에 대해 true를 반환한다", () => {
+            expect(isValidTimeframe('1Week')).toBe(true);
         });
     });
 
@@ -137,6 +190,7 @@ describe('TIMEFRAME_LOOKBACK_DAYS', () => {
         '1Hour',
         '4Hour',
         '1Day',
+        '1Week',
     ];
 
     describe('모든 Timeframe 값에 대한 항목이 존재할 때', () => {
@@ -179,6 +233,12 @@ describe('TIMEFRAME_LOOKBACK_DAYS', () => {
 
         it("'1Day'에 대해 730을 반환한다", () => {
             expect(TIMEFRAME_LOOKBACK_DAYS['1Day']).toBe(730);
+        });
+
+        it("'1Week'은 일봉 5년 구간(Fear & Greed와 같은 호출)을 쓴다", () => {
+            expect(TIMEFRAME_LOOKBACK_DAYS['1Week']).toBe(
+                FEAR_GREED_LOOKBACK_DAYS
+            );
         });
     });
 });

@@ -12,6 +12,7 @@ import {
     formatQuotedPrice,
     formatSignedPercent,
     roundQuotedPrice,
+    unmeasuredBarsLabel,
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { patternOverlayId } from '@/domain/overlays/patternOverlays';
@@ -230,8 +231,9 @@ function keyPointsLine(
         : '- Key points: N/A';
 }
 
-/** The line a block prints on intraday bars: the base rate was measured on daily bars only (DOM-12). */
-export const BASE_RATE_NOT_MEASURED_LINE = '- Not measured on intraday bars.';
+/** The line a block prints on non-daily bars: the base rate was measured on daily bars only (DOM-12). */
+export const baseRateNotMeasuredLine = (timeframe: Timeframe): string =>
+    `- Not measured on ${unmeasuredBarsLabel(timeframe)} bars.`;
 
 const percentOf = (share: number): string => `${(share * 100).toFixed(1)}%`;
 
@@ -263,11 +265,11 @@ export function formatBaseRateLine(row: MeasuredBaseRate, id: string): string {
     return `- Measured on this engine (${scope.symbols} symbols, daily ${scope.from.slice(0, 4)}–${scope.to.slice(0, 4)}): the measured target came before the invalidation within 60 bars in ${percentOf(row.eventShare)} of ${row.n.toLocaleString('en-US')} ${patternNamePlural(row, id)}; a target at the same distance on other dates came first in ${percentOf(row.placeboShare)}. ${advice[row.verdict]}`;
 }
 
-/** The base-rate line of a block: {@link formatBaseRateLine}, or {@link BASE_RATE_NOT_MEASURED_LINE} off daily bars. */
+/** The base-rate line of a block: {@link formatBaseRateLine}, or {@link baseRateNotMeasuredLine} off daily bars. */
 function baseRateLine(id: string, timeframe: Timeframe): string {
     const row = patternCardBaseRate(id, timeframe);
     return row === null
-        ? BASE_RATE_NOT_MEASURED_LINE
+        ? baseRateNotMeasuredLine(timeframe)
         : formatBaseRateLine(row, id);
 }
 
@@ -493,7 +495,7 @@ export function printedPatternGeometriesByOverlayId(
  * @param quoting - How every price in this section is quoted (same quoting
  *   the rest of the technical prompt uses).
  * @param timeframe - Bar resolution; key-point dates render date-only on
- *   `'1Day'` and `YYYY-MM-DD HH:MM UTC` on every intraday timeframe.
+ *   `'1Day'`/`'1Week'` and `YYYY-MM-DD HH:MM UTC` on every intraday timeframe.
  * @param offeredOverlayIds - Ids of the `kind: 'pattern'` overlay candidates
  *   the caller already built (`buildOverlayCandidates`). `patternOverlayId`
  *   names a candidate deterministically even when its overlay was dropped

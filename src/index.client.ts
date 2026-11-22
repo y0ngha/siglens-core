@@ -622,6 +622,7 @@ export type {
     OverallScenarioName,
     PriceTargetAvg,
     Timeframe,
+    ProviderTimeframe,
     Tier,
     MeteredRevealPolicy,
     TierConfig,

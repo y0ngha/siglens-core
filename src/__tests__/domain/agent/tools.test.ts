@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { TIMEFRAMES } from '@/domain/constants/market';
+import { PROVIDER_TIMEFRAMES } from '@/domain/constants/market';
 import {
     SWING_EPISODES_LISTED_MAX,
     SWING_LOOKBACK_YEARS,
@@ -1264,14 +1264,14 @@ describe('get_bars_indicators 타임프레임', () => {
         findToolSpec(tool)?.inputSchema.properties.timeframe?.enum;
 
     it('차트 도구만 주봉·월봉을 받는다', () => {
-        expect(AGENT_BARS_TIMEFRAMES).toEqual([
-            ...TIMEFRAMES,
-            '1Week',
-            '1Month',
-        ]);
+        // Literal lists: core now analyses `1Week` too, but the agent's tool specs stay
+        // byte-identical to the released ones (WP-19 core-1).
+        const released = ['5Min', '15Min', '30Min', '1Hour', '4Hour', '1Day'];
+        expect(PROVIDER_TIMEFRAMES).toEqual(released);
+        expect(AGENT_BARS_TIMEFRAMES).toEqual([...released, '1Week', '1Month']);
         expect(enumOf('get_bars_indicators')).toEqual(AGENT_BARS_TIMEFRAMES);
-        expect(enumOf('get_cached_analysis')).toEqual(TIMEFRAMES);
-        expect(enumOf('run_fresh_analysis')).toEqual(TIMEFRAMES);
+        expect(enumOf('get_cached_analysis')).toEqual(released);
+        expect(enumOf('run_fresh_analysis')).toEqual(released);
     });
 
     it('1Week·1Month 인자를 통과시키고 모르는 값은 거부한다', () => {

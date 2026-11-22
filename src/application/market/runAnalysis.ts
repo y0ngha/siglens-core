@@ -22,6 +22,8 @@ import {
     checkAnalysisUsageAllowed,
     recordAnalysisUsageSafely,
 } from '@/application/usage';
+import { isDailyOrLonger } from '@/domain/constants/market';
+import { standardDailyWindow } from '@/domain/analysis/standardDailyWindow';
 import { computeRiskLevel } from '@/domain/analysis/riskLevel';
 import { trendBasisOf } from '@/domain/analysis/analysisTrend';
 import {
@@ -452,11 +454,15 @@ async function runAnalysisImpl(
         );
     }
 
+    // One reference instant for every bars fetch and the weekly risk-grade window below, so
+    // a run that crosses a UTC midnight cuts the daily history at the same date throughout.
+    const barsNow = priorAnalysisNow;
     const barsData = await fetchBarsWithIndicators(
         marketDataProvider,
         symbol,
         timeframe,
-        fmpSymbol
+        fmpSymbol,
+        barsNow
     );
     const { bars, indicators } = barsData;
 
@@ -464,15 +470,17 @@ async function runAnalysisImpl(
     const lastClose = bars[bars.length - 1]?.close;
     const atr = lastNonNull(indicators.atr) ?? undefined;
 
-    const dailyDataPromise =
-        timeframe === '1Day'
-            ? Promise.resolve(barsData)
-            : fetchBarsWithIndicators(
-                  marketDataProvider,
-                  symbol,
-                  '1Day',
-                  fmpSymbol
-              );
+    // A weekly request already carries the daily series (`fearGreedBars`), which
+    // `fearGreedInputs` reads, so it needs no second fetch either.
+    const dailyDataPromise = isDailyOrLonger(timeframe)
+        ? Promise.resolve(barsData)
+        : fetchBarsWithIndicators(
+              marketDataProvider,
+              symbol,
+              '1Day',
+              fmpSymbol,
+              barsNow
+          );
 
     const fearGreed: FearGreedSnapshot | null = await dailyDataPromise
         .then(d => {
@@ -527,7 +535,10 @@ async function runAnalysisImpl(
         // Free carries every always-on skill plus its most relevant fired gated
         // skills per group; member and pro carry every fired skill. The tier and the
         // cap are in the cache key, so the two never share an entry.
-        gatedSkillCap
+        gatedSkillCap,
+        // A weekly chart counts the sessions of its unfinished week from the daily
+        // series it was built from.
+        timeframe === '1Week' ? barsData.fearGreedBars : undefined
     );
     // Logged here, before the model call, so a failure is reported even when
     // the generation itself fails: without it a throwing qualifier reads as
@@ -708,9 +719,15 @@ async function runAnalysisImpl(
     // `riskLevel` is computed, not the model's pick: each locale is its own LLM
     // run and the schema gave no rubric, so the same inputs came back "high" in
     // one language and "medium" in another. The model's value is overwritten.
+    // A weekly chart takes its grade from the daily series (the standard 1Day window of
+    // `fearGreedBars`): the grade is one volatility reading per instrument, and the daily
+    // scale and daily-only factors are the ones that were measured.
     const riskLevel = computeRiskLevel({
-        bars,
-        timeframe,
+        bars:
+            timeframe === '1Week'
+                ? standardDailyWindow(barsData.fearGreedBars ?? [], barsNow)
+                : bars,
+        timeframe: timeframe === '1Week' ? '1Day' : timeframe,
         events: marketEventCandidates,
         earningsDates: options.earningsDates,
     });

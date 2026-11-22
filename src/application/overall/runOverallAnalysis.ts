@@ -27,6 +27,7 @@ import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { aggregateBarsToWeekly } from '@/domain/analysis/aggregateBarsToWeekly';
 import { buildOverallAnalysisPrompt } from '@/domain/analysis/overallPrompt';
 import {
     OVERALL_RESPONSE_SCHEMA,
@@ -663,20 +664,28 @@ export async function runOverallAnalysis(
             ? Promise.resolve(undefined)
             : timeframe === '1Day'
               ? dailyBarsPromise.then(d => d?.bars)
-              : fetchBarsWithIndicators(
-                    marketDataProvider,
-                    symbol,
-                    timeframe,
-                    fmpSymbol
-                )
-                    .then(d => d.bars)
-                    .catch(error => {
-                        console.error(
-                            '[RunOverallAnalysis] Prior-analysis bars fetch failed; proceeding without prior-analysis context:',
-                            error
-                        );
-                        return undefined;
-                    });
+              : timeframe === '1Week'
+                ? // The weekly series is built from the daily history this run already
+                  // holds, so a weekly overall request needs no second fetch either.
+                  dailyBarsPromise.then(d =>
+                      d === null
+                          ? undefined
+                          : aggregateBarsToWeekly(d.fearGreedBars ?? d.bars)
+                  )
+                : fetchBarsWithIndicators(
+                      marketDataProvider,
+                      symbol,
+                      timeframe,
+                      fmpSymbol
+                  )
+                      .then(d => d.bars)
+                      .catch(error => {
+                          console.error(
+                              '[RunOverallAnalysis] Prior-analysis bars fetch failed; proceeding without prior-analysis context:',
+                              error
+                          );
+                          return undefined;
+                      });
 
     const [fearGreed, priorAnalysisBars] = await Promise.all([
         fearGreedPromise,

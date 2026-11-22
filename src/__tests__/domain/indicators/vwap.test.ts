@@ -96,6 +96,10 @@ describe('isSessionVwapMeaningful', () => {
         expect(isSessionVwapMeaningful('1Day')).toBe(false);
     });
 
+    it('is false on the weekly timeframe: a weekly bar holds several daily sessions', () => {
+        expect(isSessionVwapMeaningful('1Week')).toBe(false);
+    });
+
     it('is true for every intraday timeframe', () => {
         for (const timeframe of [
             '5Min',

@@ -13,7 +13,9 @@
 ```typescript
 // domain/types.ts
 
-export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
+export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day' | '1Week';
+// provider가 서빙하는 타임프레임 — `1Week` 이전의 여섯 멤버. 주봉은 core가 일봉에서 만든다.
+export type ProviderTimeframe = Exclude<Timeframe, '1Week'>;
 
 export interface TickerBase {
     symbol: string;
@@ -117,8 +119,16 @@ export interface StochRSIResult {
 
 export const DEFAULT_TIMEFRAME: Timeframe = '1Day';
 
+// provider가 서빙하는 타임프레임(옛 TIMEFRAMES, 같은 순서). 에이전트 도구 enum이 이 값을 쓴다.
+export const PROVIDER_TIMEFRAMES: readonly ProviderTimeframe[] = ['5Min', '15Min', '30Min', '1Hour', '4Hour', '1Day'];
+
 // 유효한 타임프레임 전체 목록 — URL 파라미터 검증 등 모든 검증은 이 상수를 기준으로 한다.
-export const TIMEFRAMES: readonly Timeframe[] = ['5Min', '15Min', '30Min', '1Hour', '4Hour', '1Day'];
+export const TIMEFRAMES: readonly Timeframe[] = [...PROVIDER_TIMEFRAMES, '1Week'];
+
+// `'1Day'` 또는 `'1Week'`. `=== '1Day'`가 "분·시간봉이 아님"을 뜻하던 자리에 쓴다.
+// 일봉에서만 측정한 규칙(base rate, 눌림 블록, 신뢰도 문장)은 `=== '1Day'`를 그대로 둔다.
+export function isDailyOrLonger(timeframe: Timeframe): boolean;
+export function isIntraday(timeframe: Timeframe): boolean;
 
 // URL 쿼리 파라미터 등 외부 입력에서 Timeframe을 검증할 때 사용한다.
 export function isValidTimeframe(value: string | undefined | null): value is Timeframe;
@@ -143,8 +153,8 @@ export const TIER_CONFIG = {
   },
   timeframes: {
     free: ['1Day'],
-    member: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min'],
-    pro: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min'],
+    member: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min', '1Week'],
+    pro: ['1Day', '1Hour', '4Hour', '5Min', '15Min', '30Min', '1Week'],
   },
   infoDepth: {
     free: ['direction', 'summary'],
@@ -166,7 +176,7 @@ export const TIER_CONFIG = {
 ```
 
 free-tier analysis gating부터 `timeframes`/`infoDepth`는 `member`와 `pro`가 **동일**하다.
-둘 다 전체 타임프레임(`1Day`/`1Hour`/`4Hour`/`5Min`/`15Min`/`30Min`)과 전체 8단계
+둘 다 전체 타임프레임(`1Day`/`1Hour`/`4Hour`/`5Min`/`15Min`/`30Min`/`1Week`)과 전체 8단계
 정보 깊이(`direction`~`confidence`)에 접근한다. 오직 `free`만 `1Day` 단일 타임프레임과
 `direction`/`summary` 두 정보 깊이로 제한된다. member/pro의 차등은 이제 `models`
 (사용 가능 AI 모델 목록)에서만 존재하며, timeframes/infoDepth 두 축에서는 구분되지 않는다.
@@ -1408,6 +1418,7 @@ consumer가 결정한다.
 | 1Hour      | 14  | 12/26/9 | 20/2 | 20/60 |
 | 4Hour      | 14  | 12/26/9 | 20/2 | 20/60 |
 | 1Day       | 14  | 12/26/9 | 20/2 | 20/60 |
+| 1Week      | 14  | 12/26/9 | 20/2 | 20/60 |
 
 ---
 
@@ -1425,10 +1436,48 @@ bars를 가져올 때 아래 값을 참고로 사용한다.
 1Hour  → 200봉 (약 1.2개월)
 4Hour  → 200봉 (약 5개월)
 1Day   → 500봉 (약 2년)
+1Week  → 260봉 (약 5년, 일봉 5년치를 묶은 수 — provider의 `limit`은 무시된다)
 
 추가 로딩이 필요한 consumer(예: 무한 스크롤 UI)는 매 요청마다 200봉씩 prepend하는
 방식을 사용할 수 있다. 라이브러리는 추가 로딩 전략을 강제하지 않는다.
 ```
+
+---
+
+## 주봉 (`1Week`)
+
+주봉은 provider가 아니라 **core가 일봉에서 만든다**. 분석 경로(`fetchBarsWithIndicators`)는
+provider에 `'1Day'`를 `FEAR_GREED_LOOKBACK_DAYS`(약 5년) 구간으로 요청하고(`1Day`와 같은 호출이라 소비자의
+일봉 이력 캐시를 공유한다), `hasUsablePrices`로 걸러 낸 일봉을 `aggregateBarsToWeekly`로 묶는다. `bars`·`indicators`가
+주봉이고 `fearGreedBars`는 일봉 원본이라 공포·탐욕과 일봉 계열 읽기는 일봉 분석과 같은 시계열을 본다.
+
+- **주 경계**: ISO 주, 월요일 00:00 UTC, 모든 시장. 크립토 주는 월~일 UTC다. 일봉은 UTC 자정에 찍혀 있어야 하며
+  아니면 호출당 한 번 경고한다. 주봉의 `time`은 그 주 월요일이고 프롬프트 행은 `YYYY-MM-DD 00:00`로 읽힌다.
+- **마지막 주는 미완성일 수 있다**: 마지막 봉을 그대로 두고 코드가 표시한다. `isLastPeriodBarFinished(bar, period, clock)`은
+  거래 시간이 아니고 다음 정규 개장이 더 늦은 주에 있으면 완성으로 본다(공휴일로 줄어든 주는 세션 스펙에서 나온다).
+  시계가 없으면 `false`(마지막 봉은 형성 중). 미완성이면 `## Recent Bar Data` 마지막 행에
+  `(week in progress: 3 of 5 sessions so far; its close is the latest price)`가 붙는다: "so far"는 관측한 일봉 수, 총합은 거래소
+  캘린더가 그 주에 잡은 세션 수다(DOM-12). 세션 스펙에 휴장 데이터(`closeMinuteFor`)가 없는 상장(현재 KRX)은 총합을 증명할 수 없어 `(week in progress: 3 sessions so far; …)`처럼 총합 없이 낸다.
+- **분석 TTL**: 일봉과 같은 세션 경계(`ANALYSIS_CACHE_TTL['1Week'] = SECONDS_PER_DAY`).
+- **티어**: member·pro만. free는 `1Day` 그대로.
+- **일봉 분기 결정표**(`=== '1Day'`가 "일봉 전용"인지 "가장 긴 타임프레임"인지 사이트마다 정했다):
+
+| 사이트 | `1Week` |
+|---|---|
+| `isSessionVwapMeaningful`, VWAP 거리 카드 | 없음(`isIntraday`) |
+| `TIMEFRAME_LABEL`, 막대 날짜(`formatBarDate`) | `Weekly`, 날짜만 |
+| `PROMPT_CONFIG_BY_TIMEFRAME` | 추세 샘플 7, 최근 행 26, 스퀴즈 10 |
+| `TIMEFRAME_CONTEXT` | 신뢰도 주장 없는 한 문장(DOM-12) |
+| 호라이즌 | 20/52/156봉, `~5 months` / `~1 year` / `~3 years` |
+| 피벗(`pivotSourceBar`) | 마지막 주가 끝났으면 그 주, 아니면 그 앞 주 |
+| `marketEventHorizonMs` | `isDailyOrLonger`(일봉과 같은 마지막 거래일 상한) |
+| `riskLevel` | **일봉 시계열**(표준 730일 구간)에 `1Day` 척도로 계산: 차트와 무관하게 종목당 하나 |
+| ATR 극단 문구 | `ATR_EXTREME_PERCENT_WEEKLY = 13`(6 × √5, 미측정) |
+| 손절·목표 간격 측정 문장, 캔들 신뢰도, 눌림 블록 | 일봉 전용 — 주봉에는 출력하지 않음 |
+| 합류 파라미터 / 신뢰도 문장 | 일봉 파라미터, `Weekly, not measured: descriptive only.` |
+| `PATTERN_MIN_HEIGHT_PRICE_PCT` | 0.06(미측정) |
+| 측정 base rate, 수준 유지 문장 | `null` / `Not measured on weekly bars`(분·시간봉은 `intraday` 그대로) |
+| 종합(overall) 라벨·가중치 | `Weekly`, `1Day` 가중치 |
 
 ---
 

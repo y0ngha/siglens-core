@@ -2,8 +2,19 @@ import type { OptionsAnalysisResponse } from './options/types';
 import type { PriceQuoting } from './analysis/promptFormat';
 import type { MeasuredBaseRate } from './analysis/measuredBaseRates';
 
-/** Bar resolution literal accepted by the market data providers and indicator pipeline. */
-export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
+/**
+ * Bar resolution literal accepted by the analysis pipeline. `'1Week'` is built
+ * by core from daily bars (ISO week, Monday 00:00 UTC); no provider serves it
+ * (see {@link ProviderTimeframe}).
+ */
+export type Timeframe =
+    '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day' | '1Week';
+
+/**
+ * Timeframes a `MarketDataProvider` serves: the six members `Timeframe` had
+ * before `'1Week'` existed. Core builds the others from `'1Day'` bars.
+ */
+export type ProviderTimeframe = Exclude<Timeframe, '1Week'>;
 
 /** U.S. regular-session state — weekend, regular-session-open, or weekday-closed. */
 export type EtSessionStatus = 'weekend' | 'open' | 'closed';
@@ -2463,11 +2474,14 @@ export interface BarsData {
     /** Aggregate indicator suite for the same bars. */
     indicators: IndicatorResult;
     /**
-     * Longer daily history (oldest-first, ≈ `FEAR_GREED_LOOKBACK_DAYS`) used
-     * **only** for Fear & Greed. Present for `1Day` results from
-     * `fetchBarsWithIndicators`; `bars` is its most recent standard-window
-     * slice. Read it through `fearGreedInputs`. Server-side data — consumers
-     * should not ship it to browsers.
+     * Longer daily history (oldest-first, ≈ `FEAR_GREED_LOOKBACK_DAYS`).
+     * Present for `1Day` and `1Week` results from `fetchBarsWithIndicators`.
+     * On `1Day`, `bars` is its most recent standard-window slice. On `1Week`,
+     * `bars` is the **weekly** series and this is the daily source it was
+     * aggregated from. Fear & Greed reads it through `fearGreedInputs`; a
+     * weekly analysis also reads it for the unfinished week's session count
+     * and for the risk grade (computed on the daily series). Server-side
+     * data — consumers should not ship it to browsers.
      */
     fearGreedBars?: Bar[];
 }

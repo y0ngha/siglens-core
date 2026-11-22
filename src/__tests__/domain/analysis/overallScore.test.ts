@@ -89,6 +89,12 @@ describe('OVERALL_AXIS_WEIGHTS', () => {
         );
     });
 
+    it('weights a weekly chart like a daily one: no weekly weighting was measured', () => {
+        expect(OVERALL_AXIS_WEIGHTS['1Week']).toEqual(
+            OVERALL_AXIS_WEIGHTS['1Day']
+        );
+    });
+
     it('gives every axis a positive weight on every timeframe', () => {
         // 가중치 0은 "축이 죽었다"는 뜻이고, 그건 이 테이블이 아니라 기권 경로가
         // 표현해야 한다. 상수로 0을 박으면 데이터가 있는데도 투표하지 못한다.

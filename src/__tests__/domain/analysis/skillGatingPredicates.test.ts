@@ -206,6 +206,15 @@ describe('isStateNotable — bollinger pctB (TF-aware)', () => {
     it('fires exactly at the 1Day hi boundary (pctB === hi)', () => {
         expect(firesAtHiBoundary('1Day')).toBe(true);
     });
+    it('uses the daily-strict default bounds on 1Week (no own entry)', () => {
+        expect(BOLLINGER_PCTB_BY_TF['1Week']).toBeUndefined();
+        const ctx = makeCtx({
+            timeframe: '1Week',
+            price: 0.98,
+            bollinger: { lower: 0, middle: 0.49, upper: 1 },
+        });
+        expect(isStateNotable(P('bollinger', 'pctB'), ctx)).toBe(true);
+    });
     it('fires exactly at the 1Hour hi boundary (pctB === hi)', () => {
         expect(firesAtHiBoundary('1Hour')).toBe(true);
     });
@@ -396,6 +405,15 @@ describe('isStateNotable — vwap bandDistAtr (intraday only)', () => {
     it('always returns false on the 1Day timeframe', () => {
         const ctx = makeCtx({
             timeframe: '1Day',
+            price: 110,
+            atr: 1,
+            vwap: 100,
+        });
+        expect(isStateNotable(P('vwap', 'bandDistAtr'), ctx)).toBe(false);
+    });
+    it('always returns false on the 1Week timeframe', () => {
+        const ctx = makeCtx({
+            timeframe: '1Week',
             price: 110,
             atr: 1,
             vwap: 100,

@@ -396,7 +396,9 @@ established. Do not infer a cause from absence (null metrics do not prove "sourc
 unavailable"): the caller that knows passes an explicit flag, and the renderer reads it.
 Name the flag after the fact proven, not the conclusion you hope for. A measured claim
 (a hit rate, a reliability sentence) carries the scope it was measured on (daily bars, one
-market), so it is not rendered on a prompt outside that scope.
+market), so it is not rendered on a prompt outside that scope. An unknown input
+states nothing (never "0 of N"), and a total is rendered only together with the data that
+proves it (a session count needs the holiday calendar, else "N so far").
 
 ```typescript
 // ❌ metrics === null ? 'FINRA unavailable' : ...   // null also means "nothing reported"
