@@ -36,6 +36,20 @@ describe('callDeepSeekWithRetry', () => {
         vi.clearAllMocks();
     });
 
+    it('hands the caller signal to withRetry so a backoff wait can be aborted', async () => {
+        mockCallDeepSeek.mockResolvedValueOnce('result');
+        const controller = new AbortController();
+
+        await callDeepSeekWithRetry('prompt', MODEL, 'key', {
+            signal: controller.signal,
+        });
+
+        expect(mockWithRetry).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({ signal: controller.signal })
+        );
+    });
+
     it('delegates to withRetry with the configured retry policy', async () => {
         mockCallDeepSeek.mockResolvedValueOnce('result');
 
@@ -139,5 +153,37 @@ describe('classifyDeepSeekError', () => {
             'none'
         );
         expect(classifyDeepSeekError(null)).toBe('none');
+    });
+
+    it('an AbortError (what a provider throws once the caller aborted) is not retryable', () => {
+        expect(
+            classifyDeepSeekError(new DOMException('aborted', 'AbortError'))
+        ).toBe('none');
+    });
+
+    it('the real withRetry with this classifier calls fn once and rethrows the AbortError', async () => {
+        const { withRetry: realWithRetry } = await vi.importActual<
+            typeof import('@/infrastructure/ai/retry/withRetry')
+        >('@/infrastructure/ai/retry/withRetry');
+        const controller = new AbortController();
+        const aborted = new DOMException('aborted', 'AbortError');
+        const fn = vi.fn<() => Promise<string>>().mockImplementation(() => {
+            controller.abort();
+            return Promise.reject(aborted);
+        });
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        await expect(
+            realWithRetry(fn, {
+                maxAttempts: 5,
+                baseDelayMs: 1000,
+                signal: controller.signal,
+                classify: classifyDeepSeekError,
+            })
+        ).rejects.toBe(aborted);
+
+        expect(fn).toHaveBeenCalledTimes(1);
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
     });
 });

@@ -27,6 +27,20 @@ describe('callChatGPTWithRetry', () => {
         vi.clearAllMocks();
     });
 
+    it('hands the caller signal to withRetry so a backoff wait can be aborted', async () => {
+        mockCallChatGPT.mockResolvedValueOnce('result');
+        const controller = new AbortController();
+
+        await callChatGPTWithRetry('prompt', MODEL, 'key', {
+            signal: controller.signal,
+        });
+
+        expect(mockWithRetry).toHaveBeenCalledWith(
+            expect.any(Function),
+            expect.objectContaining({ signal: controller.signal })
+        );
+    });
+
     it('delegates to withRetry with the configured retry policy', async () => {
         mockCallChatGPT.mockResolvedValueOnce('result');
 

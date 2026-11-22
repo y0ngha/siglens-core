@@ -77,6 +77,7 @@ export async function callDeepSeekWithRetry(
             maxAttempts,
             baseDelayMs: AI_RETRY_DELAY_MS,
             abortIfCumulativeDelayReachesMs,
+            signal,
             classify: classifyDeepSeekError,
         }
     );

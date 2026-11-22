@@ -16,6 +16,7 @@ import {
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { classifyStackOrder } from '@/domain/analysis/trendStructure';
+import { MA_CYCLE_PERIODS } from '@/domain/analysis/cycleConstants';
 import type {
     BollingerResult,
     CycleStage,
@@ -311,12 +312,6 @@ export const MACD_CYCLE_EMA_SHORT = 9;
 export const MACD_CYCLE_EMA_MID = 21;
 export const MACD_CYCLE_EMA_LONG = 60;
 
-/**
- * @internal Bars a cycle card looks back over for its stage history (the current bar
- * included). Lives beside the cycle periods: the history and the line it explains are one rule.
- */
-export const CYCLE_LOOKBACK_BARS = 120;
-
 type Sign = 1 | -1 | 0;
 
 /** @internal `0` is its own sign — the stage table below has no "exactly zero" row, so it must fall through to "no matching stage", never round into `+`/`-`. */
@@ -424,9 +419,6 @@ function volumeLine(
     const ratio = lastVolume / average;
     return `- Volume: last bar ${formatNullableNumber(ratio, PCT_DP)}× 20-bar average`;
 }
-
-/** @internal MA periods of the 이동평균선 대순환 (MA cycle) strategy: short, medium, long. */
-export const MA_CYCLE_PERIODS = { short: 5, medium: 20, long: 60 } as const;
 
 type MaCycleOrder =
     | 'short>medium>long'

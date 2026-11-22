@@ -379,6 +379,12 @@ export {
 // Computed cards (WP-16): the `computed_card` values a skill's frontmatter may take, for the
 // siglens catalog validator (a Tier 4 constant, its own block per PUBLIC_API.md#API-7).
 export { COMPUTED_CARD_KINDS } from './domain/analysis/computedCardKinds';
+// MA-cycle periods (5/20/60) and the cycle observation window (120 bars): one source for the
+// prompt text and for renderers (Tier 4 constants, own block per PUBLIC_API.md#API-7).
+export {
+    CYCLE_LOOKBACK_BARS,
+    MA_CYCLE_PERIODS,
+} from './domain/analysis/cycleConstants';
 // Position bucket — pure P&L-band bucketizer + its domain type. Consumers
 // (siglens server action) compute the bucket, then pass the finished enum to
 // runAnalysis; the cache-key/prompt wiring stays internal.

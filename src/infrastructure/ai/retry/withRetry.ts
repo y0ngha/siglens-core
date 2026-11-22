@@ -102,8 +102,40 @@ export function get429RetryDelay(error: unknown): number | undefined {
     return Math.ceil(parseFloat(match[1]) * 1000);
 }
 
-function sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+/**
+ * 호출자 abort를 나타내는 오류. 이미 `name === 'AbortError'`인 reason은 그대로 쓰고
+ * (`AbortSignal.abort()`의 기본 reason), 사용자 정의 reason은 `cause`로 보존한 채
+ * `AbortError`로 감싼다 — 호출자는 abort를 항상 같은 이름으로 구분한다.
+ */
+function abortErrorOf(signal: AbortSignal): Error {
+    const reason: unknown = signal.reason;
+    if (reason instanceof Error && reason.name === 'AbortError') return reason;
+    const error = new Error('The retry was aborted', { cause: reason });
+    error.name = 'AbortError';
+    return error;
+}
+
+/**
+ * `ms` 뒤에 resolve한다. `signal`이 abort되면(이미 abort된 경우 포함) 타이머를 지우고
+ * 즉시 `AbortError`로 reject한다 — 취소된 요청이 backoff가 끝나길 기다리다 다음 시도를
+ * 일으키지 않게 한다.
+ */
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+    return new Promise((resolve, reject) => {
+        if (signal?.aborted) {
+            reject(abortErrorOf(signal));
+            return;
+        }
+        const onAbort = (): void => {
+            clearTimeout(timer);
+            reject(abortErrorOf(signal as AbortSignal));
+        };
+        const timer = setTimeout(() => {
+            signal?.removeEventListener('abort', onAbort);
+            resolve();
+        }, ms);
+        signal?.addEventListener('abort', onAbort, { once: true });
+    });
 }
 
 /**
@@ -143,6 +175,12 @@ export async function withRetry<T>(
         wallClockBudgetMs?: number;
         /** provider별 분류기. 미지정 시 {@link classifyError}. */
         classify?: (error: unknown) => ErrorKind;
+        /**
+         * 호출자의 취소 신호. 시작 전에 이미 abort됐으면 첫 시도 없이, backoff 대기 중에 abort되면
+         * 대기를 끊고 다음 시도 없이 `name === 'AbortError'`인 오류로 reject한다. 진행 중인 `fn()`을
+         * 끊는 일은 `fn`이 같은 신호를 provider에 넘겨 처리한다.
+         */
+        signal?: AbortSignal;
     }
 ): Promise<T> {
     const {
@@ -151,12 +189,15 @@ export async function withRetry<T>(
         abortIfCumulativeDelayReachesMs,
         wallClockBudgetMs,
         classify = classifyError,
+        signal,
     } = options;
     const delayLimit =
         abortIfCumulativeDelayReachesMs ?? RETRY_ALLOWABLE_TIME_MS;
     const wallClockLimit = wallClockBudgetMs ?? RETRY_WALL_CLOCK_BUDGET_MS;
     const startedAt = Date.now();
     let cumulativeDelay = 0;
+
+    if (signal?.aborted) throw abortErrorOf(signal);
 
     for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         const attemptStartedAt = Date.now();
@@ -202,7 +243,7 @@ export async function withRetry<T>(
                 error
             );
             cumulativeDelay += delay;
-            await sleep(delay);
+            await sleep(delay, signal);
         }
     }
     // 두 예산(누적 delay / wall-clock) 중 하나를 초과해 break된 경우에만 도달

@@ -236,6 +236,20 @@ describe('gemini-retry', () => {
     });
 
     describe('callGeminiWithRetry', () => {
+        it('hands the caller signal to withRetry so a backoff wait can be aborted', async () => {
+            mockCallGemini.mockResolvedValueOnce('result');
+            const controller = new AbortController();
+
+            await callGeminiWithRetry('prompt', MODEL, 'key', {
+                signal: controller.signal,
+            });
+
+            expect(mockWithRetry).toHaveBeenCalledWith(
+                expect.any(Function),
+                expect.objectContaining({ signal: controller.signal })
+            );
+        });
+
         it('delegates to withRetry with the configured retry policy', async () => {
             mockCallGemini.mockResolvedValueOnce('result');
 

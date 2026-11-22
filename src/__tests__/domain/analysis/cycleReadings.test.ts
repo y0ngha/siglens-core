@@ -6,8 +6,8 @@ import {
     describeCycleReading,
     readCycle,
 } from '@/domain/analysis/cycleReadings';
+import { CYCLE_LOOKBACK_BARS } from '@/domain/analysis/cycleConstants';
 import {
-    CYCLE_LOOKBACK_BARS,
     buildIndicatorStateSection,
     macdCycleStageOf,
     maCycleStageOf,
