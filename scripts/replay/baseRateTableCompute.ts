@@ -6,15 +6,9 @@
  * evaluation; `baseRateTable.ts` loads the runs, refuses inputs it cannot trust and writes
  * the table.
  *
- * Verdict rule (WP-17 G3, one rule for every subject):
- *  - `insufficient_sample` below `BASE_RATE_MIN_N` events (the row then carries the pooled
- *    figures of its subject, `key: 'pooled'`);
- *  - `beats_placebo` iff the Holm-adjusted test rejects zero at 5%, the difference is
- *    positive (the textbook direction: the event reaches its target / moves its way / holds
- *    more often than the placebo), its interval's low bound is above zero and the sign holds
- *    in both time halves and in the US and Korean markets separately; a half or market the
- *    data does not cover fails the rule;
- *  - `no_edge` otherwise.
+ * Verdict rule (WP-17 G3, one rule for every subject): `verdictOf` in
+ * `src/domain/analysis/baseRateVerdict.ts`. A row below `BASE_RATE_MIN_N` events carries the
+ * pooled figures of its subject, `key: 'pooled'`.
  */
 import {
     candleHitObservations,
@@ -27,6 +21,10 @@ import {
     widerInterval,
     type EdgeStat,
 } from './engineEvalCompute';
+import {
+    verdictOf,
+    type VerdictInputs,
+} from '@/domain/analysis/baseRateVerdict';
 import { holmAdjust } from './engineEvalStats';
 import type { CandleEvent, Observation, PatternEvent } from './engineEvalTypes';
 import { mean } from './stats';
@@ -57,32 +55,6 @@ export interface BaseRateRow {
     difference: { mean: number; low: number; high: number };
     verdict: BaseRateVerdict;
     scope: BaseRateScope;
-}
-
-/** What the verdict rule read for one row: the JSON companion lets a test recompute it. */
-export interface VerdictInputs {
-    n: number;
-    /** Holm-adjusted p of the difference across the subject's eligible families; level rows use their interval. */
-    significant: boolean | null;
-    mean: number | null;
-    low: number | null;
-    /** The difference's mean in each time half and market; `null` when empty. */
-    splits: Record<'early' | 'late' | 'us' | 'kr', number | null>;
-}
-
-export function verdictOf(input: VerdictInputs): BaseRateVerdict {
-    if (input.n < BASE_RATE_MIN_N) return 'insufficient_sample';
-    const splitsHold = Object.values(input.splits).every(
-        v => v !== null && v > 0
-    );
-    return input.significant === true &&
-        input.mean !== null &&
-        input.mean > 0 &&
-        input.low !== null &&
-        input.low > 0 &&
-        splitsHold
-        ? 'beats_placebo'
-        : 'no_edge';
 }
 
 export interface RowDetail {
@@ -341,8 +313,40 @@ export interface LevelSummaryInput {
     tables: {
         market: Record<string, LevelGroup | undefined>;
         half: Record<string, LevelGroup | undefined>;
+        /** Held rate per kind family (all markets and halves pooled). */
+        family: Record<string, LevelGroup | undefined>;
     };
 }
+
+const levelRowOf = (
+    key: string,
+    group: LevelGroup,
+    inputs: VerdictInputs,
+    holmP: number | null,
+    scope: BaseRateScope
+): RowDetail => ({
+    family: key,
+    row: {
+        subject: 'price_level',
+        key,
+        n: group.held.n,
+        eventShare: finite(group.held.share, `level ${key} held share`),
+        placeboShare: finite(
+            group.transplant.share,
+            `level ${key} placebo share`
+        ),
+        difference: {
+            mean: finite(group.difference.mean, `level ${key} difference`),
+            low: finite(group.difference.low, `level ${key} interval low`),
+            high: finite(group.difference.high, `level ${key} interval high`),
+        },
+        verdict: verdictOf(inputs),
+        scope,
+    },
+    inputs,
+    atrEdge: null,
+    holmP,
+});
 
 export function priceLevelRow(
     summary: LevelSummaryInput,
@@ -365,26 +369,112 @@ export function priceLevelRow(
         },
     };
     return {
+        ...levelRowOf('pooled', overall, inputs, null, scope),
         family: 'pooled',
-        row: {
-            subject: 'price_level',
-            key: 'pooled',
-            n: overall.held.n,
-            eventShare: finite(overall.held.share, 'level held share'),
-            placeboShare: finite(
-                overall.transplant.share,
-                'level placebo share'
-            ),
-            difference: {
-                mean: finite(overall.difference.mean, 'level difference'),
-                low: finite(overall.difference.low, 'level interval low'),
-                high: finite(overall.difference.high, 'level interval high'),
-            },
-            verdict: verdictOf(inputs),
-            scope,
-        },
-        inputs,
-        atrEdge: null,
-        holmP: null,
+    };
+}
+
+/** 97.5th percentile of the standard normal: the half-width of a 95% interval in standard errors. */
+const Z_975 = 1.959964;
+
+/** Complementary error function (Numerical Recipes `erfc`, fractional error below 1.2e-7). */
+function erfc(x: number): number {
+    const z = Math.abs(x);
+    const t = 1 / (1 + 0.5 * z);
+    const ans =
+        t *
+        Math.exp(
+            -z * z -
+                1.26551223 +
+                t *
+                    (1.00002368 +
+                        t *
+                            (0.37409196 +
+                                t *
+                                    (0.09678418 +
+                                        t *
+                                            (-0.18628806 +
+                                                t *
+                                                    (0.27886807 +
+                                                        t *
+                                                            (-1.13520398 +
+                                                                t *
+                                                                    (1.48851587 +
+                                                                        t *
+                                                                            (-0.82215223 +
+                                                                                t *
+                                                                                    0.17087277))))))))
+        );
+    return x >= 0 ? ans : 2 - ans;
+}
+
+/**
+ * Two-sided p of a difference from its mean and 95% interval, treating the interval as a
+ * normal one (standard error = width / (2 * 1.96)). A level evaluation's `summary.json` keeps
+ * the interval of every group but not the bootstrap p, so the family tests of the price-level
+ * table are ranked by this p. `null` when the interval is missing or has no width.
+ */
+export function intervalP(difference: LevelGroup['difference']): number | null {
+    const { mean: m, low, high } = difference;
+    if (m === null || low === null || high === null) return null;
+    const se = (high - low) / (2 * Z_975);
+    return se > 0 ? erfc(Math.abs(m) / se / Math.SQRT2) : null;
+}
+
+/**
+ * One row per kind family of the printed price levels (`families`, in key order), same held and
+ * transplant definitions as `priceLevelRow`, Holm over the families at or above
+ * `BASE_RATE_MIN_N` resolved touches and the shared `verdictOf`. A family below the floor, or
+ * with no levels at all, carries the pooled figures under `key: 'pooled'` with
+ * `insufficient_sample` (the rule of the pattern rows). The summary holds no per-family market
+ * or half breakdown, so a family's splits are `null` and, fail closed, it cannot read
+ * `beats_placebo` until they are measured.
+ */
+export function priceLevelFamilyTable(
+    summary: LevelSummaryInput,
+    scope: BaseRateScope,
+    families: readonly string[]
+): SubjectTable {
+    const pooled = priceLevelRow(summary, scope);
+    const groups = families.toSorted().map(family => ({
+        family,
+        group: summary.tables.family[family],
+    }));
+    const eligible = groups.flatMap(({ family, group }) =>
+        group !== undefined && group.held.n >= BASE_RATE_MIN_N
+            ? [{ family, group }]
+            : []
+    );
+    const adjusted = holmAdjust(
+        eligible.map(e => intervalP(e.group.difference))
+    );
+    const holmOf = new Map(eligible.map((e, i) => [e.family, adjusted[i]]));
+    return {
+        pooled,
+        rows: groups.map(({ family, group }) => {
+            if (group === undefined || group.held.n < BASE_RATE_MIN_N) {
+                return {
+                    ...pooled,
+                    family,
+                    row: { ...pooled.row, verdict: 'insufficient_sample' },
+                    inputs: { ...pooled.inputs, n: group?.held.n ?? 0 },
+                };
+            }
+            const holmP = holmOf.get(family) ?? null;
+            return levelRowOf(
+                family,
+                group,
+                {
+                    n: group.held.n,
+                    significant:
+                        holmP === null ? null : holmP < BASE_RATE_ALPHA,
+                    mean: group.difference.mean,
+                    low: group.difference.low,
+                    splits: { early: null, late: null, us: null, kr: null },
+                },
+                holmP,
+                scope
+            );
+        }),
     };
 }

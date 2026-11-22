@@ -8,7 +8,7 @@
  *       --out <file> [--json <file>] [--allow-dirty]
  *
  * The definitions are pre-registered in `signalBaseRateCompute.ts`. The generator fails
- * closed (exit 2, TE-16) on a dirty checkout, a set whose bars fingerprint it does not know,
+ * closed (exit 2, CONVENTIONS.md#TE-16) on a dirty checkout, a set whose bars fingerprint it does not know,
  * a signal type with no episode and a horizon it cannot compute; any other error exits 1.
  * It reads bars only (no network, no model, no randomness beyond the seeded placebo draw), so
  * the same checkout, set and `--date` give a byte-identical file. `--out` may be inside the
@@ -25,6 +25,7 @@ import { format, resolveConfig } from 'prettier';
 import { parseArgs } from '../ab-harness/cliArgs';
 import { loadSet, dirtyDiffSha256 } from './engineEval';
 import { weeksOfTimes } from './engineEvalStats';
+import { FailClosedError } from './failClosed';
 import { EVAL_CONSTANTS, type EvalMarket } from './engineEvalTypes';
 import {
     REPO_ROOT,
@@ -60,14 +61,6 @@ export const SIGNAL_TABLE_PATH = join(
 export const KNOWN_SET_FINGERPRINTS: readonly string[] = [
     '0ba4d6a50b731f880777cd867c6e472903d9c7311b2a2476fc588a3d87ec9f0e',
 ];
-
-/** A refusal the generator reports with exit code 2 instead of an error. */
-export class FailClosedError extends Error {
-    constructor(message: string) {
-        super(message);
-        this.name = 'FailClosedError';
-    }
-}
 
 export interface SignalTableArgs {
     set: string;

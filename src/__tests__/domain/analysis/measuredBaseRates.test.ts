@@ -6,9 +6,12 @@ import {
     PATTERN_BASE_RATES,
     PATTERN_POOLED_BASE_RATE,
     PRICE_LEVEL_BASE_RATE,
+    PRICE_LEVEL_FAMILY_BASE_RATES,
     measuredBaseRateFor,
+    priceLevelFamilyBaseRateFor,
     type MeasuredBaseRate,
 } from '@/domain/analysis/measuredBaseRates';
+import { verdictOf } from '@/domain/analysis/baseRateVerdict';
 import type {
     CandlePattern,
     ChartPatternId,
@@ -183,4 +186,92 @@ describe('measuredBaseRates (generated table)', () => {
             ).toBeNull();
         }
     );
+});
+
+describe('PRICE_LEVEL_FAMILY_BASE_RATES', () => {
+    // The kind families of the level evaluation (`KIND_FAMILY` in scripts/replay/levelEvalTypes.ts,
+    // which the generator's test pins to this list).
+    const FAMILIES = [
+        'avwap',
+        'band',
+        'fib',
+        'ichimoku',
+        'ma',
+        'pivot',
+        'round',
+        'supertrend',
+        'swing',
+        'vp',
+        'vwap',
+    ];
+
+    it('has a row for every kind family, each with the pooled scope', () => {
+        expect(Object.keys(PRICE_LEVEL_FAMILY_BASE_RATES).toSorted()).toEqual(
+            FAMILIES
+        );
+        Object.values(PRICE_LEVEL_FAMILY_BASE_RATES).forEach(row => {
+            expect(row.subject).toBe('price_level');
+            expect(row.scope).toEqual(PRICE_LEVEL_BASE_RATE.scope);
+        });
+    });
+
+    it('gives a family without enough touches the pooled figures, as insufficient', () => {
+        Object.entries(PRICE_LEVEL_FAMILY_BASE_RATES)
+            .filter(([, row]) => row.key === 'pooled')
+            .forEach(([, row]) => {
+                expect(row).toEqual({
+                    ...PRICE_LEVEL_BASE_RATE,
+                    verdict: 'insufficient_sample',
+                });
+            });
+    });
+
+    it('keys an own row by its family and reads the same outcome as the pooled row', () => {
+        Object.entries(PRICE_LEVEL_FAMILY_BASE_RATES)
+            .filter(([, row]) => row.key !== 'pooled')
+            .forEach(([family, row]) => {
+                expect(row.key).toBe(family);
+                expect(row.n).toBeGreaterThanOrEqual(BASE_RATE_MIN_N);
+                expect(row.n).toBeLessThan(PRICE_LEVEL_BASE_RATE.n);
+                expect(row.difference.mean).toBeCloseTo(
+                    row.eventShare - row.placeboShare,
+                    5
+                );
+            });
+    });
+
+    it('stores the verdict the shared rule gives an own row whose market and half split is unmeasured', () => {
+        Object.values(PRICE_LEVEL_FAMILY_BASE_RATES)
+            .filter(row => row.key !== 'pooled')
+            .forEach(row => {
+                expect(row.verdict).toBe(
+                    verdictOf({
+                        n: row.n,
+                        significant: row.difference.low > 0,
+                        mean: row.difference.mean,
+                        low: row.difference.low,
+                        splits: { early: null, late: null, us: null, kr: null },
+                    })
+                );
+            });
+    });
+
+    it('reads a family through the accessor: its own row, or null for a pooled stand-in or an unknown family', () => {
+        Object.entries(PRICE_LEVEL_FAMILY_BASE_RATES).forEach(
+            ([family, row]) => {
+                expect(priceLevelFamilyBaseRateFor(family)).toBe(
+                    row.key === family ? row : null
+                );
+            }
+        );
+        // The stored vwap row is the pooled figures, not a measurement of vwap levels.
+        expect(PRICE_LEVEL_FAMILY_BASE_RATES.vwap).toMatchObject({
+            key: 'pooled',
+            verdict: 'insufficient_sample',
+        });
+        expect(priceLevelFamilyBaseRateFor('vwap')).toBeNull();
+        expect(priceLevelFamilyBaseRateFor('fib')?.key).toBe('fib');
+        expect(priceLevelFamilyBaseRateFor('no_such')).toBeNull();
+        expect(priceLevelFamilyBaseRateFor('toString')).toBeNull();
+    });
 });

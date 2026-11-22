@@ -378,7 +378,9 @@ export {
     CANDLE_BASE_RATES,
     PATTERN_BASE_RATES,
     PRICE_LEVEL_BASE_RATE,
+    PRICE_LEVEL_FAMILY_BASE_RATES,
     measuredBaseRateFor,
+    priceLevelFamilyBaseRateFor,
 } from './domain/analysis/measuredBaseRates';
 export type {
     BaseRateSubject,

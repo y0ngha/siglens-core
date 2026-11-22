@@ -17,12 +17,12 @@ import {
 import {
     BASE_RATE_MIN_N,
     candleTable,
+    intervalP,
     patternTable,
+    priceLevelFamilyTable,
     priceLevelRow,
-    verdictOf,
     type BaseRateScope,
     type LevelSummaryInput,
-    type VerdictInputs,
 } from '../../../../scripts/replay/baseRateTableCompute';
 import { renderBaseRateTable } from '../../../../scripts/replay/baseRateTableRender';
 import { summarizeArm } from '../../../../scripts/replay/engineEvalCompute';
@@ -31,6 +31,7 @@ import type {
     EvalEvent,
     PatternEvent,
 } from '../../../../scripts/replay/engineEvalTypes';
+import { verdictOf } from '@/domain/analysis/baseRateVerdict';
 import { makeTempDir } from './replayFixtures';
 import { candleEvent, patternEvent } from './engineEvalFixtures';
 
@@ -97,61 +98,6 @@ const candles = (
             },
         };
     });
-
-const verdictInputs = (over: Partial<VerdictInputs> = {}): VerdictInputs => ({
-    n: 200,
-    significant: true,
-    mean: 0.05,
-    low: 0.01,
-    splits: { early: 0.04, late: 0.06, us: 0.05, kr: 0.05 },
-    ...over,
-});
-
-describe('verdictOf', () => {
-    it('is insufficient below the sample floor, whatever the numbers say', () => {
-        expect(verdictOf(verdictInputs({ n: BASE_RATE_MIN_N - 1 }))).toBe(
-            'insufficient_sample'
-        );
-        expect(verdictOf(verdictInputs({ n: BASE_RATE_MIN_N }))).toBe(
-            'beats_placebo'
-        );
-    });
-
-    it('beats the placebo only with a significant positive difference that holds in every split', () => {
-        expect(verdictOf(verdictInputs())).toBe('beats_placebo');
-        expect(verdictOf(verdictInputs({ significant: false }))).toBe(
-            'no_edge'
-        );
-        expect(verdictOf(verdictInputs({ significant: null }))).toBe('no_edge');
-        expect(verdictOf(verdictInputs({ mean: -0.05 }))).toBe('no_edge');
-        expect(verdictOf(verdictInputs({ low: -0.001 }))).toBe('no_edge');
-        expect(verdictOf(verdictInputs({ low: 0 }))).toBe('no_edge');
-    });
-
-    it('fails closed on a split that flips sign or is not covered', () => {
-        expect(
-            verdictOf(
-                verdictInputs({
-                    splits: { early: 0.04, late: -0.01, us: 0.05, kr: 0.05 },
-                })
-            )
-        ).toBe('no_edge');
-        expect(
-            verdictOf(
-                verdictInputs({
-                    splits: { early: 0.04, late: 0.06, us: 0.05, kr: null },
-                })
-            )
-        ).toBe('no_edge');
-        expect(
-            verdictOf(
-                verdictInputs({
-                    splits: { early: 0.04, late: 0.06, us: 0, kr: 0.05 },
-                })
-            )
-        ).toBe('no_edge');
-    });
-});
 
 describe('patternTable', () => {
     const events = [
@@ -278,6 +224,7 @@ describe('priceLevelRow', () => {
                 'pre-2022': group(0.5, 1000, 0.003, -0.01),
                 '2022+': group(0.5, 1000, -0.003, -0.01),
             },
+            family: {},
         },
         ...over,
     });
@@ -302,6 +249,7 @@ describe('priceLevelRow', () => {
                 tables: {
                     market: { us: positive, kr: positive },
                     half: { 'pre-2022': positive, '2022+': positive },
+                    family: {},
                 },
             }),
             scope
@@ -318,6 +266,242 @@ describe('priceLevelRow', () => {
         ).toThrow('is not computable');
     });
 });
+
+describe('priceLevelFamilyTable', () => {
+    const FAMILIES = ['vwap', 'fib', 'ma', 'band', 'rare'];
+    /** Standard errors of the difference for a two-sided normal p (0.5, 0.2, 0.03, 0.001, 0.0001). */
+    const Z = {
+        p50: 0.67449,
+        p20: 1.28155,
+        p03: 2.17009,
+        p001: 3.29053,
+        p0001: 3.89059,
+    };
+    const SE = 0.01;
+    /** A level group whose difference is `z` standard errors from zero, with a 95% interval. */
+    const groupWithZ = (z: number, n = 5000) => {
+        const m = z * SE;
+        return {
+            held: { n, share: 0.5 + m },
+            transplant: { n: n * 3, share: 0.5 },
+            difference: {
+                mean: m,
+                low: m - 1.959964 * SE,
+                high: m + 1.959964 * SE,
+            },
+        };
+    };
+    const summaryOf = (
+        family: LevelSummaryInput['tables']['family']
+    ): LevelSummaryInput => ({
+        overall: groupWithZ(Z.p50, 550171),
+        tables: {
+            market: { us: groupWithZ(Z.p50), kr: groupWithZ(Z.p50) },
+            half: {
+                'pre-2022': groupWithZ(Z.p50),
+                '2022+': groupWithZ(Z.p50),
+            },
+            family,
+        },
+    });
+
+    it('has a row per family in key order, the pooled row beside it, with n and scope', () => {
+        const table = priceLevelFamilyTable(
+            summaryOf({
+                fib: groupWithZ(Z.p50),
+                ma: groupWithZ(Z.p50),
+                band: groupWithZ(Z.p50),
+            }),
+            scope,
+            FAMILIES
+        );
+        expect(table.rows.map(r => r.family)).toEqual([
+            'band',
+            'fib',
+            'ma',
+            'rare',
+            'vwap',
+        ]);
+        expect(table.pooled.row).toMatchObject({
+            key: 'pooled',
+            n: 550171,
+            subject: 'price_level',
+        });
+        expect(table.rows[1].row).toMatchObject({
+            subject: 'price_level',
+            key: 'fib',
+            n: 5000,
+            scope,
+        });
+        // The same held/transplant definitions as the pooled row: share is `held.share`.
+        expect(table.rows[1].row.eventShare).toBeCloseTo(
+            groupWithZ(Z.p50).held.share
+        );
+        expect(table.rows[1].row.placeboShare).toBe(0.5);
+    });
+
+    it('gives a family below the floor, or with no levels, the pooled figures as insufficient', () => {
+        const table = priceLevelFamilyTable(
+            summaryOf({
+                fib: groupWithZ(Z.p50),
+                rare: groupWithZ(Z.p001, BASE_RATE_MIN_N - 1),
+            }),
+            scope,
+            FAMILIES
+        );
+        const byKey = (key: string) => table.rows.find(r => r.family === key);
+        expect(byKey('rare')?.row).toMatchObject({
+            key: 'pooled',
+            verdict: 'insufficient_sample',
+            n: table.pooled.row.n,
+        });
+        expect(byKey('rare')?.inputs.n).toBe(BASE_RATE_MIN_N - 1);
+        expect(byKey('vwap')?.row.verdict).toBe('insufficient_sample');
+        expect(byKey('vwap')?.inputs.n).toBe(0);
+        expect(byKey('fib')?.row.verdict).toBe('no_edge');
+        expect(byKey('rare')?.holmP).toBeNull();
+    });
+
+    it('applies Holm across the families, not a per-family test (falsified)', () => {
+        // Three families with p = 0.03 each. Tested one by one each rejects zero; across the
+        // three, Holm lifts the smallest to 0.09 and none does.
+        const table = priceLevelFamilyTable(
+            summaryOf({
+                fib: groupWithZ(Z.p03),
+                ma: groupWithZ(Z.p03),
+                band: groupWithZ(Z.p03),
+            }),
+            scope,
+            ['fib', 'ma', 'band']
+        );
+        table.rows.forEach(r => {
+            expect(
+                intervalP({
+                    mean: r.row.difference.mean,
+                    low: r.row.difference.low,
+                    high: r.row.difference.high,
+                })
+            ).toBeCloseTo(0.03, 3);
+            expect(r.holmP).toBeCloseTo(0.09, 2);
+            expect(r.inputs.significant).toBe(false);
+        });
+        // A lone family at the same p is significant: the correction counts the families.
+        const lone = priceLevelFamilyTable(
+            summaryOf({ fib: groupWithZ(Z.p03) }),
+            scope,
+            ['fib']
+        );
+        expect(lone.rows[0].holmP).toBeCloseTo(0.03, 3);
+        expect(lone.rows[0].inputs.significant).toBe(true);
+    });
+
+    it('counts only the families at or above the floor in the Holm correction', () => {
+        const table = priceLevelFamilyTable(
+            summaryOf({
+                fib: groupWithZ(Z.p03),
+                ma: groupWithZ(Z.p03, BASE_RATE_MIN_N - 1),
+                band: groupWithZ(Z.p03, BASE_RATE_MIN_N - 1),
+            }),
+            scope,
+            ['fib', 'ma', 'band']
+        );
+        expect(table.rows.find(r => r.family === 'fib')?.holmP).toBeCloseTo(
+            0.03,
+            3
+        );
+    });
+
+    it('never reads beats_placebo while a family has no market and half breakdown', () => {
+        const table = priceLevelFamilyTable(
+            summaryOf({ fib: groupWithZ(Z.p0001) }),
+            scope,
+            ['fib']
+        );
+        const fib = table.rows[0];
+        expect(fib.inputs.significant).toBe(true);
+        expect(fib.inputs.low).toBeGreaterThan(0);
+        expect(fib.inputs.splits).toEqual({
+            early: null,
+            late: null,
+            us: null,
+            kr: null,
+        });
+        expect(fib.row.verdict).toBe('no_edge');
+    });
+
+    it('stores the verdict the shared rule gives the inputs it keeps', () => {
+        const table = priceLevelFamilyTable(
+            summaryOf({
+                fib: groupWithZ(Z.p50),
+                ma: groupWithZ(Z.p001),
+                band: groupWithZ(-Z.p20),
+            }),
+            scope,
+            FAMILIES
+        );
+        table.rows.forEach(r => {
+            expect(r.row.verdict).toBe(verdictOf(r.inputs));
+        });
+    });
+
+    it('refuses a family whose difference it cannot compute', () => {
+        expect(() =>
+            priceLevelFamilyTable(
+                summaryOf({
+                    fib: {
+                        held: { n: 5000, share: 0.5 },
+                        transplant: { n: 15000, share: 0.5 },
+                        difference: { mean: null, low: null, high: null },
+                    },
+                }),
+                scope,
+                ['fib']
+            )
+        ).toThrow('is not computable');
+    });
+});
+
+describe('intervalP', () => {
+    it('is 0.05 at the edge of a 95% interval, 1 at a zero difference, symmetric in sign', () => {
+        expect(intervalP({ mean: 0.0196, low: 0, high: 0.0392 })).toBeCloseTo(
+            0.05,
+            3
+        );
+        expect(intervalP({ mean: 0, low: -0.01, high: 0.01 })).toBeCloseTo(
+            1,
+            6
+        );
+        expect(intervalP({ mean: -0.0196, low: -0.0392, high: 0 })).toBeCloseTo(
+            0.05,
+            3
+        );
+    });
+
+    it('is null for a missing or zero-width interval', () => {
+        expect(intervalP({ mean: null, low: 0, high: 1 })).toBeNull();
+        expect(intervalP({ mean: 0.1, low: null, high: 1 })).toBeNull();
+        expect(intervalP({ mean: 0.1, low: 0.1, high: 0.1 })).toBeNull();
+    });
+});
+
+const flatLevelSummary: LevelSummaryInput = {
+    overall: {
+        held: { n: 1000, share: 0.5 },
+        transplant: { n: 3000, share: 0.5 },
+        difference: { mean: 0, low: -0.01, high: 0.01 },
+    },
+    tables: {
+        market: {},
+        half: {},
+        family: {
+            fib: {
+                held: { n: 500, share: 0.52 },
+                transplant: { n: 1500, share: 0.5 },
+                difference: { mean: 0.02, low: -0.01, high: 0.05 },
+            },
+        },
+    },
+};
 
 describe('renderBaseRateTable', () => {
     it('writes the header, the types and one record entry per row', () => {
@@ -345,17 +529,11 @@ describe('renderBaseRateTable', () => {
             },
             patterns: pattern,
             candles: candle,
-            priceLevel: priceLevelRow(
-                {
-                    overall: {
-                        held: { n: 1000, share: 0.5 },
-                        transplant: { n: 3000, share: 0.5 },
-                        difference: { mean: 0, low: -0.01, high: 0.01 },
-                    },
-                    tables: { market: {}, half: {} },
-                },
-                scope
-            ).row,
+            priceLevel: priceLevelRow(flatLevelSummary, scope).row,
+            priceLevelFamilies: priceLevelFamilyTable(flatLevelSummary, scope, [
+                'fib',
+                'vwap',
+            ]),
         });
         expect(source).toContain(
             'GENERATED by scripts/replay/baseRateTable.ts'
@@ -368,20 +546,17 @@ describe('renderBaseRateTable', () => {
         expect(source).toContain("verdict: 'insufficient_sample'");
         expect(source).toContain('export function measuredBaseRateFor(');
         expect(source).toContain("if (timeframe !== '1Day') return null;");
+        expect(source).toContain('export const PRICE_LEVEL_FAMILY_BASE_RATES');
+        expect(source).toContain("'fib': {");
+        expect(source).toContain("'vwap': {");
+        expect(source).toContain(
+            'export function priceLevelFamilyBaseRateFor('
+        );
+        expect(source).toContain('not the bootstrap p');
     });
 
     it('gives every exported symbol its own doc, never a doc that belongs to the next one', () => {
-        const row = priceLevelRow(
-            {
-                overall: {
-                    held: { n: 1000, share: 0.5 },
-                    transplant: { n: 3000, share: 0.5 },
-                    difference: { mean: 0, low: -0.01, high: 0.01 },
-                },
-                tables: { market: {}, half: {} },
-            },
-            scope
-        ).row;
+        const row = priceLevelRow(flatLevelSummary, scope).row;
         const pattern = patternTable(
             patterns('a', 120, () => true),
             WEEKS,
@@ -403,6 +578,10 @@ describe('renderBaseRateTable', () => {
                 scope
             ),
             priceLevel: row,
+            priceLevelFamilies: priceLevelFamilyTable(flatLevelSummary, scope, [
+                'fib',
+                'vwap',
+            ]),
         });
         // No doc block is directly followed by another declaration's doc or by a blank line,
         // and the two union types each carry a doc about themselves.
@@ -526,6 +705,7 @@ function writeLevelRun(
             tables: {
                 market: { us: group, kr: group },
                 half: { 'pre-2022': group, '2022+': group },
+                family: { fib: group, ma: group },
             },
         })
     );
@@ -704,6 +884,23 @@ describe('generateTable and runBaseRateTable', () => {
         );
         expect(companion.chartPatterns.rows).toHaveLength(2);
         expect(companion.priceLevel.row.verdict).toBe('no_edge');
+        expect(
+            companion.priceLevelFamilies.rows.map(
+                (r: { family: string }) => r.family
+            )
+        ).toEqual([
+            'avwap',
+            'band',
+            'fib',
+            'ichimoku',
+            'ma',
+            'pivot',
+            'round',
+            'supertrend',
+            'swing',
+            'vp',
+            'vwap',
+        ]);
         await runBaseRateTable(world.args, () => undefined);
         expect(readFileSync(world.args.out, 'utf-8')).toBe(first);
         const config = (await resolveConfig(TABLE_PATH)) ?? {};
@@ -883,3 +1080,39 @@ describe('generateTable and runBaseRateTable', () => {
         );
     });
 });
+
+/**
+ * The reproduction gate (CONVENTIONS.md#TE-16): regenerates the table from the clean runs it
+ * was made from and compares it with the committed file, everything below the header (the
+ * header carries the date and the commit the runs were made on). The runs live outside the
+ * repository, so this runs only when `BASE_RATE_RUNS` names a directory that holds the three
+ * run directories `geometry`, `c9` and `levels`:
+ *
+ *   BASE_RATE_RUNS=<dir> yarn test src/__tests__/scripts/replay/baseRateTable.test.ts
+ */
+const RUNS_DIR = process.env.BASE_RATE_RUNS;
+
+describe.skipIf(RUNS_DIR === undefined || RUNS_DIR === '')(
+    'reproduction from the runs',
+    () => {
+        const body = (source: string): string =>
+            source.slice(source.indexOf('import type { ChartPatternId'));
+
+        it('regenerates the committed table, below its header, byte for byte', async () => {
+            const dir = RUNS_DIR ?? '';
+            const args: BaseRateTableArgs = {
+                engine: join(dir, 'geometry'),
+                candles: join(dir, 'c9'),
+                levels: join(dir, 'levels'),
+                out: '',
+                json: null,
+                date: '2000-01-01',
+                allowDirty: true,
+            };
+            const generated = await generateTable(args, readInputs(args));
+            expect(body(generated.source)).toBe(
+                body(readFileSync(TABLE_PATH, 'utf-8'))
+            );
+        }, 3_600_000);
+    }
+);

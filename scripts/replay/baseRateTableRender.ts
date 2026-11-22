@@ -56,6 +56,7 @@ export function renderBaseRateTable(input: {
     patterns: SubjectTable;
     candles: SubjectTable;
     priceLevel: BaseRateRow;
+    priceLevelFamilies: SubjectTable;
 }): string {
     const { header } = input;
     return `/**
@@ -128,6 +129,42 @@ ${recordSource(input.candles)}
 };
 
 export const PRICE_LEVEL_BASE_RATE: MeasuredBaseRate = ${rowSource(input.priceLevel)};
+
+/**
+ * The same measurement per kind family of the printed price levels (fib, vp, swing, ma,
+ * round, pivot, ichimoku, band, supertrend, vwap, avwap), pooled across the symbols of the set
+ * (see \`scope\`), both markets and every period: a claim made from a row must say so and
+ * give its \`n\` (resolved touches). Read it through \`priceLevelFamilyBaseRateFor\`: a family
+ * with fewer than BASE_RATE_MIN_N touches, or none, carries the pooled figures of
+ * \`PRICE_LEVEL_BASE_RATE\` under \`key: 'pooled'\` with \`insufficient_sample\`, and such a
+ * row is NOT the family's measurement. A family's p is reconstructed from its stored interval
+ * (normal approximation), not the bootstrap p, and its split by market and half is not
+ * measured, so no family can read \`beats_placebo\`. Never a statement about a single level of
+ * a report.
+ */
+export const PRICE_LEVEL_FAMILY_BASE_RATES: Readonly<
+    Record<string, MeasuredBaseRate>
+> = {
+${recordSource(input.priceLevelFamilies)}
+};
+
+/**
+ * The measured base rate of a price-level kind family, or \`null\` when the family has no
+ * measurement of its own: it is not in the table, or its row is the pooled figures under
+ * \`insufficient_sample\` (too few touches, or none).
+ */
+export function priceLevelFamilyBaseRateFor(
+    family: string
+): MeasuredBaseRate | null {
+    const row = Object.entries(PRICE_LEVEL_FAMILY_BASE_RATES).find(
+        ([key]) => key === family
+    )?.[1];
+    return row === undefined ||
+        row.key !== family ||
+        row.verdict === 'insufficient_sample'
+        ? null
+        : row;
+}
 
 /**
  * The measured base rate of a detected pattern or candle; \`null\` off daily bars (nothing
