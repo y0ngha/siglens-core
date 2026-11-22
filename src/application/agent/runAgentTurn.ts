@@ -49,6 +49,7 @@ import type {
     RunAgentTurnDependencies,
     RunAgentTurnParams,
     RunAgentTurnResult,
+    WebSearchClaim,
 } from './types';
 
 const DEFAULT_MAX_OUTPUT_TOKENS = 4_096;
@@ -343,6 +344,7 @@ export async function runAgentTurn(
     const now = params.now ?? new Date();
     const { counters } = deps;
     const globalLimits = deps.globalLimits ?? AGENT_GLOBAL_LIMITS;
+    const executorMetering = deps.webSearchMetering === 'executor';
     const { userId, tier } = params;
 
     // 1. Daily quotas. An uncapped (`Infinity`) quota is not counted at all:
@@ -533,31 +535,38 @@ export async function runAgentTurn(
                     ))
                 )
                     return refuse({ error: 'quota', scope: 'daily' });
-                if (
-                    !(await claim(
-                        counters.webSearchGlobalDay,
-                        GLOBAL_SUBJECT,
-                        globalLimits.webSearchPerDay
-                    ))
-                ) {
-                    console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
-                        scope: 'global_day',
-                        limit: globalLimits.webSearchPerDay,
-                    });
-                    return refuse({ error: 'quota', scope: 'global_day' });
-                }
-                if (
-                    !(await claim(
-                        counters.webSearchGlobalMonth,
-                        GLOBAL_SUBJECT,
-                        globalLimits.webSearchPerMonth
-                    ))
-                ) {
-                    console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
-                        scope: 'global_month',
-                        limit: globalLimits.webSearchPerMonth,
-                    });
-                    return refuse({ error: 'quota', scope: 'global_month' });
+                // In executor metering the shared budget is charged by the
+                // executor, per billed request, not per tool call.
+                if (!executorMetering) {
+                    if (
+                        !(await claim(
+                            counters.webSearchGlobalDay,
+                            GLOBAL_SUBJECT,
+                            globalLimits.webSearchPerDay
+                        ))
+                    ) {
+                        console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+                            scope: 'global_day',
+                            limit: globalLimits.webSearchPerDay,
+                        });
+                        return refuse({ error: 'quota', scope: 'global_day' });
+                    }
+                    if (
+                        !(await claim(
+                            counters.webSearchGlobalMonth,
+                            GLOBAL_SUBJECT,
+                            globalLimits.webSearchPerMonth
+                        ))
+                    ) {
+                        console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+                            scope: 'global_month',
+                            limit: globalLimits.webSearchPerMonth,
+                        });
+                        return refuse({
+                            error: 'quota',
+                            scope: 'global_month',
+                        });
+                    }
                 }
             }
             return {
@@ -574,6 +583,81 @@ export async function runAgentTurn(
             }
             return refuse({ error: 'unavailable' });
         }
+    };
+
+    /**
+     * One-call claim closure for `webSearchMetering: 'executor'`. Day then
+     * month, like the gate; the day unit is given back when the month refuses.
+     * A unit that was claimed is never refunded afterwards (the upstream
+     * request may already have been billed). The first call decides; later
+     * calls replay its result so a retrying executor cannot charge twice.
+     */
+    const createWebSearchClaim = (): (() => Promise<WebSearchClaim>) => {
+        let decided: Promise<WebSearchClaim> | undefined;
+        const decide = async (): Promise<WebSearchClaim> => {
+            if (turnSignal.aborted) {
+                return { ok: false, refusal: { error: 'unavailable' } };
+            }
+            const claimedDay: boolean[] = [];
+            try {
+                if (globalLimits.webSearchPerDay !== Infinity) {
+                    if (
+                        !(await counters.webSearchGlobalDay.consume(
+                            GLOBAL_SUBJECT,
+                            globalLimits.webSearchPerDay
+                        ))
+                    ) {
+                        console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+                            scope: 'global_day',
+                            limit: globalLimits.webSearchPerDay,
+                        });
+                        return {
+                            ok: false,
+                            refusal: { error: 'quota', scope: 'global_day' },
+                        };
+                    }
+                    claimedDay.push(true);
+                }
+                if (
+                    globalLimits.webSearchPerMonth !== Infinity &&
+                    !(await counters.webSearchGlobalMonth.consume(
+                        GLOBAL_SUBJECT,
+                        globalLimits.webSearchPerMonth
+                    ))
+                ) {
+                    if (claimedDay.length > 0) {
+                        await safeRefund(
+                            counters.webSearchGlobalDay,
+                            GLOBAL_SUBJECT
+                        );
+                    }
+                    console.warn(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+                        scope: 'global_month',
+                        limit: globalLimits.webSearchPerMonth,
+                    });
+                    return {
+                        ok: false,
+                        refusal: { error: 'quota', scope: 'global_month' },
+                    };
+                }
+                return { ok: true };
+            } catch (error) {
+                if (!(error instanceof CounterStoreUnavailableError)) {
+                    console.warn('[runAgentTurn] tool quota check failed', {
+                        name: 'web_search',
+                        error,
+                    });
+                }
+                if (claimedDay.length > 0) {
+                    await safeRefund(
+                        counters.webSearchGlobalDay,
+                        GLOBAL_SUBJECT
+                    );
+                }
+                return { ok: false, refusal: { error: 'unavailable' } };
+            }
+        };
+        return () => (decided ??= decide());
     };
 
     /** Returns the serialized tool message content. */
@@ -625,6 +709,9 @@ export async function runAgentTurn(
                         tier,
                         locale: params.locale,
                         signal: turnSignal,
+                        ...(executorMetering && call.name === 'web_search'
+                            ? { claimWebSearchUnit: createWebSearchClaim() }
+                            : {}),
                     }),
                     turnSignal
                 ),

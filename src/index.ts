@@ -1359,6 +1359,7 @@ export type {
     AgentRemaining,
     ExecuteTool,
     ToolExecutionContext,
+    WebSearchClaim,
 } from './application/agent/types';
 export type { ProviderErrorCode } from './application/shared/providerError';
 export type { ArgIssue, ValidateArgsResult } from './domain/agent/validateArgs';

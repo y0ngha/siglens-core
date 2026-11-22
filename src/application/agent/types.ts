@@ -68,6 +68,17 @@ export interface RunAgentTurnParams {
     signal?: AbortSignal;
 }
 
+/** Result of `ToolExecutionContext.claimWebSearchUnit`. */
+export type WebSearchClaim =
+    | { ok: true }
+    | {
+          ok: false;
+          /** Return this as the tool result; it is the same shape the gate emits. */
+          refusal:
+              | { error: 'quota'; scope: 'global_day' | 'global_month' }
+              | { error: 'unavailable' };
+      };
+
 export interface ToolExecutionContext {
     /** The requesting user's id, forwarded to the executor. */
     userId: string;
@@ -77,6 +88,16 @@ export interface ToolExecutionContext {
     locale: AgentLocale;
     /** Combined caller/deadline abort signal for the in-flight tool call. */
     signal: AbortSignal;
+    /**
+     * Present only for `web_search` calls when
+     * `RunAgentTurnDependencies.webSearchMetering === 'executor'`. Claims one
+     * unit of the service-wide budget: call it immediately before the billed
+     * upstream request, never for a cache hit or a provider that is not
+     * billed. Idempotent per tool call: the first call decides, later calls
+     * return the same result without charging again. On `ok: false` the
+     * executor returns `refusal` as its result.
+     */
+    claimWebSearchUnit?: () => Promise<WebSearchClaim>;
 }
 
 /** Executor contract: never throws for domain errors — return `{ error }`. */
@@ -116,6 +137,13 @@ export interface RunAgentTurnDependencies {
     maxOutputTokens?: number;
     /** Service-wide web-search caps; defaults to `AGENT_GLOBAL_LIMITS`. */
     globalLimits?: AgentGlobalLimits;
+    /**
+     * Where the service-wide `web_search` budget is charged. `'gate'` (default)
+     * charges it before the executor runs, for every call. `'executor'` leaves
+     * it to the executor, which claims one unit per billed request through
+     * `ToolExecutionContext.claimWebSearchUnit`.
+     */
+    webSearchMetering?: 'gate' | 'executor';
 }
 
 export type AgentTurnEvent =

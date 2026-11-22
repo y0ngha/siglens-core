@@ -13,6 +13,7 @@ import type {
     AgentTurnEvent,
     RunAgentTurnDependencies,
     RunAgentTurnParams,
+    ToolExecutionContext,
 } from '@/application/agent/types';
 import type {
     AgentMessage,
@@ -162,6 +163,291 @@ function failingProvider(error: unknown) {
 afterEach(() => {
     vi.useRealTimers();
     vi.restoreAllMocks();
+});
+
+describe('runAgentTurn webSearchMetering', () => {
+    const search = (id: string) => ({
+        id,
+        name: 'web_search',
+        args: { query: 'x' },
+    });
+    const oneToolStep = (
+        ...toolCalls: Array<{
+            id: string;
+            name: string;
+            args: Record<string, unknown>;
+        }>
+    ) =>
+        scriptedProvider([
+            { text: '', toolCalls, stopReason: 'tool_use', usage: USAGE },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+
+    /** Executor that claims `claims` times and returns the claim results. */
+    function claimingExecutor(claims: number) {
+        return vi.fn(
+            async (
+                name: string,
+                _args: Record<string, unknown>,
+                ctx: ToolExecutionContext
+            ) => {
+                if (ctx.claimWebSearchUnit === undefined)
+                    return { tool: name, claimed: 'absent' };
+                const results = await Array.from({ length: claims }).reduce<
+                    Promise<unknown[]>
+                >(
+                    async (acc, _) => [
+                        ...(await acc),
+                        await ctx.claimWebSearchUnit?.(),
+                    ],
+                    Promise.resolve([])
+                );
+                return { tool: name, results };
+            }
+        );
+    }
+
+    it('gate 모드(기본): 실행기 컨텍스트에 claimWebSearchUnit이 없고 전역 카운터는 호출 전에 소비된다', async () => {
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, { executeTool: claimingExecutor(1) });
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { tool: 'web_search', claimed: 'absent' },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(1);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(1);
+    });
+
+    it("'gate'를 명시해도 기본값과 같다", async () => {
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(1),
+            webSearchMetering: 'gate',
+        });
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { tool: 'web_search', claimed: 'absent' },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(1);
+    });
+
+    it('executor 모드: 실행기가 claim하지 않으면 전역 consume이 한 번도 없다', async () => {
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(0),
+            webSearchMetering: 'executor',
+        });
+        const day = vi.spyOn(d.counters.webSearchGlobalDay, 'consume');
+        const month = vi.spyOn(d.counters.webSearchGlobalMonth, 'consume');
+        await runAgentTurn(params(), d);
+        expect(day).not.toHaveBeenCalled();
+        expect(month).not.toHaveBeenCalled();
+        expect(d.executeTool).toHaveBeenCalledTimes(1);
+    });
+
+    it('executor 모드: claim은 일 → 월을 한 번씩 소비하고 ok를 돌려준다', async () => {
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(1),
+            webSearchMetering: 'executor',
+        });
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { tool: 'web_search', results: [{ ok: true }] },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(1);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(1);
+    });
+
+    it('executor 모드: 같은 호출에서 claim을 또 불러도 같은 결과, 추가 소비 없음', async () => {
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(3),
+            webSearchMetering: 'executor',
+        });
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            {
+                tool: 'web_search',
+                results: [{ ok: true }, { ok: true }, { ok: true }],
+            },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(1);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(1);
+    });
+
+    it('executor 모드: 서로 다른 web_search 호출은 각자 한 단위를 쓴다', async () => {
+        const p = oneToolStep(search('w1'), search('w2'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(2),
+            webSearchMetering: 'executor',
+        });
+        await runAgentTurn(params(), d);
+        expect(d.counters.webSearchGlobalDay.count).toBe(2);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(2);
+    });
+
+    it('executor 모드: 일 예산 소진 → quota global_day와 알람 마커, 월은 건드리지 않는다', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(2),
+            webSearchMetering: 'executor',
+            globalLimits: { webSearchPerDay: 7, webSearchPerMonth: 70 },
+        });
+        d.counters.webSearchGlobalDay = memoryCounter(0);
+        await runAgentTurn(params(), d);
+        const refusal = {
+            ok: false,
+            refusal: { error: 'quota', scope: 'global_day' },
+        };
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { tool: 'web_search', results: [refusal, refusal] },
+        ]);
+        expect(warn).toHaveBeenCalledWith(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+            scope: 'global_day',
+            limit: 7,
+        });
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(0);
+    });
+
+    it('executor 모드: 월 예산 소진 → 일 단위 환불, quota global_month와 알람 마커', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(1),
+            webSearchMetering: 'executor',
+            globalLimits: { webSearchPerDay: 7, webSearchPerMonth: 70 },
+        });
+        d.counters.webSearchGlobalMonth = memoryCounter(0);
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            {
+                tool: 'web_search',
+                results: [
+                    {
+                        ok: false,
+                        refusal: { error: 'quota', scope: 'global_month' },
+                    },
+                ],
+            },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(0);
+        expect(warn).toHaveBeenCalledWith(WEB_SEARCH_BUDGET_EXHAUSTED_LOG, {
+            scope: 'global_month',
+            limit: 70,
+        });
+    });
+
+    it('executor 모드: 한도가 Infinity면 그 카운터는 건드리지 않는다', async () => {
+        const p = oneToolStep(search('w1'));
+        const d = deps(p, {
+            executeTool: claimingExecutor(1),
+            webSearchMetering: 'executor',
+            globalLimits: {
+                webSearchPerDay: Infinity,
+                webSearchPerMonth: Infinity,
+            },
+        });
+        await runAgentTurn(params(), d);
+        expect(toolResults(p.calls[1]!)).toEqual([
+            { tool: 'web_search', results: [{ ok: true }] },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(0);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(0);
+    });
+
+    it.each(['webSearchGlobalDay', 'webSearchGlobalMonth'] as const)(
+        'executor 모드: %s 장애 → unavailable, 이미 쓴 일 단위는 돌려준다',
+        async counter => {
+            vi.spyOn(console, 'warn').mockImplementation(() => {});
+            const p = oneToolStep(search('w1'));
+            const d = deps(p, {
+                executeTool: claimingExecutor(1),
+                webSearchMetering: 'executor',
+            });
+            d.counters[counter] = unavailableCounter();
+            await runAgentTurn(params(), d);
+            expect(toolResults(p.calls[1]!)).toEqual([
+                {
+                    tool: 'web_search',
+                    results: [{ ok: false, refusal: { error: 'unavailable' } }],
+                },
+            ]);
+            expect(d.counters.webSearchGlobalDay.count).toBe(0);
+        }
+    );
+
+    it('executor 모드: 턴이 abort된 뒤의 claim은 카운터를 건드리지 않는다', async () => {
+        const controller = new AbortController();
+        const p = oneToolStep(search('w1'));
+        const results: unknown[] = [];
+        const d = deps(p, {
+            executeTool: vi.fn(
+                async (
+                    _name: string,
+                    _args: Record<string, unknown>,
+                    ctx: ToolExecutionContext
+                ) => {
+                    controller.abort();
+                    results.push(await ctx.claimWebSearchUnit?.());
+                    return { done: true };
+                }
+            ),
+            webSearchMetering: 'executor',
+        });
+        await runAgentTurn(params({ signal: controller.signal }), d);
+        expect(results).toEqual([
+            { ok: false, refusal: { error: 'unavailable' } },
+        ]);
+        expect(d.counters.webSearchGlobalDay.count).toBe(0);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(0);
+    });
+
+    it('executor 모드: web_search가 아닌 도구에는 claim 클로저를 주지 않는다', async () => {
+        const seen: Array<[string, boolean]> = [];
+        const p = oneToolStep(search('w1'), quoteCall);
+        const d = deps(p, {
+            executeTool: vi.fn(
+                async (
+                    name: string,
+                    _args: Record<string, unknown>,
+                    ctx: ToolExecutionContext
+                ) => {
+                    seen.push([name, ctx.claimWebSearchUnit !== undefined]);
+                    return { ok: true };
+                }
+            ),
+            webSearchMetering: 'executor',
+        });
+        await runAgentTurn(params(), d);
+        expect(seen).toEqual(
+            expect.arrayContaining([
+                ['web_search', true],
+                ['get_quote', false],
+            ])
+        );
+        expect(seen).toHaveLength(2);
+    });
+
+    it('executor 모드: 턴당 상한은 claim이 아니라 호출 수로 센다', async () => {
+        const cap = AGENT_TURN_CAPS.maxWebSearch;
+        const p = oneToolStep(
+            ...Array.from({ length: cap + 1 }, (_, i) => search(`w${i}`))
+        );
+        const d = deps(p, {
+            executeTool: claimingExecutor(0),
+            webSearchMetering: 'executor',
+        });
+        await runAgentTurn(params(), d);
+        expect(d.executeTool).toHaveBeenCalledTimes(cap);
+        expect(toolResults(p.calls[1]!)[cap]).toEqual({
+            error: 'quota',
+            scope: 'per_turn',
+        });
+        expect(d.counters.webSearchGlobalDay.count).toBe(0);
+    });
 });
 
 describe('runAgentTurn', () => {
