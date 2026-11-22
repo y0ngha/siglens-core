@@ -18,7 +18,7 @@ import {
 } from '@/domain/analysis/outputLocale';
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { isActiveModelId } from '@/domain/analysis/modelSpecs';
 import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { ActiveModelId, NewsAnalysisResponse } from '@/domain/types';
@@ -116,10 +116,9 @@ export async function runMarketNewsDigest(
 
     // callModelId resolves the actual ActiveModelId for the AI call.
     // Deprecated model strings live in ModelId but not in MODEL_SPECS.
-    const callModelId: ActiveModelId =
-        (modelId as string) in MODEL_SPECS
-            ? (modelId as ActiveModelId)
-            : DEEPSEEK_V4_1_FLASH_MODEL;
+    const callModelId: ActiveModelId = isActiveModelId(modelId)
+        ? modelId
+        : DEEPSEEK_V4_1_FLASH_MODEL;
 
     // ── 4. LLM call (with in-flight deduplication) ──
     const raw = await dedupeGeneration(

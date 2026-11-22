@@ -12,7 +12,7 @@ import type {
 } from '@/application/investorFlows/types';
 import { normalizeInvestorFlowsAnalysisResponse } from '@/domain/analysis/normalizeInvestorFlows';
 import { buildInvestorFlowsAnalysisPrompt } from '@/domain/analysis/investorFlowsPrompt';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { isActiveModelId } from '@/domain/analysis/modelSpecs';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
@@ -176,10 +176,9 @@ export async function runInvestorFlowsAnalysis(
     // Restate the output language as the LAST instruction; empty for the default locale.
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
-    const callModelId: ActiveModelId =
-        (modelId as string) in MODEL_SPECS
-            ? (modelId as ActiveModelId)
-            : DEEPSEEK_V4_1_FLASH_MODEL;
+    const callModelId: ActiveModelId = isActiveModelId(modelId)
+        ? modelId
+        : DEEPSEEK_V4_1_FLASH_MODEL;
 
     const raw = await dedupeGeneration(
         cache,

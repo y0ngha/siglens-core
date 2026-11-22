@@ -4,6 +4,7 @@ import {
     isChatGPTModel,
     isClaudeModel,
     isDeepSeekModel,
+    isActiveModelId,
     isGeminiModel,
     isReasoningToggleable,
     MODEL_SPECS,
@@ -589,5 +590,18 @@ describe('2026-11 roster rows (floors per vendor docs, not sent; low/high measur
                 expect(TIER_CONFIG.models[tier], model).not.toContain(model);
             }
         }
+    });
+});
+
+describe('isActiveModelId', () => {
+    it('accepts every MODEL_SPECS key', () => {
+        for (const key of Object.keys(MODEL_SPECS)) {
+            expect(isActiveModelId(key)).toBe(true);
+        }
+    });
+
+    it('rejects deprecated or unknown model strings', () => {
+        expect(isActiveModelId('claude-3-opus-retired')).toBe(false);
+        expect(isActiveModelId('')).toBe(false);
     });
 });
