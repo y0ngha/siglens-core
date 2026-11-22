@@ -1111,6 +1111,13 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * the model's value is overwritten, and kept only when it cannot be measured
  * (under 40 bars, no usable ATR or close). Results carry an optional `trendBasis`. Bytes change for every technical
  * prompt.
+ * Detected signals change too (C11e): `golden_cross` / `death_cross` are now the
+ * SMA50/SMA200 cross (201 bars, so a daily chart only), and the former SMA20/SMA50
+ * rule is reported as `short_ma_bullish_cross` / `short_ma_bearish_cross`. The signal
+ * list the prompt prints, the confluence tally's type names and the skill selection
+ * read the new ids; the tally itself is unchanged (the new pair is in family `ma`, the
+ * 50/200 cross is excluded). Bytes change for technical prompts whose bars carry
+ * either cross.
  *
  * @internal
  */

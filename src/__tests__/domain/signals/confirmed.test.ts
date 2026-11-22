@@ -17,6 +17,8 @@ import {
     detectParabolicSarFlip,
     detectRsiOverbought,
     detectRsiOversold,
+    detectShortMaBearishCross,
+    detectShortMaBullishCross,
     detectSqueezeMomentumBullish,
     detectSupertrendBullishFlip,
     findCross,
@@ -217,7 +219,175 @@ function buildBarsWithCloses(closes: number[]): Bar[] {
     }));
 }
 
-describe('detectGoldenCross', () => {
+/** Plain trailing SMA of `values` at index `end` (inclusive); independent of the detectors. */
+function smaAt(values: readonly number[], end: number, period: number): number {
+    const window = values.slice(end - period + 1, end + 1);
+    return window.reduce((sum, v) => sum + v, 0) / period;
+}
+
+/**
+ * First index `i` (with a full slow window) where `fast` crosses `slow` in `direction`
+ * on bar `i` (previous bar not already across), mirroring the detectors' cross rule
+ * (`fPrev <= sPrev && f > s` up, `fPrev >= sPrev && f < s` down).
+ */
+function firstCrossIndex(
+    closes: readonly number[],
+    fastPeriod: number,
+    slowPeriod: number,
+    direction: 'up' | 'down'
+): number {
+    const idx = closes.findIndex((_, i) => {
+        if (i < slowPeriod) return false;
+        const f = smaAt(closes, i, fastPeriod);
+        const s = smaAt(closes, i, slowPeriod);
+        const fPrev = smaAt(closes, i - 1, fastPeriod);
+        const sPrev = smaAt(closes, i - 1, slowPeriod);
+        return direction === 'up'
+            ? fPrev <= sPrev && f > s
+            : fPrev >= sPrev && f < s;
+    });
+    if (idx < 0) throw new Error('fixture has no cross');
+    return idx;
+}
+
+// 230 slowly falling bars then a steep rise: SMA50 climbs through the still-falling SMA200.
+const GOLDEN_50_200_CLOSES: readonly number[] = [
+    ...Array.from({ length: 230 }, (_, i) => 200 - i * 0.4),
+    ...Array.from({ length: 70 }, (_, i) => 108 + i * 2),
+];
+// Mirror: 230 slowly rising bars then a steep fall.
+const DEATH_50_200_CLOSES: readonly number[] = [
+    ...Array.from({ length: 230 }, (_, i) => 100 + i * 0.4),
+    ...Array.from({ length: 70 }, (_, i) => 192 - i * 2),
+];
+
+describe('detectGoldenCross (SMA50 vs SMA200)', () => {
+    const crossIdx = firstCrossIndex(GOLDEN_50_200_CLOSES, 50, 200, 'up');
+
+    it('교차한 봉이 마지막 봉이면 Signal을 반환한다', () => {
+        const bars = buildBarsWithCloses(
+            GOLDEN_50_200_CLOSES.slice(0, crossIdx + 1)
+        );
+        const result = detectGoldenCross(bars, EMPTY_INDICATOR_RESULT);
+        expect(result).toEqual({
+            type: 'golden_cross',
+            direction: 'bullish',
+            phase: 'confirmed',
+            detectedAt: crossIdx,
+        });
+    });
+
+    it('교차 후 마지막 3봉(교차 봉 포함) 안이면 계속 반환한다', () => {
+        const bars = buildBarsWithCloses(
+            GOLDEN_50_200_CLOSES.slice(0, crossIdx + 3)
+        );
+        expect(
+            detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)?.detectedAt
+        ).toBe(crossIdx);
+    });
+
+    it('교차가 마지막 3봉 밖으로 밀리면 null을 반환한다', () => {
+        const bars = buildBarsWithCloses(
+            GOLDEN_50_200_CLOSES.slice(0, crossIdx + 4)
+        );
+        expect(detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+
+    it('교차 이전 봉에서는 null이다', () => {
+        const bars = buildBarsWithCloses(
+            GOLDEN_50_200_CLOSES.slice(0, crossIdx)
+        );
+        expect(detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+
+    it('200봉이면 SMA200이 마지막 봉에서 처음 나오는 길이라도 201봉 미만이므로 null이다', () => {
+        const bars = buildBarsWithCloses(GOLDEN_50_200_CLOSES.slice(0, 200));
+        expect(detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+
+    it('20/50만 교차하는 V자 시리즈에서는 null이다(이전 규칙이 아니다)', () => {
+        const closes = [
+            ...Array.from({ length: 45 }, (_, i) => 100 - i * 0.5),
+            ...Array.from({ length: 15 }, (_, i) => 77.5 + i * 2),
+        ];
+        const bars = buildBarsWithCloses(closes);
+        expect(detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+
+    it('사전 계산된 MA50/MA200을 재사용해도 같은 결과를 낸다', () => {
+        const bars = buildBarsWithCloses(
+            GOLDEN_50_200_CLOSES.slice(0, crossIdx + 1)
+        );
+        const indicators: IndicatorResult = {
+            ...EMPTY_INDICATOR_RESULT,
+            ma: { 50: calculateMA(bars, 50), 200: calculateMA(bars, 200) },
+        };
+        expect(detectGoldenCross(bars, indicators)).toEqual(
+            detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)
+        );
+    });
+
+    it('사전 계산된 MA가 있으면 그 값을 쓴다(계산을 다시 하지 않는다)', () => {
+        const bars = buildBarsWithCloses(
+            GOLDEN_50_200_CLOSES.slice(0, crossIdx + 1)
+        );
+        // 평탄한 가짜 시리즈를 주입하면 교차가 없으므로 null — 주입값이 쓰였다는 증거.
+        const flat = Array<number | null>(bars.length).fill(100);
+        const indicators: IndicatorResult = {
+            ...EMPTY_INDICATOR_RESULT,
+            ma: { 50: flat, 200: flat },
+        };
+        expect(detectGoldenCross(bars, indicators)).toBeNull();
+    });
+});
+
+describe('detectDeathCross (SMA50 vs SMA200)', () => {
+    const crossIdx = firstCrossIndex(DEATH_50_200_CLOSES, 50, 200, 'down');
+
+    it('교차한 봉이 마지막 봉이면 Signal을 반환한다', () => {
+        const bars = buildBarsWithCloses(
+            DEATH_50_200_CLOSES.slice(0, crossIdx + 1)
+        );
+        expect(detectDeathCross(bars, EMPTY_INDICATOR_RESULT)).toEqual({
+            type: 'death_cross',
+            direction: 'bearish',
+            phase: 'confirmed',
+            detectedAt: crossIdx,
+        });
+    });
+
+    it('교차 후 마지막 3봉 안이면 반환하고 4봉째에는 null이다', () => {
+        const within = buildBarsWithCloses(
+            DEATH_50_200_CLOSES.slice(0, crossIdx + 3)
+        );
+        const outside = buildBarsWithCloses(
+            DEATH_50_200_CLOSES.slice(0, crossIdx + 4)
+        );
+        expect(detectDeathCross(within, EMPTY_INDICATOR_RESULT)).not.toBeNull();
+        expect(detectDeathCross(outside, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+
+    it('200봉이면 null이다', () => {
+        const bars = buildBarsWithCloses(DEATH_50_200_CLOSES.slice(0, 200));
+        expect(detectDeathCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+
+    it('평탄한 시리즈에서는 null이다', () => {
+        const bars = buildBarsWithCloses(Array(260).fill(100));
+        expect(detectDeathCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+
+    it('20/50만 교차하는 역V자 시리즈에서는 null이다', () => {
+        const closes = [
+            ...Array.from({ length: 45 }, (_, i) => 100 + i * 0.5),
+            ...Array.from({ length: 15 }, (_, i) => 122.5 - i * 2),
+        ];
+        const bars = buildBarsWithCloses(closes);
+        expect(detectDeathCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+    });
+});
+
+describe('detectShortMaBullishCross (SMA20 vs SMA50)', () => {
     describe('최근 3봉 내 MA20이 MA50을 상향 교차할 때', () => {
         it('Signal을 반환한다', () => {
             // V-shape: 45봉 하락(100→77.5) 후 15봉 상승(77.5→105.5).
@@ -227,9 +397,12 @@ describe('detectGoldenCross', () => {
                 ...Array.from({ length: 15 }, (_, i) => 77.5 + i * 2),
             ];
             const bars = buildBarsWithCloses(closes);
-            const result = detectGoldenCross(bars, EMPTY_INDICATOR_RESULT);
+            const result = detectShortMaBullishCross(
+                bars,
+                EMPTY_INDICATOR_RESULT
+            );
             expect(result).not.toBeNull();
-            expect(result?.type).toBe('golden_cross');
+            expect(result?.type).toBe('short_ma_bullish_cross');
             expect(result?.direction).toBe('bullish');
             expect(result?.phase).toBe('confirmed');
         });
@@ -244,14 +417,18 @@ describe('detectGoldenCross', () => {
                 ...Array.from({ length: 20 }, (_, i) => 77.5 + i * 2),
             ];
             const bars = buildBarsWithCloses(closes);
-            expect(detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+            expect(
+                detectShortMaBullishCross(bars, EMPTY_INDICATOR_RESULT)
+            ).toBeNull();
         });
     });
 
     describe('bars가 MA50에 부족할 때', () => {
         it('null을 반환한다', () => {
             const bars = buildBarsWithCloses(Array(30).fill(100));
-            expect(detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+            expect(
+                detectShortMaBullishCross(bars, EMPTY_INDICATOR_RESULT)
+            ).toBeNull();
         });
     });
 
@@ -260,7 +437,9 @@ describe('detectGoldenCross', () => {
             // 51봉 flat: len=51, start=max(1, 51-3)=48. MA50은 idx=48에서 null이라
             // null 건너뛰기 분기(continue)가 실행됨.
             const bars = buildBarsWithCloses(Array(51).fill(100));
-            expect(detectGoldenCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+            expect(
+                detectShortMaBullishCross(bars, EMPTY_INDICATOR_RESULT)
+            ).toBeNull();
         });
     });
 
@@ -278,14 +457,14 @@ describe('detectGoldenCross', () => {
                 ...EMPTY_INDICATOR_RESULT,
                 ma: { 20: precomputedMa20 },
             };
-            const result = detectGoldenCross(bars, indicators);
+            const result = detectShortMaBullishCross(bars, indicators);
             expect(result).not.toBeNull();
-            expect(result?.type).toBe('golden_cross');
+            expect(result?.type).toBe('short_ma_bullish_cross');
         });
     });
 });
 
-describe('detectDeathCross', () => {
+describe('detectShortMaBearishCross (SMA20 vs SMA50)', () => {
     describe('최근 3봉 내 MA20이 MA50을 하향 교차할 때', () => {
         it('Signal을 반환한다', () => {
             // Inverted V-shape: 45봉 상승(100→122.5) 후 15봉 하락(122.5→94.5).
@@ -294,9 +473,12 @@ describe('detectDeathCross', () => {
                 ...Array.from({ length: 15 }, (_, i) => 122.5 - i * 2),
             ];
             const bars = buildBarsWithCloses(closes);
-            const result = detectDeathCross(bars, EMPTY_INDICATOR_RESULT);
+            const result = detectShortMaBearishCross(
+                bars,
+                EMPTY_INDICATOR_RESULT
+            );
             expect(result).not.toBeNull();
-            expect(result?.type).toBe('death_cross');
+            expect(result?.type).toBe('short_ma_bearish_cross');
             expect(result?.direction).toBe('bearish');
             expect(result?.phase).toBe('confirmed');
         });
@@ -306,14 +488,18 @@ describe('detectDeathCross', () => {
         it('null을 반환한다', () => {
             const closes = Array(80).fill(100);
             const bars = buildBarsWithCloses(closes);
-            expect(detectDeathCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+            expect(
+                detectShortMaBearishCross(bars, EMPTY_INDICATOR_RESULT)
+            ).toBeNull();
         });
     });
 
     describe('bars가 MA50에 부족할 때', () => {
         it('null을 반환한다', () => {
             const bars = buildBarsWithCloses(Array(30).fill(100));
-            expect(detectDeathCross(bars, EMPTY_INDICATOR_RESULT)).toBeNull();
+            expect(
+                detectShortMaBearishCross(bars, EMPTY_INDICATOR_RESULT)
+            ).toBeNull();
         });
     });
 
@@ -329,9 +515,9 @@ describe('detectDeathCross', () => {
                 ...EMPTY_INDICATOR_RESULT,
                 ma: { 20: precomputedMa20 },
             };
-            const result = detectDeathCross(bars, indicators);
+            const result = detectShortMaBearishCross(bars, indicators);
             expect(result).not.toBeNull();
-            expect(result?.type).toBe('death_cross');
+            expect(result?.type).toBe('short_ma_bearish_cross');
         });
     });
 });

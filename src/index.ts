@@ -160,6 +160,13 @@ export type {
     ConfirmedSignalTimelineOptions,
 } from './domain/signals/timeline';
 export {
+    CROSS_LOOKBACK_BARS,
+    GOLDEN_CROSS_FAST_PERIOD,
+    GOLDEN_CROSS_SLOW_PERIOD,
+    SHORT_MA_CROSS_FAST_PERIOD,
+    SHORT_MA_CROSS_SLOW_PERIOD,
+} from './domain/signals/constants';
+export {
     confluenceFamilyWeight,
     CONFLUENCE_EXIT_MIN,
     CONFLUENCE_EXIT_SCORE,

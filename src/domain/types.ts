@@ -2258,6 +2258,8 @@ export type ConfirmedSignalType =
     | 'rsi_overbought'
     | 'golden_cross'
     | 'death_cross'
+    | 'short_ma_bullish_cross'
+    | 'short_ma_bearish_cross'
     | 'macd_bullish_cross'
     | 'macd_bearish_cross'
     | 'bollinger_lower_bounce'

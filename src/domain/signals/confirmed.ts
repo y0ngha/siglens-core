@@ -1,5 +1,6 @@
 import type {
     Bar,
+    ConfirmedSignalType,
     CrossDirection,
     IndicatorResult,
     MACDResult,
@@ -29,6 +30,8 @@ import {
     GAP_MIN_ATR_MULT,
     GOLDEN_CROSS_FAST_PERIOD,
     GOLDEN_CROSS_SLOW_PERIOD,
+    SHORT_MA_CROSS_FAST_PERIOD,
+    SHORT_MA_CROSS_SLOW_PERIOD,
     SQUEEZE_MOMENTUM_ZERO_CROSS,
 } from '@/domain/signals/constants';
 
@@ -112,48 +115,96 @@ export function findThresholdCross(
     return null;
 }
 
-/** @internal Detects a fast-over-slow MA golden cross (bullish confirmed signal). */
-export function detectGoldenCross(
+/** Which two SMAs cross, in which direction, and the signal that reports it. */
+interface SmaCrossSpec {
+    readonly fastPeriod: number;
+    readonly slowPeriod: number;
+    readonly direction: CrossDirection;
+    readonly type: ConfirmedSignalType;
+}
+
+/**
+ * Shared body of the four MA-cross detectors, so the golden/death pair (50/200) and the
+ * short-term pair (20/50) cannot drift apart. Needs `slowPeriod + 1` bars. The signal's
+ * bias follows the cross direction (`up` is bullish), so a call site cannot pair a
+ * bullish type with a downward cross by accident.
+ */
+function detectSmaCross(
     bars: Bar[],
-    indicators: IndicatorResult
+    indicators: IndicatorResult,
+    { fastPeriod, slowPeriod, direction, type }: SmaCrossSpec
 ): Signal | null {
-    if (bars.length < GOLDEN_CROSS_SLOW_PERIOD + 1) return null;
-    const fast =
-        indicators.ma[GOLDEN_CROSS_FAST_PERIOD] ??
-        calculateMA(bars, GOLDEN_CROSS_FAST_PERIOD);
-    const slow =
-        indicators.ma[GOLDEN_CROSS_SLOW_PERIOD] ??
-        calculateMA(bars, GOLDEN_CROSS_SLOW_PERIOD);
-    const crossIdx = findCross(fast, slow, CROSS_LOOKBACK_BARS, 'up');
+    if (bars.length < slowPeriod + 1) return null;
+    const fast = indicators.ma[fastPeriod] ?? calculateMA(bars, fastPeriod);
+    const slow = indicators.ma[slowPeriod] ?? calculateMA(bars, slowPeriod);
+    const crossIdx = findCross(fast, slow, CROSS_LOOKBACK_BARS, direction);
     if (crossIdx === null) return null;
     return {
-        type: 'golden_cross',
-        direction: 'bullish',
+        type,
+        direction: direction === 'up' ? 'bullish' : 'bearish',
         phase: 'confirmed',
         detectedAt: crossIdx,
     };
 }
 
-/** @internal Detects a fast-under-slow MA death cross (bearish confirmed signal). */
+/**
+ * Detects a golden cross: SMA50 crossing above SMA200 within the last
+ * `CROSS_LOOKBACK_BARS` bars (bullish confirmed signal). Needs 201 bars.
+ *
+ * Before C11e this id meant SMA20/SMA50; that rule is now
+ * {@link detectShortMaBullishCross}.
+ *
+ * @internal
+ */
+export function detectGoldenCross(
+    bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    return detectSmaCross(bars, indicators, {
+        fastPeriod: GOLDEN_CROSS_FAST_PERIOD,
+        slowPeriod: GOLDEN_CROSS_SLOW_PERIOD,
+        direction: 'up',
+        type: 'golden_cross',
+    });
+}
+
+/** @internal Detects a death cross: SMA50 crossing below SMA200 within the last `CROSS_LOOKBACK_BARS` bars (bearish). Needs 201 bars. */
 export function detectDeathCross(
     bars: Bar[],
     indicators: IndicatorResult
 ): Signal | null {
-    if (bars.length < GOLDEN_CROSS_SLOW_PERIOD + 1) return null;
-    const fast =
-        indicators.ma[GOLDEN_CROSS_FAST_PERIOD] ??
-        calculateMA(bars, GOLDEN_CROSS_FAST_PERIOD);
-    const slow =
-        indicators.ma[GOLDEN_CROSS_SLOW_PERIOD] ??
-        calculateMA(bars, GOLDEN_CROSS_SLOW_PERIOD);
-    const crossIdx = findCross(fast, slow, CROSS_LOOKBACK_BARS, 'down');
-    if (crossIdx === null) return null;
-    return {
+    return detectSmaCross(bars, indicators, {
+        fastPeriod: GOLDEN_CROSS_FAST_PERIOD,
+        slowPeriod: GOLDEN_CROSS_SLOW_PERIOD,
+        direction: 'down',
         type: 'death_cross',
-        direction: 'bearish',
-        phase: 'confirmed',
-        detectedAt: crossIdx,
-    };
+    });
+}
+
+/** @internal Detects the short-term MA bullish cross: SMA20 crossing above SMA50 within the last `CROSS_LOOKBACK_BARS` bars. Needs 51 bars. */
+export function detectShortMaBullishCross(
+    bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    return detectSmaCross(bars, indicators, {
+        fastPeriod: SHORT_MA_CROSS_FAST_PERIOD,
+        slowPeriod: SHORT_MA_CROSS_SLOW_PERIOD,
+        direction: 'up',
+        type: 'short_ma_bullish_cross',
+    });
+}
+
+/** @internal Detects the short-term MA bearish cross: SMA20 crossing below SMA50 within the last `CROSS_LOOKBACK_BARS` bars. Needs 51 bars. */
+export function detectShortMaBearishCross(
+    bars: Bar[],
+    indicators: IndicatorResult
+): Signal | null {
+    return detectSmaCross(bars, indicators, {
+        fastPeriod: SHORT_MA_CROSS_FAST_PERIOD,
+        slowPeriod: SHORT_MA_CROSS_SLOW_PERIOD,
+        direction: 'down',
+        type: 'short_ma_bearish_cross',
+    });
 }
 
 function findMacdCross(

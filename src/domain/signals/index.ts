@@ -28,6 +28,8 @@ import {
     detectParabolicSarFlip,
     detectRsiOverbought,
     detectRsiOversold,
+    detectShortMaBearishCross,
+    detectShortMaBullishCross,
     detectSqueezeMomentumBearish,
     detectSqueezeMomentumBullish,
     detectSupertrendBearishFlip,
@@ -53,6 +55,8 @@ const DETECTORS: readonly Detector[] = [
     detectRsiOverbought,
     detectGoldenCross,
     detectDeathCross,
+    detectShortMaBullishCross,
+    detectShortMaBearishCross,
     detectMacdBullishCross,
     detectMacdBearishCross,
     detectBollingerLowerBounce,
@@ -95,8 +99,8 @@ const DETECTORS: readonly Detector[] = [
  * Run every bundled signal detector against bars + indicators and collect
  * the non-null results.
  *
- * Combines 32 confirmed-signal detectors — bullish/bearish mirror pairs for
- * RSI overbought / oversold, golden / death cross, MACD cross, Bollinger band
+ * Combines 34 confirmed-signal detectors — bullish/bearish mirror pairs for
+ * RSI overbought / oversold, golden / death cross (SMA50/SMA200), short-term MA cross (SMA20/SMA50), MACD cross, Bollinger band
  * touches, Bollinger %B mean-reversion crosses, Supertrend / Parabolic SAR
  * flips, Ichimoku breakout / breakdown,
  * CCI / DMI / CMF crosses, MFI bounce / reversal, Keltner breakouts,

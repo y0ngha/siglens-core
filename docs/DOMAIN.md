@@ -1737,7 +1737,7 @@ display:
 ### Modules
 
 - `trend.ts` — `classifyTrend(bars, indicators): TrendState` using EMA20 slope over 20 bars (±3% threshold)
-- `confirmed.ts` — 32 detectors: bullish/bearish pairs over RSI, MA cross, MACD, Bollinger (band touch, %B), Supertrend, Parabolic SAR, Ichimoku, CCI, DMI, CMF, MFI, Keltner, squeeze momentum, plus the price-structure pairs `new_52w_high`/`new_52w_low` (close past every high/low in `[last − 365d, last)`, only when the window's first bar is ≥ 358 days old) and `gap_up`/`gap_down` (last bar's range clears the previous bar's by ≥ 0.25 × ATR(14), or by any amount when ATR is unavailable). The four price-structure types are excluded from the `evaluateConfluence` tally (not measured as votes).
+- `confirmed.ts` — 34 detectors: bullish/bearish pairs over RSI, golden/death cross (SMA50 vs SMA200, needs 201 bars), short-term MA cross `short_ma_bullish_cross`/`short_ma_bearish_cross` (SMA20 vs SMA50, the pre-C11e `golden_cross` rule, needs 51 bars; family `ma` in the confluence tally), MACD, Bollinger (band touch, %B), Supertrend, Parabolic SAR, Ichimoku, CCI, DMI, CMF, MFI, Keltner, squeeze momentum, plus the price-structure pairs `new_52w_high`/`new_52w_low` (close past every high/low in `[last − 365d, last)`, only when the window's first bar is ≥ 358 days old) and `gap_up`/`gap_down` (last bar's range clears the previous bar's by ≥ 0.25 × ATR(14), or by any amount when ATR is unavailable). The four price-structure types and the 50/200 `golden_cross`/`death_cross` are excluded from the `evaluateConfluence` tally (not measured as votes; the 20/50 rule the tally was measured on is `short_ma_*`, so the tally is unchanged).
 - `anticipation.ts` — 8 detectors: RSI regular divergence (bullish/bearish), MACD histogram convergence (bullish/bearish), Bollinger squeeze (bullish/bearish), Support/Resistance proximity (bullish/bearish)
 - `index.ts` — `detectSignals(bars, indicators)` aggregator
 - `newSignals.ts` — `detectNewConfirmedSignals(bars)`: confirmed signals that begin on the last bar (confirmed in `detectSignals` on `bars` and of a `type` not confirmed on `bars.slice(0, -1)`). The episode-start rule a once-per-session recorder applies, from the bars alone. A cross still inside `CROSS_LOOKBACK_BARS` since an earlier bar, a state signal that keeps holding and any `expected`-phase signal are not returned; one that ended and restarted on the last bar is. Fewer than 2 bars → `[]`.
@@ -1745,7 +1745,8 @@ display:
 
 ### Key Constants (`domain/signals/constants.ts`)
 
-- `CROSS_LOOKBACK_BARS = 3` — max bar distance to accept golden/death/MACD cross as recent
+- `CROSS_LOOKBACK_BARS = 3` — max bar distance to accept golden/death/short-MA/MACD cross as recent (public)
+- `GOLDEN_CROSS_FAST_PERIOD = 50`, `GOLDEN_CROSS_SLOW_PERIOD = 200` — golden/death cross SMA periods; `SHORT_MA_CROSS_FAST_PERIOD = 20`, `SHORT_MA_CROSS_SLOW_PERIOD = 50` — short-term MA cross (all public, both entrypoints)
 - `DIVERGENCE_LOOKBACK_BARS = 20`, `DIVERGENCE_FRESHNESS_BARS = 5`, `PIVOT_WINDOW = 2`
 - `HISTOGRAM_CONVERGENCE_BARS = 5`
 - `SQUEEZE_LOOKBACK_BARS = 120`, `SQUEEZE_PERCENTILE = 0.1`, `SQUEEZE_PCT_B_THRESHOLD = 0.5`

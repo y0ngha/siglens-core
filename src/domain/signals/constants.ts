@@ -1,5 +1,5 @@
 // Confirmed signal thresholds
-/** @internal Lookback window (bars) for cross-based confirmed signals. */
+/** Lookback window (bars) for cross-based confirmed signals: a cross counts while it sits within the last this-many bars. */
 export const CROSS_LOOKBACK_BARS = 3;
 
 // Price-structure confirmed signals (52-week extremes, gaps)
@@ -54,11 +54,17 @@ export const TREND_EMA_PERIOD = 20;
  */
 export const TREND_SLOPE_MIN_ATR = 1.0;
 
-// Golden/Death cross periods: slow period (50) is not in MA_DEFAULT_PERIODS
-/** @internal Fast MA period for golden/death cross detection. */
-export const GOLDEN_CROSS_FAST_PERIOD = 20;
-/** @internal Slow MA period for golden/death cross detection. */
-export const GOLDEN_CROSS_SLOW_PERIOD = 50;
+// Golden/Death cross (50/200) and short-term MA cross (20/50) periods.
+// Neither pair is fully in MA_DEFAULT_PERIODS ([5, 20, 60, 120, 200]); the detectors
+// fall back to `calculateMA` for the missing periods.
+/** Fast SMA period of the golden/death cross (the 50/200 "golden cross" in common usage). */
+export const GOLDEN_CROSS_FAST_PERIOD = 50;
+/** Slow SMA period of the golden/death cross. Detection needs `SLOW + 1` bars. */
+export const GOLDEN_CROSS_SLOW_PERIOD = 200;
+/** Fast SMA period of the short-term MA cross (the pre-C11e `golden_cross` rule). */
+export const SHORT_MA_CROSS_FAST_PERIOD = 20;
+/** Slow SMA period of the short-term MA cross. Detection needs `SLOW + 1` bars. */
+export const SHORT_MA_CROSS_SLOW_PERIOD = 50;
 /** @internal MA periods used as support/resistance reference levels. */
 export const SR_MA_PERIODS = [50, 200] as const;
 
