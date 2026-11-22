@@ -3,11 +3,6 @@ import {
     isCompanyEarningsEvent,
 } from '@/domain/analysis/earningsEvents';
 import { ANALYSIS_TREND_MIN_BARS } from '@/domain/analysis/analysisTrend';
-import { structuralRiskReward } from '@/domain/analysis/planCheck';
-import {
-    AT_PRICE_BAR_RANGE_FRACTION,
-    meanBarRangePercent,
-} from '@/domain/analysis/referenceLevels';
 import {
     formatNullableNumber,
     formatQuotedPrice,
@@ -45,8 +40,6 @@ import type {
     NewsCategory,
     NewsImpact,
     PullbackEventCaveatInput,
-    ReferenceLevel,
-    ReferenceLevels,
     Timeframe,
 } from '@/domain/types';
 
@@ -54,8 +47,8 @@ import type {
  * Deterministic chart facts rendered into the analysis prompt.
  *
  * Numbers the model was previously asked to produce itself now arrive pre-computed: the
- * indicator-confluence tally, the short-term washout reading (daily charts) and the
- * risk:reward available from the current price.
+ * indicator-confluence tally, the short-term washout reading (daily charts), the trend
+ * and the stop and target spacing.
  *
  * **Why confluence moved out of the model.** The prompt used to instruct: *"Count
  * confirming signals from different categories … Strong confluence: 3+ categories agree."*
@@ -78,13 +71,16 @@ import type {
  * the time, so without the reading next to it the tally pulls the verdict the wrong way on
  * exactly the charts where the measured edge is.
  *
- * **Why risk:reward moved out.** Downstream measurement on live
- * ticks showed the nearest resistance sitting *below* the current price a meaningful share of
- * the time, with only a sliver of upside to the first obstacle. The effect was worst exactly
- * where the indicators agreed most — median risk:reward collapsed toward **0** in the
- * highest composite-score band. Strong confluence is therefore not evidence that entering now is attractive,
- * and the model cannot notice that unless the ratio is put in front of it before it writes
- * a verdict.
+ * **Why the structural risk:reward is gone (WP-18).** The block divided the distance to the
+ * nearest level above by the distance to the nearest level below and told the model that a
+ * ratio under 1.0 meant "entering here risks more than the next move offers". Across the
+ * 65-symbol daily replay set both anchors sat a median 0.53 ATR from the close (inside one
+ * bar's range), the ratio's rank correlation with the next 10 sessions' return was 0.001,
+ * and the printed levels held no more often than a price at the same distance on another
+ * date. A verdict sentence on a number that carries no information is a claim the data
+ * contradict (DOM-9, DOM-12), so the ratio and its sentences were removed; the measured
+ * level statement is in the market reference framing and the plan's own risk:reward is
+ * arithmetic on its own stop and target (`planCheck`).
  */
 
 /**
@@ -164,10 +160,6 @@ const CONFLUENCE_RELIABILITY: Record<Timeframe, string> = {
     '4Hour': INTRADAY_RELIABILITY,
     '1Day': 'Daily, descriptive only — measured 2000–2026, days with this entry rule met were followed by below-baseline 10-day returns in every period, and exit-rule days by returns above the baseline in three of five, level with it in a fourth and below it in 2007–09. Report the tally as how many indicator families agree, not as evidence for or against entering.',
 };
-
-function fmtRatio(n: number): string {
-    return n.toFixed(2);
-}
 
 /** `short_ma_bullish_cross(ma)` — or `support_proximity_bullish(support, half weight)` when expected. */
 function describeSignal(type: string): string {
@@ -249,12 +241,12 @@ const PULLBACK_HEADER = '### Short-term sell-off check (computed, 1Day bars)';
  *
  * Asked to judge it, the model never chose "enter": across repeated A/B runs,
  * `entryRecommendation` was "wait" every time. It read the
- * reading's normal companions — a bearish tally, a sub-1.0 structural ratio, a red Elder
+ * reading's normal companions — a bearish tally, a red Elder
  * Impulse, price under the short averages — as missing confirmation, and asked for a
  * reversal candle or a close back above MA5. That confirmation is exactly what the
  * measurement found costs the edge (waiting for %R to cross back lost it in every
  * period). Rewriting the rule alone moved only some washout days to "enter"; printing the
- * verdict as a rule-engine value, like the tally and the ratio, moved all of them and left
+ * verdict as a rule-engine value, like the tally, moved all of them and left
  * every near-washout day at "wait".
  */
 /**
@@ -375,8 +367,7 @@ const PULLBACK_READING_TEXT: Record<PullbackReading, string> = {
 /**
  * Render the washout half of the block — daily charts only.
  *
- * The inputs precede the reading for the same reason the risk:reward block prints its
- * levels before its ratio: the model can check the conclusion against the numbers. The
+ * The inputs precede the reading so the model can check the conclusion against the numbers. The
  * base rate is printed only for a reading that has one; `none` carries no claim.
  */
 function formatPullback(
@@ -430,97 +421,25 @@ function formatPullbackSection(
           ];
 }
 
-/**
- * Levels beyond the at-price band on each side: not flagged `atPrice` by the reference
- * builder, and at least `floorPercent` away (the distance check also covers a reference
- * assembled without flags).
- */
-function levelsBeyondNoise(
-    levels: ReferenceLevels,
-    floorPercent: number
-): ReferenceLevels {
-    const clear = (l: ReferenceLevel): boolean =>
-        !l.atPrice && Math.abs(l.distancePercent) >= floorPercent;
-    return {
-        support: levels.support.filter(clear),
-        resistance: levels.resistance.filter(clear),
-    };
-}
-
-/** Pick the tightest horizon that still has a level beyond the noise floor on both sides. */
-function nearestLevels(
-    reference: MarketReference,
-    floorPercent: number
-): ReferenceLevels | null {
-    for (const horizon of [reference.short, reference.medium, reference.long]) {
-        const levels = levelsBeyondNoise(horizon.levels, floorPercent);
-        if (levels.resistance.length > 0 && levels.support.length > 0) {
-            return levels;
-        }
-    }
-    return null;
-}
+const ENTRY_ZONE_HEADER = '### Entry Zone vs Last Close';
 
 /**
- * Render the risk:reward half of the block.
- *
- * Deliberately phrased as a constraint on the *verdict* rather than on the prose. The
- * downstream failure was not that analyses described the upside inaccurately — it was that
- * `entryRecommendation` said "enter" while the nearest obstacle was half a percent away.
+ * The close the plan state is judged against, printed with the zone's own formatter (DOM-8,
+ * DOM-11) so the model can place the zone around it. It lives here and not in the Step 1
+ * rule because that rule sits in the cross-symbol byte-stable prefix and cannot carry a
+ * per-chart number. Empty without a usable last close.
  */
-const RISK_REWARD_HEADER = '### Risk:Reward From Current Price';
-
-function formatRiskReward(
-    reference: MarketReference,
+function formatEntryZoneRule(
     bars: readonly Bar[],
     quoting: PriceQuoting
 ): string[] {
-    const meanRangePercent = meanBarRangePercent(bars);
-    const floorPercent = meanRangePercent * AT_PRICE_BAR_RANGE_FRACTION;
-    const noiseNote =
-        floorPercent > 0
-            ? [
-                  `Levels within ${formatNullableNumber(floorPercent)}% of the current price (half the mean bar range over the last ${ATR_DEFAULT_PERIOD} bars) sit inside ordinary bar noise and are skipped here. Do not anchor a stop-loss or an entry trigger on such an at-price level.`,
-              ]
-            : [];
-    // Said explicitly rather than dropping the block: a silently absent ratio reads to the
-    // model as "nothing to worry about", which is a claim, not an absence of measurement.
-    const notMeasurable = [
-        RISK_REWARD_HEADER,
-        ...noiseNote,
-        'Not measurable: no horizon has both a support and a resistance level beyond bar noise. This is an absence of measurement, not a favourable or unfavourable ratio — do not derive one from at-price levels.',
-    ];
-
-    const levels = nearestLevels(reference, floorPercent);
-    const up = levels?.resistance[0];
-    const down = levels?.support[0];
-    if (!levels || !up || !down) return notMeasurable;
-
-    // Can still be null after the guard above: a zero-distance support or a "resistance"
-    // the collector placed at or below the price makes the ratio undefined, not zero.
-    //
-    // Both legs use their raw distances. The noise band above already bounds each leg from
-    // below at the same half bar range, so the ratio cannot explode. Flooring only the risk
-    // leg at a full bar range was tried and rejected: across 90 real charts it pushed 34
-    // verdicts from >= 1.0 to below 1.0, where the verdict sentence ("the nearest obstacle
-    // above is closer than the nearest support below") became false.
-    const ratio = structuralRiskReward(levels);
-    if (ratio === null) return notMeasurable;
-
-    const verdict =
-        ratio < 1
-            ? 'Below 1.0: the nearest obstacle above is closer than the nearest support below. Outside the sell-off path, entering here risks more than the next move offers.'
-            : 'At or above 1.0: there is more room to the next obstacle above than to the support below.';
-
+    const close = bars.at(-1)?.close;
+    if (close === undefined || !Number.isFinite(close) || close <= 0) {
+        return [];
+    }
     return [
-        RISK_REWARD_HEADER,
-        ...noiseNote,
-        `Nearest resistance ${up.label} at ${formatQuotedPrice(up.price, quoting)} (${formatNullableNumber(up.distancePercent)}%)`,
-        `Nearest support ${down.label} at ${formatQuotedPrice(down.price, quoting)} (${formatNullableNumber(down.distancePercent)}%)`,
-        `Structural risk:reward from current price = ${fmtRatio(ratio)}`,
-        verdict,
-        // The correlation is the part the model cannot infer from the ratio alone.
-        'Measured downstream: analyses with the strongest indicator agreement carried the WORST ratios (median 0.00 in the highest agreement band, 1.27 in a middling one). Outside the sell-off path, strong indicator agreement plus a sub-1.0 ratio is a reason to put the entry zone at a named pullback level rather than at the price, not a reason to enter at the price. On a sell-off in an uptrend the nearest levels sit a bar or two away on both sides, so this ratio is not the measured edge and does not override the sell-off verdict.',
+        ENTRY_ZONE_HEADER,
+        `Last close ${formatQuotedPrice(close, quoting)}. Code reads entryPrices against this close with exact edges: the zone contains it when its low <= close <= its high; a zone whose high is below the close is a pullback plan; a zone above the close needs a rise into it. Step 1 of the action rules gives the entryRecommendation for each. To plan an entry at the price, make the zone contain the last close.`,
     ];
 }
 
@@ -615,7 +534,6 @@ export function formatDeterministicMetricsSection(
         events,
         earningsDates
     );
-    const riskReward = formatRiskReward(reference, bars, quoting);
     const spacing = formatStopTargetSpacing(
         reference,
         bars,
@@ -629,7 +547,7 @@ export function formatDeterministicMetricsSection(
         ...formatTrendBlock(trend, bars.length, quoting),
         ...confluence,
         ...pullback,
-        ...riskReward,
         ...spacing,
+        ...formatEntryZoneRule(bars, quoting),
     ].join('\n');
 }

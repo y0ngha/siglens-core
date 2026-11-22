@@ -1188,6 +1188,23 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * it. Bytes change only for the daily charts that carried such a line (4 of 838 in the
  * replay set).
  *
+ * The structural risk:reward is gone and the zone has one rule (WP-18, still `p34`,
+ * unreleased). `### Risk:Reward From Current Price` (the nearest level above over the
+ * nearest below, with its two verdict sentences) leaves `## Deterministic Metrics`, and the
+ * Step 1 bullet that turned a sub-1.0 ratio into "a named pullback level" and the "sub-1.0
+ * structural ratio" in the sell-off bullet leave the action rules; its at-price noise
+ * sentence moves into `### Stop & Target Spacing`. The market reference framing replaces
+ * "backtesting shows precise level/trend prediction is near-random" with the measured hold
+ * rate of the printed levels (numbers on `1Day`, none on intraday). The plan state reads the
+ * close against the entry zone by exact edges (`zoneLow <= close <= zoneTop`, no 1% band
+ * above the top), the same comparison the outcome labeller uses, so
+ * `entryRecommendation = enter` falls (on the replay set's stored plans: `in_zone` from
+ * 51.8% to 19.6%). Step 1 says "enter" when the close is inside the zone and tells the
+ * model to make the zone contain the last close to plan an entry at the price; the close
+ * itself is printed in the new `### Entry Zone vs Last Close` block (Step 1 sits in the
+ * byte-stable prefix and cannot carry it). Stable bytes change for every technical prompt
+ * (Step 1 and the sell-off bullet), dynamic bytes for every technical prompt.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p34' as const;

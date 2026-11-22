@@ -146,31 +146,43 @@ specific mistake this wording exists to prevent. `exitMin` stays at the module d
 every timeframe, including the daily one where `min` rises: raising an entry bar must not
 raise the exit bar with it.
 
-The section also renders **structural risk:reward from the current price**, computed off
-the reference levels rendered immediately above it. That ordering is the point — the model
-sees the inputs, then the conclusion, and can check one against the other. The reason it
-exists at all is an observed failure mode: the nearest resistance often sat *below* the
-current price, and risk:reward was inversely related to signal strength (collapsing
-toward **0** in the highest-conviction band). Strong confluence is therefore not evidence that entering now is
-attractive, and the model cannot notice that unless the ratio precedes its verdict.
+The section used to render a **structural risk:reward from the current price** (the nearest
+level above divided by the nearest level below) with two verdict sentences, and Step 1 turned a
+sub-1.0 ratio into "put the zone at a named pullback level". WP-18 removed the block, the
+sentences and the Step 1 bullet. Measured on the 65-symbol daily replay set (41,036 days):
+both anchors sat a median 0.53 ATR from the close, inside one bar's range; the ratio's rank
+correlation with the next 10 sessions' return was 0.001; and the printed levels held no more
+often than a price at the same distance on another date (49.6% against 49.7% of 550,171
+touches, `PRICE_LEVEL_HOLD_RATE`). A verdict sentence on a number that carries no information is
+a claim the data contradict (DOM-9, DOM-12). No level score exists either: a fitted score of
+kinds, touches, volume and recency did not beat its own placebo out of sample
+(`scripts/replay/levelEval.ts`, gate L-gate). The measured statement is in the market reference
+framing (`formatLevelHoldFraming`, numbers on `1Day`, none on intraday), and the plan's own
+risk:reward stays arithmetic on its own stop and target (`planCheck`, the `riskReward` line).
 
-The ratio skips levels closer than **half the mean bar range of the last 14 bars**. Without
-that floor it divided by whichever level happened to touch the price — hourly AAPL paired a
-0.06% "resistance" with a 0.01% "support", a 15-minute NVDA chart printed 180.38 — which is
-noise divided by noise, and the model was then told to put stops on those levels. Two
-upstream fixes remove most such levels at the source: intraday pivots are computed from the
-**prior session** (not the prior bar, whose pivot sits on the price) grouped by the
-listing's own calendar date (Eastern for U.S. equities, KST for KRW, UTC for crypto), and
-round-number steps follow one continuous rule — the smallest 1/2.5/5×10ⁿ at or above 2% of
+The **at-price noise band** stays: levels closer than half the mean bar range of the last 14
+bars are flagged `atPrice` and are not stop or entry candidates. Without that floor a stop
+landed on whichever level touched the price (hourly AAPL paired a 0.06% "resistance" with a
+0.01% "support"). `### Stop & Target Spacing` now carries the sentence that says so ("Levels
+within X% of the current price ... are skipped in the lists below"), next to the lists it
+describes. Two upstream fixes remove most such levels at the source: intraday pivots are
+computed from the **prior session** (not the prior bar, whose pivot sits on the price) grouped
+by the listing's own calendar date (Eastern for U.S. equities, KST for KRW, UTC for crypto),
+and round-number steps follow one continuous rule — the smallest 1/2.5/5×10ⁿ at or above 2% of
 price (a flat 10 put `Round 77110` next to BTC; the old $1–$1,000 tier table jumped 20× at
 its seams).
 
 `splitBySide` flags levels inside that band `atPrice` and keeps at most two of them **outside**
-the six-per-side cap. Capping first let an at-price cluster fill every slot, and the
-risk:reward block then found no usable level and vanished; it now says "not measurable"
-instead. Its legs use raw distances — the noise band already bounds both. A full-bar-range
-floor on the risk leg alone was tried and removed: it flipped 34 of 90 real-chart verdicts
-below 1.0 and made the verdict sentence false.
+the six-per-side cap, so an at-price cluster cannot fill every slot and leave a side empty.
+
+**One zone rule (WP-18, N46).** The close is read against the plan's entry zone by exact edges
+everywhere: `in_zone` is `zoneLow <= close <= zoneTop`, above the top is `above_zone`, below the
+low is `below_zone` (`positionAgainstZone`, shared by `planCheck.exceedsEntryZone`, `buildPlanState`
+and the outcome labeller's approach). WP-15's 1% band above the top called a plan `in_zone` /
+`enter` while the model had written a pullback plan (the zone's high under the close) and the
+labeller filled it only on a dip; with the band gone the three agree. The last close is printed
+in `### Entry Zone vs Last Close` (the zone's own price formatter) because Step 1 sits in the
+cross-symbol byte-stable prefix and cannot carry a per-chart number.
 
 ## Short-term washout (`signals/pullback.ts`)
 
@@ -194,7 +206,7 @@ and is the oscillator the chart prompt already prints; `rsi2` is reported for re
   the verdict the wrong way on exactly the charts with the measured edge.
 - **The washout verdict is the rule engine's, not the model's.** Asked to judge it, the
   model effectively never chose "enter" (across repeated A/B runs): it read the reading's
-  normal companions — a bearish tally, a sub-1.0 structural ratio, a red Elder Impulse — as
+  normal companions — a bearish tally, a red Elder Impulse — as
   missing confirmation. A `washoutInUptrend` block therefore prints `Entry verdict
   (computed): enter — sell-off path` and Step 1 tells the model to copy it. Near and below-MA200 readings carry no
   verdict — their edge is too thin or their loss tail too heavy to decide in code.
@@ -241,8 +253,8 @@ the model would otherwise derive itself (a time converted to another zone, a rat
 and printed by code, because the model's own derivation is the part that goes wrong.
 ❌ "per-share amounts keep their decimals" ✅ "per-share amounts keep their decimals; indicator readings and changes still round"
 
-Why: a floor on the structural risk:reward leg passed every unit test and still flipped a
-third of verdicts on real charts (see the note under the confluence section above).
+Why: a floor on the (since removed) structural risk:reward leg passed every unit test and
+still flipped a third of verdicts on real charts.
 
 <a id="DOM-8"></a>
 #### DOM-8 — Precomputed prompt values reuse the engine's own rules

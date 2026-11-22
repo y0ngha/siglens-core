@@ -5,9 +5,10 @@
  * prose of the plan agrees with the state. Pure functions over plans a run stored;
  * `analysisFieldsEval.ts` builds them from the run and the set's bars.
  *
- * The state rules here are the instrument's own copy: the tolerance rule is WP-15's (1%,
- * applied by `stateOf`), the exact rule is `zoneLow <= close <= zoneTop`. Neither calls the
- * function a run's stored field came from; the stored `planState` is only compared with.
+ * The state rules here are the instrument's own copy: the tolerance rule is WP-15's retired
+ * 1% band ({@link tolerancePositionOf}, kept only to restate old runs), the exact rule is
+ * `zoneLow <= close <= zoneTop` (what `stateOf` and production use since WP-18). Neither
+ * calls the function a run's stored field came from; the stored `planState` is only compared with.
  * `--restate exact` re-derives every position of an old run with the exact rule, no model
  * call.
  */
@@ -69,6 +70,24 @@ export function geometryOf(
     if (close > top) return close <= top * (1 + tol) ? 'band_above' : 'above';
     if (close < low) return close >= low * (1 - tol) ? 'band_below' : 'below';
     return 'strictly_inside';
+}
+
+/**
+ * The position WP-15's rule gave: a `no_setup` row stays, otherwise above the zone top by
+ * more than the 1% tolerance, below the low by more than it, else `in_zone`. Only for
+ * restating runs made before the exact-edge rule.
+ */
+export function tolerancePositionOf(
+    base: PlanPosition,
+    close: number,
+    low: number | null,
+    top: number | null
+): PlanPosition {
+    if (base === 'no_setup' || low === null || top === null) return base;
+    const tol = C.zoneTolerance;
+    if (close > top * (1 + tol)) return 'above_zone';
+    if (close < low * (1 - tol)) return 'below_zone';
+    return 'in_zone';
 }
 
 /** One plan of a run, with what the zone measurements read. */

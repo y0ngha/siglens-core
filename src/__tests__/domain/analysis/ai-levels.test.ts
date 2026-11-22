@@ -1018,6 +1018,45 @@ describe('postProcessAnalysisWithReconcile', () => {
             });
         });
 
+        it('a KRW close off the tick grid is compared at the tick the prompt printed (DOM-8)', () => {
+            const krw: AnalysisResponse = {
+                ...baseResponse,
+                actionRecommendation: {
+                    ...baseRec,
+                    entryPrices: [70_500, 71_500],
+                    stopLoss: 68_000,
+                    takeProfitPrices: [75_000],
+                },
+            };
+            // 71,540 rounds to the printed 71,500 (100-won tick), the zone high.
+            const raw = 71_540;
+            expect(roundToKrxTick(raw, 'share')).toBe(71_500);
+            const result = postProcessAnalysisWithReconcile(
+                krw,
+                raw,
+                900,
+                [],
+                'KRW',
+                undefined,
+                'share'
+            );
+            const rec = result.actionRecommendation;
+            expect(rec?.planCheck?.currentPrice).toBe(71_500);
+            expect(rec?.planCheck?.exceedsEntryZone).toBe(false);
+            expect(rec?.planState?.position).toBe('in_zone');
+            // The same raw close in a USD listing is not rounded: above the zone high.
+            const usd = postProcessAnalysisWithReconcile(
+                krw,
+                raw,
+                900,
+                [],
+                'USD'
+            );
+            expect(usd.actionRecommendation?.planCheck?.exceedsEntryZone).toBe(
+                true
+            );
+        });
+
         it('현재가가 진입 구간을 벗어나면 두 손익비가 갈라진다', () => {
             const result = postProcessAnalysisWithReconcile(
                 healthy,

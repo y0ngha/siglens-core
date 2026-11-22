@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildPlanCheck,
-    ENTRY_ZONE_TOLERANCE,
     PLAN_MIN_ATR_SPACING,
 } from '@/domain/analysis/planCheck';
 import {
@@ -127,18 +126,28 @@ describe('buildPlanState — one case per row of the state table', () => {
         ).toMatchObject({ position: 'no_setup', reason: 'no_room_above' });
     });
 
-    it('row 5: a close above the zone top by more than the tolerance is above_zone (the edge is inside)', () => {
-        const edge = ZONE_TOP * (1 + ENTRY_ZONE_TOLERANCE);
-        expect(stateOf(rec(), edge).position).toBe('in_zone');
-        const above = stateOf(rec(), edge + 0.01);
-        expect(above).toMatchObject({ position: 'above_zone' });
-        expect(above).toHaveProperty('distanceAtr');
+    it('row 5: any close above the zone top is above_zone (the edge itself is inside)', () => {
+        expect(stateOf(rec(), ZONE_TOP).position).toBe('in_zone');
+        const oneTickAbove = stateOf(rec(), ZONE_TOP + 0.01);
+        expect(oneTickAbove).toMatchObject({ position: 'above_zone' });
+        expect(oneTickAbove).toHaveProperty('distanceAtr');
+        // Inside WP-15's 1% band above the top (102 * 1.01 = 103.02): above now.
+        expect(stateOf(rec(), 102.5)).toMatchObject({
+            position: 'above_zone',
+            distanceAtr: 0.25,
+        });
     });
 
-    it('row 6: a close below the zone low by more than the tolerance is below_zone (the edge is inside)', () => {
-        const edge = ZONE_LOW * (1 - ENTRY_ZONE_TOLERANCE);
-        expect(stateOf(rec(), edge).position).toBe('in_zone');
-        expect(stateOf(rec(), edge - 0.01).position).toBe('below_zone');
+    it('row 6: any close below the zone low is below_zone (the edge itself is inside)', () => {
+        expect(stateOf(rec(), ZONE_LOW).position).toBe('in_zone');
+        expect(stateOf(rec(), ZONE_LOW - 0.01).position).toBe('below_zone');
+        expect(stateOf(rec(), 97.5).position).toBe('below_zone');
+    });
+
+    it('a live price reads by the same exact edges (0.1% over the top is above_zone)', () => {
+        const live = ZONE_TOP * 1.001;
+        expect(stateOf(rec(), live)).toMatchObject({ position: 'above_zone' });
+        expect(stateOf(rec(), ZONE_LOW * 0.999).position).toBe('below_zone');
     });
 
     it('row 7: otherwise in_zone, with a zero distance', () => {

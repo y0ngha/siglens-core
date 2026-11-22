@@ -1353,8 +1353,9 @@ entryRecommendation 계산값(모델의 선택이 아님). `actionRecommendation
 
 planState           종가가 플랜 진입 구간 어디에 있는가(`buildPlanState`). 첫 일치 우선: 구간 없음/유효 손절 없음/
                     종가가 손절 이하/구간 상단보다 1 ATR 이상 위의 목표가 없음은 `no_setup`(사유 `no_zone`,
-                    `no_stop`, `stopped`, `no_room_above`), 종가가 상단×1.01 초과면 `above_zone`, 하단×0.99
-                    미만이면 `below_zone`, 아니면 `in_zone`. 값은 사실만 말한다("구간 위"이지 "눌림을 기다려라"가
+                    `no_stop`, `stopped`, `no_room_above`), 종가가 구간 상단보다 높으면 `above_zone`, 하단보다
+                    낮으면 `below_zone`, 아니면 `in_zone`(`zoneLow ≤ 종가 ≤ zoneTop`, 경계 포함, 허용 오차 없음 —
+                    `planCheck.exceedsEntryZone`과 결과 라벨러의 접근 방향(`inside`/`from_above`/`from_below`)이 같은 비교). 값은 사실만 말한다("구간 위"이지 "눌림을 기다려라"가
                     아님). `atr`, `stopDistanceAtr`(구간 하단−손절, ATR 단위 2자리), `distanceAtr`(종가가 가까운
                     구간 경계 밖으로 벗어난 거리, 구간 안 0), `stopBasis`(`model`/`level`/`atr`)를 함께 싣는다.
                     손익비 하한은 상태 조건이 아니다(손절 하한 적용 뒤 가장 가까운 목표가 기준 손익비가 1 미만인

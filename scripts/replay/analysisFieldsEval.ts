@@ -7,7 +7,7 @@
  *   npx tsx scripts/replay/analysisFieldsEval.ts --mode trend --bars <bars dir> --labels <decisions.csv> --out <dir>
  *   npx tsx scripts/replay/analysisFieldsEval.ts --mode skills --set <set> --skills <app>/skills --out <dir>
  *       [--limit N] [--run <free after> --before <free before> [--member-run <member run>]]
- *   npx tsx scripts/replay/analysisFieldsEval.ts --mode plan --set <set> --run <run dir> --out <dir>
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode plan --set <set> --run <run dir> --out <dir> [--legacy-zone]
  *       [--before <run dir>] [--noise-pp <n>]
  *   npx tsx scripts/replay/analysisFieldsEval.ts --mode gating --set <set> --skills <app>/skills --out <dir>
  *       [--tier free|member] [--limit N] [--baseline <earlier gating out dir>]
@@ -107,6 +107,7 @@ import {
     distanceAboveTopAtr,
     exactPosition,
     geometryOf,
+    tolerancePositionOf,
     cueComparison,
     targetRoomComparison,
     zoneGates,
@@ -193,6 +194,12 @@ export interface FieldsEvalArgs {
     lang: ClaimLanguage & ZoneLanguage;
     /** `zone`: read the positions with the exact edges instead of the stored ones. */
     restate: boolean;
+    /**
+     * `plan`: the run predates the exact-edge zone rule (WP-18), so its stored `planState` is
+     * recomputed with WP-15's 1% band; without the flag P1 compares it with exact edges and a
+     * legacy run fails by design.
+     */
+    legacyZone: boolean;
 }
 
 const GATE_IDS: Record<EvalMode, readonly string[]> = {
@@ -298,6 +305,7 @@ export function parseFieldsEvalArgs(argv: readonly string[]): FieldsEvalArgs {
         repeat: raw.repeat === undefined ? null : resolve(raw.repeat),
         lang: parseLang(raw.lang),
         restate: parseRestate(raw.restate),
+        legacyZone: raw['legacy-zone'] === 'true',
     };
     if (!Number.isFinite(args.noisePp) || args.noisePp < 0) {
         throw new Error('--noise-pp must be a non-negative number');
@@ -316,6 +324,9 @@ function validateCombination(args: FieldsEvalArgs): void {
     }
     if (args.restate && mode !== 'zone') {
         throw new Error(`${mode}: --restate applies to zone only`);
+    }
+    if (args.legacyZone && mode !== 'plan') {
+        throw new Error(`${mode}: --legacy-zone applies to plan only`);
     }
     if (mode === 'trend') {
         if ((args.set === null) === (args.bars === null)) {
@@ -829,7 +840,11 @@ interface MeasuredRun {
     closeMismatch: number;
 }
 
-function measureRun(run: RunData, set: SetData): MeasuredRun {
+function measureRun(
+    run: RunData,
+    set: SetData,
+    tolerance: number = 0
+): MeasuredRun {
     const atrCache = new Map<string, readonly (number | null)[]>();
     const atrOf = (symbol: string): readonly (number | null)[] => {
         const cached = atrCache.get(symbol);
@@ -848,7 +863,7 @@ function measureRun(run: RunData, set: SetData): MeasuredRun {
     });
     return {
         run,
-        measures: built.map(b => measurePlan(b.plan)),
+        measures: built.map(b => measurePlan(b.plan, tolerance)),
         planCases: new Map(
             built.map(b => [`${b.plan.caseId}#${b.plan.repeat}`, b])
         ),
@@ -916,13 +931,17 @@ function p7Sample(
 
 function planMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
     const set = loadSetData(args.set ?? '');
-    const after = measureRun(loadRunData(args.run ?? '', set), set);
+    // A run made before the exact-edge rule shipped planState with the 1% band: compare it with
+    // that rule, or P1 fails on every plan the band called in_zone.
+    const tolerance = args.legacyZone ? C.zoneTolerance : 0;
+    const after = measureRun(loadRunData(args.run ?? '', set), set, tolerance);
     const beforeRun =
         args.before === null ? null : loadRunData(args.before, set);
     if (beforeRun !== null) {
         assertComparableRuns(after.run, beforeRun, PAIRED_RUN_FIELDS);
     }
-    const before = beforeRun === null ? null : measureRun(beforeRun, set);
+    const before =
+        beforeRun === null ? null : measureRun(beforeRun, set, tolerance);
     const labels = after.run.labels;
     const headlineKeys =
         labels === null
@@ -1008,6 +1027,9 @@ function planMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
                 labels === null
                     ? 'absent: distributions use every result, no outcomes'
                     : 'labels.jsonl',
+            zoneRule: args.legacyZone
+                ? 'legacy: 1% band (run predates the exact-edge rule)'
+                : 'exact edges',
             resultsWithoutPlan: after.noPlan,
             closeMismatch: after.closeMismatch,
             noisePp: args.noisePp,
@@ -1518,7 +1540,12 @@ function zoneCasesOf(
             atr: measure.atr,
             zoneLow: measure.zoneLow,
             zoneTop: measure.zoneTop,
-            tolerancePosition: measure.position,
+            tolerancePosition: tolerancePositionOf(
+                measure.position,
+                built.plan.close,
+                measure.zoneLow,
+                measure.zoneTop
+            ),
             storedPosition: built.plan.storedState?.position ?? null,
             approach: labels.get(built.plan.caseId) ?? null,
             prose: [

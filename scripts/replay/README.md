@@ -396,9 +396,10 @@ located label, per plan or per rendered prompt).
   comparison with a stored `planState` when there is one covers position, reason, ATR, stop
   distance, distance beyond the zone and stop basis. Distributions: position, reason, stop basis, stop and target distances in ATR,
   verdict by position, where the close sits against the zone by stored verdict (`closeVsZoneByVerdict`
-  uses the state table's 1% tolerance on both sides; `closeVsZoneByVerdictSection1` keeps the
-  figure WP-15 §1 measured, with no tolerance below the zone, so a baseline reproduces the
-  design's 420 / 277 / 104), the volatility grade
+  uses the state table's exact edges, since WP-18; a run made before that shipped a 1% band above the
+  zone top, so pass `--legacy-zone` (plan mode only) to recompute its stored `planState` with that
+  band, otherwise P1 fails on every plan the band called `in_zone`; the output `inputs.zoneRule`
+  records which rule was used), the volatility grade
   against the next 10 sessions, outcomes by position from `labels.jsonl` (a `no_setup` plan is
   relabelled as `wait`). Distributions use the headline rows when `labels.jsonl` exists
   (`planAllResults` has every result; P1 and P3 always read every result with a plan, P2 the

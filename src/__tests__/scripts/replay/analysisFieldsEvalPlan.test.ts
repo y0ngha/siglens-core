@@ -80,18 +80,19 @@ describe('stateOf: the table, first match wins', () => {
         ).toBe('no_room_above');
     });
 
-    it('row 5: above the zone only beyond the top times 1.01', () => {
-        expect(stateOf({ ...baseState, close: 101 }).position).toBe('in_zone');
-        expect(stateOf({ ...baseState, close: 101.01 }).position).toBe(
+    it('row 5: above the zone beyond the top, with no tolerance band', () => {
+        expect(stateOf({ ...baseState, close: 100 }).position).toBe('in_zone');
+        expect(stateOf({ ...baseState, close: 100.01 }).position).toBe(
+            'above_zone'
+        );
+        expect(stateOf({ ...baseState, close: 101 }).position).toBe(
             'above_zone'
         );
     });
 
-    it('row 6: below the zone only beyond the low times 0.99', () => {
-        expect(stateOf({ ...baseState, close: 97.02 }).position).toBe(
-            'in_zone'
-        );
-        expect(stateOf({ ...baseState, close: 97.01 }).position).toBe(
+    it('row 6: below the zone beyond the low, with no tolerance band', () => {
+        expect(stateOf({ ...baseState, close: 98 }).position).toBe('in_zone');
+        expect(stateOf({ ...baseState, close: 97.99 }).position).toBe(
             'below_zone'
         );
     });
@@ -573,28 +574,31 @@ describe('measurePlan', () => {
         expect(m.stateDiffs).toEqual([]);
     });
 
-    it('puts the close against the zone with the state tolerance on both sides', () => {
+    it('puts the close against the zone by exact edges on both sides', () => {
         const where = (close: number) =>
             measurePlan(planCase({ close })).closeVsZone;
-        expect(where(101)).toBe('in');
-        expect(where(101.01)).toBe('above');
-        expect(where(97.02)).toBe('in');
-        expect(where(97.01)).toBe('below');
+        expect(where(100)).toBe('in');
+        expect(where(100.01)).toBe('above');
+        expect(where(98)).toBe('in');
+        expect(where(97.99)).toBe('below');
         expect(
             measurePlan(planCase({ entryPrices: [] })).closeVsZone
         ).toBeNull();
     });
 
-    it('keeps the unbanded section 1 view apart: below is any close under the zone low', () => {
+    it("reads a run that predates the exact-edge rule with WP-15's 1% band when asked to", () => {
         const where = (close: number) =>
-            measurePlan(planCase({ close })).closeVsZoneSection1;
-        expect(where(101)).toBe('in');
-        expect(where(101.01)).toBe('above');
-        expect(where(98)).toBe('in');
-        expect(where(97.99)).toBe('below');
-        expect(
-            measurePlan(planCase({ entryPrices: [] })).closeVsZoneSection1
-        ).toBeNull();
+            measurePlan(planCase({ close }), 0.01).closeVsZone;
+        expect(where(100.9)).toBe('in');
+        expect(where(101.1)).toBe('above');
+        expect(where(97.1)).toBe('in');
+        expect(where(96.9)).toBe('below');
+        expect(measurePlan(planCase({ close: 100.9 }), 0.01).position).toBe(
+            'in_zone'
+        );
+        expect(measurePlan(planCase({ close: 100.9 })).position).toBe(
+            'above_zone'
+        );
     });
 
     it('uses the lowest target above the zone as the first target', () => {
@@ -660,7 +664,6 @@ function measure(
         stateDiffs: null,
         verdictEqual: true,
         closeVsZone: 'in',
-        closeVsZoneSection1: 'in',
         forward: null,
         rrAtEntry: null,
         ...overrides,
@@ -807,20 +810,6 @@ describe('summarizePlanRun', () => {
         expect(summarizePlanRun(rows, null).closeVsZoneByVerdict).toEqual({
             wait: { above: 2 },
             enter: { in: 1 },
-        });
-        const section1 = summarizePlanRun(
-            [
-                measure('in_zone', {
-                    caseId: 'a',
-                    closeVsZone: 'in',
-                    closeVsZoneSection1: 'below',
-                }),
-            ],
-            null
-        );
-        expect(section1.closeVsZoneByVerdict).toEqual({ wait: { in: 1 } });
-        expect(section1.closeVsZoneByVerdictSection1).toEqual({
-            wait: { below: 1 },
         });
     });
 

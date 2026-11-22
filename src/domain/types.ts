@@ -2167,8 +2167,8 @@ interface PlanStateBase {
 /**
  * The plan's state against the last close, computed by `buildPlanState`. First matching
  * row wins: no zone, no stop, close at or below the stop, no target at least one ATR above
- * the zone top (`no_setup`); otherwise the close above the zone top by more than 1%, below the
- * zone low by more than 1%, or inside it.
+ * the zone top (`no_setup`); otherwise the close above the zone top, below the zone low, or
+ * inside it (`zoneLow <= close <= zoneTop`, exact edges with no tolerance).
  */
 export type PlanState =
     | (PlanStateBase & {
@@ -2257,7 +2257,7 @@ export interface PlanCheck {
     currentPrice: number;
     /** Highest recommended entry price, or `null` when the plan names no entry. */
     entryZoneTop: number | null;
-    /** Price has risen past the entry zone by more than {@link ENTRY_ZONE_TOLERANCE}. */
+    /** The close is above the top of the entry zone (exact edge, no tolerance). */
     exceedsEntryZone: boolean;
     /** Price has already fallen through the plan's stop — the plan is void, not merely stale. */
     belowStopLoss: boolean;

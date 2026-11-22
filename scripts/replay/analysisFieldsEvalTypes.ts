@@ -59,7 +59,7 @@ export const FIELDS_EVAL_CONSTANTS = {
     minBarsForStoredLabel: 60,
     /** Stored labels further apart than this many bars are not a "day to day" pair. */
     maxPairGapBars: 5,
-    /** WP-15 §3.2-3.3: stop band, spacing and the zone tolerances. */
+    /** WP-15 §3.2-3.3: stop band and spacing; `zoneTolerance` is WP-15's retired 1% zone band, kept for the `zone` mode's restatement of old runs. */
     planMinAtrSpacing: 1,
     stopMaxAtrFromMid: 5,
     /** Fallback stop distance below the zone low (ATR) when no printed support lies in the band. */

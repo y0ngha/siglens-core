@@ -1,8 +1,4 @@
-import type {
-    ActionRecommendation,
-    PlanCheck,
-    ReferenceLevels,
-} from '@/domain/types';
+import type { ActionRecommendation, PlanCheck } from '@/domain/types';
 
 /**
  * Deterministic arithmetic comparing a trade plan against the price that actually exists.
@@ -21,17 +17,6 @@ import type {
  *
  * Nothing here overrides the AI. It measures, names the gap, and leaves the verdict alone.
  */
-
-/**
- * @internal
- *
- * Slack allowed above the entry zone before price counts as having left it (1%).
- *
- * The zone is an AI approximation and the reference price is a single close, so trimming on
- * a fractional overshoot reports noise rather than a fact. Too wide and a genuine chase
- * reads as "still in the zone".
- */
-export const ENTRY_ZONE_TOLERANCE = 0.01;
 
 /**
  * @internal Minimum distance, in ATR, between the entry zone and the stop below it, and
@@ -133,56 +118,44 @@ export function riskRewardFrom(
 /**
  * @internal
  *
- * Risk:reward from `price` to the nearest structural levels on either side.
+ * Where a price sits against an entry zone, by exact edges: `inside` for
+ * `low <= price <= high` (both edges included), `above` for `price > high`, `below` for
+ * `price < low`.
  *
- * Unlike {@link riskRewardFrom} this needs no plan — it runs on the deterministic
- * support/resistance the domain already derives, so it is available **before** the model
- * writes anything. That ordering is the point: the model can be told "the nearest thing
- * above you is 0.4% away and the nearest thing below is 2.7% away" while it still has the
- * chance to answer "wait".
- *
- * Both sides carry a signed `distancePercent` relative to the same current price, so the
- * ratio needs no price argument.
+ * The one comparison every reader of "is the price in the zone" shares (DOM-8):
+ * {@link exceedsEntryZone}, `buildPlanState` (`in_zone` / `above_zone` / `below_zone`) and the
+ * outcome labeller's approach (`labelPlanOutcome`, `inside` / `from_above` / `from_below`). There
+ * is no tolerance band: the model writes the zone after seeing the close, so a zone whose high
+ * is under the close is a pullback plan by construction, and a state that called it
+ * "in the zone" disagreed with the prose and with the fill rule (WP-18, N46).
  */
-export function structuralRiskReward(levels: ReferenceLevels): number | null {
-    const up = levels.resistance[0];
-    const down = levels.support[0];
-    if (!up || !down) return null;
-
-    const reward = up.distancePercent;
-    const risk = Math.abs(down.distancePercent);
-    if (!Number.isFinite(reward) || !Number.isFinite(risk) || risk === 0) {
-        return null;
-    }
-    // `resistance` is defined as the levels above current price and `support` as the ones
-    // below, so a sign that contradicts either definition means the collector produced
-    // something inconsistent. That is "unmeasurable", not "no upside" — and on the support
-    // side `Math.abs` above would otherwise launder a positive distance into a
-    // plausible-looking ratio.
-    if (reward <= 0 || down.distancePercent > 0) return null;
-
-    return reward / risk;
+export function positionAgainstZone(
+    price: number,
+    low: number,
+    high: number
+): 'above' | 'inside' | 'below' {
+    if (price > high) return 'above';
+    if (price < low) return 'below';
+    return 'inside';
 }
 
 /**
  * @internal
  *
- * Whether the current price has risen past the top of the recommended entry zone.
+ * Whether the current price sits above the top of the recommended entry zone: any close
+ * above the highest usable entry price, with no tolerance (see {@link positionAgainstZone}).
  *
  * Only the upper side is checked. Price *below* the zone is cheaper than the plan asked
  * for, which is not the failure mode this describes.
  */
 export function exceedsEntryZone(
     price: number,
-    entryPrices: readonly number[] | undefined,
-    tolerance: number = ENTRY_ZONE_TOLERANCE
+    entryPrices: readonly number[] | undefined
 ): boolean {
     if (!finitePositive(price)) return false;
     const top = entryZoneTop(entryPrices);
     if (top === null) return false;
-    const safeTolerance =
-        Number.isFinite(tolerance) && tolerance >= 0 ? tolerance : 0;
-    return price > top * (1 + safeTolerance);
+    return positionAgainstZone(price, top, top) === 'above';
 }
 
 /**
