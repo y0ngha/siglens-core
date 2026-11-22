@@ -21,11 +21,17 @@ import {
     buildLevelLadder,
     calendarPeriodChange,
     closeOnOrBefore,
+    computeBarChangeStats,
+    computeBarRangeStats,
+    computeCloseStreak,
+    computeEarningsReactions,
     computePriceStats,
     isIsoDate,
+    LONG_TERM_MA_CROSS,
     minusCalendarMonths,
     priceStatsEarliestDate,
     readPutCallRatio,
+    scanLongTermMaCrosses,
     tallyEarningsReactions,
 } from '@/index';
 
@@ -78,6 +84,23 @@ describe('index — agent exports', () => {
         expect(typeof PRICE_STATS_NOTE_TEMPLATES.historyStart).toBe('function');
         expect('AGENT_PRICE_STATS_PERIODS' in clientApi).toBe(false);
         expect('PRICE_STATS_NOTE_TEMPLATES' in clientApi).toBe(false);
+    });
+
+    // 서버 진입점 전용이다: 봉 통계는 도구 실행기(서버)만 계산하고 브라우저 번들은 쓰지 않는다.
+    it('봉 통계 함수·상수를 서버 진입점으로만 내보낸다', () => {
+        const fns = {
+            computeBarChangeStats,
+            computeBarRangeStats,
+            computeCloseStreak,
+            computeEarningsReactions,
+            scanLongTermMaCrosses,
+        };
+        Object.entries(fns).forEach(([name, fn]) => {
+            expect(typeof fn).toBe('function');
+            expect(name in clientApi).toBe(false);
+        });
+        expect(LONG_TERM_MA_CROSS.lookbackBars).toBe(252);
+        expect('LONG_TERM_MA_CROSS' in clientApi).toBe(false);
     });
 
     // 서버 진입점 전용이다: 결과 notes는 도구 실행기(서버)만 붙이고 브라우저 번들은 쓰지 않는다.

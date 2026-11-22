@@ -594,6 +594,27 @@ export {
     minusCalendarMonths,
 } from './domain/agent/calendarPeriods';
 export type { CalendarPeriodChange } from './domain/agent/calendarPeriods';
+// Server entry only: the bar statistics run in the agent tool executor, never in a browser bundle.
+export {
+    computeBarChangeStats,
+    computeBarRangeStats,
+    computeCloseStreak,
+    computeEarningsReactions,
+    LONG_TERM_MA_CROSS,
+    scanLongTermMaCrosses,
+} from './domain/agent/barStats';
+export type {
+    BarChangeStats,
+    BarChangeStatsIndicators,
+    BarChangeStatsOptions,
+    BarExtreme,
+    BarRangeStats,
+    CloseStreak,
+    CloseStreakDirection,
+    CloseStreakOptions,
+    EarningsReaction,
+    EarningsReactionOptions,
+} from './domain/agent/barStats';
 export {
     computePriceStats,
     priceStatsEarliestDate,
