@@ -560,8 +560,7 @@ npx tsx scripts/replay/analysisFieldsEval.ts --mode zone --set <set> --run <run>
   distance above the top and the zone width in ATR, and the share of plans whose prose reads as a
   pullback plan (`되돌림|눌림|조정 시|조정을|조정이|조정 후|지지 확인 후|대기`, English with `--lang en`) by group. Gates: **Z1**
   the stored state equals the exact rule, `in_zone` is inside the edges and the labeller's approach
-  `inside` agrees (100% of each; needs `labels.jsonl` for the last part); **Z2** at most 66/164 (40.2%, the M2 figure under the completed cue list) of the
-  exact `in_zone` plans read as pullbacks; **N3** no position above 85% of the headline rows (stored
+  `inside` agrees (100% of each; needs `labels.jsonl` for the last part); **Z2** (with `--before`) the share of exact-edge `in_zone` plans written as pullbacks is no higher in the after arm than in the before arm, same regex and rule, on the paired cases (null below 90% paired); **N3** no position above 85% of the headline rows (stored
   positions, or exact ones with `--restate exact`), `in_zone` reported with its interval; **N2** (with
   `--before`) the share of plans whose first target is at least 1 ATR above the zone top does not fall by
   more than 5 pp. `n1Sample` lists the 40 cases the manual read (N1) takes: 15 `in_zone`, 15 `above_zone`

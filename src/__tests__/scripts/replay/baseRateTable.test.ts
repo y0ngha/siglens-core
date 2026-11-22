@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
     TABLE_PATH,
     generateTable,
+    isEvalEvent,
     inputProblems,
     parseBaseRateTableArgs,
     readEngineInput,
@@ -757,6 +758,40 @@ describe('generateTable and runBaseRateTable', () => {
         expect(() => readEngineInput(world.args.engine)).toThrow(
             'line 1 is not an event'
         );
+    });
+
+    it('rejects an event that lacks a field the table reads', () => {
+        const events = [
+            candleEvent({ pattern: 'hammer' }),
+            patternEvent({ id: 'a' }),
+        ];
+        expect(events.every(isEvalEvent)).toBe(true);
+        const without = (event: object, field: string): unknown =>
+            Object.fromEntries(
+                Object.entries(event).filter(([key]) => key !== field)
+            );
+        expect(isEvalEvent(without(events[1], 'target60'))).toBe(false);
+        expect(isEvalEvent(without(events[1], 'week'))).toBe(false);
+        expect(isEvalEvent({ ...events[1], market: 'jp' })).toBe(false);
+        expect(isEvalEvent({ ...events[1], placeboTargetHit: 'x' })).toBe(
+            false
+        );
+        expect(isEvalEvent(without(events[0], 'pattern'))).toBe(false);
+        expect(isEvalEvent({ ...events[0], matched: null })).toBe(false);
+        expect(
+            isEvalEvent({ ...events[0], y: { h1: 1, h5: Number.NaN, h10: 1 } })
+        ).toBe(false);
+        // A neutral candle needs no outcome.
+        expect(
+            isEvalEvent({
+                ...events[0],
+                status: 'neutral',
+                y: null,
+                matched: null,
+            })
+        ).toBe(true);
+        expect(isEvalEvent(null)).toBe(false);
+        expect(isEvalEvent({ kind: 'other' })).toBe(false);
     });
 
     it('lets a dirty run through for inspection and keeps the sha in the header', async () => {

@@ -128,6 +128,66 @@ export interface EngineInput {
     events: readonly EvalEvent[];
 }
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+    typeof value === 'object' && value !== null;
+const isText = (value: unknown): boolean => typeof value === 'string';
+const isNumber = (value: unknown): boolean =>
+    typeof value === 'number' && Number.isFinite(value);
+const isHorizons = (value: unknown): boolean =>
+    isRecord(value) && ['h1', 'h5', 'h10'].every(k => isNumber(value[k]));
+const isPlacebo = (value: unknown): boolean =>
+    isRecord(value) &&
+    isNumber(value.n) &&
+    isHorizons(value.y) &&
+    isHorizons(value.pct) &&
+    isHorizons(value.hit);
+
+/**
+ * Whether `value` has every field the table reads from an event, of the type it reads it as:
+ * the slice, the week and half it is clustered by, the outcome and its placebo. A line that
+ * lacks one would otherwise turn into a NaN row.
+ */
+export function isEvalEvent(value: unknown): value is EvalEvent {
+    if (!isRecord(value)) return false;
+    const common =
+        isText(value.symbol) &&
+        (value.market === 'us' || value.market === 'kr') &&
+        isText(value.date) &&
+        isText(value.week) &&
+        (value.half === 'early' || value.half === 'late');
+    if (!common) return false;
+    if (value.kind === 'pattern') {
+        const outcome = (v: unknown): boolean =>
+            v === 'hit' || v === 'inval' || v === 'open';
+        return (
+            isText(value.id) &&
+            outcome(value.target60) &&
+            outcome(value.cons60) &&
+            isNumber(value.placeboTargetHit) &&
+            isNumber(value.placeboConsHit) &&
+            isNumber(value.placeboN)
+        );
+    }
+    if (value.kind === 'candle') {
+        const tested = value.status === 'tested';
+        return (
+            isText(value.pattern) &&
+            (value.direction === 1 ||
+                value.direction === -1 ||
+                value.direction === 0) &&
+            (tested ||
+                value.status === 'neutral' ||
+                value.status === 'dropped') &&
+            (!tested ||
+                (isHorizons(value.y) &&
+                    isHorizons(value.pct) &&
+                    isPlacebo(value.matched) &&
+                    isPlacebo(value.unmatched)))
+        );
+    }
+    return false;
+}
+
 export function readEngineInput(dir: string): EngineInput {
     const lines = readFileSync(join(dir, 'events.jsonl'), 'utf-8')
         .split('\n')
@@ -138,18 +198,12 @@ export function readEngineInput(dir: string): EngineInput {
         summary: readJson<ArmSummary>(join(dir, 'summary.json')),
         events: lines.map((line, i) => {
             const parsed: unknown = JSON.parse(line);
-            if (
-                typeof parsed !== 'object' ||
-                parsed === null ||
-                !('kind' in parsed) ||
-                (parsed.kind !== 'candle' && parsed.kind !== 'pattern')
-            ) {
+            if (!isEvalEvent(parsed)) {
                 throw new Error(
-                    `${dir}/events.jsonl line ${i + 1} is not an event`
+                    `${dir}/events.jsonl line ${i + 1} is not an event of the shape engineEval writes`
                 );
             }
-            // The kind was just checked; the rest is the shape engineEval wrote.
-            return parsed as EvalEvent;
+            return parsed;
         }),
     };
 }

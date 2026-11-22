@@ -43,7 +43,9 @@ export const CLAIM_PATTERNS: Record<
         reliabilityRaw: /신뢰도가 높|높은 신뢰|확률이 높|신뢰할 만|승률|적중률/,
         reliability:
             /신뢰도가 높|높은 신뢰|확률이 높|신뢰할 만|(?<!상)승률|적중률/,
-        negation: /높지 않|높지는 않|낮|차이가 없|없습니다|아닙니다|어렵/,
+        // Read on the clause after the match (see `negatedAfter`): the claim itself is negated.
+        negation:
+            /^지(?:는)? (?:않|못)|^(?:이|은|는|도)?\s*(?:매우\s*|다소\s*)?낮|차이(?:가|는)? 없|근거(?:가|는)? 없|어렵/,
         conditional: /면[\s,]/,
         strongNarrow: /(강한|강력한|견고한|두터운) (지지|저항)/,
         strongBroad: /(강한|강력한|견고한|두터운|핵심|중요한) (지지|저항)/,
@@ -96,9 +98,33 @@ function levelReasons(keyLevels: Rec | null): readonly string[] {
     ].map(level => asText(asRec(level)?.reason));
 }
 
-/** Sentences of a card: split at full stops, question and exclamation marks and line breaks. */
-const sentencesOf = (text: string): readonly string[] =>
-    text.split(/(?<=[.!?。])\s*|\n+/).filter(part => part.trim() !== '');
+/**
+ * Sentences of a card: split at a full stop, question or exclamation mark followed by
+ * whitespace, and at line breaks. A stop after a digit (`3.`, a list marker) or after a common
+ * abbreviation (`e.g.`) does not end a sentence, and `3.5%` has no whitespace to split at.
+ */
+export const sentencesOf = (text: string): readonly string[] =>
+    text
+        .split(
+            /(?<=[.!?。])(?<![0-9]\.)(?<!\b(?:e\.g|i\.e|vs|etc|approx|no)\.)\s+|\n+/
+        )
+        .filter(part => part.trim() !== '');
+
+/**
+ * Whether the clause after a match negates it. The clause ends at a comma, a semicolon or a
+ * contrast ("-지만", "-으나"): "신뢰도가 높지만 확인이 어렵다" keeps its claim, "신뢰도가 높다고
+ * 보기 어렵다" does not.
+ */
+function negatedAfter(
+    sentence: string,
+    end: number,
+    language: ClaimLanguage
+): boolean {
+    const { negation } = CLAIM_PATTERNS[language];
+    if (language === 'en') return negation.test(sentence);
+    const clause = sentence.slice(end).split(/[,;]|지만|하나|으나/)[0];
+    return negation.test(clause);
+}
 
 /**
  * A positive reliability claim: a sentence the list matches, without a negation and with no
@@ -108,12 +134,12 @@ export function isPositiveClaim(
     text: string,
     language: ClaimLanguage
 ): boolean {
-    const { reliability, negation, conditional } = CLAIM_PATTERNS[language];
+    const { reliability, conditional } = CLAIM_PATTERNS[language];
     return sentencesOf(text).some(sentence => {
         const hit = reliability.exec(sentence);
         return (
             hit !== null &&
-            !negation.test(sentence) &&
+            !negatedAfter(sentence, hit.index + hit[0].length, language) &&
             !conditional.test(sentence.slice(0, hit.index))
         );
     });

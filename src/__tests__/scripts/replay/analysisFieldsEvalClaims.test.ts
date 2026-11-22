@@ -3,6 +3,7 @@ import {
     CLAIM_PATTERNS,
     claimsGates,
     isPositiveClaim,
+    sentencesOf,
     compareClaims,
     readClaimCase,
     type ClaimCase,
@@ -61,6 +62,44 @@ describe('the wording lists', () => {
         expect(isPositiveClaim('This is highly reliable', 'en')).toBe(true);
         expect(isPositiveClaim('This is not reliable', 'en')).toBe(false);
         expect(isPositiveClaim('If it breaks out it is reliable', 'en')).toBe(
+            false
+        );
+    });
+
+    it('keeps a positive claim when a negative word sits in another clause', () => {
+        const positive = (text: string) => isPositiveClaim(text, 'ko');
+        // 낮, 어렵, 없습니다 about something else, before or after the claim.
+        expect(positive('거래량이 낮지만 신뢰도가 높습니다')).toBe(true);
+        expect(positive('변동성이 낮고 신뢰도가 높습니다')).toBe(true);
+        expect(positive('신뢰도가 높지만 진입 시점을 잡기 어렵습니다')).toBe(
+            true
+        );
+        expect(positive('신뢰도가 높고, 반대 신호는 없습니다')).toBe(true);
+        expect(positive('신뢰도가 높아 보이며 위험은 낮은 편입니다')).toBe(
+            true
+        );
+        // The claim itself negated.
+        expect(positive('신뢰도가 높다고 보기 어렵습니다')).toBe(false);
+        expect(positive('신뢰도가 높지는 않습니다')).toBe(false);
+        expect(positive('승률이 낮습니다')).toBe(false);
+        expect(positive('적중률은 낮은 편입니다')).toBe(false);
+        expect(positive('승률 차이는 없습니다')).toBe(false);
+        expect(positive('신뢰도가 높다는 근거가 없습니다')).toBe(false);
+    });
+
+    it('splits sentences at a stop followed by whitespace, not inside a number or an abbreviation', () => {
+        expect(sentencesOf('돌파하면 유효합니다. 신뢰도가 높습니다')).toEqual([
+            '돌파하면 유효합니다.',
+            '신뢰도가 높습니다',
+        ]);
+        expect(
+            sentencesOf('수익률 3.5% 구간에서 신뢰도가 높습니다')
+        ).toHaveLength(1);
+        expect(sentencesOf('e.g. 이중바닥 신뢰도가 높습니다')).toHaveLength(1);
+        expect(sentencesOf('1. 신뢰도가 높습니다')).toHaveLength(1);
+        expect(sentencesOf('첫째\n둘째')).toEqual(['첫째', '둘째']);
+        // A condition in the same sentence as a "3.5%" stays ahead of the claim.
+        expect(isPositiveClaim('3.5% 넘으면 확률이 높아집니다', 'ko')).toBe(
             false
         );
     });

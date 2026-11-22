@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
     PULLBACK_CUE,
     ZONE_GATES,
+    cueComparison,
     distanceAboveTopAtr,
     exactPosition,
     geometryOf,
@@ -277,26 +278,65 @@ describe('zoneGates', () => {
         expect(gateOf(withNoSetup, 'Z1')?.pass).toBe(true);
     });
 
-    it('Z2 passes at the measured M2 figure of 66 in 164 and fails at 67', () => {
-        const plans = (cues: number) =>
-            Array.from({ length: 164 }, (_, i) =>
-                zoneCase({ caseId: `b${i}`, prose: i < cues ? '눌림' : '진입' })
+    describe('Z2', () => {
+        const arm = (cues: number, count = 20, prefix = 'z') =>
+            Array.from({ length: count }, (_, i) =>
+                zoneCase({
+                    caseId: `${prefix}${i}`,
+                    prose: i < cues ? '눌림' : '진입',
+                })
             );
-        const gate = (cues: number) => gateOf(plans(cues), 'Z2');
-        expect(gate(66)?.pass).toBe(true);
-        expect(gate(67)?.pass).toBe(false);
-        expect(gate(66)?.threshold).toBe('<= 40.2% (66/164)');
-        expect(ZONE_GATES.maxInZoneCueShare).toBe(66 / 164);
-    });
+        const z2 = (after: readonly ZoneCase[], before: readonly ZoneCase[]) =>
+            zoneGates(
+                zoneReport(after, { language: 'ko', restate: false }),
+                after.length,
+                null,
+                cueComparison(after, before, 'ko')
+            ).find(g => g.id === 'Z2');
 
-    it('Z2 holds the cue share of the exact in_zone plans to 40%', () => {
-        const cue = (n: number) =>
-            Array.from({ length: 10 }, (_, i) =>
-                zoneCase({ caseId: `z${i}`, prose: i < n ? '눌림' : '진입' })
+        it('passes when the after arm writes pullbacks no more often than the before arm', () => {
+            expect(z2(arm(8, 20, 'z'), arm(8, 20, 'z'))?.pass).toBe(true);
+            expect(z2(arm(5, 20, 'z'), arm(8, 20, 'z'))?.pass).toBe(true);
+        });
+
+        it('fails when the after arm writes more of them, by one plan', () => {
+            expect(z2(arm(9, 20, 'z'), arm(8, 20, 'z'))?.pass).toBe(false);
+        });
+
+        it('restates the before arm with the exact edges, like the after arm', () => {
+            // The before arm's stored 1% state is irrelevant: only the exact in_zone plans count.
+            const before = arm(8).map(c => ({
+                ...c,
+                close: 101,
+                tolerancePosition: 'in_zone' as const,
+            }));
+            const comparison = cueComparison(arm(8), before, 'ko');
+            expect(comparison.before.n).toBe(0);
+            expect(comparison.after.n).toBe(20);
+        });
+
+        it('is not computable without a before run, below full coverage or without in_zone plans', () => {
+            const after = arm(8);
+            expect(
+                zoneGates(
+                    zoneReport(after, { language: 'ko', restate: false }),
+                    after.length,
+                    null
+                ).find(g => g.id === 'Z2')?.pass
+            ).toBeNull();
+            // Only half of the after cases are in the before run.
+            expect(z2(after, arm(8, 10, 'z'))?.pass).toBeNull();
+            const above = arm(0).map(c => ({ ...c, close: 105 }));
+            expect(z2(above, above)?.pass).toBeNull();
+        });
+
+        it('reports both shares and the pairing', () => {
+            const gate = z2(arm(5), arm(8));
+            expect(gate?.value).toContain(
+                '40.0% (8/20) -> 25.0% (5/20), 20 paired'
             );
-        expect(gateOf(cue(4), 'Z2')?.pass).toBe(true);
-        expect(gateOf(cue(5), 'Z2')?.pass).toBe(false);
-        expect(gateOf(consistent.slice(3), 'Z2')?.pass).toBeNull();
+            expect(gate?.threshold).toBe('after <= before');
+        });
     });
 
     it('N3 keeps every position under 85% of the rows', () => {

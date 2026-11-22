@@ -107,6 +107,7 @@ import {
     distanceAboveTopAtr,
     exactPosition,
     geometryOf,
+    cueComparison,
     targetRoomComparison,
     zoneGates,
     zoneReport,
@@ -1556,6 +1557,8 @@ function zoneMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
     });
     const targetRoom =
         before === null ? null : targetRoomComparison(after, before);
+    const cue =
+        before === null ? null : cueComparison(after, before, args.lang);
     deps.log(
         `zone: ${after.length} plans${args.restate ? ', positions restated with exact edges' : ''}`
     );
@@ -1570,8 +1573,8 @@ function zoneMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
             restate: args.restate,
             language: args.lang,
         },
-        summary: { zone: report, targetRoom },
-        gates: zoneGates(report, after.length, targetRoom),
+        summary: { zone: report, targetRoom, cueComparison: cue },
+        gates: zoneGates(report, after.length, targetRoom, cue),
         rows: after.map(c => ({
             caseId: c.caseId,
             tolerance: c.tolerancePosition,

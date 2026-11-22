@@ -20,15 +20,8 @@ import type { PlanPosition } from './analysisFieldsEvalPlan';
 import { quantile, mean, median } from './stats';
 import { sha256Hex } from './fsUtil';
 
-/** Gate thresholds of WP-18 §8.3 (pre-registered). */
+/** Gate thresholds of WP-18 §8.3. Z2 has none: it compares the after arm with the before arm. */
 export const ZONE_GATES = {
-    /**
-     * Z2: share of `in_zone` plans whose prose reads as a pullback plan, at most. WP-18
-     * pre-registered 40% against a regex the brief did not print (36% measured); the
-     * instrument's completed `PULLBACK_CUE.ko` measures 66 of 164 exact-in_zone plans on the
-     * `2026-11-22-wp15-c2-after2` run, and that figure is the bound (0.402 would fail at it).
-     */
-    maxInZoneCueShare: 66 / 164,
     /** N3: no position above this share of the headline rows. */
     maxPositionShare: 0.85,
     /** N2: first-target-room non-inferiority margin (share, after minus before). */
@@ -46,7 +39,7 @@ export type ZoneLanguage = (typeof ZONE_LANGUAGES)[number];
  * Words of a plan that reads as a pullback ("wait for a dip to the zone"). The Korean list
  * is the design's list as far as it is documented (the brief elided part of it), completed
  * from the 9 plans a first version missed ("조정을 기다", "조정 후"): against the design's own
- * per-case flags on the `c2-after2` run it finds 549 of 550, and 31 plans the design did not flag.
+ * per-case flags on a reference run it finds 549 of 550, and 31 plans the design did not flag.
  */
 export const PULLBACK_CUE: Record<ZoneLanguage, RegExp> = {
     ko: /되돌림|눌림|조정 시|조정을|조정이|조정 후|지지 확인 후|대기/,
@@ -401,6 +394,43 @@ export function targetRoomComparison(
     };
 }
 
+// ─── Z2 (paired, needs a before run) ──────────────────────────────────────────
+
+export interface CueComparison {
+    paired: number;
+    /** Pullback-cue share of the plans the exact rule calls `in_zone`, over the paired cases. */
+    before: ShareStat;
+    after: ShareStat;
+}
+
+/**
+ * Z2's inputs: for the cases both runs planned, the share of exact-edge `in_zone` plans whose
+ * prose reads as a pullback plan, in each arm. Same regex, same restated rule, same cases:
+ * a change of wording moves the two arms alike, so only the prompt's effect is left.
+ */
+export function cueComparison(
+    after: readonly ZoneCase[],
+    before: readonly ZoneCase[],
+    language: ZoneLanguage
+): CueComparison {
+    const cue = PULLBACK_CUE[language];
+    const beforeBy = new Map(before.map(c => [c.caseId, c]));
+    const pairs = after.flatMap(a => {
+        const b = beforeBy.get(a.caseId);
+        return b === undefined ? [] : [{ a, b }];
+    });
+    const inZoneShare = (cases: readonly ZoneCase[]): ShareStat =>
+        countShare(
+            cases.filter(c => exactPosition(c) === 'in_zone'),
+            c => cue.test(c.prose)
+        );
+    return {
+        paired: pairs.length,
+        before: inZoneShare(pairs.map(p => p.b)),
+        after: inZoneShare(pairs.map(p => p.a)),
+    };
+}
+
 // ─── Gates ────────────────────────────────────────────────────────────────────
 
 const pct = (v: number | null): string =>
@@ -411,14 +441,15 @@ const describeShare = (s: ShareStat | null): string =>
 
 /**
  * Z1: the stored plan state is the exact rule on every plan, `in_zone` is exactly inside the
- * edges, and the outcome labeller's approach agrees. Z2: at most 66/164 (40.2%) of the `in_zone` plans
- * read as pullback plans. N3: no position above 85% of the headline rows. N2: the share of
+ * edges, and the outcome labeller's approach agrees. Z2: the after arm's share of exact-edge `in_zone` plans
+ * written as pullback plans is no higher than the before arm's, on the paired cases. N3: no position above 85% of the headline rows. N2: the share of
  * plans with room for a target does not fall by more than 5 pp against the before run.
  */
 export function zoneGates(
     report: ZoneReport,
     afterCases: number,
-    targetRoom: TargetRoomComparison | null
+    targetRoom: TargetRoomComparison | null,
+    cue: CueComparison | null = null
 ): readonly GateResult[] {
     const all = (s: ShareStat | null): boolean | null =>
         s === null ? null : s.count === s.n;
@@ -432,11 +463,6 @@ export function zoneGates(
         : parts.includes(null)
           ? null
           : true;
-    const exactCue = report.cueByGroup.exact_in_zone;
-    const z2 =
-        exactCue.share === null
-            ? null
-            : exactCue.share <= ZONE_GATES.maxInZoneCueShare + 1e-12;
     const shares = Object.entries(report.n3.positions).flatMap(([name, s]) =>
         s.share === null ? [] : [{ name, share: s.share }]
     );
@@ -446,6 +472,17 @@ export function zoneGates(
         afterCases > 0 &&
         targetRoom.paired >=
             Math.ceil(C.gates.minPairedShare * afterCases - 1e-9);
+    const cueCovered =
+        cue !== null &&
+        afterCases > 0 &&
+        cue.paired >= Math.ceil(C.gates.minPairedShare * afterCases - 1e-9);
+    const z2 =
+        !cueCovered ||
+        cue === null ||
+        cue.after.share === null ||
+        cue.before.share === null
+            ? null
+            : cue.after.share <= cue.before.share + 1e-12;
     return [
         {
             id: 'Z1',
@@ -458,10 +495,13 @@ export function zoneGates(
         {
             id: 'Z2',
             description:
-                'plans the exact rule calls in_zone whose prose reads as a pullback plan',
+                'plans the exact rule calls in_zone whose prose reads as a pullback plan, after against before, on the paired cases',
             pass: z2,
-            value: `${pct(exactCue.share)} (${describeShare(exactCue)})`,
-            threshold: '<= 40.2% (66/164)',
+            value:
+                cue === null
+                    ? 'no --before run'
+                    : `${pct(cue.before.share)} (${describeShare(cue.before)}) -> ${pct(cue.after.share)} (${describeShare(cue.after)}), ${cue.paired} paired${cueCovered ? '' : `, under the ${C.gates.minPairedShare * 100}% of ${afterCases} cases a decision needs`}`,
+            threshold: 'after <= before',
         },
         {
             id: 'N2',
