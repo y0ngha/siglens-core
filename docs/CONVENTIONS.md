@@ -755,7 +755,7 @@ the test proves nothing:
 ```
 
 Verify by reverting the guard (or flipping the sign): the test must fail. When a value is
-set per builder, pin it per builder. Each fix gets a test where one condition differs, shown to fail on the reverted code; a row carrying several violations confounds it.
+set per builder, pin it per builder. Each fix gets a test where one condition differs, shown to fail on the reverted code; a row carrying several violations confounds it. A test for a claimed invariant or equivalence counts that its fixtures reach every branch the claim covers, and compares against an independent oracle (not a wrapper over the same pipeline).
 
 A guard added to block a specific false positive gets a near-miss fixture of that case,
 and mirrored branches (left/right edge, bullish/bearish) each get their own.

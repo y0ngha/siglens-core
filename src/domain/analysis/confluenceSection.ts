@@ -167,7 +167,7 @@ function fmtRatio(n: number): string {
     return n.toFixed(2);
 }
 
-/** `golden_cross(ma)` — or `support_proximity_bullish(support, half weight)` when expected. */
+/** `short_ma_bullish_cross(ma)` — or `support_proximity_bullish(support, half weight)` when expected. */
 function describeSignal(type: string): string {
     const family = signalFamily(type);
     return isExpectedSignal(type)

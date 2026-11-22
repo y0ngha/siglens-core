@@ -13,7 +13,7 @@ import { detectSignals } from '@/domain/signals';
  * Minimum weighted **indicator-family** count required for a trigger.
  *
  * Deliberately not a count of signal *types*. The 36 members of {@link SignalType} this
- * rule counts (the four 52-week-extreme and gap types are left out of the tally) derive
+ * rule counts (the 52-week-extreme, gap and 50/200 cross types are left out of the tally) derive
  * from only 14 indicators — RSI contributes 4 types, MACD 4, Bollinger 6 — so
  * counting types treats transforms of the same close series as independent votes. In
  * practice a sizeable share of the snapshots that reached "3 types" spanned only two indicators
@@ -140,8 +140,8 @@ const SIGNAL_FAMILY: Readonly<Record<string, string>> = {
     rsi_overbought: 'rsi',
     rsi_bullish_divergence: 'rsi',
     rsi_bearish_divergence: 'rsi',
-    golden_cross: 'ma',
-    death_cross: 'ma',
+    short_ma_bullish_cross: 'ma',
+    short_ma_bearish_cross: 'ma',
     macd_bullish_cross: 'macd',
     macd_bearish_cross: 'macd',
     macd_histogram_bullish_convergence: 'macd',
@@ -176,7 +176,12 @@ const SIGNAL_FAMILY: Readonly<Record<string, string>> = {
 
 /**
  * Detector outputs kept out of the tally entirely — the 52-week-extreme and gap
- * detectors.
+ * detectors, and the 50/200 golden / death cross.
+ *
+ * `golden_cross` / `death_cross` were the SMA20/SMA50 rule when the family weights and
+ * thresholds below were measured; that rule is now `short_ma_*` (family `ma`, so the
+ * tally is unchanged). The SMA50/SMA200 cross that took over the old ids has never been
+ * measured as a vote, so it stays out until it is.
  *
  * Every threshold and weight above was set (or re-measured) on the indicator catalogue
  * alone; these price-structure types have never been measured as confluence votes. Left
@@ -190,6 +195,8 @@ const CONFLUENCE_EXCLUDED_TYPES: ReadonlySet<SignalType> = new Set([
     'new_52w_low',
     'gap_up',
     'gap_down',
+    'golden_cross',
+    'death_cross',
 ]);
 
 /**

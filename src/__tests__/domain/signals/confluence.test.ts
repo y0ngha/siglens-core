@@ -73,14 +73,15 @@ function snapshot(over: Partial<ConfluenceSnapshot> = {}): ConfluenceSnapshot {
 
 /**
  * 컨플루언스가 집계하는 시그널 타입 전수. 계열 매핑이 카탈로그를 빠짐없이 덮는지
- * 검증하는 데 쓴다. 가격 구조 4종(52주 신고·신저, 갭 상승·하락)은 집계에서 빠지므로
- * 여기 없다 — 아래 '가격 구조 신호는 컨플루언스 집계에서 제외된다'가 따로 고정한다.
+ * 검증하는 데 쓴다. 가격 구조 4종(52주 신고·신저, 갭 상승·하락)과 50/200 골든·데드크로스는
+ * 집계에서 빠지므로 여기 없다 — 아래 '가격 구조 신호는 컨플루언스 집계에서 제외된다'와
+ * '50/200 골든·데드크로스는 컨플루언스 집계에서 제외된다'가 따로 고정한다.
  */
 const CONFIRMED: ConfirmedSignalType[] = [
     'rsi_oversold',
     'rsi_overbought',
-    'golden_cross',
-    'death_cross',
+    'short_ma_bullish_cross',
+    'short_ma_bearish_cross',
     'macd_bullish_cross',
     'macd_bearish_cross',
     'bollinger_lower_bounce',
@@ -135,7 +136,10 @@ describe('signalFamily', () => {
         expect(signalFamily('rsi_oversold')).toBe(
             signalFamily('rsi_bullish_divergence')
         );
-        expect(signalFamily('golden_cross')).toBe(signalFamily('death_cross'));
+        expect(signalFamily('short_ma_bullish_cross')).toBe(
+            signalFamily('short_ma_bearish_cross')
+        );
+        expect(signalFamily('short_ma_bullish_cross')).toBe('ma');
         expect(signalFamily('bollinger_lower_bounce')).toBe(
             signalFamily('bollinger_squeeze_bullish')
         );
@@ -850,6 +854,49 @@ describe('가격 구조 신호는 컨플루언스 집계에서 제외된다', ()
                     .sort()
             );
             expect(fresh.filter(t => PRICE_STRUCTURE.includes(t))).toEqual([]);
+        }
+    );
+});
+
+describe('50/200 골든·데드크로스는 컨플루언스 집계에서 제외된다', () => {
+    // 250봉 평탄 뒤 마지막 봉 급등/급락: 50/200과 20/50이 같은 봉에서 함께 교차한다.
+    function flatThenJump(last: number): Bar[] {
+        return buildBars([...Array<number>(250).fill(100), last]);
+    }
+
+    it.each([
+        {
+            name: '급등',
+            last: 130,
+            direction: 'bullish' as const,
+            cross: 'golden_cross',
+            short: 'short_ma_bullish_cross',
+        },
+        {
+            name: '급락',
+            last: 70,
+            direction: 'bearish' as const,
+            cross: 'death_cross',
+            short: 'short_ma_bearish_cross',
+        },
+    ])(
+        '$name: detectSignals에는 $cross가 있지만 스냅샷에는 $short만 남는다',
+        ({ last, direction, cross, short }) => {
+            const bars = flatThenJump(last);
+            const detected = detectSignals(bars, calculateIndicators(bars)).map(
+                sig => sig.type as string
+            );
+            expect(detected).toContain(cross);
+            expect(detected).toContain(short);
+
+            const snap = evaluateConfluence(bars, { timeframe: '1Day' })!;
+            const counted =
+                direction === 'bullish' ? snap.bullish : snap.bearish;
+            const fresh =
+                direction === 'bullish' ? snap.freshBullish : snap.freshBearish;
+            expect(counted).not.toContain(cross);
+            expect(counted).toContain(short);
+            expect(fresh).not.toContain(cross);
         }
     );
 });

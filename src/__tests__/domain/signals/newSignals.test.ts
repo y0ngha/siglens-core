@@ -58,26 +58,52 @@ describe('detectNewConfirmedSignals', () => {
         });
     });
 
-    describe('골든크로스가 마지막 봉에서 처음 확정되면', () => {
+    describe('단기 이평 상승 교차가 마지막 봉에서 처음 확정되면', () => {
         it('반환하고, 이전 봉에서 이미 있던 신호는 빼며, 확정 신호만 담는다', () => {
             const bars = barsOf(V_SHAPE.slice(0, 60));
             const result = detectNewConfirmedSignals(bars);
 
             // 이전 봉(59봉)에는 없고 마지막 봉(60봉)에만 있는 확정 신호 하나.
             expect(confirmedTypesOf(bars.slice(0, -1))).not.toContain(
-                'golden_cross'
+                'short_ma_bullish_cross'
             );
-            expect(typesOf(result)).toEqual(['golden_cross']);
+            expect(typesOf(result)).toEqual(['short_ma_bullish_cross']);
             expect(result.every(s => s.phase === 'confirmed')).toBe(true);
         });
     });
 
-    describe('골든크로스가 한 봉 전에 발생했으면(lookback 안)', () => {
+    describe('단기 이평 상승 교차가 한 봉 전에 발생했으면(lookback 안)', () => {
         it('detectSignals에는 남아 있어도 새 신호가 아니다', () => {
             const bars = barsOf(V_SHAPE.slice(0, 61));
 
-            expect(confirmedTypesOf(bars)).toContain('golden_cross');
+            expect(confirmedTypesOf(bars)).toContain('short_ma_bullish_cross');
             expect(typesOf(detectNewConfirmedSignals(bars))).not.toContain(
+                'short_ma_bullish_cross'
+            );
+        });
+    });
+
+    describe('50/200 골든크로스가 마지막 봉에서 처음 확정되면', () => {
+        // 평탄한 205봉 뒤 급등 봉: 20/50과 50/200이 같은 봉에서 함께 교차한다.
+        const bars = barsOf([...Array<number>(205).fill(100), 130]);
+
+        it('golden_cross와 short_ma_bullish_cross를 감지기 순서로 반환한다', () => {
+            expect(confirmedTypesOf(bars.slice(0, -1))).not.toContain(
+                'golden_cross'
+            );
+            // 급등 봉은 다른 지표도 함께 켜므로 MA 교차 타입만 걸러 순서를 본다.
+            expect(
+                typesOf(detectNewConfirmedSignals(bars)).filter(
+                    t => t === 'golden_cross' || t === 'short_ma_bullish_cross'
+                )
+            ).toEqual(['golden_cross', 'short_ma_bullish_cross']);
+        });
+
+        it('다음 봉에서는 lookback 안에 남은 교차라 새 신호가 아니다', () => {
+            const next = barsOf([...Array<number>(205).fill(100), 130, 131]);
+
+            expect(confirmedTypesOf(next)).toContain('golden_cross');
+            expect(typesOf(detectNewConfirmedSignals(next))).not.toContain(
                 'golden_cross'
             );
         });

@@ -135,7 +135,7 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 
 ### Tier 2 — Domain Building Blocks
 
-**통합 계산기/감지기 (4)**
+**통합 계산기/감지기 (9)**
 | Symbol | Source |
 |---|---|
 | `calculateIndicators` | `domain/indicators/index.ts` |
@@ -143,6 +143,7 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | `detectNewConfirmedSignals(bars)` — 마지막 봉에서 **새로 시작한** 확정 신호. `detectSignals(bars, calculateIndicators(bars))`의 `phase: 'confirmed'` 신호 중, 같은 계산을 `bars.slice(0, -1)`에 했을 때 같은 `type`의 확정 신호가 없던 것만 감지기 순서대로 돌려준다(하루 한 번 기록하는 쪽의 에피소드 시작 규칙을 봉만으로 계산). 직전 봉에서 이미 켜진 교차(lookback 안)·계속 이어지는 상태 신호·`expected` 신호는 빼고, 끝났다가 마지막 봉에서 다시 시작한 신호는 넣는다. 2봉 미만이면 `[]`. 마지막 봉이 기대한 세션인지는 consumer가 확인한다. 두 entrypoint 모두 export. Returns `readonly Signal[]`. | `domain/signals/newSignals.ts` |
 | `confirmedSignalTimeline(bars, { days, lookbackDays? })` — 지난 세션별 **확정 신호**. 마지막 `days`개 봉 각각에 대해, 그 봉까지의 `lookbackDays`(기본 `SIGNAL_SCAN_DAILY_LOOKBACK_DAYS` = 400일) 창에서 `detectSignals(window, calculateIndicators(window))`의 `phase: 'confirmed'` 신호를 감지기 순서대로 돌려준다. 대시보드 스캐너를 그 봉의 세션에 돌린 결과와 같고(미래 봉은 읽지 않음) 감지기 목록을 따로 갖지 않아 새 감지기를 자동으로 따른다. `days`는 `bars.length`로 제한, `days < 1`이거나 `bars`가 비면 `[]`. `signals`가 `[]`이면 평가했고 확정 신호가 없다는 뜻이고, `null`이면 평가할 수 없는 날(창이 2봉 미만이거나 창 안에 유한하지 않은 종가가 있음, 또는 `bars`가 시간 오름차순이 아님 → 전 날짜 `null`)이라 "신호 없음"으로 읽으면 안 된다. `lookbackDays`가 0 초과의 유한한 수가 아니면 기본값을 쓴다. 하루당 지표 계산 1회라 긴 구간은 호출하는 쪽이 나눈다. 두 entrypoint 모두 export. Returns `readonly ConfirmedSignalDay[]` (`{ time, close, changePercent, signals: readonly Signal[] | null }`); `SIGNAL_SCAN_DAILY_LOOKBACK_DAYS`와 타입 `ConfirmedSignalDay`·`ConfirmedSignalTimelineOptions`도 함께 export. | `domain/signals/timeline.ts` |
 | `classifyTrend` | `domain/signals/index.ts` |
+| `CROSS_LOOKBACK_BARS`(3) / `GOLDEN_CROSS_FAST_PERIOD`(50) / `GOLDEN_CROSS_SLOW_PERIOD`(200) / `SHORT_MA_CROSS_FAST_PERIOD`(20) / `SHORT_MA_CROSS_SLOW_PERIOD`(50) — `detectSignals`의 교차 신호 상수. `golden_cross`/`death_cross`는 SMA50이 SMA200을 최근 `CROSS_LOOKBACK_BARS`봉 안에 교차(201봉 필요), `short_ma_bullish_cross`/`short_ma_bearish_cross`는 SMA20/SMA50 교차(51봉 필요, 컨플루언스 계열 `ma`)다. 컨플루언스 집계는 변하지 않는다(50/200은 제외, `short_ma_*`가 20/50 표를 이어받는다). **소비자 조치(semver minor)**: `SignalType`을 키로 하는 전수 `Record<SignalType, …>` 맵에는 `short_ma_bullish_cross`/`short_ma_bearish_cross`를 추가해야 하고, `golden_cross`/`death_cross`는 이제 50/200을 뜻하므로 20/50을 가정한 라벨·설명·집계를 고친다. 두 entrypoint 모두 export. | `domain/signals/constants.ts` |
 
 **개별 지표 단독 export (2)** — 통합 계산기와 별개로 소비자가 직접 쓰도록 노출한 순수 함수. `calculateMA`는 서버 entry 전용, `calculateIchimokuFutureCloud`는 양 entrypoint.
 | Symbol | Source |
