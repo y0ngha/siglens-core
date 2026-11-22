@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { postProcessRawAnalysis } from '@/application/market/postProcessRawAnalysis';
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
-import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
+import {
+    enrichAnalysisWithConfidence,
+    isFallbackAnalysis,
+} from '@/domain/analysis/confidence';
 import { checkPlanInvariants } from '@/domain/analysis/planInvariants';
 import { ENTRY_RECOMMENDATION_BY_POSITION } from '@/domain/analysis/planState';
 import { roundAnalysisPrices } from '@/domain/analysis/roundAnalysisPrices';
@@ -9,8 +12,10 @@ import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
 import { normalizeIdList } from '@/domain/analysis/normalize';
 import type {
     AnalysisResponse,
+    IndicatorGuideResult,
     OverlayCandidate,
     PatternTargetGeometry,
+    RawStrategyResult,
     Skill,
 } from '@/domain/types';
 import {
@@ -229,6 +234,8 @@ describe('postProcessRawAnalysis', () => {
                 lastClose: 71_700,
                 atr,
                 stopCandidates: [],
+                computedIndicatorResults: [],
+                computedStrategyResults: [],
                 currency: 'KRW',
                 locale,
                 krxTickTable: 'share',
@@ -266,6 +273,8 @@ describe('postProcessRawAnalysis', () => {
                 lastClose: 71_700,
                 atr: 900,
                 stopCandidates: [],
+                computedIndicatorResults: [],
+                computedStrategyResults: [],
                 allowedPatternSkills,
             }).reconciled.patternSummaries.map(p => p.skillName);
 
@@ -287,6 +296,8 @@ describe('postProcessRawAnalysis', () => {
             lastClose: 71_700,
             atr: 900,
             stopCandidates: [],
+            computedIndicatorResults: [],
+            computedStrategyResults: [],
             currency: 'KRW',
             krxTickTable: 'share',
         });
@@ -312,6 +323,8 @@ describe('postProcessRawAnalysis', () => {
             lastClose: 71_700,
             atr: undefined,
             stopCandidates: [],
+            computedIndicatorResults: [],
+            computedStrategyResults: [],
         });
         expect(resolvedOverlays.unknownIds).toEqual(['no-such-candidate']);
         expect(resolvedOverlays.chartOverlays).toEqual([]);
@@ -326,6 +339,8 @@ describe('postProcessRawAnalysis', () => {
             lastClose: 71_700,
             atr: 900,
             stopCandidates: [],
+            computedIndicatorResults: [],
+            computedStrategyResults: [],
         }).reconciled;
         const explicit = postProcessRawAnalysis({
             rawResult: rawAnalysis(),
@@ -335,6 +350,8 @@ describe('postProcessRawAnalysis', () => {
             lastClose: 71_700,
             atr: 900,
             stopCandidates: [],
+            computedIndicatorResults: [],
+            computedStrategyResults: [],
             currency: 'USD',
             locale: 'ko',
         }).reconciled;
@@ -393,6 +410,8 @@ describe('postProcessRawAnalysis', () => {
                 lastClose: 71_700,
                 atr: 900,
                 stopCandidates: [],
+                computedIndicatorResults: [],
+                computedStrategyResults: [],
                 currency: 'KRW',
                 krxTickTable: 'share',
             });
@@ -410,6 +429,132 @@ describe('postProcessRawAnalysis', () => {
                 .filter(keyPrice => keyPrice.label === '측정 목표가')
                 .map(keyPrice => keyPrice.price);
             expect(prices).toEqual([73_000]);
+        });
+    });
+
+    describe('cards computed in code', () => {
+        const cycleSkill: Skill = {
+            name: 'MA Cycle Strategy',
+            description: 'd',
+            indicators: [],
+            confidenceWeight: 0.55,
+            content: '## Body',
+            type: 'strategy',
+            computedCard: 'ma_cycle',
+        };
+        const fibSkill: Skill = {
+            ...cycleSkill,
+            name: 'Fibonacci Strategy',
+            confidenceWeight: 0.7,
+            computedCard: undefined,
+        };
+        const indicatorCard: IndicatorGuideResult = {
+            indicatorName: 'MA Signal Guide',
+            signals: [
+                {
+                    type: 'skill',
+                    description: 'MA Signal Guide: mixed.',
+                    trend: 'neutral',
+                    reading: {
+                        kind: 'ma',
+                        basis: 'always_on',
+                        state: 'mixed',
+                        values: {
+                            close: 1,
+                            ma5: 1,
+                            ma20: 1,
+                            ma60: 1,
+                            ma120: 1,
+                            ma200: 1,
+                        },
+                        signals: [],
+                    },
+                },
+            ],
+        };
+        const cycleCard: RawStrategyResult = {
+            strategyName: 'MA Cycle Strategy',
+            trend: 'bearish',
+            summary: 'MA cycle: stage 4',
+            candidateIds: [],
+        };
+        const run = (rawResult: unknown) =>
+            postProcessRawAnalysis({
+                rawResult,
+                skills: [cycleSkill, fibSkill],
+                overlayCandidates: [],
+                patternGeometries: new Map(),
+                lastClose: 71_700,
+                atr: 900,
+                stopCandidates: [],
+                computedIndicatorResults: [indicatorCard],
+                computedStrategyResults: [cycleCard],
+            });
+        const modelWrites = rawAnalysis({
+            indicatorResults: [
+                {
+                    indicatorName: 'MA Signal Guide',
+                    signals: [
+                        {
+                            type: 'skill',
+                            description: '모델이 쓴 카드',
+                            trend: 'bullish',
+                        },
+                    ],
+                },
+            ],
+            strategyResults: [
+                {
+                    strategyName: 'MA Cycle Strategy',
+                    trend: 'bullish',
+                    summary: '모델이 쓴 사이클',
+                },
+                {
+                    strategyName: 'Fibonacci Strategy',
+                    trend: 'neutral',
+                    summary: '피보나치',
+                },
+            ],
+        });
+
+        it('replaces the model indicatorResults with the computed cards', () => {
+            expect(run(modelWrites).reconciled.indicatorResults).toEqual([
+                indicatorCard,
+            ]);
+        });
+
+        it('drops the model entry of a computed-card strategy and appends the computed card after the model strategies', () => {
+            const { reconciled } = run(modelWrites);
+            expect(reconciled.strategyResults.map(s => s.strategyName)).toEqual(
+                ['Fibonacci Strategy', 'MA Cycle Strategy']
+            );
+            expect(reconciled.strategyResults[1]).toMatchObject({
+                summary: 'MA cycle: stage 4',
+                trend: 'bearish',
+                confidenceWeight: 0.55,
+            });
+        });
+
+        it('keeps the cards out of the model output the price provenance check reads', () => {
+            const { modelOutput } = run(modelWrites);
+            expect(modelOutput.indicatorResults).toEqual([]);
+            expect(
+                modelOutput.strategyResults.map(s => s.strategyName)
+            ).toEqual(['Fibonacci Strategy']);
+        });
+
+        it('attaches nothing to the empty fallback reply, so it is still recognised as one', () => {
+            const { reconciled, modelOutput } = run({});
+            expect(reconciled.indicatorResults).toEqual([]);
+            expect(reconciled.strategyResults).toEqual([]);
+            expect(isFallbackAnalysis(reconciled)).toBe(true);
+            expect(isFallbackAnalysis(modelOutput)).toBe(true);
+        });
+
+        it('attaches the cards to a reply that has a summary and nothing else', () => {
+            const { reconciled } = run({ summary: '요약만 있는 답' });
+            expect(isFallbackAnalysis(reconciled)).toBe(false);
+            expect(reconciled.indicatorResults).toEqual([indicatorCard]);
         });
     });
 });

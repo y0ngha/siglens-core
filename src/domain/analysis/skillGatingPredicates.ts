@@ -1,5 +1,9 @@
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import {
+    formatNullableNumber,
+    formatQuotedPrice,
+} from '@/domain/analysis/promptFormat';
+import {
     CRSI_OVERBOUGHT,
     CRSI_OVERSOLD,
     HURST_RANDOM_WALK,
@@ -12,7 +16,13 @@ import {
     WILLIAMS_R_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
 import type {
+    BollingerResult,
+    IndicatorStateRead,
+    StateRead,
+    VolRegimeRead,
     ChandelierResult,
+    ImpulseColor,
+    IndicatorCardStates,
     SkillSelectionContext,
     SkillStatePredicate,
     Timeframe,
@@ -113,10 +123,6 @@ const lastNumber = (series: (number | null)[]): number | null => {
     return v ?? null;
 };
 
-/** True when `value` sits at/above `hi` or at/below `lo`. */
-const isOutsideBounds = (value: number, hi: number, lo: number): boolean =>
-    value >= hi || value <= lo;
-
 const isFiniteNumber = (value: number | null | undefined): value is number =>
     value !== null && value !== undefined && Number.isFinite(value);
 
@@ -158,134 +164,276 @@ const recentFiniteMean = (
 };
 
 /**
- * Notable when the latest finite volatility read sits in the top (≥ HIGH×mean)
- * or bottom (≤ LOW×mean) of its recent window — a vol-regime extreme. Shared by
- * Yang-Zhang and EWMA. Null-safe: returns `false` when the latest read or the
- * window mean is missing/degenerate.
+ * The regime a volatility series is in when its latest finite read sits in the top (≥
+ * HIGH×mean) or bottom (≤ LOW×mean) of its recent window — a vol-regime extreme — else `null`.
+ * Shared by Yang-Zhang and EWMA. Null-safe: `null` when the latest read or the window mean is
+ * missing/degenerate.
  */
-const volRegimeNotable = (series: (number | null)[]): boolean => {
+const volRegimeOf = (series: (number | null)[]): VolRegimeRead | null => {
     const latest = lastNumber(series);
-    if (!isFiniteNumber(latest)) return false;
+    if (!isFiniteNumber(latest)) return null;
     const mean = recentFiniteMean(series, VOL_REGIME_WINDOW);
-    if (!isFiniteNumber(mean) || mean <= 0) return false;
-    return (
-        latest >= mean * VOL_REGIME_HIGH_MULT ||
-        latest <= mean * VOL_REGIME_LOW_MULT
-    );
+    if (!isFiniteNumber(mean) || mean <= 0) return null;
+    if (latest >= mean * VOL_REGIME_HIGH_MULT) {
+        return { latest, state: 'high_volatility' };
+    }
+    return latest <= mean * VOL_REGIME_LOW_MULT
+        ? { latest, state: 'low_volatility' }
+        : null;
 };
 
-// ── Per-feature predicate evaluators ────────────────────────────────────────
+// ── Printed figures ─────────────────────────────────────────────────────────
+// The band, VWAP and Bollinger predicates decide on the figures the prompt prints
+// (DOM-8): a recomputation from the rendered text must reach the same state. KRX prices
+// are printed on their tick, so a band edge a few won inside the raw value would
+// otherwise put the gate and the line the model reads on opposite sides of a threshold.
 
-const bollingerPctBNotable = (
+/** `value` as the prompt prints a price-axis figure (unchanged without print settings). */
+const printedPrice = (ctx: SkillSelectionContext, value: number): number =>
+    ctx.print === undefined
+        ? value
+        : Number(formatQuotedPrice(value, ctx.print.quoting));
+
+/** `value` as the prompt prints a bounded figure (`fmt`, two decimals; unchanged without print settings). */
+const printedFigure = (ctx: SkillSelectionContext, value: number): number =>
+    ctx.print === undefined ? value : Number(formatNullableNumber(value, 2));
+
+/** `value` as the prompt prints a difference of prices (unchanged without print settings). */
+const printedDifference = (
+    ctx: SkillSelectionContext,
+    value: number
+): number =>
+    ctx.print === undefined
+        ? value
+        : Number(formatNullableNumber(value, ctx.print.differenceDp));
+
+// ── Per-feature state readers ───────────────────────────────────────────────
+// Each reader returns what it found when the feature is notable — the state and the
+// unrounded values it was decided on — or `null`. `isStateNotable` is `readIndicatorState`
+// being non-null, so the gate that injects a skill and the card built for it read one rule.
+
+/** The pairs `(bollinger, pctB)` reads: price-relative %B beyond the timeframe's bounds. */
+export const readBollingerPctB = (
     p: SkillStatePredicate,
     ctx: SkillSelectionContext
-): boolean => {
+): StateRead<
+    IndicatorCardStates['bollinger'],
+    'pctB' | 'upper' | 'lower'
+> | null => {
     const band = lastOf(ctx.indicators.bollinger);
-    // `!band` covers both null and the undefined returned for an empty series.
-    if (!band || !isFiniteNumber(band.upper) || !isFiniteNumber(band.lower)) {
-        return false;
-    }
-    const width = band.upper - band.lower;
-    if (width <= 0) return false;
-    const pctB = (ctx.price - band.lower) / width;
-
-    const tfBounds =
+    const bounds =
         BOLLINGER_PCTB_BY_TF[ctx.timeframe] ?? BOLLINGER_PCTB_DEFAULT;
-    const hi = p.hi ?? tfBounds.hi;
-    const lo = p.lo ?? tfBounds.lo;
-    return isOutsideBounds(pctB, hi, lo);
+    const [hi, lo] = [p.hi ?? bounds.hi, p.lo ?? bounds.lo];
+    // The engine's own %B is the figure the prompt prints (`## Pro-Indicator Agreement`), so the
+    // state is decided on it, as printed (DOM-8). Recomputing %B from band edges the prompt
+    // rounded (a KRX tick moves an edge by up to half a tick) could land on the other side of
+    // the bound than the line the model reads. Only a series without it (a hand-built
+    // context) falls back to the price against the bands.
+    const derived = lastOf(ctx.indicators.bollingerDerived)?.pctB ?? null;
+    const pctB = isFiniteNumber(derived)
+        ? printedFigure(ctx, derived)
+        : pctBFromBands(band, ctx.price);
+    if (pctB === null) return null;
+    const raw = {
+        pctB,
+        upper: band?.upper ?? null,
+        lower: band?.lower ?? null,
+    };
+    if (pctB >= hi) return { state: 'above_band_pctb', raw };
+    return pctB <= lo ? { state: 'below_band_pctb', raw } : null;
 };
 
-const keltnerBandDistNotable = (ctx: SkillSelectionContext): boolean => {
-    if (ctx.price <= 0) return false;
+/** `(price − lower) / (upper − lower)` of the latest band, or `null` when the band cannot give one. */
+const pctBFromBands = (
+    band: BollingerResult | null | undefined,
+    price: number
+): number | null => {
+    // `!band` covers both null and the undefined returned for an empty series.
+    if (!band || !isFiniteNumber(band.upper) || !isFiniteNumber(band.lower)) {
+        return null;
+    }
+    const width = band.upper - band.lower;
+    return width <= 0 ? null : (price - band.lower) / width;
+};
+
+/**
+ * The side a price sits on a channel `[lower, upper]`: beyond a band, or within `margin` of
+ * one (the nearer band when it is within `margin` of both). `null` anywhere else.
+ */
+const bandSide = (
+    price: number,
+    upper: number,
+    lower: number,
+    margin: number
+): IndicatorCardStates['keltner'] | null => {
+    if (price >= upper) return 'beyond_upper';
+    if (price <= lower) return 'beyond_lower';
+    const toUpper = upper - price;
+    const toLower = price - lower;
+    if (toUpper > margin && toLower > margin) return null;
+    return toUpper <= toLower ? 'near_upper' : 'near_lower';
+};
+
+export const readKeltnerBand = (
+    ctx: SkillSelectionContext
+): StateRead<
+    IndicatorCardStates['keltner'],
+    'upper' | 'lower' | 'atr'
+> | null => {
+    if (ctx.price <= 0) return null;
     const kc = lastOf(ctx.indicators.keltnerChannel);
     // `!kc` covers both null and the undefined returned for an empty series.
     if (!kc || !isFiniteNumber(kc.upper) || !isFiniteNumber(kc.lower)) {
-        return false;
+        return null;
     }
-    const atr = lastNumber(ctx.indicators.atr);
-    if (!isFiniteNumber(atr) || atr <= 0) return false;
+    const rawAtr = lastNumber(ctx.indicators.atr);
+    if (!isFiniteNumber(rawAtr)) return null;
+    const atr = printedDifference(ctx, rawAtr);
+    if (atr <= 0) return null;
 
     // Beyond either band → breakout/breakdown; otherwise within proximity band.
-    if (ctx.price >= kc.upper || ctx.price <= kc.lower) return true;
-    const margin = KELTNER_BAND_PROXIMITY_ATR * atr;
-    return kc.upper - ctx.price <= margin || ctx.price - kc.lower <= margin;
+    const [upper, lower] = [
+        printedPrice(ctx, kc.upper),
+        printedPrice(ctx, kc.lower),
+    ];
+    const state = bandSide(
+        printedPrice(ctx, ctx.price),
+        upper,
+        lower,
+        KELTNER_BAND_PROXIMITY_ATR * atr
+    );
+    return state === null ? null : { state, raw: { upper, lower, atr } };
 };
 
-const williamsRLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readWilliamsRLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['williams_r'], 'williamsR'> | null => {
     const wr = lastNumber(ctx.indicators.williamsR);
-    if (!isFiniteNumber(wr)) return false;
-    return wr >= WILLIAMS_R_OVERBOUGHT_LEVEL || wr <= WILLIAMS_R_OVERSOLD_LEVEL;
+    if (!isFiniteNumber(wr)) return null;
+    if (wr >= WILLIAMS_R_OVERBOUGHT_LEVEL) {
+        return { state: 'overbought', raw: { williamsR: wr } };
+    }
+    return wr <= WILLIAMS_R_OVERSOLD_LEVEL
+        ? { state: 'oversold', raw: { williamsR: wr } }
+        : null;
 };
 
-const stochasticLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readStochasticLevel = (
+    ctx: SkillSelectionContext
+): StateRead<
+    IndicatorCardStates['stochastic'],
+    'percentK' | 'percentD'
+> | null => {
     const st = lastOf(ctx.indicators.stochastic);
     // `!st` covers both null and the undefined returned for an empty series.
-    if (!st || !isFiniteNumber(st.percentK)) return false;
-    return isOutsideBounds(
-        st.percentK,
-        STOCHASTIC_OVERBOUGHT_LEVEL,
-        STOCHASTIC_OVERSOLD_LEVEL
-    );
+    if (!st || !isFiniteNumber(st.percentK)) return null;
+    const raw = { percentK: st.percentK, percentD: st.percentD ?? null };
+    if (st.percentK >= STOCHASTIC_OVERBOUGHT_LEVEL) {
+        return { state: 'overbought', raw };
+    }
+    return st.percentK <= STOCHASTIC_OVERSOLD_LEVEL
+        ? { state: 'oversold', raw }
+        : null;
 };
 
-const stochRsiLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readStochRsiLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['stoch_rsi'], 'k' | 'd'> | null => {
     const sr = lastOf(ctx.indicators.stochRsi);
     // `!sr` covers both null and the undefined returned for an empty series.
-    if (!sr || !isFiniteNumber(sr.k)) return false;
-    return isOutsideBounds(sr.k, STOCH_RSI_OVERBOUGHT, STOCH_RSI_OVERSOLD);
+    if (!sr || !isFiniteNumber(sr.k)) return null;
+    const raw = { k: sr.k, d: sr.d ?? null };
+    if (sr.k >= STOCH_RSI_OVERBOUGHT) return { state: 'overbought', raw };
+    return sr.k <= STOCH_RSI_OVERSOLD ? { state: 'oversold', raw } : null;
 };
 
-const donchianProximityNotable = (ctx: SkillSelectionContext): boolean => {
-    if (ctx.price <= 0) return false;
+export const readDonchianProximity = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['donchian'], 'upper' | 'lower'> | null => {
+    if (ctx.price <= 0) return null;
     const dc = lastOf(ctx.indicators.donchianChannel);
     // `!dc` covers both null and the undefined returned for an empty series.
     if (!dc || !isFiniteNumber(dc.upper) || !isFiniteNumber(dc.lower)) {
-        return false;
+        return null;
     }
-    const range = dc.upper - dc.lower;
-    if (range <= 0) return false;
+    const [upper, lower] = [
+        printedPrice(ctx, dc.upper),
+        printedPrice(ctx, dc.lower),
+    ];
+    const range = upper - lower;
+    if (range <= 0) return null;
 
-    if (ctx.price >= dc.upper || ctx.price <= dc.lower) return true;
-    const margin = DONCHIAN_PROXIMITY_FRACTION * range;
-    return dc.upper - ctx.price <= margin || ctx.price - dc.lower <= margin;
+    const state = bandSide(
+        printedPrice(ctx, ctx.price),
+        upper,
+        lower,
+        DONCHIAN_PROXIMITY_FRACTION * range
+    );
+    return state === null ? null : { state, raw: { upper, lower } };
 };
 
-const vwapDistNotable = (ctx: SkillSelectionContext): boolean => {
+export const readVwapDistance = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['vwap'], 'vwap' | 'atr'> | null => {
     // VWAP resets each session, so a "distance from VWAP" reading is only
     // meaningful intraday; on a daily chart it is never notable.
-    if (ctx.timeframe === INTRADAY_VWAP_DISABLED_TIMEFRAME) return false;
-    const vwap = lastNumber(ctx.indicators.vwap);
-    if (!isFiniteNumber(vwap)) return false;
-    const atr = lastNumber(ctx.indicators.atr);
-    if (!isFiniteNumber(atr) || atr <= 0) return false;
-    return Math.abs(ctx.price - vwap) >= VWAP_DISTANCE_ATR * atr;
+    if (ctx.timeframe === INTRADAY_VWAP_DISABLED_TIMEFRAME) return null;
+    const rawVwap = lastNumber(ctx.indicators.vwap);
+    if (!isFiniteNumber(rawVwap)) return null;
+    const rawAtr = lastNumber(ctx.indicators.atr);
+    if (!isFiniteNumber(rawAtr)) return null;
+    const [vwap, atr, price] = [
+        printedPrice(ctx, rawVwap),
+        printedDifference(ctx, rawAtr),
+        printedPrice(ctx, ctx.price),
+    ];
+    if (atr <= 0 || Math.abs(price - vwap) < VWAP_DISTANCE_ATR * atr) {
+        return null;
+    }
+    return { state: price > vwap ? 'above' : 'below', raw: { vwap, atr } };
 };
 
-const buySellRatioNotable = (ctx: SkillSelectionContext): boolean => {
+export const readBuySellRatio = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['buy_sell_volume'], 'buyRatio'> | null => {
     const bsv = lastOf(ctx.indicators.buySellVolume);
     // `!bsv` covers both null and the undefined returned for an empty series.
-    if (!bsv) return false;
+    if (!bsv) return null;
     const total = bsv.buyVolume + bsv.sellVolume;
-    if (total <= 0) return false;
+    if (total <= 0) return null;
     const ratio = bsv.buyVolume / total;
-    return ratio >= BUY_SELL_RATIO_BULLISH || ratio <= BUY_SELL_RATIO_BEARISH;
+    // Percent units, the way `## Volume Analysis (Buy/Sell)` prints it.
+    const raw = { buyRatio: ratio * 100 };
+    if (ratio >= BUY_SELL_RATIO_BULLISH) {
+        return { state: 'buy_dominant', raw };
+    }
+    return ratio <= BUY_SELL_RATIO_BEARISH
+        ? { state: 'sell_dominant', raw }
+        : null;
 };
 
-// ── Pro-indicator evaluators (Phase 3) ───────────────────────────────────────
+// ── Pro-indicator readers (Phase 3) ──────────────────────────────────────────
 
 /** MACD-V: notable when the latest read sits in the ±150 OB/OS risk zone. */
-const macdVLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readMacdVLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['macd_v'], 'macdV'> | null => {
     const v = lastNumber(ctx.indicators.macdV);
-    if (!isFiniteNumber(v)) return false;
-    return Math.abs(v) >= MACDV_OVERBOUGHT;
+    if (!isFiniteNumber(v) || Math.abs(v) < MACDV_OVERBOUGHT) return null;
+    return {
+        state: v > 0 ? 'high_positive' : 'high_negative',
+        raw: { macdV: v },
+    };
 };
 
 /** Connors RSI: notable at its fast-moving <10 / >90 extremes. */
-const connorsRsiLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readConnorsRsiLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['connors_rsi'], 'crsi'> | null => {
     const v = lastNumber(ctx.indicators.connorsRsi);
-    if (!isFiniteNumber(v)) return false;
-    return v <= CRSI_OVERSOLD || v >= CRSI_OVERBOUGHT;
+    if (!isFiniteNumber(v)) return null;
+    if (v >= CRSI_OVERBOUGHT) return { state: 'overbought', raw: { crsi: v } };
+    return v <= CRSI_OVERSOLD ? { state: 'oversold', raw: { crsi: v } } : null;
 };
 
 /**
@@ -293,25 +441,36 @@ const connorsRsiLevelNotable = (ctx: SkillSelectionContext): boolean => {
  * cross marks the momentum turn the indicator is built to surface. A flat read
  * landing exactly on zero is not a flip.
  */
-const forceIndexLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readForceIndexLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['force_index'], 'forceIndex'> | null => {
     const pair = lastTwoFinite(ctx.indicators.forceIndex);
-    if (pair === null) return false;
+    if (pair === null) return null;
     const [prev, latest] = pair;
-    return Math.sign(prev) !== Math.sign(latest) && latest !== 0;
+    if (Math.sign(prev) === Math.sign(latest) || latest === 0) return null;
+    return {
+        state: latest > 0 ? 'turned_positive' : 'turned_negative',
+        raw: { forceIndex: latest },
+    };
 };
 
 /**
  * Elder-Ray: notable on Elder's two core turn conditions vs the previous bar —
  * bear power negative but rising (best-buy setup) OR bull power positive but
- * falling (selling pressure entering a rally). False on null / insufficient bars.
+ * falling (selling pressure entering a rally). Null on missing / insufficient bars.
  */
-const elderRayLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readElderRayLevel = (
+    ctx: SkillSelectionContext
+): StateRead<
+    IndicatorCardStates['elder_ray'],
+    'bullPower' | 'bearPower'
+> | null => {
     const series = ctx.indicators.elderRay;
     const n = series.length;
-    if (n < 2) return false;
+    if (n < 2) return null;
     const prev = series[n - 2];
     const cur = series[n - 1];
-    if (!prev || !cur) return false;
+    if (!prev || !cur) return null;
 
     const bearTurningUp =
         isFiniteNumber(prev.bearPower) &&
@@ -323,7 +482,16 @@ const elderRayLevelNotable = (ctx: SkillSelectionContext): boolean => {
         isFiniteNumber(cur.bullPower) &&
         cur.bullPower > 0 &&
         cur.bullPower < prev.bullPower;
-    return bearTurningUp || bullTurningDown;
+    if (!bearTurningUp && !bullTurningDown) return null;
+    return {
+        state:
+            bearTurningUp && bullTurningDown
+                ? 'both'
+                : bearTurningUp
+                  ? 'bear_power_rising'
+                  : 'bull_power_falling',
+        raw: { bullPower: cur.bullPower, bearPower: cur.bearPower },
+    };
 };
 
 /**
@@ -331,17 +499,23 @@ const elderRayLevelNotable = (ctx: SkillSelectionContext): boolean => {
  * a permission change worth surfacing — either it flipped vs the previous
  * coloured bar, or it is not 'blue' (green/red actively forbid one side).
  */
-const elderImpulseLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readElderImpulseLevel = (
+    ctx: SkillSelectionContext
+): {
+    readonly state: IndicatorCardStates['elder_impulse'];
+    readonly flippedFrom: ImpulseColor | null;
+} | null => {
     const series = ctx.indicators.elderImpulse;
     const latest = lastOf(series);
-    if (!latest) return false;
+    if (!latest) return null;
 
     // Previous *coloured* bar (skip trailing nulls) to detect a flip. Predicate
     // excludes the last index without allocating an O(N) slice.
     const lastIdx = series.length - 1;
     const prev = series.findLast((c, i) => c !== null && i < lastIdx) ?? null;
     const flipped = prev !== null && prev !== latest;
-    return flipped || latest !== 'blue';
+    if (!flipped && latest === 'blue') return null;
+    return { state: latest, flippedFrom: flipped ? prev : null };
 };
 
 /**
@@ -349,60 +523,193 @@ const elderImpulseLevelNotable = (ctx: SkillSelectionContext): boolean => {
  * CHANDELIER_FLIP_LOOKBACK bars (a regime change), not merely whenever a trend
  * exists. Reads the trailing window of non-null trends.
  */
-const chandelierLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readChandelierLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['chandelier'], 'stop'> | null => {
     const series: ChandelierResult[] = ctx.indicators.chandelierExit;
     const n = series.length;
-    if (n < 2) return false;
+    if (n < 2) return null;
     const latest = series[n - 1];
-    if (!latest || latest.trend === null) return false;
+    if (!latest || latest.trend === null) return null;
 
     const from = Math.max(0, n - CHANDELIER_FLIP_LOOKBACK - 1);
     for (let i = n - 2; i >= from; i -= 1) {
         const item = series[i];
         if (!item || item.trend === null) continue;
-        return item.trend !== latest.trend;
+        if (item.trend === latest.trend) return null;
+        return latest.trend === 'long'
+            ? { state: 'flipped_long', raw: { stop: latest.longStop } }
+            : { state: 'flipped_short', raw: { stop: latest.shortStop } };
     }
-    return false;
+    return null;
 };
 
 /** Hurst: notable when |H − 0.5| clears the decisive margin (off random walk). */
-const hurstLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readHurstLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['hurst'], 'hurst'> | null => {
     const v = lastNumber(ctx.indicators.hurst);
-    if (!isFiniteNumber(v)) return false;
-    return Math.abs(v - HURST_RANDOM_WALK) >= HURST_DECISIVE_MARGIN;
+    if (!isFiniteNumber(v)) return null;
+    if (Math.abs(v - HURST_RANDOM_WALK) < HURST_DECISIVE_MARGIN) return null;
+    return {
+        state: v > HURST_RANDOM_WALK ? 'trending' : 'mean_reverting',
+        raw: { hurst: v },
+    };
 };
 
 /** Variance Ratio: notable when |VR − 1| clears the decisive margin. */
-const varianceRatioLevelNotable = (ctx: SkillSelectionContext): boolean => {
+export const readVarianceRatioLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['variance_ratio'], 'varianceRatio'> | null => {
     const v = lastNumber(ctx.indicators.varianceRatio);
-    if (!isFiniteNumber(v)) return false;
-    return Math.abs(v - VR_RANDOM_WALK) >= VR_DECISIVE_MARGIN;
+    if (!isFiniteNumber(v)) return null;
+    if (Math.abs(v - VR_RANDOM_WALK) < VR_DECISIVE_MARGIN) return null;
+    return {
+        state: v > VR_RANDOM_WALK ? 'trending' : 'mean_reverting',
+        raw: { varianceRatio: v },
+    };
 };
 
 /** Regression: notable when the trend fit is clean (r² ≥ significance cutoff). */
-const regressionLevelNotable = (ctx: SkillSelectionContext): boolean => {
-    const latest = lastOf(ctx.indicators.regression);
-    if (!latest || !isFiniteNumber(latest.r2)) return false;
-    return latest.r2 >= REGRESSION_R2_SIGNIFICANT;
+export const readRegressionLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['regression'], 'r2'> | null => {
+    // The regime line prints the R² of the last bar that has a slope, so the state is read
+    // from that bar and that figure.
+    const latest = ctx.indicators.regression.findLast(r => r.slope !== null);
+    if (!latest || !isFiniteNumber(latest.r2)) return null;
+    const r2 = printedFigure(ctx, latest.r2);
+    if (r2 < REGRESSION_R2_SIGNIFICANT) return null;
+    return {
+        state: (latest.slope ?? 0) >= 0 ? 'strong_fit_up' : 'strong_fit_down',
+        raw: { r2 },
+    };
 };
 
-/** Yang-Zhang: notable when realized vol is in a top/bottom regime extreme. */
-const yangZhangLevelNotable = (ctx: SkillSelectionContext): boolean =>
-    volRegimeNotable(ctx.indicators.yangZhang);
+/**
+ * Yang-Zhang: notable when realized vol is in a top/bottom regime extreme. `sigma` is the
+ * per-bar σ in percent units, the way `## Market Regime & Risk Context` prints it.
+ */
+export const readYangZhangLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['yang_zhang'], 'sigma'> | null => {
+    const regime = volRegimeOf(ctx.indicators.yangZhang);
+    return regime === null
+        ? null
+        : { state: regime.state, raw: { sigma: regime.latest * 100 } };
+};
 
-/** EWMA: notable when reactive vol is in a top/bottom regime extreme. */
-const ewmaLevelNotable = (ctx: SkillSelectionContext): boolean =>
-    volRegimeNotable(ctx.indicators.ewmaVolatility);
+/** EWMA: notable when reactive vol is in a top/bottom regime extreme (σ in percent units). */
+export const readEwmaLevel = (
+    ctx: SkillSelectionContext
+): StateRead<IndicatorCardStates['ewma'], 'sigma'> | null => {
+    const regime = volRegimeOf(ctx.indicators.ewmaVolatility);
+    return regime === null
+        ? null
+        : { state: regime.state, raw: { sigma: regime.latest * 100 } };
+};
+
+/**
+ * @internal
+ * What a textbook *state* predicate found on the analyzed chart: the state it is in and the
+ * unrounded values it was decided on, or `null` when the feature is not notable.
+ *
+ * Pure: reads only `predicate` and the already-computed values inside `ctx`
+ * (the last entry of each indicator series plus `ctx.price` / `ctx.timeframe`).
+ * Any missing / null / degenerate input yields `null` rather than throwing, so
+ * an under-warmed indicator never spuriously loads a gated skill.
+ *
+ * @param predicate - The `(feature, predicate)` pair from a skill's `gating.state`.
+ * @param ctx - Read-only chart selection context.
+ * @returns The state when the feature has reached its textbook extreme, else `null`.
+ */
+export function readIndicatorState(
+    predicate: SkillStatePredicate,
+    ctx: SkillSelectionContext
+): IndicatorStateRead | null {
+    switch (predicate.feature) {
+        case 'bollinger':
+            return predicate.predicate === 'pctB'
+                ? readBollingerPctB(predicate, ctx)
+                : null;
+        case 'keltner':
+            return predicate.predicate === 'bandDistAtr'
+                ? readKeltnerBand(ctx)
+                : null;
+        case 'williamsR':
+            return predicate.predicate === 'level'
+                ? readWilliamsRLevel(ctx)
+                : null;
+        case 'stochastic':
+            return predicate.predicate === 'level'
+                ? readStochasticLevel(ctx)
+                : null;
+        case 'stochRsi':
+            return predicate.predicate === 'level'
+                ? readStochRsiLevel(ctx)
+                : null;
+        case 'donchian':
+            return predicate.predicate === 'channelProximity'
+                ? readDonchianProximity(ctx)
+                : null;
+        case 'vwap':
+            return predicate.predicate === 'bandDistAtr'
+                ? readVwapDistance(ctx)
+                : null;
+        case 'buySellVolume':
+            return predicate.predicate === 'ratio'
+                ? readBuySellRatio(ctx)
+                : null;
+        // ── Pro-indicators Phase 3 — all gated on the generalized 'level' kind ─
+        case 'macdV':
+            return predicate.predicate === 'level' ? readMacdVLevel(ctx) : null;
+        case 'connorsRsi':
+            return predicate.predicate === 'level'
+                ? readConnorsRsiLevel(ctx)
+                : null;
+        case 'forceIndex':
+            return predicate.predicate === 'level'
+                ? readForceIndexLevel(ctx)
+                : null;
+        case 'elderRay':
+            return predicate.predicate === 'level'
+                ? readElderRayLevel(ctx)
+                : null;
+        case 'elderImpulse':
+            return predicate.predicate === 'level'
+                ? readElderImpulseLevel(ctx)
+                : null;
+        case 'chandelier':
+            return predicate.predicate === 'level'
+                ? readChandelierLevel(ctx)
+                : null;
+        case 'hurst':
+            return predicate.predicate === 'level' ? readHurstLevel(ctx) : null;
+        case 'varianceRatio':
+            return predicate.predicate === 'level'
+                ? readVarianceRatioLevel(ctx)
+                : null;
+        case 'regression':
+            return predicate.predicate === 'level'
+                ? readRegressionLevel(ctx)
+                : null;
+        case 'yangZhang':
+            return predicate.predicate === 'level'
+                ? readYangZhangLevel(ctx)
+                : null;
+        case 'ewma':
+            return predicate.predicate === 'level' ? readEwmaLevel(ctx) : null;
+        default:
+            return null;
+    }
+}
 
 /**
  * @internal
  * Decide whether a textbook *state* predicate is currently notable for the
- * analyzed chart.
- *
- * Pure: reads only `predicate` and the already-computed values inside `ctx`
- * (the last entry of each indicator series plus `ctx.price` / `ctx.timeframe`).
- * Any missing / null / degenerate input yields `false` rather than throwing, so
- * an under-warmed indicator never spuriously loads a gated skill.
+ * analyzed chart: {@link readIndicatorState} found a state. Any missing / null /
+ * degenerate input yields `false` rather than throwing, so an under-warmed
+ * indicator never spuriously loads a gated skill.
  *
  * @param predicate - The `(feature, predicate)` pair from a skill's `gating.state`.
  * @param ctx - Read-only chart selection context.
@@ -412,85 +719,5 @@ export function isStateNotable(
     predicate: SkillStatePredicate,
     ctx: SkillSelectionContext
 ): boolean {
-    switch (predicate.feature) {
-        case 'bollinger':
-            return predicate.predicate === 'pctB'
-                ? bollingerPctBNotable(predicate, ctx)
-                : false;
-        case 'keltner':
-            return predicate.predicate === 'bandDistAtr'
-                ? keltnerBandDistNotable(ctx)
-                : false;
-        case 'williamsR':
-            return predicate.predicate === 'level'
-                ? williamsRLevelNotable(ctx)
-                : false;
-        case 'stochastic':
-            return predicate.predicate === 'level'
-                ? stochasticLevelNotable(ctx)
-                : false;
-        case 'stochRsi':
-            return predicate.predicate === 'level'
-                ? stochRsiLevelNotable(ctx)
-                : false;
-        case 'donchian':
-            return predicate.predicate === 'channelProximity'
-                ? donchianProximityNotable(ctx)
-                : false;
-        case 'vwap':
-            return predicate.predicate === 'bandDistAtr'
-                ? vwapDistNotable(ctx)
-                : false;
-        case 'buySellVolume':
-            return predicate.predicate === 'ratio'
-                ? buySellRatioNotable(ctx)
-                : false;
-        // ── Pro-indicators Phase 3 — all gated on the generalized 'level' kind ─
-        case 'macdV':
-            return predicate.predicate === 'level'
-                ? macdVLevelNotable(ctx)
-                : false;
-        case 'connorsRsi':
-            return predicate.predicate === 'level'
-                ? connorsRsiLevelNotable(ctx)
-                : false;
-        case 'forceIndex':
-            return predicate.predicate === 'level'
-                ? forceIndexLevelNotable(ctx)
-                : false;
-        case 'elderRay':
-            return predicate.predicate === 'level'
-                ? elderRayLevelNotable(ctx)
-                : false;
-        case 'elderImpulse':
-            return predicate.predicate === 'level'
-                ? elderImpulseLevelNotable(ctx)
-                : false;
-        case 'chandelier':
-            return predicate.predicate === 'level'
-                ? chandelierLevelNotable(ctx)
-                : false;
-        case 'hurst':
-            return predicate.predicate === 'level'
-                ? hurstLevelNotable(ctx)
-                : false;
-        case 'varianceRatio':
-            return predicate.predicate === 'level'
-                ? varianceRatioLevelNotable(ctx)
-                : false;
-        case 'regression':
-            return predicate.predicate === 'level'
-                ? regressionLevelNotable(ctx)
-                : false;
-        case 'yangZhang':
-            return predicate.predicate === 'level'
-                ? yangZhangLevelNotable(ctx)
-                : false;
-        case 'ewma':
-            return predicate.predicate === 'level'
-                ? ewmaLevelNotable(ctx)
-                : false;
-        default:
-            return false;
-    }
+    return readIndicatorState(predicate, ctx) !== null;
 }

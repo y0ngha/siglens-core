@@ -165,7 +165,13 @@ const taggedGuides = (
 ): readonly TaggedGuide[] =>
     catalog.flatMap(s =>
         s.group === group && s.computedCard !== undefined
-            ? [{ name: s.name, computedCard: s.computedCard }]
+            ? [
+                  {
+                      name: s.name,
+                      computedCard: s.computedCard,
+                      triggers: triggersOf(s),
+                  },
+              ]
             : []
     );
 
@@ -190,8 +196,8 @@ export function readGatingRow(
         printed: candles,
         tier: sample.tier,
     });
-    const hasCards = sample.cards !== undefined && sample.cards !== null;
-    const context = hasCards ? input.cardContext(sample.caseId) : null;
+    const cards = sample.cards ?? null;
+    const context = cards === null ? null : input.cardContext(sample.caseId);
     const tagged = taggedGuides(input.catalog, 'indicator_guide');
     const cycleSkills = new Set([
         ...Object.keys(CYCLE_STRATEGY_SKILLS),
@@ -228,23 +234,23 @@ export function readGatingRow(
         ).some(name => cycleSkills.has(name)),
         cards: {
             indicator:
-                hasCards && context !== null && tagged.length > 0
+                cards !== null && tagged.length > 0
                     ? checkIndicatorCards({
-                          prompt: text,
-                          close:
-                              context.closes[context.closes.length - 1] ?? null,
+                          // The computed lines are printed in the dynamic part; the guides'
+                          // own digests (stable) quote line formats and must not be read.
+                          prompt: sample.dynamic,
                           injected: tagged.filter(
                               g => headingPosition(text, g.name) >= 0
                           ),
-                          cards: readIndicatorCards(sample.cards?.indicator),
+                          cards: readIndicatorCards(cards.indicator),
                       })
                     : null,
             cycle:
-                hasCards && context !== null
+                cards !== null && context !== null
                     ? checkCycleCards({
-                          prompt: text,
+                          prompt: sample.dynamic,
                           closes: context.closes,
-                          cards: readCycleCards(sample.cards?.cycle),
+                          cards: readCycleCards(cards.cycle),
                       })
                     : null,
         },
@@ -289,6 +295,9 @@ export interface CardSummary {
         cards: number;
         valueMismatches: number;
         stateMismatches: number;
+        trendMismatches: number;
+        newlyLitMismatches: number;
+        partial: number;
         unreadable: number;
         naAlwaysOn: number;
     } | null;
@@ -414,6 +423,13 @@ function cardSummary(
                       stateMismatches: sum(
                           indicator.map(c => c.values.stateMismatches)
                       ),
+                      trendMismatches: sum(
+                          indicator.map(c => c.trendMismatches)
+                      ),
+                      newlyLitMismatches: sum(
+                          indicator.map(c => c.newlyLitMismatches)
+                      ),
+                      partial: sum(indicator.map(c => c.values.partial)),
                       unreadable: sum(indicator.map(c => c.values.unreadable)),
                       naAlwaysOn: sum(indicator.map(c => c.naAlwaysOn)),
                   },
@@ -430,6 +446,8 @@ function cardSummary(
                           cycle.map(c => c.historyMismatches)
                       ),
                       trendMismatches: sum(cycle.map(c => c.trendMismatches)),
+                      valueMismatches: sum(cycle.map(c => c.valueMismatches)),
+                      setViolations: sum(cycle.map(c => c.setViolations)),
                   },
     };
 }
@@ -600,10 +618,13 @@ export function gatingGates(summary: GatingSummary): readonly GateResult[] {
         ),
         gate(
             'D6',
-            'card values are printed numbers and the recomputed state equals the card state',
+            'card values are printed numbers, the recomputed state equals the card state, the trend is the rule trend of the printed lines and an event card shows the event newly lit on this bar when one is printed',
             !cardCapable || ind === null
                 ? null
-                : ind.valueMismatches > 0 || ind.stateMismatches > 0
+                : ind.valueMismatches > 0 ||
+                    ind.stateMismatches > 0 ||
+                    ind.trendMismatches > 0 ||
+                    ind.newlyLitMismatches > 0
                   ? false
                   : ind.unreadable > 0
                     ? null
@@ -612,8 +633,8 @@ export function gatingGates(summary: GatingSummary): readonly GateResult[] {
                 ? noCards
                 : ind === null
                   ? noRender
-                  : `value mismatches ${ind.valueMismatches}, state mismatches ${ind.stateMismatches}, cards of a kind without a reader ${ind.unreadable} of ${ind.cards} (readers: ${READER_KINDS.join(', ')})`,
-            '0 mismatches, every state recomputed'
+                  : `value mismatches ${ind.valueMismatches}, state mismatches ${ind.stateMismatches}, trend mismatches ${ind.trendMismatches}, event not the newly lit one ${ind.newlyLitMismatches}, cards of a kind without a reader ${ind.unreadable} of ${ind.cards}, of them with a state the printed lines only bound ${ind.partial} (readers: ${READER_KINDS.length} kinds)`,
+            '0 mismatches, every kind has a reader (partial kinds: the state must be an allowed one)'
         ),
         gate(
             'D8',
@@ -623,12 +644,14 @@ export function gatingGates(summary: GatingSummary): readonly GateResult[] {
                 : cards.cycle.withoutPrintedStage === 0 &&
                       cards.cycle.stageMismatches === 0 &&
                       cards.cycle.historyMismatches === 0 &&
-                      cards.cycle.trendMismatches === 0,
+                      cards.cycle.trendMismatches === 0 &&
+                      cards.cycle.valueMismatches === 0 &&
+                      cards.cycle.setViolations === 0,
             !cycleCapable
                 ? noCards
                 : cards.cycle === null
                   ? noRender
-                  : `cards ${cards.cycle.cards}, without a printed stage ${cards.cycle.withoutPrintedStage}, stage ${cards.cycle.stageMismatches}, history ${cards.cycle.historyMismatches}, trend ${cards.cycle.trendMismatches}`,
+                  : `cards ${cards.cycle.cards}, without a printed stage ${cards.cycle.withoutPrintedStage}, stage ${cards.cycle.stageMismatches}, history ${cards.cycle.historyMismatches}, trend ${cards.cycle.trendMismatches}, values/order ${cards.cycle.valueMismatches}, card set ${cards.cycle.setViolations}`,
             '0 mismatches'
         ),
         gate(

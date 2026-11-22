@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { COMPUTED_CARD_KINDS } from '@/domain/analysis/computedCardKinds';
 import {
     bootstrapCi,
     cardTrendAgreement,
@@ -218,6 +219,40 @@ describe('readArmCase', () => {
         expect(cardTrendAgreement([c], { 'MA Signal Guide': 'ma' })).toEqual({
             'MA Signal Guide': { kind: 'ma', n: 2, agree: 1, opposite: 1 },
         });
+    });
+
+    it("takes an event card's rule trend from the signals the stored prompt printed for the skill's triggers", () => {
+        const prompt = [
+            '- RSI(14): 24.5 [falling]',
+            'Bullish signals: rsi_oversold(rsi)',
+            'Bearish signals: none',
+        ].join('\n');
+        const c = readArmCase(
+            result({
+                promptDynamic: prompt,
+                body: {
+                    indicatorResults: [
+                        {
+                            indicatorName: 'RSI Signal Guide',
+                            signals: [
+                                { trend: 'bullish' },
+                                { trend: 'bearish' },
+                            ],
+                        },
+                    ],
+                },
+            })
+        );
+        const kinds = { 'RSI Signal Guide': 'rsi' };
+        expect(
+            cardTrendAgreement([c], kinds, {
+                'RSI Signal Guide': ['rsi_oversold', 'rsi_overbought'],
+            })
+        ).toEqual({
+            'RSI Signal Guide': { kind: 'rsi', n: 2, agree: 1, opposite: 1 },
+        });
+        // Without the triggers no signal can be told to belong to the skill: no reading, no row.
+        expect(cardTrendAgreement([c], kinds)).toEqual({});
     });
 });
 
@@ -1039,10 +1074,14 @@ describe('outputGates', () => {
                 ),
                 'D7'
             );
-        expect(d7(['obv', 'macd_cycle', 'stochastic']).pass).toBe(true);
-        const undecided = d7(['obv', 'rsi', 'cci']);
+        // Every kind core can tag has a rule, so the gate decides on all of them.
+        expect(d7(['obv', 'macd_cycle', 'stochastic', 'rsi', 'cci']).pass).toBe(
+            true
+        );
+        expect(d7([...COMPUTED_CARD_KINDS]).pass).toBe(true);
+        const undecided = d7(['obv', 'mystery_kind', 'other_kind']);
         expect(undecided.pass).toBeNull();
-        expect(undecided.value).toContain('cci, rsi');
+        expect(undecided.value).toContain('mystery_kind, other_kind');
     });
 
     it('every gate id is produced', () => {

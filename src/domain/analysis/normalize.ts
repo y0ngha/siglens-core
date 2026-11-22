@@ -27,6 +27,7 @@ import type {
     TrendlineDirection,
     TrendlinePoint,
 } from '@/domain/types';
+import { normalizeIndicatorReading } from './normalizeCards';
 import {
     asArray,
     asBoolean,
@@ -161,6 +162,18 @@ export function normalizeSignal(v: unknown): AnalysisSignal | null {
     };
 }
 
+/**
+ * @internal Normalizes an analysis signal read back from a stored result: {@link normalizeSignal}
+ * plus the reading core attached (`normalizeIndicatorReading`), dropped when it is not one the
+ * builder writes. The model-reply path never calls this, so a model cannot supply a reading.
+ */
+export function normalizeCachedSignal(v: unknown): AnalysisSignal | null {
+    const signal = normalizeSignal(v);
+    if (signal === null) return null;
+    const reading = normalizeIndicatorReading(asObject(v)?.reading);
+    return reading === undefined ? signal : { ...signal, reading };
+}
+
 /** @internal Normalizes an indicator-guide result. */
 export function normalizeIndicatorGuideResult(
     v: unknown
@@ -172,6 +185,23 @@ export function normalizeIndicatorGuideResult(
     return {
         indicatorName,
         signals: compact(asArray(o.signals).map(normalizeSignal)),
+    };
+}
+
+/**
+ * @internal Normalizes an indicator-guide result read back from a stored result, keeping the
+ * readings of its signals ({@link normalizeCachedSignal}).
+ */
+export function normalizeCachedIndicatorGuideResult(
+    v: unknown
+): IndicatorGuideResult | null {
+    const o = asObject(v);
+    if (!o) return null;
+    const indicatorName = asString(o.indicatorName);
+    if (!indicatorName) return null;
+    return {
+        indicatorName,
+        signals: compact(asArray(o.signals).map(normalizeCachedSignal)),
     };
 }
 

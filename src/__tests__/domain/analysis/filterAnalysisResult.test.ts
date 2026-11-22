@@ -809,3 +809,91 @@ describe('trendBasis tier gating', () => {
         expect('trendBasis' in result).toBe(false);
     });
 });
+
+describe('computed cards tier gating', () => {
+    const cards = makeAnalysisResponse({
+        indicatorResults: [
+            {
+                indicatorName: 'RSI Signal Guide',
+                signals: [
+                    {
+                        type: 'skill',
+                        description: 'RSI Signal Guide: rsi_oversold.',
+                        trend: 'bullish',
+                        strength: 'strong',
+                        reading: {
+                            kind: 'rsi',
+                            basis: 'event',
+                            state: 'rsi_oversold',
+                            values: { rsi: 24.5 },
+                            signals: [
+                                {
+                                    type: 'rsi_oversold',
+                                    phase: 'confirmed',
+                                    barsAgo: 0,
+                                },
+                            ],
+                        },
+                    },
+                ],
+            },
+        ],
+        strategyResults: [
+            {
+                id: 'MA Cycle_0',
+                strategyName: 'MA Cycle',
+                trend: 'bearish',
+                summary: 'MA cycle: stage 4',
+                confidenceWeight: 0.55,
+                candidateIds: [],
+                cycle: {
+                    kind: 'ma_cycle',
+                    stage: 4,
+                    previousStage: 3,
+                    barsInStage: 5,
+                    progression: 'forward',
+                    stageChanges: 2,
+                    values: { ma5: 1, ma20: 2, ma60: 3 },
+                    order: ['long', 'medium', 'short'],
+                    slopes: { ma5: 'falling', ma20: 'falling', ma60: 'flat' },
+                },
+            },
+        ],
+    });
+
+    it('hands a tier with the partial detail the readings, and one with the skill detection the cycle', () => {
+        const { result } = filterAnalysisResult(
+            cards,
+            'member',
+            restrictedConfig
+        );
+        expect(result.indicatorResults?.[0].signals[0].reading?.kind).toBe(
+            'rsi'
+        );
+        expect(result.strategyResults?.[0].cycle?.stage).toBe(4);
+    });
+
+    it('withholds the indicator cards from a tier without the partial detail, whatever the cycle depth', () => {
+        const { result } = filterAnalysisResult(cards, 'member', {
+            ...restrictedConfig,
+            infoDepth: {
+                ...restrictedConfig.infoDepth,
+                member: ['direction', 'summary', 'skill_detection'],
+            },
+        });
+        expect(result.indicatorResults).toBeNull();
+        expect(result.strategyResults?.[0].cycle?.kind).toBe('ma_cycle');
+    });
+
+    it('withholds the cycle card with the strategy results when the skill detection is not allowed', () => {
+        const { result } = filterAnalysisResult(
+            cards,
+            'member',
+            denySkillDetectionConfig
+        );
+        expect(result.strategyResults).toBeNull();
+        expect(result.indicatorResults?.[0].indicatorName).toBe(
+            'RSI Signal Guide'
+        );
+    });
+});

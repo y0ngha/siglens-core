@@ -12,6 +12,7 @@ import {
     loadSkillsCached,
     clearSkillsCache,
 } from '@/infrastructure/skills/loader';
+import { COMPUTED_CARD_KINDS } from '@/domain/analysis/computedCardKinds';
 import type { SkillCounts } from '@/domain/types';
 import {
     withDigest as withDigestFixture,
@@ -887,6 +888,56 @@ ${withDigest('Body content')}`;
             const skills = await new FileSkillsLoader().loadSkills();
 
             expect(skills[0].overlayKind).toBeUndefined();
+        }
+    );
+});
+
+// ─────────────────────────────────────────
+// computed_card parsing — the kind of card core builds in code for the skill
+// ─────────────────────────────────────────
+
+describe('FileSkillsLoader — computed_card parsing', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const guideFm = (tagLine: string) => `---
+name: RSI Signal Guide
+description: Test computed card
+type: indicator_guide
+indicators: ['rsi']
+confidence_weight: 0.9
+${tagLine}
+---
+${withDigest('Body content')}`;
+
+    it.each(COMPUTED_CARD_KINDS)(
+        'computed_card: %s → computedCard',
+        async kind => {
+            mockReaddir.mockResolvedValue([makeDirent('guide.md')]);
+            mockReadFile.mockResolvedValue(guideFm(`computed_card: ${kind}`));
+
+            const skills = await new FileSkillsLoader().loadSkills();
+
+            expect(skills[0].computedCard).toBe(kind);
+        }
+    );
+
+    it.each([
+        'computed_card: bogus',
+        'computed_card: RSI',
+        'computed_card:',
+        '',
+    ])(
+        '%j → computedCard is undefined, the rest of the skill still loads',
+        async line => {
+            mockReaddir.mockResolvedValue([makeDirent('guide.md')]);
+            mockReadFile.mockResolvedValue(guideFm(line));
+
+            const skills = await new FileSkillsLoader().loadSkills();
+
+            expect(skills[0].computedCard).toBeUndefined();
+            expect(skills[0].name).toBe('RSI Signal Guide');
         }
     );
 });

@@ -43,24 +43,19 @@ export function groupOf(skill: Pick<Skill, 'type' | 'category'>): string {
 }
 
 /**
- * The `computedCard` tag of a skill (WP-16 core-2 on). Read structurally: the field does not
- * exist on a core without it, and the instrument must run on that core too.
+ * The computed cards an assembled prompt record carries (`indicatorCards` and `cycleCards`,
+ * typed `@internal` fields of `AssembledPromptRecord`), or `null` for a record without them.
+ * Typed reads: `analysisFieldsEvalRender.test.ts` pins that the fields the instrument reads are
+ * the ones `runAnalysis` hands out.
  */
-function computedCardOf(skill: Skill): string | undefined {
-    const tag: unknown = Reflect.get(skill, 'computedCard');
-    return typeof tag === 'string' ? tag : undefined;
-}
-
-/**
- * The computed cards an assembled prompt carries (`indicatorCards` and `cycleCards`, WP-16
- * core-2 on), or `null` on a core that computes none.
- */
-function cardsOf(record: AssembledPromptRecord): PromptSample['cards'] {
-    const indicator: unknown = Reflect.get(record, 'indicatorCards');
-    const cycle: unknown = Reflect.get(record, 'cycleCards');
-    return indicator === undefined && cycle === undefined
+export function cardsOf(record: AssembledPromptRecord): PromptSample['cards'] {
+    return record.indicatorCards === undefined &&
+        record.cycleCards === undefined
         ? null
-        : { indicator, cycle };
+        : {
+              indicator: record.indicatorCards ?? [],
+              cycle: record.cycleCards ?? [],
+          };
 }
 
 const OFFLINE_KEY = 'offline-evaluation-no-network';
@@ -121,7 +116,7 @@ export const renderWithCore: RenderSkills = async input => {
             skill.gating.signalKind === 'event'
                 ? skill.gating.triggers
                 : undefined,
-        computedCard: computedCardOf(skill),
+        computedCard: skill.computedCard,
     }));
 
     // The DeepSeek client only checks that a key exists before the request; the request

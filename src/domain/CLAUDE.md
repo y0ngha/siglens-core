@@ -251,7 +251,10 @@ A number rendered into a prompt uses the same thresholds, rounding and detector 
 the engine that consumers (and the grounded-number checks) recompute from. Gap lines compare
 `size >= GAP_MIN_ATR_MULT * atr` like the gap detector does. Use fixed tolerances, not ones
 that scale with the value's magnitude, and round inputs to the displayed precision before
-computing derived values, so a recomputation from the rendered text matches.
+computing derived values, so a recomputation from the rendered text matches. A state or gate
+that code derives from a printed figure (a %B zone, an R² label, "newly lit this bar") reads
+the printed value from the same single computation the prompt line uses, never a second
+derivation from the unrounded inputs.
 
 <a id="DOM-9"></a>
 #### DOM-9 — Model-facing text is exact and internally consistent

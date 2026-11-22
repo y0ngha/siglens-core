@@ -109,6 +109,10 @@ describe('browser public API exports', () => {
             'fibonacci',
             'elliott',
         ]);
+        // The siglens catalog validator checks `computed_card` tags against this list (API-1: both entrypoints).
+        expect(clientApi.COMPUTED_CARD_KINDS).toHaveLength(38);
+        expect(clientApi.COMPUTED_CARD_KINDS).toContain('ma_cycle');
+        expect(clientApi.COMPUTED_CARD_KINDS).toContain('rsi');
         // Consumers round displayed KRX prices with the same rule core uses.
         expect(clientApi.roundToKrxTick(205_325)).toBe(205_500);
         expect(clientApi.krxTickSize(215_000)).toBe(500);

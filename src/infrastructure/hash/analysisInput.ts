@@ -72,14 +72,15 @@ export function normalizeSkillsForHash(
 /**
  * @internal
  * Deterministic fingerprint of the **skill-selection metadata** of a catalog —
- * each skill's `name`, `gating`, and `tokenCost`, the exact fields the chart
- * selector ({@link selectSkills}) reads. Folded into the chart and fundamental
+ * each skill's `name`, `gating`, `tokenCost` and `computedCard`, the exact fields the
+ * chart selector ({@link selectSkills}) reads, plus the tag that decides which cards
+ * code builds (a tag edit changes the prompt and the cards). Folded into the chart and fundamental
  * cache keys so that editing the gating frontmatter (or the gating logic that
  * shapes which skills are injected) invalidates previously-cached analyses
  * instead of serving them stale for the full TTL.
  *
  * Skills are sorted by `name` first, so the fingerprint is independent of the
- * loader's file-walk order. Fields outside `name`/`gating`/`tokenCost` (e.g.
+ * loader's file-walk order. Fields outside `name`/`gating`/`tokenCost`/`computedCard` (e.g.
  * `content`, `description`) are intentionally excluded: a body edit is already
  * covered by the news/overall content fingerprint and a prompt-template bump,
  * and including it here would over-invalidate the chart cache.
@@ -94,6 +95,7 @@ export function hashSkillCatalog(skills: readonly Skill[]): string {
                 name: s.name,
                 gating: s.gating ?? null,
                 tokenCost: s.tokenCost ?? null,
+                computedCard: s.computedCard ?? null,
             }))
             // Pin the locale: a locale-free `localeCompare` is
             // environment-dependent, so the same catalog would hash

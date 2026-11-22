@@ -424,7 +424,6 @@ const PRICE_SCENARIO_SCHEMA = {
  * `properties` key must appear in `required`), following the same convention as
  * `optionsOiStale` in {@link OVERALL_RESPONSE_SCHEMA}:
  *   - `actionRecommendation?` → nullable object (`type: ['object', 'null']`);
- *   - `signals[].strength?` → nullable string enum;
  *   - pattern `keyPrices?` / `renderConfig?`,
  *     and every optional `actionRecommendation` field → nullable.
  *
@@ -436,6 +435,10 @@ const PRICE_SCENARIO_SCHEMA = {
  * `actionRecommendation.reconciledLevels` is omitted for the same reason: core
  * writes it only when it corrects the AI's levels, and a model-filled one was
  * shown to readers as that correction.
+ *
+ * `indicatorResults` is omitted as well: core builds the indicator cards from the
+ * prompt's own computed lines, and the strategy cards of the MA and MACD cycles
+ * (`computedStrategyResults`), so the model writes neither.
  */
 export const TECHNICAL_RESPONSE_SCHEMA = {
     type: 'object',
@@ -447,39 +450,9 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
         // core overwrites it with `computeAnalysisTrend`'s value after normalization
         // whenever that can be measured, so the model's pick is then never shown.
         trend: TREND_SCHEMA,
-        indicatorResults: {
-            type: 'array',
-            items: {
-                type: 'object',
-                properties: {
-                    indicatorName: { type: 'string' },
-                    signals: {
-                        type: 'array',
-                        items: {
-                            type: 'object',
-                            properties: {
-                                type: { type: 'string', enum: ['skill'] },
-                                description: { type: 'string' },
-                                strength: {
-                                    type: ['string', 'null'],
-                                    enum: ['strong', 'moderate', 'weak', null],
-                                },
-                                trend: TREND_SCHEMA,
-                            },
-                            required: [
-                                'type',
-                                'description',
-                                'strength',
-                                'trend',
-                            ],
-                            additionalProperties: false,
-                        },
-                    },
-                },
-                required: ['indicatorName', 'signals'],
-                additionalProperties: false,
-            },
-        },
+        // `indicatorResults` is not asked for: core builds one card per injected indicator
+        // guide from the prompt's computed lines (`buildIndicatorCards`) and drops anything
+        // the model writes under that name.
         // Kept for backward compatibility with cached/parsed shapes; core
         // overwrites it with `computeRiskLevel` after normalization, so the
         // model's pick is never shown. The value is a volatility grade (how far price
@@ -659,7 +632,6 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
     required: [
         'summary',
         'trend',
-        'indicatorResults',
         'riskLevel',
         'keyLevels',
         'priceTargets',

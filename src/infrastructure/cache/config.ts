@@ -1131,6 +1131,31 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * technical prompts whose chart carried a hint-only pattern guide or an unprinted
  * candle guide, and for every technical prompt (the candidate section intro wording).
  *
+ * Indicator and cycle cards are computed in code (WP-16, still `p34`, unreleased):
+ * `indicatorResults` leaves the response schema and its writing-rules block leaves
+ * the prompt, replaced by one line that names what code does. Code builds one
+ * card per injected indicator guide whose skill carries a `computed_card` tag
+ * (`TechnicalAssembledPrompt.indicatorCards`, structured readings of the lines
+ * the prompt prints, rendered by the consumer in the reader's language) and one
+ * card per selected MA or MACD cycle strategy
+ * (`TechnicalAssembledPrompt.cycleCards`, whose digests are no longer rendered and
+ * which leave the strategy list). A reply that is the empty fallback gets no
+ * card. The stable guidelines drop `indicatorName` from the name-matching rule and the
+ * unlisted-pattern exception from the `skillName` rule, drop `indicatorResults` from the
+ * regular-skills rule, and reword the two cycle lines of `### Indicator State` (`MA cycle` and
+ * `MACD cycle`: "copy both ... for the ... strategy" becomes "quote both when you mention the
+ * cycle"), since the model no longer writes the cycle card. The Bollinger, Keltner, Donchian,
+ * VWAP and regression gates decide on the figures the prompt prints (the engine's printed %B,
+ * the price, band edges, VWAP and ATR rounded to the prompt's precision, the printed R²), so a
+ * gated state guide can enter or leave a prompt at a threshold edge: on the 838 replay cases,
+ * 19 guide flips in 14 of 1676 prompts (bollinger +5 member and +5 free, regression +3 member,
+ * keltner -1 member and -2 free, donchian -2 free, and one elder-ray guide left a free prompt
+ * through the tier cap). The
+ * `computed_card` tag joins the catalog fingerprint, so every key built from it (the
+ * free keys, the peek key, the keys of the other analysis kinds that carry it) moves
+ * once. Stable bytes change for every technical prompt, dynamic bytes for every
+ * prompt that injected an indicator guide or a cycle strategy.
+ *
  * `entryRecommendation` is computed from the new `actionRecommendation.planState` (the
  * close inside the entry zone is `enter`, above or below it `wait`, no stand-able plan
  * `avoid`) and Step 1 of the action rules becomes zone placement. `## Deterministic

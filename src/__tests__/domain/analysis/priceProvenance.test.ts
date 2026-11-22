@@ -521,6 +521,8 @@ describe('checkPriceProvenance — KRW prompt built by buildAnalysisPrompt', () 
             lastClose,
             atr: undefined,
             stopCandidates: [],
+            computedIndicatorResults: [],
+            computedStrategyResults: [],
             currency: 'KRW',
             krxTickTable: 'share',
         });

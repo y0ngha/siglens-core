@@ -1065,6 +1065,17 @@ CANDLE_MIN_SETUP_BODY_ATR = 0.25  — 2·3봉 반전 첫 봉의 몸통 하한 (A
 > **참고**: `indicators` 필드에 명시된 인디케이터가 `IndicatorResult`에서 계산되어 전달되는 경우, AI는 정확한 수치를 기반으로 해석한다.
 > 계산되지 않는 인디케이터의 경우, AI는 raw bar 데이터(OHLCV)에서 근사 분석을 수행할 수 있다.
 
+### 지표 카드는 코드가 만든다
+
+`indicatorResults`는 모델이 쓰지 않는다(응답 스키마에 없고, 프롬프트는 카드를 쓰라고 하지 않는다. 모델이 쓴 `indicatorResults`는 후처리에서 버린다). 모델의 일은 가이드로 수치를 해석해 `summary`·계획에 쓰는 것이다. 코어는 프롬프트에 주입된 `indicator_guide` 스킬 가운데 frontmatter에 `computed_card: <kind>` 태그가 있는 것마다 카드 하나를 `buildIndicatorCards`로 만든다(순서는 프롬프트의 스킬 순서: 상시 스킬 이름순, 이어서 발화한 스킬 관련도순). 태그가 없는 가이드(`smart-money-concepts.md`, 참조 문서 `_core/*`)는 카드가 없다.
+
+- **종류**: `IndicatorCardKind` 36종 — 상시(`ma`, `ema`, `adx`, `atr`, `obv`, `volume_profile`), 이벤트(`rsi`, `macd`, `cci`, `cmf`, `dmi`, `ichimoku`, `mfi`, `parabolic_sar`, `squeeze_momentum`, `supertrend`, `bollinger_percent_b`), 상태(그 외 19종). 한 카드는 `signals[0]` 하나에 `reading`(`kind`, `basis`, `state`, `values`, `signals`), 영어 정본 `description`, 규칙 `trend`, RSI·Stochastic·CCI에만 `strength`를 담는다.
+- **값은 프롬프트가 찍은 값이다(DOM-8)**: 카드의 숫자는 같은 포매터·같은 소수 자리로 찍은 뒤 다시 읽은 값이다(가격축 `priceQuoting`, `fmt` 2자리, 차이값 `differenceDecimalPlaces`, 거래량 정수). 상시 종류의 상태는 찍힌 값에 엔진 임계값을 적용해 정한다(ADX는 찍힌 ADX로 25/20, 거래량 프로파일은 찍힌 종가를 찍힌 VAH/VAL과). 상태 종류의 상태는 스킬을 주입한 게이트(`readIndicatorState`)가 읽은 상태 그대로이고(`isStateNotable`은 그 결과가 `null`이 아닌지일 뿐이라 게이트와 카드는 어긋날 수 없다), 밴드·VWAP·볼린저 게이트는 찍힌 가격·ATR 자리로 반올림한 값으로 판정해 프롬프트 글에서 다시 계산해도 같은 상태가 나온다. 소스 줄이 `N/A`인 상시 가이드는 카드가 없다(측정 불가는 상태가 아니다). 발화한 이벤트·상태 가이드는 항상 읽기가 있다(그 값에서 발화했기 때문이다).
+- **trend**: 이벤트 종류는 발화한 신호의 방향(서로 반대면 `neutral`), `ma`/`ema`는 정렬 방향(`mixed`는 `neutral`), `adx`는 `weak`이면 `neutral` 아니면 DI 쪽, `obv`·`volume_profile`·`elder_impulse`·`vwap`·`keltner`·`donchian`·`buy_sell_volume`·`force_index`·`regression`은 상태가 가리키는 쪽, 변동성·레짐 종류(`atr`, `yang_zhang`, `ewma`, `hurst`, `variance_ratio`)는 `neutral`, `connors_rsi`는 과매수 약세·과매도 강세. 저장된 카드 중 규칙이 모델의 trend와 반대인 비율이 5%를 넘은 종류(표본 30 이상)는 `neutral`로 둔다(`stochastic`, `stoch_rsi`, `williams_r`, `bollinger`, `macd_v`, `elder_ray`, `chandelier`). `strength`는 RSI(80/20 강, 70/30 중, 그 외 약), Stochastic(90/10, 80/20), CCI(±200, ±100)만 갖고 나머지 카드에는 없다.
+- **무료 티어**: 카드는 주입된 스킬을 따른다(상시 가이드 6개와 발화한 gated 가이드 최대 3개). 필터링은 `partial_detail`(`indicatorResults`)이다.
+- **빈 폴백 응답에는 카드를 붙이지 않는다**: 모델 응답이 `isFallbackAnalysis`인 결과에 카드가 붙으면 폴백으로 인식되지 않아 캐시에 남는다. 후처리(`postProcessRawAnalysis`)는 모델 응답이 폴백이면 카드를 붙이지 않는다.
+- **캐시**: 카드(`reading`·`cycle`)는 캐시 읽기 경로에서만 정규화한다(`normalizeIndicatorReading`, `normalizeCycleReading`: 잘못된 읽기는 통째로 버리고 카드의 나머지는 남긴다). 모델 응답 경로는 읽기를 받지 않는다. `computed_card`는 카탈로그 지문(`hashSkillCatalog`)에 들어가 태그를 고치면 캐시 키가 움직인다.
+
 ### 현재 등록된 인디케이터 신호 가이드 Skills
 
 | skill 파일 | 인디케이터 | 용도 | 신뢰도 |
@@ -1118,6 +1129,13 @@ CANDLE_MIN_SETUP_BODY_ATR = 0.25  — 2·3봉 반전 첫 봉의 몸통 하한 (A
 | `strategies/mean-reversion.md` | 평균 회귀 전략 | 0.7 |
 | `strategies/elliott-wave.md` | 엘리어트 파동 | 0.7 |
 | `strategies/fibonacci.md` | 피보나치 전략 | 0.65 |
+
+### 대순환 전략 카드는 코드가 만든다
+
+`strategies/ma-cycle.md`(`computed_card: ma_cycle`)와 `strategies/macd-cycle.md`(`computed_card: macd_cycle`)가 선택되면 모델이 아니라 `buildCycleCards`가 `StrategyResult` 하나를 만든다. 두 스킬의 요약(digest)은 프롬프트에 싣지 않고 `Strategy skill list to analyze:`에서도 뺀다(그 `AI instructions`가 코드가 만드는 카드를 쓰라고 시키기 때문이다). 선택된 대순환만 전략 블록의 한 줄(`The MA cycle card is built by code from the \`- MA cycle\` line of ## Indicator State; do not add a strategyResults entry for it.`)로 이름이 올라온다. 모델이 쓴 같은 이름의 `strategyResults` 항목은 버린다. 카드는 모델의 전략 항목 뒤에 붙고, `id`는 패턴·전략이 함께 쓰는 번호(`<이름>_<n>`), `confidenceWeight`는 스킬의 값이다.
+
+- `cycle`(`CycleReading`): `stage`는 프롬프트의 `- MA cycle (MA5/MA20/MA60)` / `- MACD cycle (EMA9/21/60)` 줄이 찍은 단계(두 줄과 카드가 같은 표를 쓴다), 이력은 같은 봉별 단계 계열에서 읽는다. 창은 마지막 120봉(`CYCLE_LOOKBACK_BARS`, 현재 봉 포함), 단계가 없는 봉(전환)은 어디서도 무시한다(런을 끊지도 변화로 세지도 않는다). `previousStage`는 현재 런 이전 런의 단계, `barsInStage`는 현재 런의 단계가 있는 봉 수로 런이 창(또는 시계열)의 첫 봉에 닿으면 `null`, `progression`은 이전 → 현재가 1→2→…→6→1의 다음 걸음이면 `forward`, 이전 걸음이면 `reverse`, `stageChanges`는 연속한 두 단계 사이 변화 횟수다. `values`는 `ma_cycle`의 MA5/20/60(가격축 소수), `macd_cycle`의 상(EMA9−EMA21)·중(EMA9−EMA60)·하(EMA21−EMA60)(차이값 소수), `slopes`는 프롬프트의 추세 표본(`trendSampleCount`)으로 본 각 선의 방향이다. 그랜빌 신호와 "횡보" 판정은 계산하지 않는다.
+- `trend`는 단계로 정한다(1·6 강세, 3·4 약세, 2·5 중립). `summary`는 영어 정본 한 줄이고 표시는 `cycle`에서 렌더링한다. 단계 줄이 `N/A`면 카드가 없다. 무료 티어에서도 카드는 선택된 스킬을 따른다. 필터링은 `strategyResults`와 같다.
 
 ---
 
@@ -1180,13 +1198,15 @@ type SignalType = 'skill';
 
 interface Signal {
     type: SignalType;
-    description: string;
-    strength: SignalStrength;
+    description: string;       // 코어가 만든 카드는 영어 정본 한 줄 (표시는 reading에서)
+    strength?: SignalStrength; // RSI·Stochastic·CCI 카드만
+    trend: Trend;
+    reading?: IndicatorReading; // 코어가 만든 카드의 구조화된 읽기 (이전 캐시·모델이 쓴 신호에는 없음)
 }
 
 interface IndicatorGuideResult {
     indicatorName: string;     // indicator_guide skill 표시 이름 (예: 'RSI Signal Guide')
-    signals: Signal[];
+    signals: Signal[];         // 코어가 만든 카드는 신호 하나
 }
 
 interface KeyPrice {
@@ -1247,8 +1267,9 @@ interface StrategyResult {
     id: string;                 // 고유 ID (strategyName_index 형식, 중복 식별용)
     strategyName: string;       // 전략 skill 표시 이름 (예: '엘리어트 파동')
     trend: Trend;               // 해당 전략 분석이 시사하는 방향
-    summary: string;            // AI가 작성한 전략 요약 (markdown **label**: value 형식)
+    summary: string;            // AI가 작성한 전략 요약 (markdown **label**: value 형식). 대순환 카드는 영어 정본 한 줄
     confidenceWeight: number;   // skill의 신뢰도 가중치 (0~1)
+    cycle?: CycleReading;       // MA·MACD 대순환 카드(코어가 만든다)의 사실 — 다른 전략 카드에는 없음
 }
 
 interface ActionRecommendation {
@@ -1262,7 +1283,7 @@ interface AnalysisResponse {
     summary: string;
     trend: Trend;                   // 계산값: EMA20의 20봉 변화(ATR 단위)와 종가 위치로 결정. 측정 불가일 때만 모델 값 유지
     trendBasis?: TrendBasis;        // trend를 결정한 근거 { slopeAtr, lookbackBars, emaPeriod }. 측정 불가·이전 캐시에는 없음
-    indicatorResults: IndicatorGuideResult[]; // indicator_guide skill 기반 신호 (indicatorName별 그룹핑) — "보조지표" 섹션에 렌더링
+    indicatorResults: IndicatorGuideResult[]; // 코어가 프롬프트의 줄에서 만든 지표 카드 (indicatorName별, 모델이 쓰지 않음) — "보조지표" 섹션에 렌더링
     riskLevel: RiskLevel;           // 변동성 등급(필드명은 그대로): 가격이 보통 얼마나 움직이는가이며 방향·하방 위험이 아니다
     keyLevels: KeyLevels;
     priceTargets: PriceTargets;     // 강세/약세 시나리오별 가격 목표
@@ -1306,8 +1327,10 @@ confidence      → patternSummaries[].confidenceWeight,
 ### 필드별 의미
 
 ```
-indicatorResults[]  indicator_guide skill의 시그널 결과
-                    indicatorName으로 그룹핑 (예: "RSI Signal Guide")
+indicatorResults[]  indicator_guide skill의 카드. 모델이 쓰지 않고 `buildIndicatorCards`가 만든다
+                    (주입된 `computed_card` 태그 스킬당 하나, 소스 줄이 N/A인 상시 가이드는 없음)
+                    indicatorName으로 그룹핑 (예: "RSI Signal Guide"), signals[0].reading이 표시의 원천
+                    (description은 영어 정본). 이 필드가 생기기 전 캐시의 행은 한국어 description만 있다
                     → consumer가 "보조지표" 섹션으로 렌더링하도록 의도됨
 
 trend               계산값(모델의 선택이 아님). `computeAnalysisTrend`: EMA20이 최근 20봉 동안 ATR(14)의
@@ -1350,6 +1373,7 @@ planState           종가가 플랜 진입 구간 어디에 있는가(`buildPla
 
 strategyResults[]   strategy skill의 분석 결과
                     strategyName으로 식별 (예: "엘리어트 파동")
+                    대순환 카드(MA·MACD)는 모델이 쓰지 않고 `buildCycleCards`가 만들며 `cycle`을 가진다
                     → consumer가 "전략" 섹션으로 렌더링하도록 의도됨
 
 patternSummaries[]  pattern skill의 차트 패턴 감지 결과
@@ -1492,6 +1516,7 @@ pattern: string               # type: pattern일 때 패턴 식별자
 indicators: string[]          # 이 skill이 필요로 하는 인디케이터 목록
 confidence_weight: number     # 0.0 ~ 1.0. 표시 가중치 — Low/Medium/High 라벨로 매핑. 포함 여부와 무관
 usage_roles: string[]         # type=indicator_guide 필수. 허용 값: signal | confirmation | regime | measurement | risk (canonical 순서)
+computed_card: string         # 선택. 코어가 이 스킬의 카드를 코드로 만든다. 허용 값: COMPUTED_CARD_KINDS (지표 36종 + ma_cycle | macd_cycle). 알 수 없는 값은 버려 카드가 없다
 display:                      # 선택. 차트 표시 설정
   chart:
     show: boolean             # 기본 show/hide 여부 (기본값: false)

@@ -111,6 +111,10 @@ describe('public API exports', () => {
             'fibonacci',
             'elliott',
         ]);
+        // The siglens catalog validator checks `computed_card` tags against this list (API-1: both entrypoints).
+        expect(coreApi.COMPUTED_CARD_KINDS).toHaveLength(38);
+        expect(coreApi.COMPUTED_CARD_KINDS).toContain('ma_cycle');
+        expect(coreApi.COMPUTED_CARD_KINDS).toContain('rsi');
     });
 
     it('exports the new-signal and extreme-zone-entry rules from package entrypoint', () => {

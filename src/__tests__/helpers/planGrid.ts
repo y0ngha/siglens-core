@@ -164,6 +164,8 @@ export function postProcessGridCase(c: GridCase): AnalysisResponse {
         lastClose: GRID_LAST_CLOSE,
         atr: gridAtr(c) ?? undefined,
         stopCandidates: [],
+        computedIndicatorResults: [],
+        computedStrategyResults: [],
         currency: 'USD',
     });
     return reconciled;
@@ -263,6 +265,8 @@ export function postProcessEdgePlan(plan: EdgePlan): AnalysisResponse {
         lastClose: GRID_LAST_CLOSE,
         atr: plan.atr,
         stopCandidates: [],
+        computedIndicatorResults: [],
+        computedStrategyResults: [],
         currency: 'USD',
     }).reconciled;
 }

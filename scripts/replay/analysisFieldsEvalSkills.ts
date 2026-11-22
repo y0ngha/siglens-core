@@ -22,6 +22,7 @@ import {
     type Quantiles,
 } from './analysisFieldsEvalCompute';
 import type { RunCallStats } from './analysisFieldsEvalPlan';
+import type { IndicatorGuideResult, RawStrategyResult } from '@/domain/types';
 
 export type SkillTier = 'free' | 'member';
 export const SKILL_TIERS: readonly SkillTier[] = ['free', 'member'];
@@ -35,7 +36,7 @@ export interface CatalogSkill {
     injected: boolean;
     /** The signal and candle ids that select a gated skill (`gating.triggers`). */
     triggers?: readonly string[];
-    /** The `computed_card` kind of a card-producing skill (WP-16); absent on a core without it. */
+    /** The `computed_card` kind of a card-producing skill (WP-16); absent on an untagged skill. */
     computedCard?: string;
 }
 
@@ -45,10 +46,13 @@ export interface PromptSample {
     stable: string;
     dynamic: string;
     /**
-     * The computed cards the assembled prompt carries (WP-16 core-2 on), as stored; absent
-     * or `null` on a core that computes none.
+     * The computed cards the assembled prompt record carries (`indicatorCards`, `cycleCards`),
+     * absent or `null` for a prompt that came without them.
      */
-    cards?: { indicator: unknown; cycle: unknown } | null;
+    cards?: {
+        indicator: readonly IndicatorGuideResult[];
+        cycle: readonly RawStrategyResult[];
+    } | null;
 }
 
 /** Index of a skill's digest heading in `text`, or `-1`. */

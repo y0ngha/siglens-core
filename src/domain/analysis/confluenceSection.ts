@@ -19,6 +19,7 @@ import { formatStopTargetSpacing } from '@/domain/analysis/stopTargetSpacing';
 import {
     confluenceFamilyWeight,
     evaluateConfluence,
+    type SignalFreshness,
     isExpectedSignal,
     signalFamily,
     CONFLUENCE_MIN_BARS,
@@ -580,7 +581,8 @@ export function formatDeterministicMetricsSection(
     quoting: PriceQuoting = { dp: 2, krxTick: null },
     events: readonly MarketEvent[] = [],
     earningsDates: readonly string[] | undefined,
-    trend: AnalysisTrendReading | null
+    trend: AnalysisTrendReading | null,
+    freshness?: SignalFreshness
 ): string {
     const { min, expectedWeight } = CONFLUENCE_PARAMS_BY_TIMEFRAME[timeframe];
     // `exitMin` is deliberately not raised alongside `min` on the daily chart. Raising the
@@ -595,6 +597,7 @@ export function formatDeterministicMetricsSection(
         timeframe,
         min,
         expectedWeight,
+        freshness,
     });
 
     const confluence =

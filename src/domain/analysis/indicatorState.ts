@@ -18,6 +18,9 @@ import {
 import { classifyStackOrder } from '@/domain/analysis/trendStructure';
 import type {
     BollingerResult,
+    CycleStage,
+    MaCycleRole,
+    MaCycleStage,
     DMIResult,
     IchimokuResult,
     MACDResult,
@@ -70,7 +73,9 @@ function distanceFromLevel(
  * `null` (a `NaN` in the series must not read as
  * a real "last value").
  */
-function lastValueOf(series: (number | null)[] | undefined): number | null {
+export function lastValueOf(
+    series: (number | null)[] | undefined
+): number | null {
     if (!series) return null;
     return series.findLast(isFinite) ?? null;
 }
@@ -88,6 +93,27 @@ function maEmaLine(
     return `- Price vs ${label}: ${parts.join(' / ')}`;
 }
 
+/** The periods of `periods` that have a latest value, in period order. */
+function stackPoints(
+    periods: readonly number[],
+    series: Record<number, (number | null)[]>
+): { p: number; v: number }[] {
+    return periods
+        .map(p => ({ p, v: lastValueOf(series[p]) }))
+        .filter((x): x is { p: number; v: number } => x.v !== null);
+}
+
+/**
+ * @internal The verdict the `- MA stack` / `- EMA stack` line prints for `periods`
+ * (`null` when it prints `N/A`), so a card built from the same series cannot disagree.
+ */
+export function stackVerdictOf(
+    periods: readonly number[],
+    series: Record<number, (number | null)[]>
+): ReturnType<typeof classifyStackOrder> {
+    return classifyStackOrder(stackPoints(periods, series).map(x => x.v));
+}
+
 /**
  * @internal `bullish (MA5>MA20>MA60>MA120)` / `bearish (…<…)` /
  * `mixed (MA20>MA200>MA60…)`, or `'N/A'` when fewer than 2 of `periods` have
@@ -101,9 +127,7 @@ function stackLine(
     periods: readonly number[],
     series: Record<number, (number | null)[]>
 ): string {
-    const points = periods
-        .map(p => ({ p, v: lastValueOf(series[p]) }))
-        .filter((x): x is { p: number; v: number } => x.v !== null);
+    const points = stackPoints(periods, series);
     const verdict = classifyStackOrder(points.map(x => x.v));
     if (verdict === null) return `- ${label} stack: N/A`;
     if (verdict === 'mixed') {
@@ -283,9 +307,15 @@ function atrPctLine(
 // ─── MACD cycle (macd-cycle.md skill's data-source line) ──────────────────
 
 /** @internal EMA periods the MACD-cycle line is built from (fixed by the skill design — never the configured MA_DEFAULT_PERIODS). */
-const MACD_CYCLE_EMA_SHORT = 9;
-const MACD_CYCLE_EMA_MID = 21;
-const MACD_CYCLE_EMA_LONG = 60;
+export const MACD_CYCLE_EMA_SHORT = 9;
+export const MACD_CYCLE_EMA_MID = 21;
+export const MACD_CYCLE_EMA_LONG = 60;
+
+/**
+ * @internal Bars a cycle card looks back over for its stage history (the current bar
+ * included). Lives beside the cycle periods: the history and the line it explains are one rule.
+ */
+export const CYCLE_LOOKBACK_BARS = 120;
 
 type Sign = 1 | -1 | 0;
 
@@ -301,7 +331,7 @@ const MACD_CYCLE_STAGES: readonly {
     upper: Sign;
     middle: Sign;
     lower: Sign;
-    stage: number;
+    stage: CycleStage;
 }[] = [
     { upper: 1, middle: 1, lower: 1, stage: 1 },
     { upper: -1, middle: 1, lower: 1, stage: 2 },
@@ -310,6 +340,27 @@ const MACD_CYCLE_STAGES: readonly {
     { upper: 1, middle: -1, lower: -1, stage: 5 },
     { upper: 1, middle: 1, lower: -1, stage: 6 },
 ];
+
+/**
+ * @internal The MACD-cycle stage of three EMA values (9, 21, 60), the one table the prompt line
+ * and the cycle card share. `null` when the three signs of EMA9−EMA21, EMA9−EMA60 and
+ * EMA21−EMA60 match none of the six rows (two of the eight sign combinations are
+ * transition-only, and a zero difference matches nothing).
+ */
+export function macdCycleStageOf(
+    short: number,
+    mid: number,
+    long: number
+): CycleStage | null {
+    const upper = signOf(short - mid);
+    const middle = signOf(short - long);
+    const lower = signOf(mid - long);
+    return (
+        MACD_CYCLE_STAGES.find(
+            s => s.upper === upper && s.middle === middle && s.lower === lower
+        )?.stage ?? null
+    );
+}
 
 /**
  * `- MACD cycle (EMA9/21/60): upper (EMA9−EMA21) ±x, middle (EMA9−EMA60) ±y,
@@ -334,15 +385,9 @@ function macdCycleLine(
     const upper = short - mid;
     const middle = short - long;
     const lower = mid - long;
-    const match = MACD_CYCLE_STAGES.find(
-        s =>
-            s.upper === signOf(upper) &&
-            s.middle === signOf(middle) &&
-            s.lower === signOf(lower)
-    );
-    const stageLabel = match
-        ? `stage ${match.stage}`
-        : 'stage N/A (transition)';
+    const stage = macdCycleStageOf(short, mid, long);
+    const stageLabel =
+        stage !== null ? `stage ${stage}` : 'stage N/A (transition)';
 
     return `- ${label}: upper (EMA${MACD_CYCLE_EMA_SHORT}−EMA${MACD_CYCLE_EMA_MID}) ${formatSignedNumber(upper, diffDp)}, middle (EMA${MACD_CYCLE_EMA_SHORT}−EMA${MACD_CYCLE_EMA_LONG}) ${formatSignedNumber(middle, diffDp)}, lower (EMA${MACD_CYCLE_EMA_MID}−EMA${MACD_CYCLE_EMA_LONG}) ${formatSignedNumber(lower, diffDp)}; ${stageLabel}`;
 }
@@ -380,10 +425,8 @@ function volumeLine(
     return `- Volume: last bar ${formatNullableNumber(ratio, PCT_DP)}× 20-bar average`;
 }
 
-/** MA periods of the 이동평균선 대순환 (MA cycle) strategy: short, medium, long. */
-const MA_CYCLE_PERIODS = { short: 5, medium: 20, long: 60 } as const;
-
-type MaCycleRole = keyof typeof MA_CYCLE_PERIODS;
+/** @internal MA periods of the 이동평균선 대순환 (MA cycle) strategy: short, medium, long. */
+export const MA_CYCLE_PERIODS = { short: 5, medium: 20, long: 60 } as const;
 
 type MaCycleOrder =
     | 'short>medium>long'
@@ -394,7 +437,7 @@ type MaCycleOrder =
     | 'short>long>medium';
 
 /** MA cycle stage by top-to-bottom role order (skills/strategies/ma-cycle.md stage table). */
-const MA_CYCLE_STAGE: Readonly<Record<MaCycleOrder, number>> = {
+const MA_CYCLE_STAGE: Readonly<Record<MaCycleOrder, CycleStage>> = {
     'short>medium>long': 1,
     'medium>short>long': 2,
     'medium>long>short': 3,
@@ -412,6 +455,30 @@ const MA_CYCLE_LABEL = `- MA cycle (${(['short', 'medium', 'long'] as const)
     .join('/')})`;
 
 /**
+ * @internal The MA-cycle stage of the three MA values (short, medium, long), the one table the
+ * prompt line and the cycle card share. `null` on a missing value or a tie between two
+ * neighbours (the line then reads `N/A`).
+ */
+export function maCycleStageOf(
+    short: number | null,
+    medium: number | null,
+    long: number | null
+): MaCycleStage | null {
+    if (short === null || medium === null || long === null) return null;
+    const sorted = (
+        [
+            { role: 'short', v: short },
+            { role: 'medium', v: medium },
+            { role: 'long', v: long },
+        ] as const
+    ).toSorted((a, b) => b.v - a.v);
+    if (sorted[0].v === sorted[1].v || sorted[1].v === sorted[2].v) return null;
+    const order = sorted.map(x => x.role);
+    const key = order.join('>');
+    return isMaCycleOrder(key) ? { stage: MA_CYCLE_STAGE[key], order } : null;
+}
+
+/**
  * @internal `- MA cycle (MA5/MA20/MA60): MA5>MA20>MA60; stage 1` — the
  * 이동평균선 대순환 stage, which is fixed by the order of the three MAs alone.
  * The model read the order off the values itself and wrote "MA5 44.24 >
@@ -419,23 +486,20 @@ const MA_CYCLE_LABEL = `- MA cycle (${(['short', 'medium', 'long'] as const)
  * run of the 2026-10-02 A/B. `N/A` on a missing value or a tie.
  */
 function maCycleLine(series: Record<number, (number | null)[]>): string {
-    const pts = (['short', 'medium', 'long'] as const).map(role => ({
-        role,
-        p: MA_CYCLE_PERIODS[role],
-        v: lastValueOf(series[MA_CYCLE_PERIODS[role]]),
-    }));
-    const valued = pts.filter(
-        (x): x is { role: MaCycleRole; p: (typeof x)['p']; v: number } =>
-            x.v !== null
-    );
-    if (valued.length < pts.length) return `${MA_CYCLE_LABEL}: N/A`;
-    const sorted = valued.toSorted((a, b) => b.v - a.v);
-    if (sorted[0].v === sorted[1].v || sorted[1].v === sorted[2].v)
-        return `${MA_CYCLE_LABEL}: N/A (two MAs equal)`;
-    const order = sorted.map(x => x.role).join('>');
-    if (!isMaCycleOrder(order)) return `${MA_CYCLE_LABEL}: N/A`;
-    const stage = MA_CYCLE_STAGE[order];
-    return `${MA_CYCLE_LABEL}: ${sorted.map(x => `MA${x.p}`).join('>')}; stage ${stage}`;
+    const at = (role: MaCycleRole): number | null =>
+        lastValueOf(series[MA_CYCLE_PERIODS[role]]);
+    const [short, medium, long] = [at('short'), at('medium'), at('long')];
+    if (short === null || medium === null || long === null) {
+        return `${MA_CYCLE_LABEL}: N/A`;
+    }
+    const cycle = maCycleStageOf(short, medium, long);
+    if (cycle === null) {
+        const sorted = [short, medium, long].toSorted((a, b) => b - a);
+        return sorted[0] === sorted[1] || sorted[1] === sorted[2]
+            ? `${MA_CYCLE_LABEL}: N/A (two MAs equal)`
+            : `${MA_CYCLE_LABEL}: N/A`;
+    }
+    return `${MA_CYCLE_LABEL}: ${cycle.order.map(role => `MA${MA_CYCLE_PERIODS[role]}`).join('>')}; stage ${cycle.stage}`;
 }
 
 /** @internal `- RSI(14): 64.83 neutral (overbought ≥ 70, oversold ≤ 30)` — so "과열" is never said of a sub-70 RSI. */

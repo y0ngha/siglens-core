@@ -122,19 +122,35 @@ describe('hashSkillCatalog', () => {
         expect(hashSkillCatalog(edited)).toBe(hashSkillCatalog(catalog));
     });
 
-    it('gating·tokenCost가 없는 스킬은 null로 정규화되어 명시적 값과 구별된다', () => {
+    it('gating·tokenCost·computedCard가 없는 스킬은 null로 정규화되어 명시적 값과 구별된다', () => {
         const bare = [
             makeSkill('RSI Guide', { gating: undefined, tokenCost: undefined }),
         ];
         expect(hashSkillCatalog(bare)).toBe(
             hashAnalysisInput(
                 JSON.stringify([
-                    { name: 'RSI Guide', gating: null, tokenCost: null },
+                    {
+                        name: 'RSI Guide',
+                        gating: null,
+                        tokenCost: null,
+                        computedCard: null,
+                    },
                 ])
             )
         );
         expect(hashSkillCatalog(bare)).not.toBe(
             hashSkillCatalog([makeSkill('RSI Guide')])
+        );
+    });
+
+    it('computedCard 태그를 달거나 바꾸면 fingerprint가 움직인다 (태그는 프롬프트와 카드 출력을 바꾼다)', () => {
+        const untagged = [makeSkill('RSI Guide')];
+        const rsi = [makeSkill('RSI Guide', { computedCard: 'rsi' })];
+        const macd = [makeSkill('RSI Guide', { computedCard: 'macd' })];
+        expect(hashSkillCatalog(rsi)).not.toBe(hashSkillCatalog(untagged));
+        expect(hashSkillCatalog(macd)).not.toBe(hashSkillCatalog(rsi));
+        expect(hashSkillCatalog(rsi)).toBe(
+            hashSkillCatalog([makeSkill('RSI Guide', { computedCard: 'rsi' })])
         );
     });
 

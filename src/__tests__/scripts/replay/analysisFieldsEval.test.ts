@@ -1972,11 +1972,22 @@ describe('runFieldsEval: gating', () => {
                             indicatorName: 'MA Signal Guide',
                             signals: [
                                 {
+                                    type: 'skill',
+                                    description: 'MA Signal Guide: mixed.',
                                     trend: 'neutral',
                                     reading: {
                                         kind: 'ma',
+                                        basis: 'always_on',
                                         state: 'mixed',
-                                        values: { ma5: 10 },
+                                        values: {
+                                            close: null,
+                                            ma5: 10,
+                                            ma20: null,
+                                            ma60: null,
+                                            ma120: null,
+                                            ma200: null,
+                                        },
+                                        signals: [],
                                     },
                                 },
                             ],
