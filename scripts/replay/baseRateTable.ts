@@ -7,10 +7,12 @@
  *       --candles <engineEval dir (gate c9)> --levels <levelEval dir> --date <YYYY-MM-DD> \
  *       --out <file> [--json <file>]
  *
- * It refuses (exit 1) inputs it cannot trust: a run made on a dirty checkout, runs of
+ * It refuses (exit 2, TE-16) inputs it cannot trust: a run made on a dirty checkout, runs of
  * different sets or different core commits, a run whose own gate did not pass or was not
  * the one this table needs, a level run that is not the whole reference population, and
- * events that do not match their summary. The table is deterministic: the same inputs and
+ * events that do not match their summary; the refusal is a `FailClosedError`, reported as
+ * `FAIL: <reasons>` with nothing written. A malformed input file or a bad argument is an error
+ * (exit 1). The table is deterministic: the same inputs and
  * `--date` give a byte-identical file. `--out` may be inside the repository only at
  * `src/domain/analysis/measuredBaseRates.ts` (the table is committed there); the JSON
  * companion (every number the verdict rule read) goes outside it. `--allow-dirty` lets runs
@@ -21,6 +23,7 @@ import { readFileSync } from 'node:fs';
 import { basename, dirname, join, resolve } from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { parseArgs } from '../ab-harness/cliArgs';
+import { FailClosedError } from './signalBaseRateTable';
 import {
     candleTable,
     patternTable,
@@ -350,7 +353,7 @@ export async function generateTable(
     const { engine, candles, levels } = inputs;
     const problems = inputProblems(engine, candles, levels, args.allowDirty);
     if (problems.length > 0) {
-        throw new Error(
+        throw new FailClosedError(
             `the inputs cannot be trusted:\n- ${problems.join('\n- ')}`
         );
     }
@@ -403,7 +406,10 @@ export async function generateTable(
     };
 }
 
-/** Reads the inputs, writes the table and returns the exit code (0). */
+/**
+ * Reads the inputs, writes the table and returns the exit code: 0, or 2 when the inputs are
+ * refused (nothing is written then).
+ */
 export async function runBaseRateTable(
     args: BaseRateTableArgs,
     log: (line: string) => void = console.log
@@ -422,7 +428,14 @@ export async function runBaseRateTable(
         engine: readEngineInput(args.engine),
         candles: readEngineInput(args.candles),
         levels: readLevelInput(args.levels),
+    }).catch((error: unknown) => {
+        if (error instanceof FailClosedError) {
+            log(`FAIL: ${error.message}`);
+            return null;
+        }
+        throw error;
     });
+    if (generated === null) return 2;
     writeFileAtomic(args.out, generated.source);
     if (args.json !== null) {
         writeFileAtomic(

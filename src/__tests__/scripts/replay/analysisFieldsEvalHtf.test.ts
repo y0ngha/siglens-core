@@ -6,6 +6,8 @@ import {
     loadSetData,
     parseFieldsEvalArgs,
     readHtfBaseline,
+    riskLevelPairs,
+    type RunData,
     runFieldsEval,
     type FieldsEvalArgs,
     type FieldsEvalDeps,
@@ -324,7 +326,7 @@ describe('parseFieldsEvalArgs: the WP-19 modes', () => {
                 '--baseline',
                 '/b'
             )
-        ).toThrow(/--tier and --baseline apply to gating only/);
+        ).toThrow('zone: --baseline applies to gating and htf only');
         expect(() =>
             parse(
                 '--mode',
@@ -336,7 +338,9 @@ describe('parseFieldsEvalArgs: the WP-19 modes', () => {
                 '--tier',
                 'free'
             )
-        ).toThrow(/--tier and --baseline apply to gating only/);
+        ).toThrow(
+            'zone: --tier applies to gating, htf and weekly-hygiene only'
+        );
     });
 
     it('htf-forward takes a set and a stride only', () => {
@@ -367,7 +371,9 @@ describe('parseFieldsEvalArgs: the WP-19 modes', () => {
                 '--run',
                 '/r'
             )
-        ).toThrow(/given together/);
+        ).toThrow(
+            'weekly-hygiene: --run (weekly) and --before (daily) must be given together'
+        );
         expect(
             parse(
                 '--mode',
@@ -446,6 +452,138 @@ describe('benchmarkBarsOf', () => {
         expect(() => benchmarkBarsOf(set, join(world.dir, 'empty'))).toThrow(
             /has no bars/
         );
+    });
+
+    describe('fails closed on bars that are not bars or not oldest first', () => {
+        const goodBar = (time: number) => ({
+            time,
+            open: 1,
+            high: 2,
+            low: 0.5,
+            close: 1.5,
+            volume: 10,
+        });
+        const sidecar = (world: World, bars: readonly unknown[]): string => {
+            const dir = join(world.dir, 'sidecar');
+            mkdirSync(dir, { recursive: true });
+            writeFileSync(join(dir, 'IDX.json'), JSON.stringify({ bars }));
+            return dir;
+        };
+
+        it('accepts strictly ascending finite bars', () => {
+            const world = makeWorld();
+            const set = loadSetData(world.setDir);
+            const dir = sidecar(world, [goodBar(1), goodBar(2)]);
+            expect(benchmarkBarsOf(set, dir).get('IDX')).toHaveLength(2);
+        });
+
+        it.each([
+            [
+                'a duplicate time',
+                [goodBar(2), goodBar(2)],
+                /strictly ascending \(bar 1 does not follow bar 0\)/,
+            ],
+            [
+                'a descending time',
+                [goodBar(1), goodBar(3), goodBar(2)],
+                /strictly ascending \(bar 2 does not follow bar 1\)/,
+            ],
+            [
+                'a missing field',
+                [goodBar(1), { time: 2, open: 1 }],
+                /bar 1 .*\("high"\)/,
+            ],
+            [
+                'a non-numeric field',
+                [{ ...goodBar(1), close: '1.5' }],
+                /bar 0 .*\("close"\)/,
+            ],
+            [
+                'a null field (NaN stored as JSON)',
+                [{ ...goodBar(1), volume: null }],
+                /bar 0 .*\("volume"\)/,
+            ],
+            [
+                'an entry that is not an object',
+                [goodBar(1), 7],
+                /bar 1 is not a bar/,
+            ],
+        ] as const)('refuses %s in a sidecar file', (_name, bars, message) => {
+            const world = makeWorld();
+            const set = loadSetData(world.setDir);
+            expect(() => benchmarkBarsOf(set, sidecar(world, bars))).toThrow(
+                message
+            );
+        });
+
+        it("refuses the set's own bars when they are out of order", () => {
+            const world = makeWorld();
+            const set = loadSetData(world.setDir);
+            const stored = set.storedOf.get('NVDA');
+            if (stored === undefined) throw new Error('NVDA missing');
+            const swapped = { ...stored, bars: stored.bars.toReversed() };
+            const broken = {
+                ...set,
+                storedOf: new Map([...set.storedOf, ['NVDA', swapped]]),
+            };
+            expect(() => benchmarkBarsOf(broken, null)).toThrow(
+                /set bars of NVDA: bar times must be strictly ascending/
+            );
+        });
+    });
+});
+
+describe('riskLevelPairs', () => {
+    const resultOf = (caseId: string, riskLevel: unknown, repeat = 1) => ({
+        caseId,
+        symbol: 'X',
+        asOf: '2024-01-02',
+        repeat,
+        unfilteredResult: { riskLevel },
+        promptVersion: null,
+        promptHashes: null,
+        promptDynamic: null,
+        usage: null,
+        exchangeCount: 0,
+        latencyMs: 0,
+        error: null,
+    });
+    const runOf = (results: RunData['results']): RunData => ({
+        dir: '/r',
+        meta: {} as RunData['meta'],
+        results,
+        labels: null,
+    });
+
+    it('pairs the first repeat of each weekly case with the daily case of the same id', () => {
+        const weekly = runOf([
+            resultOf('a', 'high'),
+            resultOf('a', 'low', 2),
+            resultOf('b', 'low'),
+            resultOf('c', 'medium'),
+        ]);
+        const daily = runOf([resultOf('a', 'high'), resultOf('b', 'high')]);
+        expect(riskLevelPairs(weekly, daily)).toEqual([
+            { caseId: 'a', weekly: 'high', daily: 'high' },
+            { caseId: 'b', weekly: 'low', daily: 'high' },
+            { caseId: 'c', weekly: 'medium', daily: undefined },
+        ]);
+    });
+
+    it('reads the daily run once, not once per case', () => {
+        const weekly = runOf(
+            Array.from({ length: 50 }, (_, i) => resultOf(`c${i}`, 'low'))
+        );
+        const reads = vi.fn();
+        const daily = {
+            ...runOf([]),
+            get results() {
+                reads();
+                return [resultOf('c0', 'low')];
+            },
+        };
+        riskLevelPairs(weekly, daily);
+        expect(reads).toHaveBeenCalledTimes(1);
     });
 });
 

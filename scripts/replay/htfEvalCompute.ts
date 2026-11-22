@@ -120,7 +120,7 @@ function aggregate(
 ): readonly PeriodBar[] {
     // CP-5: a bucket extends the previous one while consecutive bars share its period.
     const out: PeriodBar[] = [];
-    usableBars(bars).forEach(bar => {
+    for (const bar of usableBars(bars)) {
         const start = startOf(bar.time);
         const last = out[out.length - 1];
         if (last !== undefined && last.time === start) {
@@ -140,7 +140,7 @@ function aggregate(
                 sessions: 1,
             });
         }
-    });
+    }
     return out;
 }
 

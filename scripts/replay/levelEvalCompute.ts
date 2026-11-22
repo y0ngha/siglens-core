@@ -751,27 +751,58 @@ export const sigmoidScore = (
             )
         ));
 
-/** Area under the ROC curve by rank sum (ties share their mean rank); `null` without both classes. */
+/**
+ * Mean ranks of `values` (1-based, ties share the mean of the ranks they span) and the number of
+ * element comparisons the tie-group scan made. Each group is found by advancing from where the
+ * previous group ended, so the scan costs at most `2n` comparisons beside the `O(n log n)` sort;
+ * the count is returned so a test can pin that bound without a clock.
+ *
+ * Every value must be finite: a NaN has no order, so its rank (and any statistic built on it) is
+ * meaningless. This throws rather than rank it; the statistics below return `null` instead.
+ */
+export function meanRanksWithCost(values: readonly number[]): {
+    ranks: number[];
+    comparisons: number;
+} {
+    if (!values.every(Number.isFinite)) {
+        throw new Error('meanRanks needs finite values');
+    }
+    const order = values
+        .map((value, i) => ({ value, i }))
+        .toSorted((a, b) => a.value - b.value);
+    const ranks = Array.from({ length: values.length }, () => 0);
+    // CP-5: state across steps in a single pass.
+    const state = { start: 0, stop: 0, comparisons: 0 };
+    while (state.start < order.length) {
+        state.stop = state.start + 1;
+        while (state.stop < order.length) {
+            state.comparisons += 1;
+            if (order[state.stop].value !== order[state.start].value) break;
+            state.stop += 1;
+        }
+        const rank = (state.start + 1 + state.stop) / 2;
+        for (let k = state.start; k < state.stop; k += 1) {
+            ranks[order[k].i] = rank;
+        }
+        state.start = state.stop;
+    }
+    return { ranks, comparisons: state.comparisons };
+}
+
+/** The mean ranks of {@link meanRanksWithCost}; throws on a non-finite value. */
+export const meanRanks = (values: readonly number[]): number[] =>
+    meanRanksWithCost(values).ranks;
+
+/**
+ * Area under the ROC curve by rank sum (ties share their mean rank); `null` without both classes
+ * or with a non-finite score (not computable, like the other statistics here).
+ */
 export function auc(
     scores: readonly number[],
     positive: readonly boolean[]
 ): number | null {
-    const order = scores
-        .map((score, i) => ({ score, i }))
-        .toSorted((a, b) => a.score - b.score);
-    const ranks = Array.from({ length: scores.length }, () => 0);
-    const state = { start: 0 };
-    while (state.start < order.length) {
-        const end = order.findIndex(
-            (o, k) => k >= state.start && o.score !== order[state.start].score
-        );
-        const stop = end < 0 ? order.length : end;
-        const rank = (state.start + 1 + stop) / 2;
-        order.slice(state.start, stop).forEach(o => {
-            ranks[o.i] = rank;
-        });
-        state.start = stop;
-    }
+    if (!scores.every(Number.isFinite)) return null;
+    const ranks = meanRanks(scores);
     const n1 = positive.filter(Boolean).length;
     const n0 = positive.length - n1;
     if (n1 === 0 || n0 === 0) return null;
@@ -1009,32 +1040,14 @@ export function robustRows(
 
 // ─── Structural ratio and N42 ─────────────────────────────────────────────────
 
-function ranks(values: readonly number[]): number[] {
-    const order = values
-        .map((value, i) => ({ value, i }))
-        .toSorted((a, b) => a.value - b.value);
-    const out = Array.from({ length: values.length }, () => 0);
-    const state = { start: 0 };
-    while (state.start < order.length) {
-        const end = order.findIndex(
-            (o, k) => k >= state.start && o.value !== order[state.start].value
-        );
-        const stop = end < 0 ? order.length : end;
-        order.slice(state.start, stop).forEach(o => {
-            out[o.i] = (state.start + 1 + stop) / 2;
-        });
-        state.start = stop;
-    }
-    return out;
-}
-
-/** Spearman rank correlation; `null` below three pairs or without variance. */
+/** Spearman rank correlation; `null` below three pairs, without variance or with a non-finite value. */
 export function spearman(
     a: readonly number[],
     b: readonly number[]
 ): number | null {
     if (a.length < 3 || a.length !== b.length) return null;
-    const [ra, rb] = [ranks(a), ranks(b)];
+    if (!a.every(Number.isFinite) || !b.every(Number.isFinite)) return null;
+    const [ra, rb] = [meanRanks(a), meanRanks(b)];
     const [ma, mb] = [mean(ra) ?? 0, mean(rb) ?? 0];
     const cov = ra.reduce((s, v, i) => s + (v - ma) * (rb[i] - mb), 0);
     const va = ra.reduce((s, v) => s + (v - ma) ** 2, 0);

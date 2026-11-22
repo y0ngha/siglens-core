@@ -184,6 +184,14 @@ describe('computeCloseStreak', () => {
         });
     });
 
+    it('anchors a flat streak on the first repeated close, not the bar that first printed the level', () => {
+        const bars = dailyBars([9, 10, 10, 10]);
+        const result = computeCloseStreak(bars, { excludeLastBar: false });
+        expect(result).toMatchObject({ direction: 'flat', days: 2 });
+        expect(result?.sinceTime).toBe(bars[2]?.time);
+        expect(result?.sinceTime).not.toBe(bars[1]?.time);
+    });
+
     it('leaves the forming last bar out', () => {
         expect(streak([10, 9, 8, 50], true)).toEqual({
             direction: 'down',
@@ -191,6 +199,19 @@ describe('computeCloseStreak', () => {
             sinceTime: timeOf(1),
             truncated: true,
         });
+    });
+
+    it('sets sinceTime to the bar of the first move when truncated, never the first loaded bar', () => {
+        const bars = dailyBars([10, 9, 8]);
+        const result = computeCloseStreak(bars, { excludeLastBar: false });
+        expect(result?.truncated).toBe(true);
+        expect(result?.sinceTime).toBe(bars[1]?.time);
+        expect(result?.sinceTime).not.toBe(bars[0]?.time);
+        // With the forming bar left out, the same bar still anchors the streak.
+        const withForming = computeCloseStreak(dailyBars([10, 9, 8, 50]), {
+            excludeLastBar: true,
+        });
+        expect(withForming?.sinceTime).toBe(bars[1]?.time);
     });
 
     it('marks truncated only when the run reaches the first loaded bar', () => {

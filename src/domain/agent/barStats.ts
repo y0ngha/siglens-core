@@ -179,12 +179,21 @@ export interface CloseStreak {
      * unchanged closes.
      */
     days: number;
-    /** `time` (Unix seconds) of the first bar of the streak (the first down day for a down streak). */
+    /**
+     * `time` (Unix seconds) of the first bar whose close moved in `direction`
+     * from the close before it (the first down day for a down streak). For
+     * `flat` that is the first bar whose close EQUALS the previous close, i.e.
+     * the second bar at the unchanged level, not the bar that first printed
+     * that level (closes 9,10,10,10 → flat, 2, `sinceTime` of the second 10);
+     * so `days` counts repeats of the close, not bars at the level.
+     */
     sinceTime: number;
     /**
      * `true` when the streak runs back to the FIRST loaded bar without a
-     * direction change: the real streak may be longer than `days`, and
-     * `sinceTime` is only the earliest loaded bar. Report it as "at least N".
+     * direction change: the real streak may be longer than `days`. Then
+     * `sinceTime` is the second loaded bar (`completed[1]`, where the first
+     * move happened), never the first loaded bar, which only supplies the
+     * close the first move is measured against. Report it as "at least N".
      */
     truncated: boolean;
 }
