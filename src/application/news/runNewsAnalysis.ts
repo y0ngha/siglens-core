@@ -1,3 +1,4 @@
+import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { dedupeGeneration } from '@/application/analysis/generationLock';
 import {
@@ -26,6 +27,7 @@ import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
 } from '@/domain/analysis/outputLocale';
+import { isActiveModelId } from '@/domain/analysis/modelSpecs';
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
@@ -273,15 +275,19 @@ export async function runNewsAnalysis(
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // ── 7. LLM call (with in-flight deduplication) ──
-    // modelId is caller-validated (BYOK gate passed a tierConfig check). Cast
-    // to ActiveModelId: caller's responsibility, same contract as the worker had.
+    // Deprecated model strings live in ModelId but not in MODEL_SPECS; guard
+    // them out so callAnalysisAi receives only a valid, dispatchable model.
+    const callModelId: ActiveModelId = isActiveModelId(modelId)
+        ? modelId
+        : DEEPSEEK_V4_1_FLASH_MODEL;
+
     const raw = await dedupeGeneration(
         cache,
         cacheKey,
         async () => {
             const generated = await callAnalysisAi({
                 prompt,
-                model: modelId as ActiveModelId,
+                model: callModelId,
                 tier,
                 userApiKey: options.userApiKey,
                 keyPolicy: options.keyPolicy,

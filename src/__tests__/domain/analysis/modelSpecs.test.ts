@@ -3,8 +3,8 @@ import {
     getThinkingLevelSequence,
     isChatGPTModel,
     isClaudeModel,
-    isDeepSeekModel,
     isActiveModelId,
+    isDeepSeekModel,
     isGeminiModel,
     isReasoningToggleable,
     MODEL_SPECS,
@@ -603,5 +603,11 @@ describe('isActiveModelId', () => {
     it('rejects deprecated or unknown model strings', () => {
         expect(isActiveModelId('claude-3-opus-retired')).toBe(false);
         expect(isActiveModelId('')).toBe(false);
+    });
+
+    it('rejects prototype keys', () => {
+        expect(isActiveModelId('toString')).toBe(false);
+        expect(isActiveModelId('constructor')).toBe(false);
+        expect(isActiveModelId('__proto__')).toBe(false);
     });
 });

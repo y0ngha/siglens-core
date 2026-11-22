@@ -36,12 +36,10 @@ const SRC_ROOT = resolve(REPO_ROOT, 'src');
  * Only ever lower these.
  */
 const BASELINE: Readonly<Record<string, number>> = {
-    'src/application/analysis/briefingModel.ts': 1,
     'src/application/analysis/callAnalysisAi.ts': 6,
     'src/application/analysis/callBriefingAi.ts': 2,
     'src/application/analysis/inFlight.ts': 2,
     'src/application/market/runAnalysis.ts': 2,
-    'src/application/news/runNewsAnalysis.ts': 1,
     'src/application/overall/runOverallAnalysis.ts': 3,
     'src/domain/agent/selectHistoryWindow.ts': 1,
     'src/domain/agent/validateArgs.ts': 1,

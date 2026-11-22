@@ -1,4 +1,4 @@
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { isActiveModelId, MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import type {
     DeepSeekModelId,
     GeminiModelId,
@@ -12,8 +12,8 @@ import type {
 export type BriefingModelId = GeminiModelId | DeepSeekModelId;
 
 function isBriefingCapable(model: string): model is BriefingModelId {
-    if (!(model in MODEL_SPECS)) return false;
-    const { provider } = MODEL_SPECS[model as keyof typeof MODEL_SPECS];
+    if (!isActiveModelId(model)) return false;
+    const { provider } = MODEL_SPECS[model];
     return provider === 'gemini' || provider === 'deepseek';
 }
 

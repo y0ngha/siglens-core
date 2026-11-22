@@ -400,12 +400,12 @@ const THINKING_LEVEL_ORDER: readonly GeminiThinkingLevel[] = [
 ];
 
 /**
- * @internal Type guard: `modelId` is a live {@link MODEL_SPECS} key. Deprecated
+ * @internal Type guard: `modelId` is a own {@link MODEL_SPECS} key (prototype keys such as `toString` are not). Deprecated
  * model strings stay in `ModelId` but have no spec row, so callers use this to
  * fall back to a dispatchable default instead of casting.
  */
 export function isActiveModelId(modelId: string): modelId is ActiveModelId {
-    return modelId in MODEL_SPECS;
+    return Object.hasOwn(MODEL_SPECS, modelId);
 }
 
 /**
