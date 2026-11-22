@@ -51,9 +51,14 @@ import { AGENT_TOOL_SPECS } from '@/domain/agent/tools';
  * - 2026-11-21 (WP-09 core-3 review round 2): the pullback clause names `range.bars`,
  *   the daily-only note and the notes rule were reworded; measured ko guest 58,297,
  *   en guest 58,806, tool specs 70,017, `get_bars_indicators` 6,818 (budgets unchanged).
+ * - 2026-11-22 (WP-30 core-1): the `web_search` description names `excerpt`,
+ *   `excerptStatus` and the third-party-text rule, and the `get_fundamentals`
+ *   `sharesBasis` sentence became the `valuation.basis` sentence; the system
+ *   prompt is unchanged. Tool specs 70,017 -> 71,091 chars of JSON, so the tool
+ *   specs budget goes 70,500 -> 71,500; the longest description is unchanged.
  */
 const SYSTEM_PROMPT_CHAR_BUDGET = 59_000;
-const TOOL_SPECS_JSON_CHAR_BUDGET = 70_500;
+const TOOL_SPECS_JSON_CHAR_BUDGET = 71_500;
 const TOOL_DESCRIPTION_MAX_CHARS = 7_000;
 const FLOOR_SLACK = 2_000;
 
