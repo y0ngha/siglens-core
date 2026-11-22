@@ -882,6 +882,8 @@ export가 바뀌면 `현재 노출 인벤토리`를 **같은 커밋**에서 고�
 
 `src/__tests__/guards/publicApiInventory.test.ts`가 두 entrypoint의 export 이름이 이 문서에 백틱 식별자로 등장하는지, 그리고 인벤토리 표 행의 첫 셀 머리 식별자가 실제로 export되는지 검사한다. 실패하면 허용 목록을 만들지 말고 문서(또는 export)를 고친다.
 
+각 entrypoint의 값 export는 짝이 되는 entrypoint 테스트(`index.test.ts`·`index.client.test.ts`)가 모두 참조해야 하고, 함수는 호출 가능 목록(`FUNCTION_EXPORTS`)에 둔다. `src/__tests__/guards/entrypointTestCoverage.test.ts`가 강제하며, 예외는 그 파일의 `EXEMPTIONS` 맵에 이유와 함께 적는다.
+
 변경 이력은 커밋 메시지(git 이력)로 남긴다. 릴리스 때 `CHANGELOG.md`에는 커밋 제목과
 `BREAKING CHANGE:` 꼬리말만 모이므로, 소비자 조치가 필요한 변경은 그 꼬리말에 적는다. 공개
 진입점의 동작이 바뀌는 커밋 본문은:
