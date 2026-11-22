@@ -9,6 +9,7 @@ import {
     OUTCOME_LABEL_VERSION,
     OUTCOME_SUBJECT_VERSION,
     outcomeEarliestLabelTime,
+    summarizeOutcomeRecord,
 } from '@/index';
 import type {
     AnalysisOutcomeLabels,
@@ -16,6 +17,9 @@ import type {
     LevelOutcomeEntry,
     LevelOutcomeLabel,
     OutcomeAnchor,
+    OutcomeRecordRow,
+    OutcomeRecordSummary,
+    OutcomeShareRecord,
     OutcomeSubject,
     OutcomeWindow,
     OutcomeWindowResult,
@@ -38,6 +42,7 @@ describe('outcome labeller public surface', () => {
         expect(typeof labelLevelOutcome).toBe('function');
         expect(typeof computeForwardReturns).toBe('function');
         expect(typeof outcomeEarliestLabelTime).toBe('function');
+        expect(typeof summarizeOutcomeRecord).toBe('function');
         expect(OUTCOME_LABEL_VERSION).toBe(1);
         expect(OUTCOME_SUBJECT_VERSION).toBe(1);
     });
@@ -50,6 +55,7 @@ describe('outcome labeller public surface', () => {
             'labelLevelOutcome',
             'computeForwardReturns',
             'outcomeEarliestLabelTime',
+            'summarizeOutcomeRecord',
             'OUTCOME_LABEL_VERSION',
             'OUTCOME_SUBJECT_VERSION',
         ].forEach(name => expect(name in clientApi).toBe(false));
@@ -97,5 +103,15 @@ describe('outcome labeller public surface', () => {
         expect(entry.outcome).toBe(level.outcome);
         expect(plan.outcome).toBe('no_plan');
         expect([targets, patterns]).toEqual([[], []]);
+    });
+
+    it('aggregates stored rows through the public entrypoint, with the record types nameable', () => {
+        const rows: OutcomeRecordRow[] = [];
+        const summary: OutcomeRecordSummary = summarizeOutcomeRecord(rows, {
+            seed: 1,
+        });
+        const plans: OutcomeShareRecord = summary.plans;
+        expect(plans.verdict).toBe('insufficient_sample');
+        expect(summary.labelVersion).toBe(OUTCOME_LABEL_VERSION);
     });
 });

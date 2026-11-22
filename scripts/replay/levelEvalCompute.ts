@@ -45,7 +45,8 @@ import {
     type RrAnchors,
 } from './levelEvalTypes';
 import { profileOf } from './markets';
-import { mean, median, quantile } from './stats';
+import { mean, median } from './stats';
+import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
 
 const HORIZONS: readonly HorizonKey[] = ['short', 'medium', 'long'];
 const SIDES: readonly LevelSideName[] = ['support', 'resistance'];

@@ -23,7 +23,7 @@ import {
     type BenchmarkInput,
     type BenchmarkTrade,
 } from '../../../../scripts/replay/backtestBenchmarksCompute';
-import { mulberry32 } from '../../../../scripts/replay/engineEvalStats';
+import { mulberry32 } from '@/domain/outcomes/weekClusterBootstrap';
 import {
     DAYS,
     FIXTURE_DATES,

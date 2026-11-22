@@ -18,7 +18,8 @@ import {
     type GateResult,
 } from './analysisFieldsEvalTypes';
 import type { PlanPosition } from './analysisFieldsEvalPlan';
-import { quantile, mean, median } from './stats';
+import { mean, median } from './stats';
+import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
 import { sha256Hex } from './fsUtil';
 
 /** Gate thresholds of WP-18 §8.3. Z2 has none: it compares the after arm with the before arm. */

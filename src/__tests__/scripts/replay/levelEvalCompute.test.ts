@@ -7,10 +7,8 @@ import type {
 } from '@/domain/outcomes/types';
 import type { Bar, ReferenceLevel } from '@/domain/types';
 import { makeResamplings } from '../../../../scripts/replay/engineEvalCompute';
-import {
-    isoWeekKey,
-    mulberry32,
-} from '../../../../scripts/replay/engineEvalStats';
+import { isoWeekKey } from '../../../../scripts/replay/engineEvalStats';
+import { mulberry32 } from '@/domain/outcomes/weekClusterBootstrap';
 import {
     addRobust,
     auc,

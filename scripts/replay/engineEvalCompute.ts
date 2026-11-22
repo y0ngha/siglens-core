@@ -20,10 +20,12 @@ import {
     intervalOf,
     pooledMean,
     recordOf,
-    resampleMultiplicities,
-    resampledMean,
     streamForKey,
 } from './engineEvalStats';
+import {
+    resampleMultiplicities,
+    resampledMean,
+} from '@/domain/outcomes/weekClusterBootstrap';
 import {
     CANDLE_VIOLATIONS,
     EVAL_CONSTANTS,

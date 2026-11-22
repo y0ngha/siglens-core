@@ -7,7 +7,8 @@
  * the rules): a bug in the function under test must not be able to hide behind a reference
  * that calls it.
  */
-import { mean, quantile, standardError } from './stats';
+import { mean, standardError } from './stats';
+import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
 import {
     EPS,
     FIELDS_EVAL_CONSTANTS as C,

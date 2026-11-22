@@ -5,10 +5,7 @@ import {
     intervalOf,
     isoDate,
     isoWeekKey,
-    mulberry32,
     pooledMean,
-    resampleMultiplicities,
-    resampledMean,
     sampleWithoutReplacement,
     streamForKey,
     weeksOfTimes,
@@ -17,21 +14,10 @@ import {
     blockOfWeek,
     recordOf,
 } from '../../../../scripts/replay/engineEvalStats';
+import { mulberry32 } from '@/domain/outcomes/weekClusterBootstrap';
 
 const draw = (rand: () => number, n: number): number[] =>
     Array.from({ length: n }, () => rand());
-
-describe('mulberry32', () => {
-    it('is deterministic for a seed and stays in [0, 1)', () => {
-        const a = draw(mulberry32(20261121), 50);
-        expect(draw(mulberry32(20261121), 50)).toEqual(a);
-        expect(a.every(v => v >= 0 && v < 1)).toBe(true);
-    });
-
-    it('differs between seeds', () => {
-        expect(draw(mulberry32(1), 5)).not.toEqual(draw(mulberry32(2), 5));
-    });
-});
 
 describe('streamForKey', () => {
     it('gives identical streams for identical keys and seeds', () => {
@@ -110,22 +96,6 @@ describe('week aggregation', () => {
 
     it('has no pooled mean without observations', () => {
         expect(pooledMean(aggregateByWeek([], ['a']))).toBeNull();
-    });
-});
-
-describe('resampling', () => {
-    it('draws weekCount weeks per replicate, deterministically', () => {
-        const m = resampleMultiplicities(6, 40, mulberry32(9));
-        expect(m).toHaveLength(40);
-        expect(m.every(row => row.length === 6)).toBe(true);
-        expect(m.every(row => row.reduce((a, b) => a + b, 0) === 6)).toBe(true);
-        expect(resampleMultiplicities(6, 40, mulberry32(9))).toEqual(m);
-    });
-
-    it('takes the mean of the resampled weeks, null when none carries an observation', () => {
-        const aggregate = { sums: [4, 0], counts: [2, 0] };
-        expect(resampledMean(aggregate, [3, 5])).toBe(2);
-        expect(resampledMean(aggregate, [0, 5])).toBeNull();
     });
 });
 

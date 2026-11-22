@@ -4,7 +4,6 @@ import {
     mean,
     median,
     pairsOf,
-    quantile,
     standardError,
 } from '../../../../scripts/replay/stats';
 
@@ -30,26 +29,9 @@ describe('standardError', () => {
     });
 });
 
-describe('quantile and median', () => {
-    it('interpolates between ranks', () => {
-        expect(quantile([1, 2, 3, 4], 0.5)).toBe(2.5);
-        expect(quantile([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 0.9)).toBeCloseTo(
-            9.1,
-            12
-        );
-    });
-
+describe('median', () => {
     it('does not depend on the input order', () => {
         expect(median([9, 1, 5])).toBe(5);
-    });
-
-    it('returns the endpoints at 0 and 1', () => {
-        expect(quantile([3, 1, 2], 0)).toBe(1);
-        expect(quantile([3, 1, 2], 1)).toBe(3);
-    });
-
-    it('is null for no values', () => {
-        expect(quantile([], 0.5)).toBeNull();
     });
 });
 
