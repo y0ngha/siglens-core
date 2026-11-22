@@ -13,6 +13,10 @@
  *       [--tier free|member] [--limit N] [--baseline <earlier gating out dir>]
  *   npx tsx scripts/replay/analysisFieldsEval.ts --mode output --set <set> --skills <app>/skills --out <dir>
  *       --run <after> --before <before> [--repeat <run>] [--noise-pp <n>]
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode claims --set <set> --skills <app>/skills --out <dir>
+ *       --run <after> --before <before> [--repeat <run>] [--noise-pp <n>] [--lang ko|en]
+ *   npx tsx scripts/replay/analysisFieldsEval.ts --mode zone --set <set> --out <dir> --run <run>
+ *       [--before <run>] [--restate exact] [--lang ko|en]
  *
  * - `trend`: the shipped trend rule (EMA20 move in ATR(14)) and two reference rules
  *   recomputed from OHLC for every day from bar 300 (label distribution, day-to-day change,
@@ -33,6 +37,13 @@
  * - `output` (WP-16): per-case pairs of an after and a before run (and a repeat run, the noise
  *   floor): output tokens, latency, what the model wrote per field, failures, levels, plan
  *   position, strategies and patterns, with bootstrap 95% intervals (O1 to V5, D7).
+ *
+ * - `claims` (WP-18): positive reliability claims on pattern and candle cards and strong-level
+ *   wording in an after run against a before run (C1, C2), with the WP-18 form of F1, F2, L1,
+ *   O1 and V1.
+ * - `zone` (WP-18): where the close sits against the entry zone, the position under the 1%
+ *   tolerance and under exact edges, the pullback-cue rate of the prose and the stratified
+ *   sample for the manual read (Z1, Z2, N2, N3; `--restate exact` re-derives an old run).
  *
  * Every definition is recomputed here (`analysisFieldsEvalTypes.ts` holds the constants);
  * the stored field under test is only ever the thing compared with. Gates (WP-15 §7.3) are
@@ -83,6 +94,25 @@ import {
     type ArmCase,
     type PatternSkill,
 } from './analysisFieldsEvalOutput';
+import {
+    CLAIM_LANGUAGES,
+    claimsGates,
+    compareClaims,
+    readClaimCase,
+    type ClaimCase,
+    type ClaimLanguage,
+} from './analysisFieldsEvalClaims';
+import {
+    ZONE_LANGUAGES,
+    distanceAboveTopAtr,
+    exactPosition,
+    geometryOf,
+    targetRoomComparison,
+    zoneGates,
+    zoneReport,
+    type ZoneCase,
+    type ZoneLanguage,
+} from './analysisFieldsEvalZone';
 import { renderWithCore, type RenderSkills } from './analysisFieldsEvalRender';
 import {
     compareLevelOverlap,
@@ -158,6 +188,10 @@ export interface FieldsEvalArgs {
     baseline: string | null;
     /** `output`: a second run of the before arm, the noise floor. */
     repeat: string | null;
+    /** `claims` and `zone`: the language of the wording lists. */
+    lang: ClaimLanguage & ZoneLanguage;
+    /** `zone`: read the positions with the exact edges instead of the stored ones. */
+    restate: boolean;
 }
 
 const GATE_IDS: Record<EvalMode, readonly string[]> = {
@@ -179,6 +213,8 @@ const GATE_IDS: Record<EvalMode, readonly string[]> = {
         'V4',
         'V5',
     ],
+    claims: ['C1', 'C2', 'F1', 'F2', 'L1', 'O1', 'V1'],
+    zone: ['Z1', 'Z2', 'N2', 'N3'],
 };
 
 function parseMode(raw: string | undefined): EvalMode {
@@ -210,6 +246,21 @@ function parseTier(raw: string | undefined): SkillTier | null {
     const tier = SKILL_TIERS.find(t => t === raw);
     if (tier === undefined) throw new Error('--tier must be free or member');
     return tier;
+}
+
+function parseLang(raw: string | undefined): ClaimLanguage & ZoneLanguage {
+    if (raw === undefined) return 'ko';
+    const known = CLAIM_LANGUAGES.find(l => l === raw);
+    if (known === undefined || !ZONE_LANGUAGES.includes(known)) {
+        throw new Error(`--lang must be ${CLAIM_LANGUAGES.join(' or ')}`);
+    }
+    return known;
+}
+
+function parseRestate(raw: string | undefined): boolean {
+    if (raw === undefined) return false;
+    if (raw === 'exact') return true;
+    throw new Error('--restate must be "exact"');
 }
 
 function parseCount(raw: string | undefined, flag: string): number | null {
@@ -244,6 +295,8 @@ export function parseFieldsEvalArgs(argv: readonly string[]): FieldsEvalArgs {
         tier: parseTier(raw.tier),
         baseline: raw.baseline === undefined ? null : resolve(raw.baseline),
         repeat: raw.repeat === undefined ? null : resolve(raw.repeat),
+        lang: parseLang(raw.lang),
+        restate: parseRestate(raw.restate),
     };
     if (!Number.isFinite(args.noisePp) || args.noisePp < 0) {
         throw new Error('--noise-pp must be a non-negative number');
@@ -257,8 +310,11 @@ function validateCombination(args: FieldsEvalArgs): void {
     if ((args.tier !== null || args.baseline !== null) && mode !== 'gating') {
         throw new Error(`${mode}: --tier and --baseline apply to gating only`);
     }
-    if (args.repeat !== null && mode !== 'output') {
-        throw new Error(`${mode}: --repeat applies to output only`);
+    if (args.repeat !== null && mode !== 'output' && mode !== 'claims') {
+        throw new Error(`${mode}: --repeat applies to output and claims only`);
+    }
+    if (args.restate && mode !== 'zone') {
+        throw new Error(`${mode}: --restate applies to zone only`);
     }
     if (mode === 'trend') {
         if ((args.set === null) === (args.bars === null)) {
@@ -298,14 +354,27 @@ function validateCombination(args: FieldsEvalArgs): void {
         }
         return;
     }
-    if (mode === 'output') {
+    if (mode === 'output' || mode === 'claims') {
         if (args.run === null || args.before === null || args.skills === null) {
             throw new Error(
-                'output: --run, --before and --skills are required'
+                `${mode}: --run, --before and --skills are required`
             );
         }
         if (args.memberRun !== null || args.limit !== null) {
-            throw new Error('output: --member-run and --limit do not apply');
+            throw new Error(`${mode}: --member-run and --limit do not apply`);
+        }
+        return;
+    }
+    if (mode === 'zone') {
+        if (args.run === null) throw new Error('zone: --run is required');
+        if (
+            args.memberRun !== null ||
+            args.skills !== null ||
+            args.limit !== null
+        ) {
+            throw new Error(
+                'zone: --member-run, --skills and --limit do not apply'
+            );
         }
         return;
     }
@@ -1230,8 +1299,20 @@ function tierOf(tier: string): 'free' | 'member' {
     throw new Error(`the run's tier "${tier}" is neither free nor member`);
 }
 
-function outputMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
-    const set = loadSetData(args.set ?? '');
+interface RunComparisonData {
+    afterRun: RunData;
+    beforeRun: RunData;
+    repeatRun: RunData | null;
+    after: readonly ArmCase[];
+    before: readonly ArmCase[];
+    repeat: readonly ArmCase[] | null;
+    comparison: ReturnType<typeof compareArms>;
+    skillsDir: string | null;
+    fingerprint: string;
+}
+
+/** The paired comparison of an after, a before and an optional repeat run (`output` and `claims`). */
+function compareRuns(args: FieldsEvalArgs, set: SetData): RunComparisonData {
     const afterRun = loadRunData(args.run ?? '', set);
     const beforeRun = loadRunData(args.before ?? '', set);
     assertComparableRuns(afterRun, beforeRun, PAIRED_RUN_FIELDS);
@@ -1281,6 +1362,38 @@ function outputMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
         noiseFloor: args.noisePp / 100,
         tier: tierOf(afterRun.meta.tier),
     });
+    return {
+        afterRun,
+        beforeRun,
+        repeatRun,
+        after,
+        before,
+        repeat,
+        comparison,
+        skillsDir: args.skills,
+        fingerprint: set.fingerprint,
+    };
+}
+
+const runInputs = (
+    data: RunComparisonData,
+    args: FieldsEvalArgs
+): Record<string, unknown> => ({
+    fingerprint: data.fingerprint,
+    skillsDir: data.skillsDir,
+    run: { dir: data.afterRun.dir, ...data.afterRun.meta },
+    before: { dir: data.beforeRun.dir, ...data.beforeRun.meta },
+    repeat:
+        data.repeatRun === null
+            ? null
+            : { dir: data.repeatRun.dir, ...data.repeatRun.meta },
+    noisePp: args.noisePp,
+});
+
+function outputMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
+    const set = loadSetData(args.set ?? '');
+    const data = compareRuns(args, set);
+    const { comparison, after, before, repeat } = data;
     deps.log(
         `output: ${comparison.n} paired cases${repeat === null ? ', no repeat run (noise floor unknown)' : `, repeat ${repeat.length}`}`
     );
@@ -1297,23 +1410,179 @@ function outputMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
                   planPosition: c.planPosition,
               };
     return {
-        inputs: {
-            fingerprint: set.fingerprint,
-            skillsDir: args.skills,
-            run: { dir: afterRun.dir, ...afterRun.meta },
-            before: { dir: beforeRun.dir, ...beforeRun.meta },
-            repeat:
-                repeatRun === null
-                    ? null
-                    : { dir: repeatRun.dir, ...repeatRun.meta },
-            noisePp: args.noisePp,
-        },
+        inputs: runInputs(data, args),
         summary: { output: comparison },
         gates: outputGates(comparison),
         rows: after.map(c => ({
             caseId: c.caseId,
             after: pick(c),
             before: pick(beforeBy.get(c.caseId)),
+        })),
+        skipped: 0,
+    };
+}
+
+/** A result's claim case; `null` for a failed call. */
+function claimCasesOf(
+    run: RunData,
+    language: ClaimLanguage
+): readonly ClaimCase[] {
+    return run.results
+        .filter(r => r.repeat === 1)
+        .flatMap(r => readClaimCase(r, language) ?? []);
+}
+
+/**
+ * `claims`: C1 and C2 on the stored text, and the WP-18 form of the non-inferiority gates
+ * (F1, F2, L1 and V1 as `output` decides them; O1 with the WP-18 bound: the change removes
+ * text, so the median output-token ratio may not grow by more than 5%).
+ */
+function claimsMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
+    const set = loadSetData(args.set ?? '');
+    const data = compareRuns(args, set);
+    const { comparison } = data;
+    const language = args.lang;
+    const [after, before] = [
+        claimCasesOf(data.afterRun, language),
+        claimCasesOf(data.beforeRun, language),
+    ];
+    const repeat =
+        data.repeatRun === null ? null : claimCasesOf(data.repeatRun, language);
+    const claims = compareClaims({ after, before, repeat });
+    deps.log(
+        `claims: ${claims.paired} paired cases (${claims.unpaired} of the after run unpaired)`
+    );
+    const shared = outputGates(comparison).filter(g =>
+        ['F1', 'F2', 'L1', 'V1'].includes(g.id)
+    );
+    const ratio = comparison.tokens.ratio;
+    const needed = Math.ceil(C.gates.minPairedShare * comparison.n - 1e-9);
+    const o1: GateResult = {
+        id: 'O1',
+        description:
+            'median per-case output-token ratio (the change removes text, so it may not grow)',
+        pass:
+            ratio.point === null || comparison.paired.o1 < needed
+                ? null
+                : ratio.point <= C.gates.claimsOutputMaxRatio + 1e-12,
+        value:
+            ratio.point === null
+                ? 'n/a'
+                : `median ${ratio.point.toFixed(3)} (95% high ${ratio.high?.toFixed(3) ?? 'n/a'}, n ${ratio.n}, paired ${comparison.paired.o1} of ${comparison.n})`,
+        threshold: `<= ${C.gates.claimsOutputMaxRatio}`,
+    };
+    const byCase = new Map(before.map(c => [c.caseId, c]));
+    return {
+        inputs: { ...runInputs(data, args), language },
+        summary: { claims, output: comparison },
+        gates: GATE_IDS.claims.flatMap(id =>
+            [
+                ...claimsGates(
+                    claims,
+                    data.afterRun.results.filter(r => r.repeat === 1).length
+                ),
+                ...shared,
+                o1,
+            ].filter(g => g.id === id)
+        ),
+        rows: after.map(c => ({
+            caseId: c.caseId,
+            after: c,
+            before: byCase.get(c.caseId) ?? null,
+        })),
+        skipped: 0,
+    };
+}
+
+/** The zone cases of a run: one per first-repeat result with a plan. */
+function zoneCasesOf(
+    run: MeasuredRun,
+    labels: ReadonlyMap<string, string | null>
+): readonly ZoneCase[] {
+    return [...run.planCases.values()].map(built => {
+        const measure = measurePlan(built.plan);
+        const ar = asRec(
+            asRec(built.result.unfilteredResult)?.actionRecommendation
+        );
+        const text = (key: string): string => {
+            const value = ar?.[key];
+            return typeof value === 'string' ? value : '';
+        };
+        return {
+            caseId: built.plan.caseId,
+            close: built.plan.close,
+            atr: measure.atr,
+            zoneLow: measure.zoneLow,
+            zoneTop: measure.zoneTop,
+            tolerancePosition: measure.position,
+            storedPosition: built.plan.storedState?.position ?? null,
+            approach: labels.get(built.plan.caseId) ?? null,
+            prose: [
+                text('entry'),
+                text('positionAnalysis'),
+                text('riskReward'),
+            ].join('\n'),
+            firstTargetRoomAtr: measure.firstTargetRoomAtr,
+        };
+    });
+}
+
+/** `labelPlanOutcome`'s approach per case of a run's `labels.jsonl` (repeat 1). */
+function approachOf(run: RunData): ReadonlyMap<string, string | null> {
+    return new Map(
+        (run.labels ?? [])
+            .filter(row => row.repeat === 1)
+            .map(row => [row.caseId, row.labels?.plan?.approach ?? null])
+    );
+}
+
+function zoneMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
+    const set = loadSetData(args.set ?? '');
+    const afterRun = loadRunData(args.run ?? '', set);
+    const beforeRun =
+        args.before === null ? null : loadRunData(args.before, set);
+    if (beforeRun !== null) {
+        assertComparableRuns(afterRun, beforeRun, PAIRED_RUN_FIELDS);
+    }
+    const after = zoneCasesOf(measureRun(afterRun, set), approachOf(afterRun));
+    const before =
+        beforeRun === null
+            ? null
+            : zoneCasesOf(measureRun(beforeRun, set), approachOf(beforeRun));
+    if (after.length === 0) throw new Error('zone: the run has no plan');
+    const report = zoneReport(after, {
+        language: args.lang,
+        restate: args.restate,
+    });
+    const targetRoom =
+        before === null ? null : targetRoomComparison(after, before);
+    deps.log(
+        `zone: ${after.length} plans${args.restate ? ', positions restated with exact edges' : ''}`
+    );
+    return {
+        inputs: {
+            fingerprint: set.fingerprint,
+            run: { dir: afterRun.dir, ...afterRun.meta },
+            before:
+                beforeRun === null
+                    ? null
+                    : { dir: beforeRun.dir, ...beforeRun.meta },
+            restate: args.restate,
+            language: args.lang,
+        },
+        summary: { zone: report, targetRoom },
+        gates: zoneGates(report, after.length, targetRoom),
+        rows: after.map(c => ({
+            caseId: c.caseId,
+            tolerance: c.tolerancePosition,
+            exact: exactPosition(c),
+            stored: c.storedPosition,
+            geometry:
+                c.zoneLow === null || c.zoneTop === null
+                    ? null
+                    : geometryOf(c.close, c.zoneLow, c.zoneTop),
+            distanceAboveTopAtr: distanceAboveTopAtr(c),
+            approach: c.approach,
         })),
         skipped: 0,
     };
@@ -1404,7 +1673,11 @@ export async function runFieldsEval(
                 ? await gatingMode(args, deps)
                 : args.mode === 'output'
                   ? outputMode(args, deps)
-                  : await skillsMode(args, deps);
+                  : args.mode === 'claims'
+                    ? claimsMode(args, deps)
+                    : args.mode === 'zone'
+                      ? zoneMode(args, deps)
+                      : await skillsMode(args, deps);
     if (output.rows.length === 0)
         throw new Error('the evaluation measured no row');
     output.gates.forEach(g => deps.log(describeGate(g)));

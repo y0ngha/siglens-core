@@ -82,25 +82,32 @@ export interface Resamplings {
     blocks: Resampling;
 }
 
-function resamplingOf(keys: readonly string[], stream: string): Resampling {
+function resamplingOf(
+    keys: readonly string[],
+    stream: string,
+    baseSeed: number
+): Resampling {
     return {
         keys,
         multiplicities: resampleMultiplicities(
             keys.length,
             bootstrapReplicates,
-            streamForKey(seed, stream)
+            streamForKey(baseSeed, stream)
         ),
     };
 }
 
 /** Both bootstraps over the run's week list (from the bars, independent of `--only`). */
-export function makeResamplings(weeks: readonly string[]): Resamplings {
+export function makeResamplings(
+    weeks: readonly string[],
+    baseSeed: number = seed
+): Resamplings {
     const blocks = [
         ...new Set(weeks.map(week => blockOfWeek(week, blockWeeks))),
     ].toSorted();
     return {
-        weeks: resamplingOf(weeks, 'bootstrap|week'),
-        blocks: resamplingOf(blocks, 'bootstrap|block'),
+        weeks: resamplingOf(weeks, 'bootstrap|week', baseSeed),
+        blocks: resamplingOf(blocks, 'bootstrap|block', baseSeed),
     };
 }
 
