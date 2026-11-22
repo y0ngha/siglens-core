@@ -37,7 +37,7 @@ import {
 } from '@/domain/analysis/confidence';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
 import { marketEventHorizonMs } from '@/domain/analysis/marketEvents';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { isActiveModelId } from '@/domain/analysis/modelSpecs';
 import {
     DEFAULT_ANALYSIS_LOCALE,
     outputLanguageReminder,
@@ -306,9 +306,8 @@ async function runAnalysisImpl(
     // 'analysis-worker' is not a model — it only lives in cache keys. When no
     // specific model was requested, resolve to the free-tier default.
     const callModelId: ActiveModelId =
-        options.modelId !== undefined &&
-        (options.modelId as string) in MODEL_SPECS
-            ? (options.modelId as ActiveModelId)
+        options.modelId !== undefined && isActiveModelId(options.modelId)
+            ? options.modelId
             : DEFAULT_RUN_ANALYSIS_MODEL;
 
     // Key gate. Under the default policy it stays here, before the cache read

@@ -29,7 +29,7 @@ import {
 import { buildOptionsAnalysisPrompt } from '@/domain/options/optionsPrompt';
 import { OPTIONS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { optionsSystemPrompt } from '@/domain/analysis/systemPrompt';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { isActiveModelId } from '@/domain/analysis/modelSpecs';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import {
     buildOptionsCacheKey,
@@ -237,10 +237,9 @@ export async function runOptionsAnalysis(
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // callModelId resolves the actual ActiveModelId for the AI call.
-    const callModelId: ActiveModelId =
-        (modelId as string) in MODEL_SPECS
-            ? (modelId as ActiveModelId)
-            : DEEPSEEK_V4_1_FLASH_MODEL;
+    const callModelId: ActiveModelId = isActiveModelId(modelId)
+        ? modelId
+        : DEEPSEEK_V4_1_FLASH_MODEL;
 
     const raw = await dedupeGeneration(
         cache,

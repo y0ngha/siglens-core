@@ -50,7 +50,7 @@ import type {
     OptionsAnalysisResponse,
     OverallAnalysisResponse,
 } from '@/domain/types';
-import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { isActiveModelId } from '@/domain/analysis/modelSpecs';
 import { DEEPSEEK_V4_1_FLASH_MODEL } from '@/application/chat/constants';
 import {
     buildOverallCacheKey,
@@ -728,10 +728,9 @@ export async function runOverallAnalysis(
     const prompt = `${dynamic}${outputLanguageReminder(locale)}`;
 
     // Resolve the callable model (overall uses the same sentinel logic as runAnalysis)
-    const callModelId: ActiveModelId =
-        (modelId as string) in MODEL_SPECS
-            ? (modelId as ActiveModelId)
-            : DEFAULT_RUN_OVERALL_MODEL;
+    const callModelId: ActiveModelId = isActiveModelId(modelId)
+        ? modelId
+        : DEFAULT_RUN_OVERALL_MODEL;
 
     // ── 10. LLM call (with in-flight deduplication) ──
     const raw = await dedupeGeneration(
@@ -784,12 +783,9 @@ export async function runOverallAnalysis(
     );
 
     // ── 11. Normalize and cache ──
-    const normalized = normalizeOverallAnalysisResponse(
-        JSON.parse(raw) as unknown,
-        {
-            optionsOiStale,
-        }
-    );
+    const normalized = normalizeOverallAnalysisResponse(JSON.parse(raw), {
+        optionsOiStale,
+    });
     // `analyzedAt` marks when THIS result was produced, so a peek/cache hit
     // can report its age — mirrors
     // `runAnalysis.ts`'s `analyzedAt` on the technical axis. A fresh clock

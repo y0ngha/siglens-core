@@ -99,7 +99,7 @@ export async function runMacroBriefing(
     );
 
     const briefing = withComputedRegime(
-        normalizeMacroBriefing(JSON.parse(raw) as unknown),
+        normalizeMacroBriefing(JSON.parse(raw)),
         data
     );
     const generatedAt = new Date().toISOString();

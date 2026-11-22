@@ -400,6 +400,16 @@ const THINKING_LEVEL_ORDER: readonly GeminiThinkingLevel[] = [
 ];
 
 /**
+ * @internal Type guard: `modelId` is an own key of {@link MODEL_SPECS}
+ * (prototype keys such as `toString` are not). Deprecated model strings stay in
+ * `ModelId` but have no spec row, so callers use this to fall back to a
+ * dispatchable default instead of casting.
+ */
+export function isActiveModelId(modelId: string): modelId is ActiveModelId {
+    return Object.hasOwn(MODEL_SPECS, modelId);
+}
+
+/**
  * Generate the MAX_TOKENS retry sequence for Gemini thinking-level reduction.
  *
  * When a Gemini call finishes with `MAX_TOKENS` the thinking budget consumed

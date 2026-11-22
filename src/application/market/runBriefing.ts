@@ -100,7 +100,7 @@ export async function runBriefing(
         { signal: options?.signal }
     );
 
-    const briefing = normalizeMarketBriefing(JSON.parse(raw) as unknown);
+    const briefing = normalizeMarketBriefing(JSON.parse(raw));
     const generatedAt = new Date().toISOString();
 
     if (!briefing.summary) {

@@ -492,6 +492,12 @@ at runtime. "Suppress TS error" is not an explanation.
 //    field as NewsAxisOptions
 ```
 
+`src/__tests__/guards/typeAssertionComment.test.ts` enforces the comment: every `as T` / `<T>x`
+in non-test `src` needs a comment on the same line or a standalone comment on the line directly
+above (`as const` is exempt; a comment that is only `eslint-disable…` does not count). Existing
+violations sit in a per-file baseline that only goes down (a drop must lower it in the same
+change; new files start at 0). The guard checks that a comment exists, not that it is a good one.
+
 Test files are exempt (`as unknown as Dirent` stubs implement only the part of an interface
 the test uses). When integrating an SDK that ships a discriminated union of events or
 responses, import its native types instead of hand-rolling `unknown` plus a `type` check:
@@ -1279,7 +1285,7 @@ branch reorders content.
 Update every doc on the changed type (interface block, field docs, record types, the
 `PUBLIC_API.md` entry) and every line that restates a rule that gained an exception.
 Examples follow the rules: an example that shows what a rule forbids, or a time zone the
-new rule replaced, makes the reader guess which is right.
+new rule replaced, makes the reader guess which is right. A guard test and the rule it enforces name each other (the rule cites the guard file, the guard's header cites the rule ID), so neither can be changed or removed unseen.
 
 This includes prose inside one prompt: a section intro and the "Writing Rules" below it
 state the same behavior, so changing one without the other leaves contradicting

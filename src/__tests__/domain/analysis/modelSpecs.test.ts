@@ -3,6 +3,7 @@ import {
     getThinkingLevelSequence,
     isChatGPTModel,
     isClaudeModel,
+    isActiveModelId,
     isDeepSeekModel,
     isGeminiModel,
     isReasoningToggleable,
@@ -589,5 +590,24 @@ describe('2026-11 roster rows (floors per vendor docs, not sent; low/high measur
                 expect(TIER_CONFIG.models[tier], model).not.toContain(model);
             }
         }
+    });
+});
+
+describe('isActiveModelId', () => {
+    it('accepts every MODEL_SPECS key', () => {
+        for (const key of Object.keys(MODEL_SPECS)) {
+            expect(isActiveModelId(key)).toBe(true);
+        }
+    });
+
+    it('rejects deprecated or unknown model strings', () => {
+        expect(isActiveModelId('claude-3-opus-retired')).toBe(false);
+        expect(isActiveModelId('')).toBe(false);
+    });
+
+    it('rejects prototype keys', () => {
+        expect(isActiveModelId('toString')).toBe(false);
+        expect(isActiveModelId('constructor')).toBe(false);
+        expect(isActiveModelId('__proto__')).toBe(false);
     });
 });
