@@ -1,4 +1,4 @@
-import { MS_PER_DAY } from '@/domain/constants/time';
+import { DAYS_PER_WEEK, MS_PER_DAY } from '@/domain/constants/time';
 import type { ExpirationSlot, ExpirationSlotKey, SlotMapping } from './types';
 
 /**
@@ -60,7 +60,6 @@ function isWindowedKey(key: ExpirationSlotKey): key is WindowedSlotKey {
 const SUNDAY = 0;
 const FRIDAY = 5;
 const SATURDAY = 6;
-const DAYS_PER_WEEK = 7;
 
 interface DatedExpiration {
     date: string;

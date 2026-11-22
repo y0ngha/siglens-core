@@ -36,6 +36,7 @@ import {
     meanBarRangePercent,
 } from '@/domain/analysis/referenceLevels';
 import { hasUsablePrices } from '@/domain/analysis/analysisUtils';
+import { isLastPeriodBarFinished } from '@/domain/analysis/barPeriods';
 import { etCalendarDate } from '@/domain/marketCalendar';
 import { anchoredVwap } from '@/domain/analysis/anchoredVwap';
 import {
@@ -152,7 +153,7 @@ function isLastDailyBarFinished(
 }
 
 /**
- * The bar floor pivots are computed from: on a daily chart the last **finished** session —
+ * The bar floor pivots are computed from: on a daily or weekly chart the last **finished** period —
  * the last bar once its session has closed (see {@link isLastDailyBarFinished}), the bar
  * before it while that bar is still forming — otherwise the previous **session**.
  *
@@ -172,11 +173,18 @@ function pivotSourceBar(
     sessionKey: SessionKey,
     clock: MarketReferenceClock | undefined
 ): Bar | null {
-    if (timeframe === '1Day') {
+    if (timeframe === '1Day' || timeframe === '1Week') {
         // A finished last bar IS the last finished session: taking the bar before it
-        // printed the previous session's pivots on every post-close analysis.
+        // printed the previous session's pivots on every post-close analysis. On a weekly
+        // chart the same rule reads "the last finished week": the classic pivots of the last
+        // completed week, whose bar is the last one only once the week is over.
         const last = bars.at(-1);
-        if (last !== undefined && isLastDailyBarFinished(last, clock)) {
+        const lastFinished =
+            last !== undefined &&
+            (timeframe === '1Day'
+                ? isLastDailyBarFinished(last, clock)
+                : isLastPeriodBarFinished(last, 'week', clock));
+        if (last !== undefined && lastFinished) {
             return hasUsablePrices(last) ? last : null;
         }
         if (bars.length < 2) return null;

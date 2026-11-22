@@ -373,6 +373,8 @@ export const PATTERN_MIN_HEIGHT_PRICE_PCT: Readonly<Record<Timeframe, number>> =
         '1Hour': 0.01,
         '4Hour': 0.01,
         '1Day': 0.03,
+        // Unmeasured: twice the daily floor, so a weekly drawing spans a visible multi-week move.
+        '1Week': 0.06,
     };
 
 /** @internal Prior trend: bars before the pattern start whose close change sets the direction. */

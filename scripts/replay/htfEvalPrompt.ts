@@ -104,11 +104,12 @@ export function printedLongTerm(prompt: string): PrintedLongTerm | null {
 
 export interface PrintedProgressTag {
     sessionsSoFar: number;
-    sessionsTotal: number;
+    /** `null` when the tag prints no total (a market whose calendar has no holiday data). */
+    sessionsTotal: number | null;
 }
 
 const WEEK_TAG =
-    /\(week in progress: (\d+) of (\d+) sessions so far; its close is the latest price\)/;
+    /\(week in progress: (\d+)(?: of (\d+))? sessions so far; its close is the latest price\)/;
 
 /**
  * The in-progress tag printed on the **last** row of `## Recent Bar Data`, and the number of
@@ -126,7 +127,8 @@ export function printedWeekTag(rows: readonly PrintedBarRow[]): {
                 ? null
                 : {
                       sessionsSoFar: Number(match[1]),
-                      sessionsTotal: Number(match[2]),
+                      sessionsTotal:
+                          match[2] === undefined ? null : Number(match[2]),
                   },
         rowsWithTag: rows.filter(row => WEEK_TAG.test(row.tail)).length,
     };
@@ -207,7 +209,7 @@ export function printedHigherBlock(prompt: string): PrintedHigherBlock | null {
         `${kind} close (${NUM})% (above|below) its 50-(?:week|month|day) average`
     );
     const progressRe =
-        /The last \w+ bar is the current \w+ \((\d+) of (\d+) sessions so far\)/;
+        /The last \w+ bar is the current \w+ \((\d+)(?: of (\d+))? sessions so far\)/;
     const alignRe =
         /^Alignment with this chart's trend \((bullish|bearish|neutral)\): (aligned|opposed|mixed)\./;
     const body = lines.slice(1);
@@ -239,7 +241,7 @@ export function printedHigherBlock(prompt: string): PrintedHigherBlock | null {
         closeVsMa50: read(maRe, m => ({ pct: m[1], side: m[2] })),
         progress: read(progressRe, m => ({
             sessionsSoFar: Number(m[1]),
-            sessionsTotal: Number(m[2]),
+            sessionsTotal: m[2] === undefined ? null : Number(m[2]),
         })),
         alignment: read(alignRe, m => ({ analysisTrend: m[1], label: m[2] })),
         unparsed: body.filter(line => !known(line)),

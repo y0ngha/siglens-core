@@ -11,6 +11,8 @@ export const HORIZON_WINDOWS_BY_TIMEFRAME: Record<
     '1Hour': { short: 24, medium: 72, long: 200 },
     '4Hour': { short: 20, medium: 60, long: 180 },
     '1Day': { short: 20, medium: 60, long: 200 },
+    // Weekly bars: ~5 months, ~1 year, ~3 years.
+    '1Week': { short: 20, medium: 52, long: 156 },
 };
 
 /** @internal Which MA/EMA periods each horizon surfaces as levels. */

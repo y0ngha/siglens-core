@@ -209,6 +209,23 @@ describe('buildOverallAnalysisPrompt', () => {
         expect(prompt).toContain('newsBulletsKo');
     });
 
+    it('labels a weekly overall prompt Weekly and says its last bar may be unfinished', () => {
+        const prompt = buildOverallAnalysisPrompt(
+            TEST_SYMBOL,
+            TEST_COMPANY_NAME,
+            MOCK_TECHNICAL,
+            MOCK_FUNDAMENTAL,
+            MOCK_NEWS,
+            '1Week' as Timeframe
+        );
+
+        expect(prompt).toContain('Weekly');
+        expect(prompt).toContain(
+            'Weekly positional chart built from daily bars'
+        );
+        expect(prompt).toContain('unfinished week');
+    });
+
     it('embeds technical, fundamental, and news summary content in the prompt', () => {
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,

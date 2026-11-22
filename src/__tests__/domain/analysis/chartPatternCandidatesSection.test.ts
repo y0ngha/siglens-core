@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-    BASE_RATE_NOT_MEASURED_LINE,
+    baseRateNotMeasuredLine,
     formatBaseRateLine,
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     CHART_PATTERN_CANDIDATES_SECTION_INTRO,
@@ -908,7 +908,7 @@ describe('the measured base-rate line of a block (WP-18 C4)', () => {
             'rectangle'
         );
         expect(b).not.toContain('Measured on this engine');
-        expect(b).not.toContain(BASE_RATE_NOT_MEASURED_LINE);
+        expect(b).not.toContain(baseRateNotMeasuredLine('1Day'));
     });
 
     it('says "not measured" on intraday bars and prints no number', () => {
@@ -923,8 +923,26 @@ describe('the measured base-rate line of a block (WP-18 C4)', () => {
             offeredIdsFor(candidates, f.bars, f.atr)
         );
         expect(block(section, 'ascending_triangle')).toContain(
-            BASE_RATE_NOT_MEASURED_LINE
+            '- Not measured on intraday bars.'
         );
+        expect(section).not.toContain('Measured on this engine');
+    });
+
+    it('says "not measured on weekly bars" on a weekly chart', () => {
+        const f = ascendingTriangle as Fixture;
+        const candidates = qualifiedOf(f);
+        const section = formatChartPatternCandidatesSection(
+            candidates,
+            f.bars,
+            f.atr,
+            USD_QUOTING,
+            '1Week',
+            offeredIdsFor(candidates, f.bars, f.atr)
+        );
+        expect(block(section, 'ascending_triangle')).toContain(
+            '- Not measured on weekly bars.'
+        );
+        expect(section).not.toMatch(/intraday/i);
         expect(section).not.toContain('Measured on this engine');
     });
 

@@ -66,6 +66,8 @@ const TREND_LABEL: Record<Trend, string> = {
 const label = TREND_LABEL[trend];
 ```
 
+Key the table by the union (`Record<Timeframe, …>`) so a new member is a compile error instead of silently taking an if/ternary chain's default branch.
+
 ### Functional Programming
 
 ```typescript
@@ -1160,7 +1162,7 @@ in two keeps describing both halves).
 
 When a contract changes (cache-hit semantics, error behavior, a default), grep for every JSDoc,
 doc table and sibling entry point that restates it and update them in the same change — a
-restatement left behind is the most common stale claim.
+restatement left behind is the most common stale claim. A fix for one named stale statement covers every doc of that symbol (type field docs and the `@returns` of each function that returns it).
 
 The same applies to version `@remarks` and change-log notes: do not claim rendered output is
 "unchanged" for a locale or prompt when a shared change (such as a new serialized metric)

@@ -5,6 +5,7 @@ import {
     differenceDecimalPlaces,
     equityListingContext,
     extractJsonFromLlmResponse,
+    formatBarDate,
     formatBarDateTime,
     formatLargeAmount,
     formatNullableNumber,
@@ -18,6 +19,8 @@ import {
     spellSmallInteger,
     stripLlmJsonFence,
     parseCalendarDate,
+    TIMEFRAME_LABEL,
+    unmeasuredBarsLabel,
 } from '@/domain/analysis/promptFormat';
 
 // ─────────────────────────────────────────
@@ -427,4 +430,34 @@ describe('spellSmallInteger', () => {
         expect(spellSmallInteger(PLAN_MIN_ATR_SPACING)).toBe('one');
         expect(spellSmallInteger(SL_MAX_ATR_MULTIPLIER)).toBe('five');
     });
+});
+
+describe('weekly timeframe formatting', () => {
+    const monday = Date.UTC(2026, 10, 16) / 1000;
+
+    it('labels the weekly chart Weekly', () => {
+        expect(TIMEFRAME_LABEL['1Week']).toBe('Weekly');
+    });
+
+    it('prints a weekly key point date-only, like a daily one', () => {
+        expect(formatBarDate(monday, '1Week')).toBe('2026-11-16');
+        expect(formatBarDate(monday, '1Day')).toBe('2026-11-16');
+    });
+
+    it('keeps the clock time on every intraday timeframe', () => {
+        expect(formatBarDate(monday, '1Hour')).toBe('2026-11-16 00:00 UTC');
+    });
+});
+
+describe('unmeasuredBarsLabel', () => {
+    it('names weekly bars on a weekly chart', () => {
+        expect(unmeasuredBarsLabel('1Week')).toBe('weekly');
+    });
+
+    it.each(['5Min', '15Min', '30Min', '1Hour', '4Hour'] as const)(
+        'keeps the intraday wording on %s',
+        timeframe => {
+            expect(unmeasuredBarsLabel(timeframe)).toBe('intraday');
+        }
+    );
 });

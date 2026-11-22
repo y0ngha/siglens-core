@@ -109,6 +109,15 @@ describe('K1: weekly hygiene', () => {
         ).toContain('vwapLevel');
     });
 
+    it('does not mistake an anchored VWAP level or skill prose for the session VWAP and the pullback block', () => {
+        const text = weeklyText().replace(
+            '(Pivot PP;',
+            '(AVWAP (swing high); Pivot PP;'
+        );
+        const withProse = `On daily charts, ## Deterministic Metrics prints a \`### Short-term sell-off check (computed, 1Day bars)\` block; intraday caveat.\n${text}`;
+        expect(check(withProse).failures).toEqual([]);
+    });
+
     it('names each registered daily-only sentence', () => {
         const samples: Record<string, string> = {
             candleReliability:
@@ -137,7 +146,9 @@ describe('K1: weekly hygiene', () => {
                 'Measured on 65 symbols (U.S. and Korean), daily bars 2018–2026: after price',
             levelHoldNotMeasured:
                 'Not measured on intraday bars. Treat these levels as a map',
-            intradayWording: 'works on an Intraday chart',
+            intradayConfluenceReliability:
+                'Intraday, descriptive only — the rule has no measured forward edge',
+            unmeasuredNamesOtherBars: 'This is Not measured on daily bars.',
         };
         expect(Object.keys(samples).toSorted()).toEqual(
             DAILY_ONLY_PATTERNS.map(p => p.name).toSorted()
@@ -147,6 +158,11 @@ describe('K1: weekly hygiene', () => {
                 check(`${weeklyText()}\n${samples[name]}`).failures
             ).toContain(`dailyOnly:${name}`);
         });
+    });
+
+    it('accepts the weekly wording of the unmeasured sentences', () => {
+        const text = `- Not measured on weekly bars.\n### Doji [Not measured on weekly bars]\n; reliability was not measured on weekly bars, so do not state any.\nNot measured on weekly bars. Treat these levels as a map\n${weeklyText()}`;
+        expect(check(text).failures).toEqual([]);
     });
 
     it('requires the weekly label and context, the weekly horizons and no daily horizon', () => {

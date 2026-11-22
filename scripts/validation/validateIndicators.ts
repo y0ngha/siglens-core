@@ -52,6 +52,7 @@ const HORIZONS: Record<Timeframe, number[]> = {
     '5Min': [],
     '30Min': [],
     '4Hour': [],
+    '1Week': [],
 };
 // ~2 years of history: the slow pro-indicators (Connors RSI percent-rank,
 // Bollinger, MACD-V) need a long warmup, so a wider window yields enough

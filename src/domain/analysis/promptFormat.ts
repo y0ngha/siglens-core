@@ -7,6 +7,7 @@
  */
 
 import type { AssetClass, CurrencyCode, Timeframe } from '@/domain/types';
+import { isDailyOrLonger } from '@/domain/constants/market';
 import { MS_PER_DAY, MS_PER_SECOND } from '@/domain/constants/time';
 import { roundToKrxTick, type KrxTickTable } from '@/domain/analysis/krxTick';
 
@@ -26,7 +27,22 @@ export const TIMEFRAME_LABEL: Record<Timeframe, string> = {
     '1Hour': '1-Hour',
     '4Hour': '4-Hour',
     '1Day': 'Daily',
+    '1Week': 'Weekly',
 };
+
+/**
+ * @internal
+ * The bar kind a "not measured" sentence names (`Not measured on intraday bars`):
+ * the base rates, the level-hold figure and the reliability rules were measured on
+ * daily bars only, so a chart that is not daily says which kind it is. One label
+ * function instead of a second copy of each sentence — the intraday text stays
+ * byte-identical, a weekly chart reads `weekly`.
+ */
+export function unmeasuredBarsLabel(
+    timeframe: Timeframe
+): 'intraday' | 'weekly' {
+    return timeframe === '1Week' ? 'weekly' : 'intraday';
+}
 
 /**
  * Character length of `YYYY-MM-DD HH:mm` — the prompt's bar-timestamp format.
@@ -60,7 +76,8 @@ export function formatBarDateTime(timeMs: number): string {
 }
 
 /**
- * `YYYY-MM-DD` from a bar's Unix-seconds `time` on a daily chart,
+ * `YYYY-MM-DD` from a bar's Unix-seconds `time` on a daily or weekly chart
+ * (a weekly bar's date is its Monday),
  * `YYYY-MM-DD HH:MM UTC` on an intraday one — a date-only stamp collapses
  * every key point of an hourly pattern onto the same calendar day (real-data
  * defect: an hourly double bottom printed both troughs and the neckline all
@@ -71,7 +88,7 @@ export function formatBarDate(
     timeframe: Timeframe
 ): string {
     const date = new Date(unixSeconds * MS_PER_SECOND);
-    if (timeframe === '1Day') return date.toISOString().slice(0, 10);
+    if (isDailyOrLonger(timeframe)) return date.toISOString().slice(0, 10);
     return `${formatBarDateTime(date.getTime())} UTC`;
 }
 

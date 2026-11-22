@@ -1,5 +1,9 @@
 import { clockParts } from '@/domain/agent/promptShared';
-import { MS_PER_DAY, MS_PER_MINUTE } from '@/domain/constants/time';
+import {
+    DAYS_PER_WEEK,
+    MS_PER_DAY,
+    MS_PER_MINUTE,
+} from '@/domain/constants/time';
 import {
     getSessionStatus,
     localSessionParts,
@@ -37,7 +41,6 @@ const WEEKDAY_FULL = [
     'Friday',
     'Saturday',
 ] as const;
-const DAYS_PER_WEEK = 7;
 const MINUTES_PER_HOUR = 60;
 const HOURS_PER_DAY = 24;
 

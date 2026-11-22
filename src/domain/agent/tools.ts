@@ -15,20 +15,24 @@ import {
 } from '@/domain/agent/swingHistory';
 import { AGENT_THEME_IDS, AGENT_THEMES } from '@/domain/agent/themes';
 import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
-import { TIMEFRAMES } from '@/domain/constants/market';
+import { PROVIDER_TIMEFRAMES } from '@/domain/constants/market';
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 
-const TIMEFRAME_ENUM: readonly string[] = TIMEFRAMES;
+// The six provider timeframes, not `TIMEFRAMES`: core now also analyses `1Week`, but letting
+// the agent ask for a weekly analysis is a tool-description change (tool-selection accuracy)
+// and stays out until it is evaluated, so the enums keep their released values.
+const TIMEFRAME_ENUM: readonly string[] = PROVIDER_TIMEFRAMES;
 
 /**
  * Timeframes `get_bars_indicators` accepts: every provider timeframe plus
  * weekly and monthly bars, which the consumer aggregates from daily bars
  * (`aggregateBarsToWeekly` / `aggregateBarsToMonthly`). Only this tool takes
- * them: SIGLENS analyses (`get_cached_analysis`, `run_fresh_analysis`) run on
- * provider timeframes, so their enums stay {@link TIMEFRAMES}.
+ * them: SIGLENS analyses (`get_cached_analysis`, `run_fresh_analysis`) keep
+ * the {@link PROVIDER_TIMEFRAMES} enum for the agent, although core itself can
+ * now build a `1Week` analysis.
  */
 export const AGENT_BARS_TIMEFRAMES = [
-    ...TIMEFRAMES,
+    ...PROVIDER_TIMEFRAMES,
     '1Week',
     '1Month',
 ] as const;

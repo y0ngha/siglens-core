@@ -306,6 +306,37 @@ describe('renderWithCore: timeframe and benchmarks', () => {
         ]);
     });
 
+    it('opens the timeframe gate only for a tier the timeframe is closed to', async () => {
+        const seen: { tier: string; gate: boolean | undefined }[] = [];
+        core.runAnalysis.mockImplementation(
+            async (_s, _n, _t, _f, _x, options) => {
+                const o = options as unknown as {
+                    tierContext: { tier: string };
+                    tierConfig?: {
+                        featureFlags: { enableTimeframeRestrictions?: boolean };
+                    };
+                };
+                seen.push({
+                    tier: o.tierContext.tier,
+                    gate: o.tierConfig?.featureFlags
+                        .enableTimeframeRestrictions,
+                });
+                return assembled(options);
+            }
+        );
+        await renderWithCore({ ...input(), timeframe: '1Week' });
+        expect(seen).toEqual([
+            { tier: 'free', gate: false },
+            { tier: 'member', gate: undefined },
+        ]);
+        seen.length = 0;
+        await renderWithCore(input());
+        expect(seen).toEqual([
+            { tier: 'free', gate: undefined },
+            { tier: 'member', gate: undefined },
+        ]);
+    });
+
     it("passes the benchmark of the case's market only when its bars are held, and serves them behind the asOf barrier", async () => {
         const served: { symbol: string; times: number[] }[] = [];
         core.runAnalysis.mockImplementation(

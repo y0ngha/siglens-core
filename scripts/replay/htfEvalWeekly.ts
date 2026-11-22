@@ -17,6 +17,7 @@ import { printedQualified } from './analysisFieldsEvalPrompt';
 import {
     HTF_EVAL_CONSTANTS as C,
     aggregateWeeks,
+    holidayAffectedWeek,
     isoWeekStart,
     roundToKrxTick,
     matchesPrinted,
@@ -55,7 +56,9 @@ export const DAILY_ONLY_PATTERNS: readonly { name: string; pattern: RegExp }[] =
         },
         {
             name: 'pullbackBlock',
-            pattern: /### Short-term sell-off check \(computed, 1Day bars\)/,
+            // Line-anchored: the strategy skills' prose names this header ("On daily charts ...
+            // prints a `### Short-term sell-off check ...`"), which is not the printed block.
+            pattern: /^### Short-term sell-off check \(computed, 1Day bars\)/m,
         },
         {
             name: 'dailyIntervalLabel',
@@ -96,11 +99,24 @@ export const DAILY_ONLY_PATTERNS: readonly { name: string; pattern: RegExp }[] =
             pattern: /Not measured on intraday bars\. Treat these levels/,
         },
         /**
-         * A weekly chart is not an intraday one, and core words every unmeasured case as
-         * "intraday" today. Any weekly prompt that still says so fails this clause until
-         * WP-19 core-1 decides the weekly wording (a core-1 follow-up).
+         * The intraday confluence reliability sentence of core (`INTRADAY_RELIABILITY`). A bare
+         * "intraday" match was registered first, but 1,056 of the set's weekly prompts carry the
+         * word inside the siglens skill catalogue's own prose (indicator caveats), which core does
+         * not write; the sentences core words are registered one by one instead.
          */
-        { name: 'intradayWording', pattern: /intraday/i },
+        {
+            name: 'intradayConfluenceReliability',
+            pattern: /^Intraday, descriptive only/m,
+        },
+        /**
+         * Core words every unmeasured case through one label (WP-19 core-1: `intraday` for
+         * minute and hour bars, `weekly` for a weekly chart): every "not measured on ... bars"
+         * sentence of a weekly prompt names weekly bars.
+         */
+        {
+            name: 'unmeasuredNamesOtherBars',
+            pattern: /not measured on (?!weekly bars)\w+ bars/i,
+        },
     ];
 
 /**
@@ -197,9 +213,17 @@ export function checkWeeklyHygiene(
     ).length;
     const fearGreed = fearGreedOf(text);
     const fearGreedDaily = fearGreedOf(daily.dynamic);
+    const pivotsCompared = holidayAffectedWeek(
+        data.replayCase.symbol,
+        periodProgress(data.bars, data.replayCase.asOf, isoWeekStart)
+    )
+        ? []
+        : printed;
     const failures = [
         ...(/^- VWAP:/m.test(text) ? ['vwapLine'] : []),
-        ...(reference.includes('VWAP') ? ['vwapLevel'] : []),
+        // `\bVWAP\b` is the session VWAP; the anchored `AVWAP (swing high|low)` levels are
+        // legitimate on a weekly chart and do not match.
+        ...(/\bVWAP\b/.test(reference) ? ['vwapLevel'] : []),
         ...DAILY_ONLY_PATTERNS.filter(p => p.pattern.test(text)).map(
             p => `dailyOnly:${p.name}`
         ),
@@ -219,7 +243,9 @@ export function checkWeeklyHygiene(
                 ? []
                 : ['rowNotMondayDate']
         ),
-        ...printed.flatMap(p => {
+        // A holiday-affected week of a market with no holiday calendar: whether the week had
+        // ended (hence the pivot source) cannot be proven, so no pivot is compared there.
+        ...pivotsCompared.flatMap(p => {
             const value = own[p.name as keyof typeof own];
             return matchesPrinted(p.price, kr ? roundToKrxTick(value) : value)
                 ? []
@@ -233,7 +259,7 @@ export function checkWeeklyHygiene(
     return {
         failures: [...new Set(failures)],
         notComputable: null,
-        pivotsChecked: printed.length,
+        pivotsChecked: pivotsCompared.length,
     };
 }
 

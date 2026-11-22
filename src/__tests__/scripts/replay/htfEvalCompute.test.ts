@@ -7,6 +7,8 @@ import {
     backdropReading,
     coreTimeframe,
     decimalsOf,
+    hasHolidayCalendar,
+    holidayAffectedWeek,
     higherReading,
     isoDateSeconds,
     isoWeekStart,
@@ -522,7 +524,31 @@ describe('against the shipped functions on seeded series', () => {
 describe('coreTimeframe', () => {
     it('passes a timeframe core lists and refuses one it does not', () => {
         expect(coreTimeframe('1Day')).toBe('1Day');
-        // `1Week` is refused until core lists it (WP-19 core-1); then this holds the other way
-        expect(() => coreTimeframe('1Week')).toThrow(/known:/);
+        // Core lists `1Week` since WP-19 core-1: the instrument now measures it.
+        expect(coreTimeframe('1Week')).toBe('1Week');
+        // A value core does not list is still refused (fail closed), with the known list.
+        expect(() => coreTimeframe('2Week' as never)).toThrow(/known:/);
+    });
+});
+
+describe('hasHolidayCalendar / holidayAffectedWeek', () => {
+    const progress = (sessionsTotal: number, totalKnown = true) => ({
+        sessionsTotal,
+        totalKnown,
+    });
+
+    it('knows the US calendar and has none for the replay KR session', () => {
+        expect(hasHolidayCalendar('AAPL')).toBe(true);
+        expect(hasHolidayCalendar('005930.KS')).toBe(false);
+    });
+
+    it('flags only a short, fully stored week of a market with no calendar', () => {
+        expect(holidayAffectedWeek('005930.KS', progress(4))).toBe(true);
+        expect(holidayAffectedWeek('005930.KS', progress(5))).toBe(false);
+        expect(holidayAffectedWeek('005930.KS', progress(4, false))).toBe(
+            false
+        );
+        expect(holidayAffectedWeek('005930.KS', null)).toBe(false);
+        expect(holidayAffectedWeek('AAPL', progress(4))).toBe(false);
     });
 });

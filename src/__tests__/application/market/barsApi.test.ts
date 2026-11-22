@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { fetchBarsWithIndicators } from '@/application/market/barsApi';
+import { standardDailyWindow } from '@/domain/analysis/standardDailyWindow';
 import {
     DEFAULT_TIMEFRAME,
     FEAR_GREED_LOOKBACK_DAYS,
@@ -474,5 +475,194 @@ describe('fetchBarsWithIndicators — 1Day Fear & Greed history', () => {
 
         expect(result.fearGreedBars).toBeUndefined();
         expect(result.bars).toEqual([mockBar]);
+    });
+});
+
+/**
+ * `1Week` is built by core from the daily history the provider already serves for `1Day`,
+ * so the provider is never asked for a weekly bar and no extra call is made.
+ */
+describe('fetchBarsWithIndicators — 1Week from daily bars', () => {
+    const NOW = new Date('2026-10-08T00:00:00.000Z');
+    const DAY_SEC = 86_400;
+    const monday = Date.UTC(2026, 8, 28) / 1000; // 2026-09-28
+    const day = (offset: number, close: number) => ({
+        time: monday + offset * DAY_SEC,
+        open: close - 1,
+        high: close + 2,
+        low: close - 3,
+        close,
+        volume: 100 + offset,
+    });
+    // Mon-Fri of the week of 2026-09-28, then Mon-Wed of the (unfinished) week of 2026-10-05.
+    const daily = [
+        ...[0, 1, 2, 3, 4].map(i => day(i, 100 + i)),
+        ...[7, 8, 9].map(i => day(i, 110 + i)),
+    ];
+
+    beforeEach(() => {
+        mockGetBars.mockReset();
+    });
+
+    it("asks the provider for '1Day' over the Fear & Greed window, once", async () => {
+        mockGetBars.mockResolvedValueOnce(daily);
+
+        await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Week',
+            'AAPL',
+            NOW
+        );
+
+        expect(mockGetBars).toHaveBeenCalledTimes(1);
+        const from = new Date(NOW);
+        from.setUTCDate(from.getUTCDate() - FEAR_GREED_LOOKBACK_DAYS);
+        expect(mockGetBars).toHaveBeenCalledWith(
+            expect.objectContaining({
+                symbol: 'AAPL',
+                timeframe: '1Day',
+                from: from.toISOString().substring(0, 10) + 'T00:00:00Z',
+            })
+        );
+    });
+
+    it('returns ISO-week bars, weekly indicators and the daily source as fearGreedBars', async () => {
+        mockGetBars.mockResolvedValueOnce(daily);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Week',
+            undefined,
+            NOW
+        );
+
+        expect(result.bars).toEqual([
+            {
+                time: monday,
+                open: 99,
+                high: 106,
+                low: 97,
+                close: 104,
+                volume: 510,
+            },
+            {
+                time: monday + 7 * DAY_SEC,
+                open: 116,
+                high: 121,
+                low: 114,
+                close: 119,
+                volume: 324,
+            },
+        ]);
+        expect(result.fearGreedBars).toEqual(daily);
+        expect(result.indicators.rsi).toHaveLength(result.bars.length);
+    });
+
+    it('skips unusable daily bars before aggregating', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockGetBars.mockResolvedValueOnce([
+            ...daily,
+            { ...day(10, 130), open: 0, high: 0, low: 0 },
+        ]);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Week',
+            undefined,
+            NOW
+        );
+
+        expect(result.bars).toHaveLength(2);
+        expect(result.bars[1]?.close).toBe(119);
+        expect(result.fearGreedBars).toEqual(daily);
+        warn.mockRestore();
+    });
+
+    it('warns once, with a count, when daily bars are not stamped at UTC midnight', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockGetBars.mockResolvedValueOnce(
+            daily.map(bar => ({ ...bar, time: bar.time + 15 * 3_600 }))
+        );
+
+        await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Week',
+            undefined,
+            NOW
+        );
+
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+            '[barsApi] daily bar not at UTC midnight; weekly buckets may shift',
+            { symbol: 'AAPL', count: daily.length }
+        );
+        warn.mockRestore();
+    });
+
+    it('does not warn when every daily bar sits at UTC midnight', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        mockGetBars.mockResolvedValueOnce(daily);
+
+        await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Week',
+            undefined,
+            NOW
+        );
+
+        expect(warn).not.toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    it("carries the same daily series a '1Day' fetch does, so the daily risk grade reads one history", async () => {
+        const longDaily = Array.from({ length: 800 }, (_, i) => ({
+            time: NOW.getTime() / 1000 - (799 - i) * DAY_SEC,
+            open: 100 + (i % 7),
+            high: 103 + (i % 7),
+            low: 98 + (i % 7),
+            close: 101 + (i % 7),
+            volume: 1000 + i,
+        }));
+        mockGetBars.mockResolvedValue(longDaily);
+
+        const weekly = await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Week',
+            undefined,
+            NOW
+        );
+        const daily = await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Day',
+            undefined,
+            NOW
+        );
+
+        expect(weekly.fearGreedBars).toEqual(daily.fearGreedBars);
+        expect(standardDailyWindow(weekly.fearGreedBars ?? [], NOW)).toEqual(
+            daily.bars
+        );
+    });
+
+    it('returns no weekly bars for an empty provider reply', async () => {
+        mockGetBars.mockResolvedValueOnce([]);
+
+        const result = await fetchBarsWithIndicators(
+            fakeProvider,
+            'AAPL',
+            '1Week',
+            undefined,
+            NOW
+        );
+
+        expect(result.bars).toEqual([]);
+        expect(result.fearGreedBars).toEqual([]);
     });
 });

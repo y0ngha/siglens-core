@@ -1,4 +1,5 @@
 import { barTimeMs } from '@/domain/analysis/priorAnalysis';
+import { isDailyOrLonger } from '@/domain/constants/market';
 import { MS_PER_DAY } from '@/domain/constants/time';
 import { latestTradingDayStartUtcMs } from '@/domain/session';
 import type {
@@ -155,7 +156,7 @@ export function selectMarketEvents(
  * leave a stale cache entry for an event the prompt renders. Only weekend and
  * holiday news (and news past the next-day UTC boundary) is cut.
  *
- * Bounded only for `1Day` on a `scheduled` session. Intraday bars carry
+ * Bounded only for `1Day` and `1Week` on a `scheduled` session. Intraday bars carry
  * no calendar-derivable stamp (a provider may or may not include extended-hours
  * bars), and an `always-open` session's daily bar closes at the next UTC
  * midnight, which every past event already precedes — so both stay unbounded
@@ -172,7 +173,7 @@ export function marketEventHorizonMs(
     session: MarketSessionSpec | undefined,
     now: Date
 ): number | null {
-    if (timeframe !== '1Day') return null;
+    if (!isDailyOrLonger(timeframe)) return null;
     if (session === undefined) return null;
     const lastBarMs = latestTradingDayStartUtcMs(session, now);
     return lastBarMs === null ? null : lastBarMs + MS_PER_DAY;

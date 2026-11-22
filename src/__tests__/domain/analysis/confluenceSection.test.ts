@@ -136,6 +136,12 @@ describe('CONFLUENCE_PARAMS_BY_TIMEFRAME', () => {
         });
     });
 
+    it('gives the weekly chart the daily parameters, unmeasured', () => {
+        expect(CONFLUENCE_PARAMS_BY_TIMEFRAME['1Week']).toEqual(
+            CONFLUENCE_PARAMS_BY_TIMEFRAME['1Day']
+        );
+    });
+
     it('gives every intraday chart the looser, unvalidated variant', () => {
         // A 30-minute bar is not a small daily bar: the same "3 signals" bar is reached far
         // more often and by weaker evidence, so intraday trades the backtest's authority
@@ -334,6 +340,21 @@ describe('formatDeterministicMetricsSection', () => {
         );
         expect(out).toContain('Entry rule (>= 3 weighted bullish families');
         expect(out).toContain('Exit rule (>= 2.5 weighted bearish families');
+    });
+
+    it('prints the weekly reliability line, with no daily measurement and no pullback block', () => {
+        const out = formatDeterministicMetricsSection(
+            enough,
+            '1Week',
+            reference()
+        );
+        expect(out).toContain('Entry rule (>= 3 weighted bullish families');
+        expect(out).toContain(
+            'Reliability: Weekly, not measured: descriptive only. Report the tally as how many indicator families agree.'
+        );
+        expect(out).not.toContain('measured 2000');
+        expect(out).not.toMatch(/intraday/i);
+        expect(out).not.toContain('Short-term sell-off check');
     });
 
     it('marks the intraday variant as unvalidated rather than borrowing the win rate', () => {

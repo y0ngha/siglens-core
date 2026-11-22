@@ -81,6 +81,15 @@ describe('marketEventHorizonMs', () => {
         }
     });
 
+    it('1Week도 1Day와 같은 마지막 거래일 상한을 쓴다', () => {
+        const now = new Date('2026-10-06T14:30:00Z');
+        expect(marketEventHorizonMs('1Week', US_EQUITY_SESSION, now)).toBe(
+            marketEventHorizonMs('1Day', US_EQUITY_SESSION, now)
+        );
+        expect(marketEventHorizonMs('1Week', undefined, now)).toBeNull();
+        expect(marketEventHorizonMs('1Week', CRYPTO_SESSION, now)).toBeNull();
+    });
+
     it('세션이 없거나 always-open이면 상한이 없다', () => {
         const now = new Date('2026-10-04T15:00:00Z');
         expect(marketEventHorizonMs('1Day', undefined, now)).toBeNull();

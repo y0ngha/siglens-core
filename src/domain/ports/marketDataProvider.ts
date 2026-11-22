@@ -1,11 +1,14 @@
-import type { Bar, MarketQuote, Timeframe } from '@/domain/types';
+import type { Bar, MarketQuote, ProviderTimeframe } from '@/domain/types';
 
 /** Options accepted by {@link MarketDataProvider.getBars}. */
 export interface GetBarsOptions {
     /** Ticker symbol accepted by the configured provider. */
     symbol: string;
-    /** Bar resolution. */
-    timeframe: Timeframe;
+    /**
+     * Bar resolution. Providers never serve `'1Week'`; core aggregates weekly
+     * bars from `'1Day'` bars.
+     */
+    timeframe: ProviderTimeframe;
     /** Maximum number of bars to return. */
     limit?: number;
     /** Optional ISO timestamp upper bound (exclusive). */

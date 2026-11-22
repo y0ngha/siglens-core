@@ -349,8 +349,8 @@ function parseRestate(raw: string | undefined): boolean {
 }
 
 /**
- * `--timeframe`: only a timeframe core knows. `1Week` is refused, with the known list, until
- * core builds weekly bars (WP-19 core-1): a weekly measurement must never be a daily one.
+ * `--timeframe`: only a timeframe core knows (`1Week` since WP-19 core-1); anything else is refused
+ * with the known list, so a weekly measurement can never silently become a daily one.
  */
 function parseTimeframe(raw: string | undefined): HtfTimeframe | null {
     if (raw === undefined) return null;

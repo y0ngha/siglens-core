@@ -152,8 +152,8 @@ function parseTier(raw: string | undefined): RunTier {
 
 /**
  * `--timeframe`: the chart timeframe every case is analysed at (default `1Day`, the set's own).
- * Only a timeframe core knows is accepted: `1Week` is refused with the list of known ones until
- * core builds weekly bars (WP-19 core-1), so a weekly run can never silently become a daily one.
+ * Only a timeframe core knows is accepted (`1Week` since WP-19 core-1); anything else is refused
+ * with the list of known ones, so a weekly run can never silently become a daily one.
  */
 function parseTimeframe(raw: string | undefined): Timeframe {
     if (raw === undefined) return '1Day';

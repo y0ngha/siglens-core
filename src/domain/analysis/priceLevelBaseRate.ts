@@ -18,6 +18,7 @@
  */
 import { PRICE_LEVEL_BASE_RATE } from '@/domain/analysis/measuredBaseRates';
 import type { MeasuredBaseRate } from '@/domain/analysis/measuredBaseRates';
+import { unmeasuredBarsLabel } from '@/domain/analysis/promptFormat';
 import type { Timeframe } from '@/domain/types';
 
 const percent = (share: number): string => `${(share * 100).toFixed(1)}%`;
@@ -29,7 +30,7 @@ const yearOf = (isoDate: string): string => isoDate.slice(0, 4);
  * @internal
  * The sentence the market reference framing carries about the printed levels: the measured
  * numbers on a daily chart, the same advice without numbers anywhere else (the measurement
- * is not available for intraday bars).
+ * is not available for intraday or weekly bars).
  */
 export function formatLevelHoldFraming(
     timeframe: Timeframe,
@@ -38,7 +39,7 @@ export function formatLevelHoldFraming(
     const advice =
         'Treat these levels as a map of where price may pause or react, not as levels that hold; do not call a level strong, firm or key because several references coincide there.';
     if (timeframe !== '1Day') {
-        return `Not measured on intraday bars. ${advice}`;
+        return `Not measured on ${unmeasuredBarsLabel(timeframe)} bars. ${advice}`;
     }
     const { scope } = rate;
     return `Measured on ${scope.symbols} symbols (U.S. and Korean), daily bars ${yearOf(scope.from)}–${yearOf(scope.to)}: after price touched one of these printed levels, it held (closed 0.5 ATR back on the level's side before closing 0.5 ATR through it, within 10 bars) in ${percent(rate.eventShare)} of ${rate.n.toLocaleString('en-US')} touches — the same as a price at the same distance on another date (${percent(rate.placeboShare)}). ${advice}`;

@@ -8,6 +8,7 @@ import {
     EMPTY_SMC_RESULT,
 } from '@/domain/indicators/constants';
 import { getAllowedTimeframes } from '@/domain/tier';
+import { TIMEFRAME_LOOKBACK_DAYS } from '@/domain/constants/market';
 import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
 import { makeKrSession } from '../../helpers/krSession';
 import type { MarketDataProvider } from '@/domain/ports/marketDataProvider';
@@ -189,6 +190,7 @@ const PROMPT_ARG = {
     earningsDates: 14,
     marketClock: 15,
     gatedSkillCap: 16,
+    dailyBars: 17,
 } as const;
 
 const promptArg = (
@@ -248,6 +250,54 @@ describe('runAnalysis', () => {
             });
             expect(mockCallAnalysisAi).not.toHaveBeenCalled();
         });
+    });
+
+    describe('1Week tier gate', () => {
+        it('free tier is refused a weekly analysis before any bars are fetched', async () => {
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Week',
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: null, tier: 'free' },
+                }
+            );
+
+            expect(result).toMatchObject({
+                status: 'error',
+                error: {
+                    code: 'timeframe_not_allowed',
+                    tier: 'free',
+                    timeframe: '1Week',
+                    allowedTimeframes: ['1Day'],
+                },
+            });
+            expect(mockFetchBarsWithIndicators).not.toHaveBeenCalled();
+            expect(mockCallAnalysisAi).not.toHaveBeenCalled();
+        });
+
+        it.each(['member', 'pro'] as const)(
+            '%s tier gets the weekly analysis',
+            async tier => {
+                const result = await runAnalysis(
+                    mockSymbol,
+                    mockCompanyName,
+                    '1Week',
+                    false,
+                    undefined,
+                    {
+                        marketDataProvider: fakeProvider,
+                        tierContext: { userId: 'u1', tier },
+                    }
+                );
+
+                expect(result.status).toBe('done');
+                expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            }
+        );
     });
 
     describe('cache hit', () => {
@@ -454,6 +504,113 @@ describe('runAnalysis', () => {
             expect(input.earningsDates).toBe(earningsDates);
             expect(input.timeframe).toBe(mockTimeframe);
             expect(input.bars).toBe(mockBarsData.bars);
+        });
+
+        it('grades a weekly chart on the daily series with the daily scale, one grade per instrument', async () => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            vi.setSystemTime(new Date('2024-02-01T12:00:00Z'));
+            const recent = mockBarsData.bars[0];
+            const ancient = { ...recent, time: recent.time - 5 * 365 * 86_400 };
+            mockFetchBarsWithIndicators.mockResolvedValueOnce({
+                ...mockBarsData,
+                bars: [{ ...recent, time: recent.time - 86_400 }],
+                fearGreedBars: [ancient, recent],
+            });
+
+            const result = await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Week',
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'member' },
+                }
+            );
+
+            expect(result.status).toBe('done');
+            const input = vi.mocked(computeRiskLevel).mock.lastCall![0];
+            expect(input.timeframe).toBe('1Day');
+            // The standard 1Day window of the daily history, not the weekly bars.
+            expect(input.bars).toEqual([recent]);
+        });
+
+        it('cuts the weekly risk window at the instant the bars were fetched, even when the run crosses a UTC midnight', async () => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            vi.setSystemTime(new Date('2026-01-05T23:59:59Z'));
+            const cutoff =
+                Date.UTC(2026, 0, 5) / 1000 -
+                TIMEFRAME_LOOKBACK_DAYS['1Day'] * 86_400;
+            const atCutoff = { ...mockBarsData.bars[0], time: cutoff };
+            const before = { ...atCutoff, time: cutoff - 86_400 };
+            mockFetchBarsWithIndicators.mockResolvedValueOnce({
+                ...mockBarsData,
+                fearGreedBars: [before, atCutoff],
+            });
+            // The model call finishes after midnight: a fresh clock read would move the cutoff.
+            mockCallAnalysisAi.mockImplementationOnce(async () => {
+                vi.setSystemTime(new Date('2026-01-06T00:00:01Z'));
+                return JSON.stringify(mockRawResult);
+            });
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Week',
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'member' },
+                }
+            );
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
+                mockSymbol,
+                '1Week',
+                undefined,
+                new Date('2026-01-05T23:59:59Z')
+            );
+            const input = vi.mocked(computeRiskLevel).mock.lastCall![0];
+            expect(input.bars).toEqual([atCutoff]);
+        });
+
+        it('passes the daily series to the prompt builder only for a weekly chart', async () => {
+            const dailyBars = [...mockBarsData.bars, ...mockBarsData.bars];
+            mockFetchBarsWithIndicators.mockResolvedValue({
+                ...mockBarsData,
+                fearGreedBars: dailyBars,
+            });
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Week',
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'member' },
+                }
+            );
+            expect(
+                promptArg(mockBuildAnalysisPrompt.mock.lastCall, 'dailyBars')
+            ).toBe(dailyBars);
+
+            mockBuildAnalysisPrompt.mockClear();
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Day',
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            expect(
+                promptArg(mockBuildAnalysisPrompt.mock.lastCall, 'dailyBars')
+            ).toBeUndefined();
         });
 
         it('overwrites the model riskLevel with the computed one (same for every locale)', async () => {
@@ -1882,14 +2039,16 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 fakeProvider,
                 mockSymbol,
                 '1Hour',
-                'AAPL.US'
+                'AAPL.US',
+                expect.any(Date)
             );
             expect(mockFetchBarsWithIndicators).toHaveBeenNthCalledWith(
                 2,
                 fakeProvider,
                 mockSymbol,
                 '1Day',
-                'AAPL.US'
+                'AAPL.US',
+                expect.any(Date)
             );
         });
 
@@ -1934,6 +2093,39 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 ([bars]) => bars === longBars
             )!;
             expect(bsv).toHaveLength(longBars.length);
+        });
+
+        it('1Week는 이미 받은 일봉(fearGreedBars)으로 공포탐욕을 계산하고 일봉을 다시 조회하지 않는다', async () => {
+            const dailyBars = [...mockBarsData.bars, ...mockBarsData.bars];
+            mockFetchBarsWithIndicators.mockResolvedValueOnce({
+                ...mockBarsData,
+                fearGreedBars: dailyBars,
+            });
+
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                '1Week',
+                false,
+                undefined,
+                {
+                    marketDataProvider: fakeProvider,
+                    tierContext: { userId: 'u1', tier: 'member' },
+                }
+            );
+
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledTimes(1);
+            expect(mockFetchBarsWithIndicators).toHaveBeenCalledWith(
+                fakeProvider,
+                mockSymbol,
+                '1Week',
+                undefined,
+                expect.any(Date)
+            );
+            expect(mockComputeFearGreedIndex).toHaveBeenCalledWith(
+                dailyBars,
+                expect.any(Array)
+            );
         });
 
         it('일봉 조회가 실패해도 공포탐욕 없이(undefined) 분석을 계속한다', async () => {

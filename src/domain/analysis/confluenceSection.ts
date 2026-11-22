@@ -139,6 +139,9 @@ export const CONFLUENCE_PARAMS_BY_TIMEFRAME: Record<
     '1Hour': { min: 2.5, expectedWeight: 0.5 },
     '4Hour': { min: 2.5, expectedWeight: 0.5 },
     '1Day': { min: 3, expectedWeight: 1 },
+    // The daily rule's parameters on weekly bars: not measured there, and the
+    // reliability line says so.
+    '1Week': { min: 3, expectedWeight: 1 },
 };
 
 /**
@@ -159,6 +162,8 @@ const CONFLUENCE_RELIABILITY: Record<Timeframe, string> = {
     '1Hour': INTRADAY_RELIABILITY,
     '4Hour': INTRADAY_RELIABILITY,
     '1Day': 'Daily, descriptive only — measured 2000–2026, days with this entry rule met were followed by below-baseline 10-day returns in every period, and exit-rule days by returns above the baseline in three of five, level with it in a fourth and below it in 2007–09. Report the tally as how many indicator families agree, not as evidence for or against entering.',
+    '1Week':
+        'Weekly, not measured: descriptive only. Report the tally as how many indicator families agree.',
 };
 
 /** `short_ma_bullish_cross(ma)` — or `support_proximity_bullish(support, half weight)` when expected. */

@@ -126,6 +126,9 @@ export const ANALYSIS_CACHE_TTL: Record<Timeframe, number> = {
     '1Hour': SECONDS_PER_HOUR,
     '4Hour': 4 * SECONDS_PER_HOUR,
     '1Day': SECONDS_PER_DAY,
+    // A weekly analysis expires at the same daily session boundary as `1Day`: the last
+    // weekly bar is the unfinished week and moves with every daily bar.
+    '1Week': SECONDS_PER_DAY,
 };
 
 /**
@@ -1220,6 +1223,11 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * Korean" instead of the 55/10 split). Stable bytes change for every technical prompt that
  * injects a pattern or candle guide (the guides and rule blocks), dynamic bytes for every
  * daily prompt with a qualified pattern and for every prompt whose framing numbers moved.
+ *
+ * `1Week` added (WP-19, still `p34`, unreleased); daily and intraday prompts unchanged. A
+ * weekly analysis is a new key namespace (`analysis:<SYM>:1Week:…`, its peek and overall
+ * keys), so no existing entry is touched. Weekly prompts say `Not measured on weekly bars`
+ * where intraday ones say `intraday` (the same sentences, one label function).
  *
  * @internal
  */

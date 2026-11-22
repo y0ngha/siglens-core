@@ -1266,6 +1266,7 @@ export type {
     TierLimitedFeature,
     TierModel,
     Timeframe,
+    ProviderTimeframe,
     Trend,
     TrendDirection,
     Trendline,
