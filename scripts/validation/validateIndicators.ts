@@ -31,6 +31,7 @@ import {
     statsFromReturns,
 } from '@/domain/validation';
 import { fetchBarsCached } from './fetchData';
+import { maxOf } from '@/domain/extent';
 
 const TICKERS = [
     'AAPL',
@@ -228,7 +229,7 @@ async function loadBarsByTimeframe(
         for (const tf of TIMEFRAMES) {
             const bars = await tryFetchBars(ticker, tf, refresh);
             if (bars === null) continue;
-            const minBars = MIN_WARMUP_BARS + Math.max(...HORIZONS[tf], 1);
+            const minBars = MIN_WARMUP_BARS + Math.max(maxOf(HORIZONS[tf]), 1);
             if (bars.length < minBars) {
                 console.warn(
                     `  [skip] ${ticker} ${tf}: insufficient bars (${bars.length} < ${minBars})`

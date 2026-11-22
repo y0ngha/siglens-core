@@ -21,6 +21,7 @@ import {
     type ReplayRegime,
     type Verdict,
 } from './types';
+import { maxOf, minOf } from '@/domain/extent';
 
 // ─── Buckets, verdicts, groups ────────────────────────────────────────────────
 export type Bucket = 'failed' | 'unlabelled' | 'excluded' | 'headline';
@@ -716,7 +717,7 @@ export function summarizeVariance(rows: readonly LabelRow[]): VarianceSummary {
             });
             return atr === null || prices.length < 2
                 ? []
-                : [(Math.max(...prices) - Math.min(...prices)) / atr];
+                : [(maxOf(prices) - minOf(prices)) / atr];
         });
         return {
             n: values.length,

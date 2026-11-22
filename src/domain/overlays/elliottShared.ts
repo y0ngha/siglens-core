@@ -29,6 +29,7 @@ import {
     formatOverlayPrice,
 } from '@/domain/overlays/format';
 import { roundQuotedPrice } from '@/domain/analysis/promptFormat';
+import { maxOf, minOf } from '@/domain/extent';
 
 /**
  * Building blocks shared by the Elliott structure counters: pivot runs and rules, the A–B–C type, and drawing helpers.
@@ -275,7 +276,7 @@ export const timeBalance = (
     const d = seq
         .slice(1, forming ? -1 : undefined)
         .map((p, i) => p.index - seq[i].index);
-    return Math.min(...d) / Math.max(...d);
+    return minOf(d) / maxOf(d);
 };
 
 /**
@@ -326,8 +327,8 @@ export function priorTrend(
     )
         return 0;
     const far = isHigh
-        ? Math.min(...before.map(b => b.low))
-        : Math.max(...before.map(b => b.high));
+        ? minOf(before.map(b => b.low))
+        : maxOf(before.map(b => b.high));
     return Math.abs(start.price - far) / size;
 }
 

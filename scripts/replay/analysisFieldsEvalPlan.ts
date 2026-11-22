@@ -27,6 +27,7 @@ import {
 } from './analysisFieldsEvalCompute';
 import { bucketOf, summarizePlans, type PlanSummary } from './reportCompute';
 import type { CaseResultFile, LabelRow, ReplayRegime, Verdict } from './types';
+import { maxOf, minOf } from '@/domain/extent';
 
 export const PLAN_POSITIONS = [
     'in_zone',
@@ -151,8 +152,8 @@ export function forwardOf(
     const window = bars.slice(index + 1, end + 1);
     return {
         changePct: (bars[end].close / close - 1) * 100,
-        lowPct: (Math.min(...window.map(b => b.low)) / close - 1) * 100,
-        highPct: (Math.max(...window.map(b => b.high)) / close - 1) * 100,
+        lowPct: (minOf(window.map(b => b.low)) / close - 1) * 100,
+        highPct: (maxOf(window.map(b => b.high)) / close - 1) * 100,
         atrPct: atr === null ? null : (atr / close) * 100,
     };
 }
@@ -181,8 +182,8 @@ export function stateOf(input: {
 }): State {
     const { zone, stop, targets, close, atr, tolerance = 0 } = input;
     if (zone.length === 0) return { position: 'no_setup', reason: 'no_zone' };
-    const lo = Math.min(...zone);
-    const hi = Math.max(...zone);
+    const lo = minOf(zone);
+    const hi = maxOf(zone);
     if (stop === null) return { position: 'no_setup', reason: 'no_stop' };
     if (close <= stop) return { position: 'no_setup', reason: 'stopped' };
     const room = targets.some(t =>
@@ -289,7 +290,7 @@ export function expectedStopOf(input: {
         level => level >= floor - 1e-9 && level <= ceiling + 1e-9
     );
     return inBand.length > 0
-        ? { stop: Math.max(...inBand), basis: 'level', verifiable: true }
+        ? { stop: maxOf(inBand), basis: 'level', verifiable: true }
         : {
               stop: quotedPrice(zoneLow - C.stopFallbackAtr * atr, market),
               basis: 'atr',
@@ -349,8 +350,8 @@ export function measurePlan(
         atr,
         tolerance,
     });
-    const lo = zone.length === 0 ? null : Math.min(...zone);
-    const hi = zone.length === 0 ? null : Math.max(...zone);
+    const lo = zone.length === 0 ? null : minOf(zone);
+    const hi = zone.length === 0 ? null : maxOf(zone);
     // The plan's entry reference is the mean of the valid entry prices (as production does).
     const mid =
         zone.length === 0
@@ -1041,7 +1042,7 @@ export function planGates(input: PlanGateInput): readonly GateResult[] {
             'no position above 70% of rows; no_setup between 2% and 35%',
             noSetup === null
                 ? null
-                : Math.max(...shares) <= g.planMaxPositionShare &&
+                : maxOf(shares) <= g.planMaxPositionShare &&
                       noSetup >= g.planNoSetupMin &&
                       noSetup <= g.planNoSetupMax,
             PLAN_POSITIONS.map(

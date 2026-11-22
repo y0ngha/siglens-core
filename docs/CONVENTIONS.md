@@ -162,6 +162,8 @@ A constant shared by two modules is defined in the lower-level one and imported 
 higher one (`signals` imports from `indicators`, never the reverse); check the import
 direction before reusing a constant. When a helper is documented as the single source of a
 selection rule, every other site calls it instead of keeping a second copy of the rule.
+When a new shared helper lands, delete the older local one in the same change and move its
+callers over; two helpers for one calculation drift on edge cases such as the empty list.
 
 ```typescript
 // ❌ collectLevels({ ...indicators, vwap: [] })   // one caller blanks the input
@@ -231,6 +233,9 @@ for (let i = period; i < n - period; i++) {
 
 Never use `reduce` with a spread accumulator (O(N²)), and never re-`slice()` a window on
 every step. Track state in one pass instead.
+Never spread an unbounded array into a call (`Math.min(...arr)` overflows the stack near
+100k entries); use `minOf`/`maxOf` from `@/domain/extent`. ESLint enforces it through the
+`MATH_EXTENT_SPREAD_SELECTOR` `no-restricted-syntax` selector.
 
 ```typescript
 // ❌ reduce((acc, v) => [...acc, f(v)], [])      // copies the array every step

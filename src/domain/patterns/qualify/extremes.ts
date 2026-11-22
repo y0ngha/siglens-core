@@ -33,6 +33,7 @@ import {
     isRecent,
     priorTrend,
 } from '@/domain/patterns/qualify/context';
+import { maxOf, minOf } from '@/domain/extent';
 
 // ─── Double / triple tops and bottoms ───────────────────────────────────────
 
@@ -90,7 +91,7 @@ function qualifyExtremeSet(
         EXTREME_MATCH_ATR_MULT * ctx.atr,
         EXTREME_MATCH_MAX_PRICE_PCT * average
     );
-    if (Math.max(...prices) - Math.min(...prices) > tolerance) return null;
+    if (maxOf(prices) - minOf(prices) > tolerance) return null;
     const gapsOk = extremes
         .slice(1)
         .every((p, i) => p.index - extremes[i].index >= EXTREME_MIN_GAP_BARS);
@@ -103,9 +104,7 @@ function qualifyExtremeSet(
     // would sit over a "double top" drawn under it.
     const slack = BOUNDARY_CONTAINMENT_ATR * ctx.atr;
     const level =
-        kind === 'high'
-            ? Math.max(...prices) + slack
-            : Math.min(...prices) - slack;
+        kind === 'high' ? maxOf(prices) + slack : minOf(prices) - slack;
     const poked = ctx.bars
         .slice(first.index, last.index + 1)
         .some(bar => (kind === 'high' ? bar.high > level : bar.low < level));

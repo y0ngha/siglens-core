@@ -1,5 +1,6 @@
 import { medianOfSorted, round2 } from '@/domain/agent/statsMath';
 import type { AgentTheme } from '@/domain/agent/themes';
+import { maxOf } from '@/domain/extent';
 
 /** Lookbacks `get_theme_snapshot` reports, in completed daily sessions. */
 export const THEME_CHANGE_WINDOWS = { '1d': 1, '5d': 5, '20d': 20 } as const;
@@ -85,7 +86,7 @@ function memberStats(member: ThemeMemberCloses): ThemeMemberStats | null {
         },
         fromHigh52wPct:
             closes.length >= HIGH_LOOKBACK_SESSIONS
-                ? pctChange(Math.max(...highWindow), last)
+                ? pctChange(maxOf(highWindow), last)
                 : null,
     };
 }

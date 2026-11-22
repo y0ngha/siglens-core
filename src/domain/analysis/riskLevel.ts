@@ -3,6 +3,7 @@ import { ATR_DEFAULT_PERIOD } from '@/domain/indicators/constants';
 import { calculateATR } from '@/domain/indicators/atr';
 import { evaluatePullback } from '@/domain/signals/pullback';
 import type { RiskLevel, RiskLevelInputs } from '@/domain/types';
+import { maxOf } from '@/domain/extent';
 
 /** ATR% (of close, daily scale) at which volatility adds 1 / 2 / 3 points. */
 export const RISK_ATR_PCT_STEPS = [2.5, 4, 6] as const;
@@ -56,8 +57,8 @@ export function scoreRisk(inputs: RiskLevelInputs): number {
         newsDrivenWashoutEvent(events, bars, earningsDates) !== null
             ? RISK_EVENT_POINTS
             : 0;
-    const high = Math.max(
-        ...bars.slice(-RISK_DRAWDOWN_LOOKBACK_BARS).map(b => b.close)
+    const high = maxOf(
+        bars.slice(-RISK_DRAWDOWN_LOOKBACK_BARS).map(b => b.close)
     );
     const drawdownPoints = stepsReached(
         ((high - last.close) / high) * 100,

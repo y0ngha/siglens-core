@@ -15,6 +15,7 @@ import type {
 } from '@/domain/indicators/fearGreed/types';
 import { median } from '@/domain/indicators/utils';
 import type { Bar } from '@/domain/types';
+import { maxOf, minOf } from '@/domain/extent';
 
 /**
  * Descriptive statistics over a Fear & Greed score history.
@@ -267,8 +268,8 @@ function buildEpisode(
             scores.length === 0
                 ? null
                 : zone === 'EXTREME_FEAR'
-                  ? Math.min(...scores)
-                  : Math.max(...scores),
+                  ? minOf(scores)
+                  : maxOf(scores),
         ongoing: last === history.length - 1,
     };
 }

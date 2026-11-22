@@ -8,6 +8,7 @@ import type {
     MarketIndexData,
     MarketSectorData,
 } from '@/domain/types';
+import { maxOf, minOf } from '@/domain/extent';
 
 /**
  * @internal `N up / N down / N flat` from a list of percent changes. Filters to finite values first (a
@@ -37,7 +38,7 @@ function formatBestWorstSpread(changes: readonly number[]): string {
     if (finite.length < MIN_ROWS_FOR_SPREAD) {
         return 'Best − worst sector spread: N/A';
     }
-    const spread = Math.max(...finite) - Math.min(...finite);
+    const spread = maxOf(finite) - minOf(finite);
     return `Best − worst sector spread: ${spread.toFixed(SPREAD_DECIMAL_PLACES)}%p`;
 }
 

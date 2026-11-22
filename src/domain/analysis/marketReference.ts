@@ -70,6 +70,7 @@ import {
 import { VP_MIN_BARS } from '@/domain/indicators/constants';
 import { localSessionParts } from '@/domain/session';
 import { findLastIndex } from '@/domain/arrayCompat';
+import { maxOf, minOf } from '@/domain/extent';
 
 const EFFICIENCY_PERIOD = 20;
 
@@ -211,8 +212,8 @@ function pivotSourceBar(
     return {
         time: session[0].time,
         open: session[0].open,
-        high: Math.max(...session.map(b => b.high)),
-        low: Math.min(...session.map(b => b.low)),
+        high: maxOf(session.map(b => b.high)),
+        low: minOf(session.map(b => b.low)),
         close: session[session.length - 1].close,
         volume: session.reduce((sum, b) => sum + b.volume, 0),
     };

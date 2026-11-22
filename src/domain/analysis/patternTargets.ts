@@ -7,6 +7,7 @@ import {
     roundQuotedPrice,
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
+import { maxOf } from '@/domain/extent';
 
 /** Upper bound on decimals kept for an app-computed pattern target. */
 const MAX_TARGET_DECIMALS = 8;
@@ -35,7 +36,7 @@ export function roundToInputPrecision(
     extra = 0
 ): number {
     const decimals = Math.min(
-        Math.max(...inputs.map(decimalPlacesOf)) + extra,
+        maxOf(inputs.map(decimalPlacesOf)) + extra,
         MAX_TARGET_DECIMALS
     );
     return Number(value.toFixed(decimals));

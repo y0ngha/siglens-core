@@ -19,6 +19,7 @@ import {
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import type { Bar, PriorAnalysis, Timeframe } from '@/domain/types';
+import { maxOf, minOf } from '@/domain/extent';
 
 /**
  * Price for prompt injection, or `null` when the value is not a finite number.
@@ -152,8 +153,8 @@ function formatEntry(
     }
 
     const reference = anchorBar.close;
-    const high = Math.max(...subsequentBars.map(b => b.high));
-    const low = Math.min(...subsequentBars.map(b => b.low));
+    const high = maxOf(subsequentBars.map(b => b.high));
+    const low = minOf(subsequentBars.map(b => b.low));
     const now = lastBar.close;
 
     // Bar-derived prices need the same non-finite guard as the consumer's own

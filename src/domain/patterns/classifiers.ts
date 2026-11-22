@@ -26,6 +26,7 @@ import {
     SINGULAR_MATRIX_DET_EPSILON,
     TRENDLINE_PIVOT_WINDOW,
 } from '@/domain/patterns/constants';
+import { maxOf, minOf } from '@/domain/extent';
 
 /** @internal An `(x, y)` sample for the least-squares fits below. */
 export interface Point {
@@ -508,8 +509,8 @@ function buildFlagContext(
     // extracted from these same bars), so this slice is never empty.
     if (consolidationBars.length === 0) return null;
     const range =
-        Math.max(...consolidationBars.map(b => b.high)) -
-        Math.min(...consolidationBars.map(b => b.low));
+        maxOf(consolidationBars.map(b => b.high)) -
+        minOf(consolidationBars.map(b => b.low));
     if (range > FLAG_CHANNEL_MAX_RANGE_ATR * atr) return null;
 
     return {
@@ -591,7 +592,7 @@ export function detectHighTightFlagAnchors(
     if (!(baseLow > 0) || (peakHigh - baseLow) / baseLow < HTF_POLE_MIN_GAIN)
         return null;
 
-    const flagLow = Math.min(...bars.slice(peakIndex + 1).map(bar => bar.low));
+    const flagLow = minOf(bars.slice(peakIndex + 1).map(bar => bar.low));
     if ((peakHigh - flagLow) / peakHigh > HTF_FLAG_MAX_RETRACE) return null;
 
     return {
@@ -727,7 +728,7 @@ function fitRounding(
 
     // Symmetric for both shapes: the rim is the extreme opposite the vertex.
     const prices = points.map(p => p.price);
-    const depth = Math.max(...prices) - Math.min(...prices);
+    const depth = maxOf(prices) - minOf(prices);
     if (depth < ROUNDING_MIN_DEPTH_ATR_MULT * atr) return null;
 
     return { startIndex, endIndex, depth };
@@ -760,7 +761,7 @@ function classifyRoundedBase(
         const handleLow = lows[lows.length - 1];
         const cup = fitRounding(cupLows, atr, 'bottom');
         if (cup) {
-            const cupTop = Math.max(...cupLows.map(p => p.price));
+            const cupTop = maxOf(cupLows.map(p => p.price));
             if (
                 handleLow.price >=
                 cupTop - CUP_HANDLE_MAX_DEPTH_RATIO * cup.depth

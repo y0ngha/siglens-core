@@ -23,6 +23,7 @@ import {
     resampledMean,
     type WeekAggregate,
 } from '@/domain/outcomes/weekClusterBootstrap';
+import { maxOf, minOf } from '@/domain/extent';
 import type { Timeframe } from '@/domain/types';
 
 /**
@@ -139,16 +140,6 @@ interface Pair {
 const weekOf = (anchorBarTime: number): number =>
     Math.floor((Math.floor(anchorBarTime / SECONDS_PER_DAY) + 3) / 7);
 
-/** Smallest and largest of a non-empty list in one pass (a spread overflows the call stack on a large list). */
-const extentOf = (values: readonly number[]): { min: number; max: number } =>
-    values.reduce(
-        (acc, v) => ({
-            min: v < acc.min ? v : acc.min,
-            max: v > acc.max ? v : acc.max,
-        }),
-        { min: values[0], max: values[0] }
-    );
-
 const isoDate = (anchorBarTime: number): string =>
     new Date(anchorBarTime * 1000).toISOString().slice(0, 10);
 
@@ -194,10 +185,7 @@ function weekClusterInterval(
 /** The difference's mean in each time half and market of the pairs; `null` where a part is empty. */
 function splitsOf(pairs: readonly Pair[]): VerdictInputs['splits'] {
     const times = pairs.map(p => p.anchorBarTime);
-    const midpoint =
-        times.length === 0
-            ? 0
-            : (extentOf(times).min + extentOf(times).max) / 2;
+    const midpoint = times.length === 0 ? 0 : (minOf(times) + maxOf(times)) / 2;
     const at = (pick: (p: Pair) => boolean): number | null =>
         meanOf(pairs.filter(pick).map(p => p.event - p.placebo));
     return {
@@ -429,8 +417,8 @@ export function summarizeOutcomeRecord(
         scope: {
             timeframe: '1Day',
             markets,
-            from: times.length === 0 ? '' : isoDate(extentOf(times).min),
-            to: times.length === 0 ? '' : isoDate(extentOf(times).max),
+            from: times.length === 0 ? '' : isoDate(minOf(times)),
+            to: times.length === 0 ? '' : isoDate(maxOf(times)),
         },
         counts: {
             rows: rows.length,
