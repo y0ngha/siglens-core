@@ -54,8 +54,9 @@ function computeFromDay(lookbackDays: number, now: Date): string {
  * @param now - Override the "now" reference used to compute the lookback window.
  *   Useful in tests; defaults to `new Date()`.
  * @returns Bars and the computed indicator results, ready to be passed to
- *   downstream prompt builders or signal detectors; for `1Day`, also the
- *   longer `fearGreedBars` history.
+ *   downstream prompt builders or signal detectors; for `1Day` and `1Week`,
+ *   also the daily `fearGreedBars` history (on `1Week`, `bars` is weekly and
+ *   `fearGreedBars` is the full daily source, not re-cut to the standard window).
  *
  * @throws {Error} If the injected provider's `getBars` call fails
  *   (e.g. network error, upstream rate limit).

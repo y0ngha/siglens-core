@@ -659,33 +659,35 @@ export async function runOverallAnalysis(
             return null;
         });
 
-    const priorAnalysisBarsPromise: Promise<Bar[] | undefined> =
-        priorAnalysisCandidates.length === 0
-            ? Promise.resolve(undefined)
-            : timeframe === '1Day'
-              ? dailyBarsPromise.then(d => d?.bars)
-              : timeframe === '1Week'
-                ? // The weekly series is built from the daily history this run already
-                  // holds, so a weekly overall request needs no second fetch either.
-                  dailyBarsPromise.then(d =>
-                      d === null
-                          ? undefined
-                          : aggregateBarsToWeekly(d.fearGreedBars ?? d.bars)
-                  )
-                : fetchBarsWithIndicators(
-                      marketDataProvider,
-                      symbol,
-                      timeframe,
-                      fmpSymbol
-                  )
-                      .then(d => d.bars)
-                      .catch(error => {
-                          console.error(
-                              '[RunOverallAnalysis] Prior-analysis bars fetch failed; proceeding without prior-analysis context:',
-                              error
-                          );
-                          return undefined;
-                      });
+    const loadPriorAnalysisBars = (): Promise<Bar[] | undefined> => {
+        if (priorAnalysisCandidates.length === 0)
+            return Promise.resolve(undefined);
+        if (timeframe === '1Day') return dailyBarsPromise.then(d => d?.bars);
+        if (timeframe === '1Week') {
+            // The weekly series is built from the daily history this run already
+            // holds, so a weekly overall request needs no second fetch either.
+            return dailyBarsPromise.then(d =>
+                d === null
+                    ? undefined
+                    : aggregateBarsToWeekly(d.fearGreedBars ?? d.bars)
+            );
+        }
+        return fetchBarsWithIndicators(
+            marketDataProvider,
+            symbol,
+            timeframe,
+            fmpSymbol
+        )
+            .then(d => d.bars)
+            .catch(error => {
+                console.error(
+                    '[RunOverallAnalysis] Prior-analysis bars fetch failed; proceeding without prior-analysis context:',
+                    error
+                );
+                return undefined;
+            });
+    };
+    const priorAnalysisBarsPromise = loadPriorAnalysisBars();
 
     const [fearGreed, priorAnalysisBars] = await Promise.all([
         fearGreedPromise,

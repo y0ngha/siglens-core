@@ -2360,14 +2360,20 @@ const ATR_EXTREME_PERCENT_INTRADAY = 2;
  * bars: a judgement call, stated as such (DOM-12).
  */
 export const ATR_EXTREME_PERCENT_WEEKLY = 13;
-const DAILY_TIMEFRAME: Timeframe = '1Day';
 
-const atrExtremeThreshold = (timeframe: Timeframe): number => {
-    if (timeframe === '1Week') return ATR_EXTREME_PERCENT_WEEKLY;
-    return timeframe === DAILY_TIMEFRAME
-        ? ATR_EXTREME_PERCENT_DAILY
-        : ATR_EXTREME_PERCENT_INTRADAY;
+// A full table, so a new timeframe fails to compile until its threshold is chosen.
+const ATR_EXTREME_PERCENT: Record<Timeframe, number> = {
+    '5Min': ATR_EXTREME_PERCENT_INTRADAY,
+    '15Min': ATR_EXTREME_PERCENT_INTRADAY,
+    '30Min': ATR_EXTREME_PERCENT_INTRADAY,
+    '1Hour': ATR_EXTREME_PERCENT_INTRADAY,
+    '4Hour': ATR_EXTREME_PERCENT_INTRADAY,
+    '1Day': ATR_EXTREME_PERCENT_DAILY,
+    '1Week': ATR_EXTREME_PERCENT_WEEKLY,
 };
+
+const atrExtremeThreshold = (timeframe: Timeframe): number =>
+    ATR_EXTREME_PERCENT[timeframe];
 
 const ATR_EXTREME_VOLATILITY_NOTE = [
     '## Extreme Volatility',
