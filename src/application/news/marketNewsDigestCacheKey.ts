@@ -9,13 +9,10 @@ import {
     hashAnalysisInput,
     normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
-import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
-} from '@/infrastructure/skills/sampling';
+import { tierCapKeyPart } from '@/infrastructure/skills/sampling';
 
 /**
- * Derive a deterministic input hash from the news article IDs, tier, and sampled skills.
+ * Derive a deterministic input hash from the news article IDs, tier, and skill catalog.
  */
 function hashMarketNewsDigestInput(
     sortedNewsIds: readonly string[],
@@ -36,32 +33,22 @@ function hashMarketNewsDigestInput(
  * one path is always readable by the other. Do not inline this derivation
  * anywhere else.
  *
- * Also returns the tier-sampled skills, because sampling is part of the hash:
- * a caller that re-samples independently would build its prompt from a
- * different skill set than the one the key encodes.
+ * Also returns the skills the key encodes, so a caller builds its prompt from
+ * exactly the skill set the hash covers.
  */
 export function resolveMarketNewsDigestCacheKey(
     options: MarketNewsDigestCacheKeyOptions
 ): MarketNewsDigestCacheKeyPlan {
     const { category, modelId, news } = options;
     const tier = options.tier ?? DEFAULT_TIER;
-    // Sorted once — both the skill-sampling seed and the input hash consume the
-    // same ordering, so the key stays independent of the caller's array order.
+    // Sorted once so the key stays independent of the caller's array order.
     const sortedNewsIds = news.map(n => n.id).toSorted();
+    const skills = options.skills ?? [];
 
-    const skillSampling = createSkillSamplingPlan(options.skills ?? [], tier, [
-        'market-news-digest',
-        category,
-        modelId,
-        reasoningSeedPart(options.reasoning),
-        tier,
-        'news-ids',
-        ...sortedNewsIds,
-    ]);
     const inputHash = hashMarketNewsDigestInput(
         sortedNewsIds,
-        tier,
-        skillSampling.skills
+        tierCapKeyPart(tier),
+        skills
     );
 
     // `reasoning`은 캐시 키에 반드시 들어가야 한다 — 추론 on/off는 같은 기사
@@ -77,6 +64,6 @@ export function resolveMarketNewsDigestCacheKey(
             options.reasoning,
             options.locale
         ),
-        skills: skillSampling.skills,
+        skills,
     };
 }

@@ -69,7 +69,7 @@ export async function runMarketNewsDigest(
     // ── 2. Hash (news IDs + skills) → build cache key → check cache ──
     // 키 파생은 `resolveMarketNewsDigestCacheKey` 한 곳에만 있다 — peek 경로와
     // 바이트 단위로 같은 키를 읽고 쓰기 위한 유일한 출처.
-    const { cacheKey, skills: sampledSkills } =
+    const { cacheKey, skills: digestSkills } =
         resolveMarketNewsDigestCacheKey(options);
     const cache = resolveCacheProvider(options.cache);
 
@@ -98,7 +98,7 @@ export async function runMarketNewsDigest(
     const { stable, dynamic } = buildMarketNewsDigestPrompt(
         categoryLabel,
         news,
-        sampledSkills,
+        digestSkills,
         locale,
         new Date()
     );

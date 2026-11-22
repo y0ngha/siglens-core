@@ -26,9 +26,11 @@ const FREE_INFO_DEPTH: readonly TierInfoDepth[] = [
     'direction',
     'summary',
     // Free sees the detection output of the skills its analysis already ran
-    // with. Skill sampling caps free to <=3 skills per prompt-injection group
-    // (see createSkillSamplingPlan), so this exposes only that limited set; the
-    // signup nudge invites members to unlock the full skill catalogue.
+    // with: every always-on skill plus at most
+    // FREE_TIER_GATED_SKILLS_PER_GROUP fired gated skills per
+    // prompt-injection group (see gatedSkillCapForTier), so this exposes only
+    // that limited set; the signup nudge invites members to unlock the full
+    // skill catalogue.
     'skill_detection',
 ];
 const PRO_INFO_DEPTH: readonly TierInfoDepth[] = [
@@ -367,10 +369,10 @@ export function getMeteredRevealPolicy(
  * has no meter ({@link getMeteredRevealPolicy}).
  *
  * `runAnalysis` never folds `tierConfig` into the analysis cache key: the
- * tier reaches the key only through the skill sampling plan
- * (`createSkillSamplingPlan(skills, tier, …)`), which reads the tier, not the
- * config. A revealed request therefore reuses the tier's cached generation
- * and only the masking (`filterAnalysisResult`) changes.
+ * tier reaches the key only as the `<tier>[-c<cap>]:<fingerprint>` part
+ * (`skillCatalogKeyPart`; free is `free-c<cap>`, e.g. `free-c3`), which reads
+ * the tier, not the config. A revealed request therefore reuses the tier's
+ * cached generation and only the masking (`filterAnalysisResult`) changes.
  *
  * @param tier - The visitor's tier.
  * @param config - Tier configuration; defaults to {@link TIER_CONFIG}.

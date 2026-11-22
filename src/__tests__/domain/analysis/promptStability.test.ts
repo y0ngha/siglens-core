@@ -3,7 +3,10 @@ import {
     buildAnalysisPrompt,
     CORE_SKILL_REFERENCE_POINTER,
 } from '@/domain/analysis/prompt';
-import { sampleSkillsForTier } from '@/domain/analysis/sampleSkillsForTier';
+import {
+    FREE_TIER_GATED_SKILLS_PER_GROUP,
+    gatedSkillCapForTier,
+} from '@/domain/analysis/skillTierCap';
 import { aiSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { buildFundamentalAnalysisPrompt } from '@/domain/analysis/fundamentalPrompt';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
@@ -432,94 +435,170 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
         }
     });
 
-    // Regression for the miss that let the Guidelines sit behind the
-    // per-symbol framing: the stability tests above feed every symbol the SAME
-    // skills, bypassing the free-tier sampler. In production the free tier
-    // draws its always_on skills per symbol (`sampleSkillsForTier`), so
-    // `stable`'s skill digests differ across symbols and anything after them is
-    // outside the shared prefix. Intent + Guidelines must therefore precede
-    // the digests, keeping `persona → Intent → Guidelines` byte-identical
-    // across symbols for provider automatic prefix caching.
-    it('free-tier sampling: system prefix (persona + Intent + Guidelines) is byte-identical across symbols', () => {
-        const catalog = Array.from({ length: 12 }, (_, i) =>
-            makeSkill({
-                name: `Always Pattern ${String(i).padStart(2, '0')}`,
-                type: 'pattern',
-                gating: alwaysOn,
-            })
-        );
+    // The free tier no longer samples always_on skills per symbol: it carries
+    // every always_on skill and caps only the fired gated ones, so the whole
+    // system message (persona + Intent + Guidelines + always_on digests) is
+    // byte-identical across symbols AND equal to member's, which is what lets
+    // the provider's automatic prefix cache serve it across both tiers.
+    it('free-tier cap: the system message is byte-identical across symbols and equal to member', () => {
+        const catalog = [
+            ...Array.from({ length: 12 }, (_, i) =>
+                makeSkill({
+                    name: `Always Pattern ${String(i).padStart(2, '0')}`,
+                    type: 'pattern',
+                    gating: alwaysOn,
+                })
+            ),
+            ...Array.from({ length: 6 }, (_, i) =>
+                makeSkill({
+                    name: `Gated Guide ${i}`,
+                    type: 'indicator_guide',
+                    gating: eventGated(['rsi_oversold']),
+                })
+            ),
+        ];
         const bars = makeBars(60, 150);
         const indicators = calculateIndicators(bars);
         const symbols = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMD'];
-
-        const systems = symbols.map(symbol => {
-            const sampled = sampleSkillsForTier(catalog, 'free', symbol);
-            const { stable, dynamic } = buildAnalysisPrompt(
+        const build = (symbol: string, tier: 'free' | 'member') =>
+            buildAnalysisPrompt(
                 symbol,
                 `${symbol} Corp.`,
                 bars,
                 indicators,
-                sampled,
-                '1Day'
+                catalog,
+                '1Day',
+                undefined,
+                'equity',
+                undefined,
+                'ko',
+                undefined,
+                undefined,
+                'USD',
+                'share',
+                undefined,
+                undefined,
+                gatedSkillCapForTier(tier)
             );
-            return {
-                sampledNames: sampled.map(skill => skill.name).join(','),
-                stable,
-                dynamic,
-                system: `${aiSystemPrompt('ko')}\n\n${stable}`,
-            };
-        });
+        const systemOf = (symbol: string, tier: 'free' | 'member') =>
+            `${aiSystemPrompt('ko')}\n\n${build(symbol, tier).stable}`;
 
-        // Precondition: the sampler really hands different symbols different
-        // skills — otherwise this test would pass vacuously.
-        expect(
-            new Set(systems.map(entry => entry.sampledNames)).size
-        ).toBeGreaterThan(1);
-
-        // Expected shared head: persona + the skill-free stable (Intent +
-        // Guidelines only).
-        const { stable: head } = buildAnalysisPrompt(
-            'AAPL',
-            'AAPL Corp.',
-            bars,
-            indicators,
-            [],
-            '1Day'
-        );
-        expect(head).toContain('## Analysis Intent');
-        expect(head).toContain('## Analysis Guidelines');
-        const sharedPrefix = `${aiSystemPrompt('ko')}\n\n${head}`;
-        for (const entry of systems) {
-            expect(entry.system.startsWith(sharedPrefix)).toBe(true);
+        const memberSystem = systemOf('AAPL', 'member');
+        // Every always_on skill is present, none was drawn away.
+        catalog
+            .filter(skill => skill.gating?.tier === 'always_on')
+            .forEach(skill => expect(memberSystem).toContain(skill.name));
+        for (const symbol of symbols) {
+            expect(systemOf(symbol, 'free')).toBe(memberSystem);
         }
-        // The byte-level common prefix of every pair of real system messages
-        // reaches past the whole Guidelines block, not just the persona.
-        const commonPrefixLength = (left: string, right: string): number => {
-            const limit = Math.min(left.length, right.length);
-            const firstDiff = Array.from({ length: limit }).findIndex(
-                (_, i) => left[i] !== right[i]
-            );
-            return firstDiff === -1 ? limit : firstDiff;
-        };
-        for (const [i, left] of systems.entries()) {
-            for (const right of systems.slice(i + 1)) {
-                expect(
-                    commonPrefixLength(left.system, right.system)
-                ).toBeGreaterThanOrEqual(sharedPrefix.length);
-            }
-        }
-        // ...and the sampled digests really do follow it and differ.
-        expect(
-            new Set(systems.map(entry => entry.system)).size
-        ).toBeGreaterThan(1);
         // The first symbol-bearing byte of the whole request is in `dynamic`,
         // never in the system message.
-        for (const [index, entry] of systems.entries()) {
-            expect(entry.system).not.toContain(symbols[index]);
+        for (const symbol of symbols) {
+            expect(systemOf(symbol, 'free')).not.toContain(symbol);
             expect(
-                entry.dynamic.startsWith(`Symbol: ${symbols[index]}\n`)
+                build(symbol, 'free').dynamic.startsWith(`Symbol: ${symbol}\n`)
             ).toBe(true);
         }
+    });
+});
+
+describe('buildAnalysisPrompt — free-tier gated skill cap', () => {
+    const fallingBars: Bar[] = Array.from({ length: 80 }, (_, i) => {
+        const close = 200 - i * 1.5;
+        return {
+            time: 1_700_000_000 + i * 86_400,
+            open: close + 0.5,
+            high: close + 1,
+            low: close - 1,
+            close,
+            volume: 1_000_000,
+        };
+    });
+    const indicators = calculateIndicators(fallingBars);
+    const gatedNames = Array.from(
+        { length: 6 },
+        (_, i) => `Oversold Guide ${i}`
+    );
+    const catalog = [
+        makeSkill({
+            name: 'Always Guide',
+            type: 'indicator_guide',
+            gating: alwaysOn,
+        }),
+        ...gatedNames.map(name =>
+            makeSkill({
+                name,
+                type: 'indicator_guide',
+                gating: eventGated(['rsi_oversold']),
+            })
+        ),
+    ];
+    const build = (cap?: number | null) =>
+        buildAnalysisPrompt(
+            'AAPL',
+            'Apple Inc.',
+            fallingBars,
+            indicators,
+            catalog,
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            'ko',
+            undefined,
+            undefined,
+            'USD',
+            'share',
+            undefined,
+            undefined,
+            cap
+        );
+    const namesIn = (text: string): string[] =>
+        gatedNames.filter(name => text.includes(name));
+
+    it('member (cap null) and an omitted cap render identical prompts and keep every fired gated skill', () => {
+        const member = build(gatedSkillCapForTier('member'));
+
+        expect(member).toEqual(build());
+        // Precondition: the chart really fires the gate, or this test is vacuous.
+        expect(namesIn(member.dynamic).length).toBeGreaterThan(
+            FREE_TIER_GATED_SKILLS_PER_GROUP
+        );
+    });
+
+    it('injectedSkills lists exactly the skills the prompt carries, so a capped-out gated skill is absent', () => {
+        const free = build(gatedSkillCapForTier('free'));
+        const member = build(gatedSkillCapForTier('member'));
+        const names = (skills: readonly { name: string }[]) =>
+            skills.map(skill => skill.name);
+
+        expect(names(free.injectedSkills)).toContain('Always Guide');
+        expect(
+            names(free.injectedSkills).filter(name => gatedNames.includes(name))
+        ).toHaveLength(FREE_TIER_GATED_SKILLS_PER_GROUP);
+        expect(names(member.injectedSkills)).toHaveLength(catalog.length);
+        names(free.injectedSkills)
+            .filter(name => gatedNames.includes(name))
+            .forEach(name => expect(free.dynamic).toContain(name));
+    });
+
+    it('free keeps the always-on skill and exactly the first cap fired gated skills of the member order', () => {
+        const member = build(gatedSkillCapForTier('member'));
+        const free = build(gatedSkillCapForTier('free'));
+        const memberOrder = namesIn(member.dynamic).toSorted(
+            (a, b) => member.dynamic.indexOf(a) - member.dynamic.indexOf(b)
+        );
+
+        expect(free.stable).toContain('Always Guide');
+        expect(free.stable).toBe(member.stable);
+        expect(namesIn(free.dynamic)).toHaveLength(
+            FREE_TIER_GATED_SKILLS_PER_GROUP
+        );
+        expect(
+            namesIn(free.dynamic).toSorted(
+                (a, b) => free.dynamic.indexOf(a) - free.dynamic.indexOf(b)
+            )
+        ).toEqual(memberOrder.slice(0, FREE_TIER_GATED_SKILLS_PER_GROUP));
     });
 });
 

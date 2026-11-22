@@ -16,7 +16,7 @@ import type {
  * Unlike {@link SubmitNewsAnalysisOptions}, this variant has no symbol,
  * companyName, earnings calendar, usage, or BYOK handling. The category
  * digest is a public analysis of the market-wide news flow for a single feed
- * category with optional tier-aware skill sampling.
+ * category with optional tier-aware cache keys.
  */
 export interface SubmitMarketNewsDigestOptions
     extends BackgroundTaskOptions, CacheOptions {
@@ -49,8 +49,7 @@ export interface SubmitMarketNewsDigestOptions
      * itself — unlike the per-card path, which is a deterministic translation
      * and stays off.
      *
-     * Participates in the cache key (`:reason=on` suffix) and in the skill
-     * sampling seed, so an on/off pair never shares a cached digest. `false`
+     * Participates in the cache key (`:reason=on` suffix), so an on/off pair never shares a cached digest. `false`
      * and `undefined` key identically to omitting it, so entries written
      * before this option existed still hit.
      */
@@ -193,9 +192,9 @@ export type MarketNewsDigestCacheKeyOptions = Pick<
     'category' | 'modelId' | 'news' | 'locale' | 'reasoning' | 'skills' | 'tier'
 >;
 
-/** @internal Cache key plus the sampled skills the key was derived from. */
+/** @internal Cache key plus the skills the key was derived from. */
 export interface MarketNewsDigestCacheKeyPlan {
     cacheKey: string;
-    /** Tier-sampled skills — the caller must build its prompt from exactly these. */
+    /** The skills the key covers — the caller must build its prompt from exactly these. */
     skills: readonly Skill[];
 }

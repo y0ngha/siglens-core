@@ -149,9 +149,9 @@ export interface SubmitAnalysisOptions
      * cache key (see {@link buildAnalysisCacheKey}'s `positionBucket` param)
      * AFTER the reasoning suffix, and injected as a neutral Korean hint into
      * the prompt's `dynamic` section (see `buildAnalysisPrompt`'s
-     * `positionBucket` param) — never into `stable`, and never joined into
-     * the skill-sampling seed (the bucket must not change which skills are
-     * sampled). `undefined` (no holding, free tier, or an unbucketable
+     * `positionBucket` param) — never into `stable`, and never part of the
+     * skill selection (the bucket must not change which skills are injected).
+     * `undefined` (no holding, free tier, or an unbucketable
      * position) produces the exact same cache key and prompt as omitting the
      * option entirely (backward compatible). Tier/holding gating (free tier
      * must never receive a bucket) is the caller's responsibility — core

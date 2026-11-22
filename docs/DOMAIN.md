@@ -1596,6 +1596,10 @@ consumer (web app / worker / CLI)
 domain/analysis/prompt.ts
   → buildAnalysisPrompt(symbol, bars, indicators, skills)
   → 모든 스킬 포함 (confidenceWeight 하한 필터 없음)
+  → 선택은 selectSkills: always_on 스킬은 항상 포함, gated 스킬은 게이트가 발화한 것만 관련도 순으로 포함
+  → free 티어는 발화한 gated 스킬을 주입 그룹(type ?? category)마다 `FREE_TIER_GATED_SKILLS_PER_GROUP`개까지만
+    관련도 순서의 앞에서 남긴다 (domain/analysis/skillTierCap.ts의 gatedSkillCapForTier). always_on은 상한이 없고,
+    member·pro는 상한이 없다. 해시 샘플링은 하지 않는다 — 캐시 키는 `${티어 키 부분}:${카탈로그 전체 지문}`이고, free의 티어 키 부분은 상한을 넣은 `free-c<상한>`이다
   → type='indicator_guide' skills → "Indicator Signal Guides" 섹션
   → type='pattern' skills → "Pattern Analysis" 섹션
   → type='candlestick' skills → "Candlestick Pattern Guides" 섹션

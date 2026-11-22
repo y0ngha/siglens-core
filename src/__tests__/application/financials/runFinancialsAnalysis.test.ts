@@ -18,6 +18,8 @@ import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FINANCIALS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
+import { fingerprintSkillCatalog } from '@/infrastructure/skills/sampling';
+import { FREE_TIER_GATED_SKILLS_PER_GROUP } from '@/domain/analysis/skillTierCap';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
 import { financialsSystemPrompt } from '@/domain/analysis/systemPrompt';
 
@@ -53,6 +55,18 @@ const mockDataProvider = {
     getCashFlowGrowths: vi.fn().mockResolvedValue([]),
 };
 
+const FINGERPRINT_CATALOG: Skill[] = [
+    {
+        name: 'Fingerprint Guide',
+        description: 'd',
+        category: 'fundamental',
+        indicators: [],
+        confidenceWeight: 1,
+        content: 'c',
+        gating: { tier: 'always_on' },
+    },
+];
+
 describe('runFinancialsAnalysis', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -71,6 +85,35 @@ describe('runFinancialsAnalysis', () => {
         mockDataProvider.getIncomeStatementGrowths.mockResolvedValue([]);
         mockDataProvider.getFinancialGrowths.mockResolvedValue([]);
         mockDataProvider.getCashFlowGrowths.mockResolvedValue([]);
+    });
+
+    describe('캐시 키의 스킬 지문', () => {
+        const keyFor = async (tier: 'free' | 'member'): Promise<string> => {
+            mockLoadSkillsCached.mockResolvedValue({
+                skills: FINGERPRINT_CATALOG,
+                skillsDegraded: false,
+            });
+            mockCacheGet.mockClear();
+            await runFinancialsAnalysis({
+                symbol: 'AAPL',
+                modelId: mockModelId,
+                dataProvider: mockDataProvider,
+                tier,
+            });
+            return mockCacheGet.mock.calls.at(-1)?.[0] as string;
+        };
+
+        it('free 키에는 상한과 카탈로그 전체 지문이, member 키에는 예전 그대로 `member:지문`이 들어간다', async () => {
+            const fingerprint = fingerprintSkillCatalog(FINGERPRINT_CATALOG);
+            const freeKey = await keyFor('free');
+            const memberKey = await keyFor('member');
+
+            expect(freeKey).toContain(
+                `free-c${FREE_TIER_GATED_SKILLS_PER_GROUP}:${fingerprint}`
+            );
+            expect(memberKey).toContain(`member:${fingerprint}`);
+            expect(freeKey).not.toBe(memberKey);
+        });
     });
 
     describe('options.cache 주입', () => {

@@ -52,7 +52,7 @@ interface NormalizedSkillForHash {
  * skills for cache-key hashing, sorted by `name` so the fingerprint is
  * independent of input order.
  *
- * @param skills - Skills sampled for a prompt.
+ * @param skills - Skills of a prompt's catalog.
  * @returns Normalized, name-sorted skill records ready for `JSON.stringify`.
  */
 export function normalizeSkillsForHash(
@@ -119,9 +119,8 @@ export function hashSkillCatalog(skills: readonly Skill[]): string {
  * the cap (never rendered into the prompt) does not invalidate the cache,
  * and the fingerprint can never cover a row the prompt omits.
  *
- * Shared between `runNewsAnalysis`'s input hash and its skill-sampling seed
- * so both invalidate whenever any rendered field of a rendered row changes,
- * including `estimate`/`previous` (an initial estimate revision, or a
+ * Used in `runNewsAnalysis`'s input hash so it invalidates whenever any
+ * rendered field of a rendered row changes, including `estimate`/`previous` (an initial estimate revision, or a
  * previous-period restatement, changes prompt bytes exactly like `actual`
  * being filled in — excluding them would serve a stale cached analysis for
  * a re-estimated or restated release).

@@ -29,8 +29,7 @@ export type AssetClass = 'equity' | 'crypto';
  * ETN, or index product: it has no earnings or company events, and macro
  * releases are among its main scheduled catalysts. Supplied by the consumer
  * (core does not classify tickers). `'fund'` is folded into the news input
- * hash and skill-sampling seed; `'company'` adds nothing. Ignored for
- * `assetClass: 'crypto'`.
+ * hash; `'company'` adds nothing. Ignored for `assetClass: 'crypto'`.
  */
 export type NewsInstrumentKind = 'company' | 'fund';
 
@@ -2113,9 +2112,9 @@ export interface PromptConfig {
  *   Analysis Intent + Guidelines blocks, see `buildAnalysisPrompt`). Never
  *   contains a symbol, job id, timestamp, or any other per-call value, but it
  *   is NOT one string per catalog: it varies with `locale` (Guidelines are
- *   localized) and, on the free tier, with the per-symbol sampled `always_on`
- *   skill set (`sampleSkillsForTier`). Content-address it by its own hash,
- *   not by the catalog fingerprint. Non-empty for skill-bearing builders
+ *   localized). For one catalog and locale it is identical across symbols and
+ *   tiers (the free-tier cap trims gated skills only, never `always_on` ones).
+ *   Content-address it by its own hash, not by the catalog fingerprint. Non-empty for skill-bearing builders
  *   (technical, fundamental, financials, congress, news) whenever the loaded
  *   catalog has `always_on` skills for that context; `''` for builders that
  *   inject no skills at all (options, market/macro briefing, economic-event,
@@ -2134,8 +2133,8 @@ export interface PromptConfig {
 export interface AssembledPrompt {
     /**
      * The cacheable section folded into the system prompt — never per-call,
-     * but it varies by `locale` and, on the free tier, by the per-symbol
-     * sampled `always_on` skill set (content-address it by its own hash).
+     * but it varies by `locale` and by the catalog's `always_on` skill set
+     * (content-address it by its own hash).
      *
      * Non-empty for skill-bearing builders (technical/fundamental/financials/
      * congress/news) with the production catalog; `''` for no-skill builders
@@ -2144,8 +2143,8 @@ export interface AssembledPrompt {
      *
      * Exception: `buildAnalysisPrompt` (technical) never returns `''` — its
      * `stable` leads with the fixed Analysis Intent + Analysis Guidelines
-     * blocks, then the `always_on` digests, so the cross-symbol-identical head
-     * precedes the per-symbol-sampled digests. The other skill-bearing
+     * blocks, then the `always_on` digests, so the fixed head precedes the
+     * catalog-dependent digests. The other skill-bearing
      * builders (fundamental/financials/congress/news/marketNewsDigest) always
      * emit their skill-section wrapper header even with 0 skills.
      *
@@ -2193,6 +2192,13 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      * price the model was shown, not a recomputation.
      */
     printedSupportPrices: readonly number[];
+    /**
+     * The skills whose digests this prompt carries: every always-on skill plus the fired
+     * gated skills that survived the tier cap (the SMC full guide is never injected, so it
+     * is absent). The caller enriches the model's output with exactly these, so a skill the
+     * cap left out of the prompt never supplies a confidence weight.
+     */
+    injectedSkills: Skill[];
 }
 
 /**
@@ -2209,13 +2215,12 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
  * many calls — a consumer storing many of these rows should content-address
  * that half by its own hash (store it once, reference it by hash) rather than
  * copying it into every row. It is not one string per `(analysisType,
- * catalog)`: it also varies with `locale` and, on the free tier, with the
- * per-symbol sampled `always_on` skill set.
+ * catalog)`: it also varies with `locale`.
  */
 export interface AssembledPromptRecord {
     /** The system message actually sent, including the folded-in `stable` skill digest. */
     readonly system: string;
-    /** The cacheable half folded into `system` (technical: Intent + Guidelines, then `always_on` digests) — repeats across calls; varies by locale and sampled skill set. */
+    /** The cacheable half folded into `system` (technical: Intent + Guidelines, then `always_on` digests) — repeats across calls; varies by locale and catalog. */
     readonly stable: string;
     /** Everything else: symbol framing, bar data, indicators, gated skills, prior analyses, output rules. */
     readonly dynamic: string;
@@ -2519,12 +2524,13 @@ export type TierLimitedFeature = 'analysisPerDay' | 'chatbotPerDay';
 export type TierInfoDepth =
     | 'direction'
     | 'summary'
-    // Visibility of the sampled catalogue skills' detection output: chart
-    // pattern summaries (patternSummaries) and strategy results
-    // (strategyResults). Granted to free so a non-member sees the <=3-per-group
-    // skills their analysis already ran with. Excludes candlePatterns, which
-    // come from a deterministic bar-level detector (not the sampled skill
-    // catalogue) and so stay partial_detail/member-only, alongside the deeper
+    // Visibility of the catalogue skills' detection output: chart pattern
+    // summaries (patternSummaries) and strategy results (strategyResults).
+    // Granted to free so a non-member sees the skills their analysis already
+    // ran with (every always-on skill plus at most
+    // FREE_TIER_GATED_SKILLS_PER_GROUP fired gated skills per group). Excludes
+    // candlePatterns, which come from a deterministic bar-level detector (not
+    // the skill catalogue) and so stay partial_detail/member-only, alongside the deeper
     // full_detail fragments (trendlines, position analysis).
     | 'skill_detection'
     | 'partial_detail'

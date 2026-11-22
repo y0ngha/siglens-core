@@ -36,10 +36,7 @@ import {
 import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
-} from '@/infrastructure/skills/sampling';
+import { skillCatalogKeyPart } from '@/infrastructure/skills/sampling';
 import type {
     ActiveModelId,
     FundamentalAnalysisResponse,
@@ -222,21 +219,15 @@ export async function runFundamentalAnalysis(
         }
     }
 
-    // Skills are loaded once; the same load serves both the sampling plan
-    // (for cache-key + prompt assembly). `skillsDegraded` reflects THIS load.
+    // Skills are loaded once; the same load serves both the catalog fingerprint
+    // (cache key) and prompt assembly. `skillsDegraded` reflects THIS load.
     const skillsResult = await loadSkillsCached();
-    const skillSampling = createSkillSamplingPlan(skillsResult.skills, tier, [
-        'fundamental',
-        symbol,
-        modelId,
-        reasoningSeedPart(options.reasoning),
-        tier,
-    ]);
+    const skillKeyPart = skillCatalogKeyPart(tier, skillsResult.skills);
 
     const cacheKey = buildFundamentalCacheKey(
         symbol,
         modelId,
-        `${tier}:${skillSampling.fingerprint}`,
+        skillKeyPart,
         options.reasoning,
         options.locale
     );
@@ -310,7 +301,7 @@ export async function runFundamentalAnalysis(
     const { stable, dynamic } = buildFundamentalAnalysisPrompt(
         symbol,
         snapshot,
-        skillSampling.skills,
+        skillsResult.skills,
         locale,
         options.currency,
         occurredAt

@@ -178,9 +178,10 @@ describe('tier', () => {
             expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);
         });
 
-        it('grants skill-detection output to free tier so its sampled skills stay visible', () => {
-            // Free runs analysis with <=3 skills per group (createSkillSamplingPlan)
-            // and now sees that limited detection output, while the deeper
+        it('grants skill-detection output to free tier so its capped skills stay visible', () => {
+            // Free runs analysis with every always-on skill plus a capped number
+            // of fired gated skills per group (gatedSkillCapForTier) and sees
+            // that limited detection output, while the deeper
             // full_detail fragments remain member-only.
             expect(isInfoDepthAllowed('free', 'skill_detection')).toBe(true);
             expect(isInfoDepthAllowed('free', 'full_detail')).toBe(false);

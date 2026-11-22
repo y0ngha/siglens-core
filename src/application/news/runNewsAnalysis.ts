@@ -47,14 +47,11 @@ import {
     normalizeSkillsForHash,
 } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
-} from '@/infrastructure/skills/sampling';
+import { tierCapKeyPart } from '@/infrastructure/skills/sampling';
 
 /**
- * Derive a deterministic hash of the news set, calendar, tier, sampled
- * skills, and (when present) the macro calendar.
+ * Derive a deterministic hash of the news set, calendar, tier, skill
+ * catalog, and (when present) the macro calendar.
  *
  * `macroFingerprintParts` is appended only when non-empty — an empty macro calendar (every call site before that option existed)
  * hashes the exact same string as before, so pre-existing cache entries stay
@@ -90,8 +87,8 @@ function hashNewsInput(
  * The caller awaits a single promise; no job IDs, no
  * Redis meta, no polling loop.
  *
- * Skills are loaded once and serve both the sampling plan (cache key / prompt
- * assembly) and the result — a single `loadSkillsCached()` replaces the split
+ * Skills are loaded once and serve both the cache key and the prompt
+ * assembly — a single `loadSkillsCached()` replaces the split
  * across submit and poll.
  *
  * Concurrent calls sharing the same in-flight key are deduplicated via
@@ -188,34 +185,19 @@ export async function runNewsAnalysis(
     const earningsDates = upcomingCalendar.map(c =>
         c.dateConfirmed === false ? `${c.earningsDate}~` : c.earningsDate
     );
-    // Empty when `macroCalendar` is omitted/[] — spreading zero extra parts
-    // keeps the seed identical to every call site before this option existed.
+    // Empty when `macroCalendar` is omitted/[] — the input hash then stays
+    // identical to every call site before this option existed.
     const macroFingerprintParts = macroCalendarFingerprintParts(macroCalendar);
     // Crypto ignores the framing, so it never splits crypto keys.
     const instrumentKind: NewsInstrumentKind =
         options.assetClass === 'crypto'
             ? 'company'
             : (options.instrumentKind ?? 'company');
-    const skillSampling = createSkillSamplingPlan(skills, tier, [
-        'news',
-        symbol,
-        modelId,
-        reasoningSeedPart(options.reasoning),
-        tier,
-        'news-ids',
-        ...newsIds.toSorted(),
-        'earnings-dates',
-        ...earningsDates.toSorted(),
-        ...(macroFingerprintParts.length > 0
-            ? ['macro-calendar', ...macroFingerprintParts]
-            : []),
-        ...(instrumentKind === 'fund' ? ['fund'] : []),
-    ]);
     const inputHash = hashNewsInput(
         newsIds,
         earningsDates,
-        tier,
-        skillSampling.skills,
+        tierCapKeyPart(tier),
+        skills,
         macroFingerprintParts,
         instrumentKind
     );
@@ -270,7 +252,7 @@ export async function runNewsAnalysis(
         companyName,
         news,
         upcomingCalendar,
-        skillSampling.skills,
+        skills,
         options.assetClass ?? 'equity',
         locale,
         options.currency,

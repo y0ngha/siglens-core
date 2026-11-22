@@ -36,10 +36,7 @@ import {
 import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
-import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
-} from '@/infrastructure/skills/sampling';
+import { skillCatalogKeyPart } from '@/infrastructure/skills/sampling';
 import type {
     ActiveModelId,
     FinancialsAnalysisResponse,
@@ -170,24 +167,16 @@ export async function runFinancialsAnalysis(
         }
     }
 
-    // Skills are loaded once; the same load serves both the sampling plan
-    // (for cache-key fingerprint + prompt assembly).
+    // Skills are loaded once; the same load serves both the catalog fingerprint
+    // (cache key) and prompt assembly.
     const skillsResult = await loadSkillsCached();
-    const skillSampling = createSkillSamplingPlan(skillsResult.skills, tier, [
-        'financials',
-        symbol,
-        modelId,
-        period,
-        String(limit),
-        reasoningSeedPart(options.reasoning),
-        tier,
-    ]);
+    const skillKeyPart = skillCatalogKeyPart(tier, skillsResult.skills);
 
     const cacheKey = buildFinancialsCacheKey(
         symbol,
         modelId,
         period,
-        `${tier}:${skillSampling.fingerprint}`,
+        skillKeyPart,
         options.reasoning,
         options.locale
     );
@@ -247,7 +236,7 @@ export async function runFinancialsAnalysis(
         symbol,
         snapshot,
         scorecard,
-        skillSampling.skills,
+        skillsResult.skills,
         locale
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so

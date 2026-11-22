@@ -46,6 +46,7 @@ import {
 } from '@/domain/indicators/fearGreed';
 import { lastNonNull } from '@/domain/indicators/utils';
 import type { CacheProvider } from '@/domain/ports/cache';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER, TIER_CONFIG, isTimeframeAllowed } from '@/domain/tier';
 import type {
     ActiveModelId,
@@ -70,8 +71,8 @@ import { resolveCacheProvider } from '@/application/shared/resolveCacheProvider'
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import {
-    createSkillSamplingPlan,
-    reasoningSeedPart,
+    skillCatalogKeyPart,
+    tierCapKeyPart,
 } from '@/infrastructure/skills/sampling';
 
 /**
@@ -332,19 +333,13 @@ async function runAnalysisImpl(
         }
     }
 
-    // Skills are loaded once; the same load serves both the sampling plan
-    // (for cache-key + prompt assembly) and confidence enrichment (post-LLM).
+    // Skills are loaded once; the same load serves the catalog fingerprint (cache
+    // key), prompt assembly and confidence enrichment (post-LLM).
     // `skillsDegraded` reflects THIS load — the label written to the cache
     // entry always matches the data actually used.
     const { skills, skillsDegraded } = await loadSkillsCached();
-    const skillSampling = createSkillSamplingPlan(skills, tier, [
-        'technical',
-        symbol,
-        timeframe,
-        effectiveModelId,
-        reasoningSeedPart(options.reasoning),
-        tier,
-    ]);
+    const skillKeyPart = skillCatalogKeyPart(tier, skills);
+    const gatedSkillCap = gatedSkillCapForTier(tier);
 
     // `narrowPriorAnalysesForCacheKey` is called exactly ONCE, from a single
     // `Date`, and its `candidates` output is reused for BOTH the cache-key
@@ -390,7 +385,7 @@ async function runAnalysisImpl(
         symbol,
         timeframe,
         effectiveModelId,
-        `${tier}:${skillSampling.fingerprint}`,
+        skillKeyPart,
         options.reasoning,
         options.positionBucket,
         options.locale,
@@ -420,7 +415,7 @@ async function runAnalysisImpl(
                     symbol,
                     timeframe,
                     effectiveModelId,
-                    tier,
+                    tierCapKeyPart(tier),
                     options.reasoning,
                     options.positionBucket,
                     options.locale
@@ -503,12 +498,13 @@ async function runAnalysisImpl(
         patternGeometries,
         trend: trendReading,
         printedSupportPrices,
+        injectedSkills,
     } = buildAnalysisPrompt(
         symbol,
         companyName,
         bars,
         indicators,
-        skillSampling.skills,
+        skills,
         timeframe,
         fearGreed ?? undefined,
         options.assetClass ?? 'equity',
@@ -524,7 +520,11 @@ async function runAnalysisImpl(
         // keeps the prompt from depending on a second clock read.
         options.session === undefined
             ? undefined
-            : { session: options.session, now: priorAnalysisNow }
+            : { session: options.session, now: priorAnalysisNow },
+        // Free carries every always-on skill plus its most relevant fired gated
+        // skills per group; member and pro carry every fired skill. The tier and the
+        // cap are in the cache key, so the two never share an entry.
+        gatedSkillCap
     );
     // Logged here, before the model call, so a failure is reported even when
     // the generation itself fails: without it a throwing qualifier reads as
@@ -618,7 +618,11 @@ async function runAnalysisImpl(
     const { reconciled, resolvedOverlays, modelOutput } =
         postProcessRawAnalysis({
             rawResult,
-            skills,
+            // A capped tier (free) enriches with exactly the skills its prompt carried:
+            // a gated skill the cap dropped must not weight the result. Uncapped tiers
+            // keep the full catalog as before; narrowing member and pro to their injected
+            // skills is a separate change that has not been measured.
+            skills: gatedSkillCap === null ? skills : injectedSkills,
             overlayCandidates,
             patternGeometries,
             lastClose,
@@ -750,7 +754,7 @@ async function runAnalysisImpl(
                     symbol,
                     timeframe,
                     effectiveModelId,
-                    tier,
+                    tierCapKeyPart(tier),
                     options.reasoning,
                     options.positionBucket,
                     options.locale

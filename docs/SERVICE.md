@@ -186,6 +186,6 @@ domain/analysis/prompt.ts
 
 - Read all `.md` files in the `skills/` directory
 - Check the `indicators` field in each file's frontmatter to identify required indicators
-- `confidence_weight` maps to a Low/Medium/High display label in the prompt; there is no weight floor that excludes a skill. The set passed to the prompt can be capped per tier by `infrastructure/skills/sampling.ts` (`sampleSkillsForTier`).
+- `confidence_weight` maps to a Low/Medium/High display label in the prompt; there is no weight floor that excludes a skill. The technical prompt caps the fired gated skills per injection group for the free tier, after relevance ordering (`domain/analysis/skillTierCap.ts`: `gatedSkillCapForTier`, applied by `selectSkills`); always-on skills are never capped, and member and pro carry every fired skill.
 - Refer to the Skills System section in `docs/DOMAIN.md` for the full file format spec,
   type definitions, and `Skill` interface
