@@ -143,7 +143,8 @@ logic) before adding a function. When the same filter or calculation appears at 
 call sites, extract one shared pure helper (`domain/` preferred) or a module-level const.
 Split `number[]`-based cores from `Bar[]`-based wrappers so both shapes share one
 implementation. Logic shared by a pair of AI providers belongs in
-`infrastructure/ai/utils.ts`.
+`infrastructure/ai/utils.ts`. A helper needed by both `src` and `scripts` lives once in
+`src`; scripts import it instead of keeping a copy.
 
 Why: duplicated helpers drift apart, and the copy nobody remembers keeps the old bug.
 
@@ -678,7 +679,7 @@ Test structure allows **2 to 5 levels**. Choose the appropriate depth based on m
 Besides sign and shape, every period-based indicator test checks values with
 `toBeCloseTo` against expected numbers computed independently. Warm-up constants are
 imported from source, and boundary constants account for the whole dependency chain of
-the algorithm (nested windows). Published statistics (shares, percentiles, confidence intervals) follow the same rule with hand-determined fixtures: a range-only assertion (`0 ≤ share ≤ 1`, `p5 ≤ median ≤ p95`) passes a strict→non-strict or wrong-baseline mutation, and TE-16 oracles must fail if reverted.
+the algorithm (nested windows). Published statistics (shares, percentiles, confidence intervals) follow the same rule with hand-determined fixtures: a range-only assertion (`0 ≤ share ≤ 1`, `p5 ≤ median ≤ p95`) passes a strict→non-strict or wrong-baseline mutation, and TE-16 oracles must fail if reverted. Pre-registered rules (week start, exclusion counting order) and a shared seeded PRNG's outputs are pinned by value the same way.
 
 ```typescript
 // ❌ expect(values[idx]).toBeGreaterThan(0);          // no actual value verified

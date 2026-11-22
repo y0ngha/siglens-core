@@ -26,8 +26,9 @@ import {
     type Share,
 } from './analysisFieldsEvalTypes';
 import { sha256Hex } from './fsUtil';
-import { mulberry32 } from './engineEvalStats';
-import { jaccard, mean, quantile } from './stats';
+import { mulberry32 } from '@/domain/outcomes/weekClusterBootstrap';
+import { jaccard, mean } from './stats';
+import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
 import type { CaseResultFile } from './types';
 
 type Rec = Record<string, unknown>;

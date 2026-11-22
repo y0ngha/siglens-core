@@ -774,6 +774,7 @@ describe('package entrypoint export presence (API-1)', () => {
         'labelAnalysisOutcome',
         'labelLevelOutcome',
         'outcomeEarliestLabelTime',
+        'summarizeOutcomeRecord',
     ];
     const VALUE_EXPORTS: readonly string[] = [
         'DEFAULT_KEY_POLICY',

@@ -1574,6 +1574,7 @@ export { extractOutcomeSubject } from './domain/outcomes/extractOutcomeSubject';
 export { labelAnalysisOutcome } from './domain/outcomes/labelAnalysisOutcome';
 export { labelLevelOutcome } from './domain/outcomes/labelLevelOutcome';
 export { outcomeEarliestLabelTime } from './domain/outcomes/outcomeEarliestLabelTime';
+export { summarizeOutcomeRecord } from './domain/outcomes/summarizeOutcomeRecord';
 export {
     OUTCOME_LABEL_VERSION,
     OUTCOME_SUBJECT_VERSION,
@@ -1602,3 +1603,8 @@ export type {
     PlanReason,
     ScenarioTargetLabel,
 } from './domain/outcomes/types';
+export type {
+    OutcomeRecordRow,
+    OutcomeRecordSummary,
+    OutcomeShareRecord,
+} from './domain/outcomes/summarizeOutcomeRecord';

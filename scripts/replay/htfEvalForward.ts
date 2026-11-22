@@ -15,10 +15,12 @@ import {
     intervalOf,
     isoWeekKey,
     pooledMean,
-    resampleMultiplicities,
-    resampledMean,
     streamForKey,
 } from './engineEvalStats';
+import {
+    resampleMultiplicities,
+    resampledMean,
+} from '@/domain/outcomes/weekClusterBootstrap';
 import {
     HTF_EVAL_CONSTANTS as C,
     aggregateWeeks,

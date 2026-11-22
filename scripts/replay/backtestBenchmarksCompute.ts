@@ -55,13 +55,16 @@ import {
     intervalOf,
     isoDate,
     isoWeekKey,
-    mulberry32,
-    resampleMultiplicities,
-    resampledMean,
     sampleWithoutReplacement,
     streamForKey,
 } from './engineEvalStats';
-import { mean, quantile } from './stats';
+import {
+    mulberry32,
+    resampleMultiplicities,
+    resampledMean,
+} from '@/domain/outcomes/weekClusterBootstrap';
+import { mean } from './stats';
+import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
 
 /** Pre-registered constants. A change to any of them bumps `version`. */
 export const BENCHMARK_CONSTANTS = {

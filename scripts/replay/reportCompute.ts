@@ -12,14 +12,8 @@
  */
 import { PLACEBO_SHIFT_ATR } from '@/domain/outcomes/constants';
 import type { LevelOutcome, PatternOutcome, PlanOutcome } from '@/domain/types';
-import {
-    jaccard,
-    mean,
-    median,
-    pairsOf,
-    quantile,
-    standardError,
-} from './stats';
+import { jaccard, mean, median, pairsOf, standardError } from './stats';
+import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
 import {
     REPLAY_REGIMES,
     type LabelRow,

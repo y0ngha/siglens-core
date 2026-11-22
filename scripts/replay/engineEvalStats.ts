@@ -4,23 +4,16 @@
  * identical placebos in every arm.
  */
 import { sha256Hex } from './fsUtil';
-import { quantile } from './stats';
+import {
+    mulberry32,
+    quantile,
+    type WeekAggregate,
+} from '@/domain/outcomes/weekClusterBootstrap';
 import {
     EVAL_CONSTANTS,
     type EvalHalf,
     type Observation,
 } from './engineEvalTypes';
-
-/** mulberry32: a 32-bit seeded generator returning floats in `[0, 1)`. */
-export function mulberry32(seed: number): () => number {
-    const state = { a: seed >>> 0 };
-    return () => {
-        state.a = (state.a + 0x6d2b79f5) >>> 0;
-        const t1 = Math.imul(state.a ^ (state.a >>> 15), 1 | state.a);
-        const t2 = (t1 + Math.imul(t1 ^ (t1 >>> 7), 61 | t1)) ^ t1;
-        return ((t2 ^ (t2 >>> 14)) >>> 0) / 4294967296;
-    };
-}
 
 /** The stream of one key: `sha256(key)`'s first 32 bits mixed with the base seed. */
 export function streamForKey(baseSeed: number, key: string): () => number {
@@ -117,12 +110,6 @@ export function blockOfWeek(week: string, blockWeeks: number): string {
 
 // ─── Cluster bootstrap ────────────────────────────────────────────────────────
 
-/** Per-cluster sums and counts of a pool, aligned with a sorted cluster list. */
-export interface WeekAggregate {
-    sums: readonly number[];
-    counts: readonly number[];
-}
-
 export function aggregateByWeek(
     observations: readonly Observation[],
     weeks: readonly string[]
@@ -137,40 +124,6 @@ export function aggregateByWeek(
         counts[i] += 1;
     });
     return { sums, counts };
-}
-
-/**
- * `replicates` resamples of `weekCount` clusters drawn with replacement, as multiplicity
- * vectors. Shared by every pool of one comparison, so a difference of two pools is taken
- * inside the same resample.
- */
-export function resampleMultiplicities(
-    weekCount: number,
-    replicates: number,
-    rand: () => number
-): number[][] {
-    return Array.from({ length: replicates }, () => {
-        const multiplicity = Array.from({ length: weekCount }, () => 0);
-        Array.from({ length: weekCount }).forEach(() => {
-            multiplicity[Math.floor(rand() * weekCount)] += 1;
-        });
-        return multiplicity;
-    });
-}
-
-/** The pool's mean in one resample; `null` when the resample holds no observation. */
-export function resampledMean(
-    aggregate: WeekAggregate,
-    multiplicity: readonly number[]
-): number | null {
-    const total = multiplicity.reduce(
-        (acc, m, i) => ({
-            sum: acc.sum + m * aggregate.sums[i],
-            n: acc.n + m * aggregate.counts[i],
-        }),
-        { sum: 0, n: 0 }
-    );
-    return total.n === 0 ? null : total.sum / total.n;
 }
 
 export function pooledMean(aggregate: WeekAggregate): number | null {

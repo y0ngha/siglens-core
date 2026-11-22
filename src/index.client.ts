@@ -912,3 +912,8 @@ export type {
     PlanReason,
     ScenarioTargetLabel,
 } from './domain/outcomes/types';
+export type {
+    OutcomeRecordRow,
+    OutcomeRecordSummary,
+    OutcomeShareRecord,
+} from './domain/outcomes/summarizeOutcomeRecord';

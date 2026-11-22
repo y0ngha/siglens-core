@@ -1,5 +1,7 @@
 /** Small numeric helpers for the replay report. Pure; every function states its empty case. */
 
+import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
+
 /** Mean, or `null` for no values. */
 export function mean(values: readonly number[]): number | null {
     return values.length === 0
@@ -15,19 +17,6 @@ export function standardError(values: readonly number[]): number | null {
         values.reduce((sum, value) => sum + (value - m) ** 2, 0) /
         (values.length - 1);
     return Math.sqrt(variance / values.length);
-}
-
-/**
- * Quantile `p` (0..1) with linear interpolation between the closest ranks; `null` for
- * no values.
- */
-export function quantile(values: readonly number[], p: number): number | null {
-    if (values.length === 0) return null;
-    const sorted = values.toSorted((a, b) => a - b);
-    const position = (sorted.length - 1) * p;
-    const lower = Math.floor(position);
-    const upper = Math.ceil(position);
-    return sorted[lower] + (sorted[upper] - sorted[lower]) * (position - lower);
 }
 
 export function median(values: readonly number[]): number | null {
