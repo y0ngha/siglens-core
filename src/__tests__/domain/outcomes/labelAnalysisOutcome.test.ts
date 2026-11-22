@@ -32,6 +32,7 @@ const FORWARD: readonly Ohlc[] = [
 
 const PLAN = {
     recommendation: 'enter',
+    position: 'in_zone',
     entryLow: 97,
     entryHigh: 99,
     stop: 95,
@@ -396,6 +397,7 @@ function subjectAround(c: number): OutcomeSubject {
         ...SUBJECT,
         plan: {
             recommendation: 'enter',
+            position: 'in_zone',
             entryLow: c * 0.97,
             entryHigh: c * 0.99,
             stop: c * 0.93,

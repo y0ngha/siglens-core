@@ -8,6 +8,7 @@ import {
     extractPromptNumbers,
     inferPromptPriceDecimals,
     parsePromptReferenceLevels,
+    parsePromptSupportPrices,
     promptNumberPattern,
 } from '@/domain/analysis/promptNumbers';
 import { buildAnalysisPrompt } from '@/domain/analysis/prompt';
@@ -301,5 +302,42 @@ describe('extractGroundingNumbers', () => {
             { value: 100, decimals: 0 },
             { value: 105, decimals: 0 },
         ]);
+    });
+});
+
+describe('parsePromptSupportPrices', () => {
+    const prompt = [
+        '## Indicator Values',
+        '- 999.99 (Not a reference; 1.00% away)',
+        '## Market Reference (deterministic · advisory)',
+        '### Short-term',
+        'Resistance (above):',
+        '- 110.50 (VWAP; 0.54% away)',
+        'Support (below):',
+        '- 99.50 (Pivot S1; 0.50% away; at price — inside bar noise, not a stop or target)',
+        '- 98.00 (MA20; 2.00% away)',
+        '- 94.00 (POC; 6.00% away)',
+        '### Medium-term',
+        'Support (below):',
+        '- 98.00 (MA20; 2.00% away)',
+        '- 1,094.50 (Fib 38.2%; 9.00% away)',
+        '## Other',
+        'Support (below):',
+        '- 1.00 (Not a market reference; 1.00% away)',
+    ].join('\n');
+
+    it('reads the Support lists of the Market Reference section, nearest first, once per price, without at-price lines', () => {
+        expect(parsePromptSupportPrices(prompt)).toEqual([1094.5, 98, 94]);
+    });
+
+    it('is empty without a Market Reference section or without supports', () => {
+        expect(
+            parsePromptSupportPrices('## Other\n- 1.00 (x; 1.00% away)')
+        ).toEqual([]);
+        expect(
+            parsePromptSupportPrices(
+                '## Market Reference\nResistance (above):\n- 110.50 (VWAP; 0.54% away)'
+            )
+        ).toEqual([]);
     });
 });

@@ -166,6 +166,7 @@ export function makeRow(overrides: Partial<LabelRow> = {}): LabelRow {
             riskLevel: 'medium',
             plan: {
                 recommendation: 'enter',
+                position: 'in_zone',
                 entryLow: 98,
                 entryHigh: 100,
                 stop: 95,

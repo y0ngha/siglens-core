@@ -123,6 +123,40 @@ export function parsePromptReferenceLevels(
 /**
  * @internal
  *
+ * The support prices a prompt printed under a `Support (below):` heading of its
+ * `## Market Reference` section, without the lines flagged `at price` (inside bar noise, not
+ * offered as a stop), one per printed price, nearest first. The text-side twin of
+ * `TechnicalAssembledPrompt.printedSupportPrices` for a caller that holds only a stored
+ * prompt; a test pins the two equal on a built prompt.
+ */
+export function parsePromptSupportPrices(dynamic: string): readonly number[] {
+    const state = marketReferenceLines(dynamic).reduce<{
+        inSupport: boolean;
+        prices: readonly number[];
+    }>(
+        (acc, raw) => {
+            const line = raw.trim();
+            if (line === 'Support (below):') return { ...acc, inSupport: true };
+            const match = line.startsWith('- ')
+                ? REFERENCE_LEVEL_LINE.exec(line)
+                : null;
+            if (!acc.inSupport || match === null) {
+                return line.startsWith('- ') && acc.inSupport
+                    ? acc
+                    : { ...acc, inSupport: false };
+            }
+            return line.includes('at price')
+                ? acc
+                : { ...acc, prices: [...acc.prices, parseToken(match[1])] };
+        },
+        { inSupport: false, prices: [] }
+    );
+    return [...new Set(state.prices)].toSorted((a, b) => b - a);
+}
+
+/**
+ * @internal
+ *
  * The modal fractional-digit count of the Market Reference prices, or `2` when the
  * section prints none. Every price of one prompt renders at one precision (see
  * `priceQuoting`), so ties do not occur in practice; one resolves to the larger count.

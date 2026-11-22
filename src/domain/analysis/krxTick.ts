@@ -82,3 +82,19 @@ export function roundToKrxTick(
     const tick = krxTickSize(price, table);
     return Math.round(price / tick) * tick;
 }
+
+/**
+ * `price` rounded **up** to the next KRX tick (a price already on a tick is unchanged), for a
+ * bound that must not be crossed downward. A non-finite or non-positive value is returned
+ * unchanged. Counts the tick of `price` itself, so a result that crosses into a coarser band
+ * is still a quotable price (every coarser tick is a multiple of the finer one).
+ */
+export function ceilToKrxTick(
+    price: number,
+    table: KrxTickTable = 'share'
+): number {
+    if (!Number.isFinite(price) || price <= 0) return price;
+    const tick = krxTickSize(price, table);
+    // The epsilon keeps a value that is a tick multiple up to float noise from jumping a tick.
+    return Math.ceil(price / tick - 1e-9) * tick;
+}

@@ -1185,7 +1185,17 @@ export interface CandlePriorMove {
  */
 export type CrossDirection = 'up' | 'down';
 
-/** Risk classification used in AI analysis output. */
+/**
+ * Volatility grade of an analysis (`low` / `medium` / `high`): how far price typically
+ * moves, from ATR% of the close, drawdown from the recent high, the MA200 position and
+ * company-event context (see `computeRiskLevel`). The field is still called `riskLevel`
+ * (API-5: a rename costs a deprecation cycle for no behaviour change).
+ *
+ * It grades movement in **both** directions, not downside or direction. Measured on the
+ * 65-symbol daily replay set (2017 to 2026, 838 analyses): the mean 10-session high-low
+ * range was 9.0% for `low`, 15.0% for `medium` and 21.9% for `high`. Consumers label it
+ * "volatility", never "risk of loss".
+ */
 export type RiskLevel = 'low' | 'medium' | 'high';
 
 /** A single AI-derived signal entry inside an indicator-guide result. */
@@ -1736,6 +1746,15 @@ export interface ResolvedLevel {
 
 /**
  * @internal
+ * A resolved stop: {@link ResolvedLevel} plus where the value came from. `basis` is `null`
+ * only when `source` is `'missing'`.
+ */
+export interface ResolvedStop extends ResolvedLevel {
+    readonly basis: StopBasis | null;
+}
+
+/**
+ * @internal
  * Internal: result of action-recommendation reconciliation.
  */
 export interface ReconcileResult {
@@ -1751,14 +1770,67 @@ export interface ValidatedActionPrices {
     takeProfitPrices: number[];
 }
 
-/** Action recommendation verdict for the long-position decision tree. */
+/**
+ * Action recommendation verdict for the long-position decision tree. Computed by code from
+ * {@link PlanState} (`in_zone` is `enter`, `above_zone` and `below_zone` are `wait`,
+ * `no_setup` is `avoid`); the model's own pick is overwritten.
+ */
 export type EntryRecommendation = 'enter' | 'wait' | 'avoid';
+
+/**
+ * Where the last close sits relative to the plan's entry zone, or `no_setup` when the plan
+ * has no usable place to stand. Each name states the fact that was measured, not what to do:
+ * `above_zone` is "the close is above the zone", not "wait for a pullback".
+ */
+export type PlanPosition = 'in_zone' | 'above_zone' | 'below_zone' | 'no_setup';
+
+/**
+ * Why a plan is `no_setup`; the first matching row of the state table wins. `no_stop`: no
+ * effective stop exists (none given and none derivable, the model's was rejected, or the zone
+ * is too wide for any stop to fit the stop band); `stopped`: the close is at or below the
+ * stop; `no_room_above`: no target lies at least one ATR above the zone top.
+ */
+export type NoSetupReason = 'no_zone' | 'no_stop' | 'stopped' | 'no_room_above';
+
+/**
+ * Where the effective stop came from: the model's own value (`model`), the highest printed
+ * support that clears the stop floor (`level`), or an ATR multiple below the zone low because
+ * no printed support cleared it (`atr`, not a price level the chart shows).
+ */
+export type StopBasis = 'model' | 'level' | 'atr';
+
+/** Fields every {@link PlanState} carries. */
+interface PlanStateBase {
+    /** ATR(14) of the last bar the state was measured with; `null` when unusable. */
+    readonly atr: number | null;
+    /** Zone low minus the effective stop, in ATR (2 dp); `null` without a stop or ATR. */
+    readonly stopDistanceAtr: number | null;
+    /** Where the effective stop came from; `null` when there is no stop or its origin is unknown (a result stored before the field existed). */
+    readonly stopBasis: StopBasis | null;
+}
+
+/**
+ * The plan's state against the last close, computed by `buildPlanState`. First matching
+ * row wins: no zone, no stop, close at or below the stop, no target at least one ATR above
+ * the zone top (`no_setup`); otherwise the close above the zone top by more than 1%, below the
+ * zone low by more than 1%, or inside it.
+ */
+export type PlanState =
+    | (PlanStateBase & {
+          readonly position: 'no_setup';
+          readonly reason: NoSetupReason;
+      })
+    | (PlanStateBase & {
+          readonly position: 'in_zone' | 'above_zone' | 'below_zone';
+          /** Close beyond the nearer zone edge, in ATR (2 dp, 0 in the zone); `null` without ATR. */
+          readonly distanceAtr: number | null;
+      });
 
 /**
  * Domain-reconciled stopLoss/takeProfit fallback levels for an ActionRecommendation.
  */
 export interface ReconciledActionLevels {
-    /** Reconciled stop-loss — the AI value when valid, otherwise the domain-derived fallback. */
+    /** Reconciled stop-loss — the AI value when it clears the stop floor (one ATR below the zone low, at most five ATR below its mid), otherwise the highest printed support in that band, otherwise 1.5 ATR below the zone low. `stopBasis` says which. */
     readonly stopLoss?: number;
     /** Reconciled take-profit prices — the AI array with every target that is not strictly above the entry zone's top edge (or past the ATR cap) dropped. A dropped target is never replaced by a computed one, so the array can be shorter than the AI's, or empty (no valid target: `riskReward` is then `''`). */
     readonly takeProfitPrices?: readonly number[];
@@ -1769,13 +1841,21 @@ export interface ReconciledActionLevels {
     /** One-sentence reason for the reconciliation, suitable for a tooltip. */
     readonly reason: string;
     /**
-     * `true` when the model's `stopLoss` was rejected and core had nothing to replace it with:
-     * it is not below the entry zone's low edge and there is no usable ATR to derive a fallback
-     * from (core never invents a level). `stopLoss` above is then absent, `exit` names no stop
+     * `true` when no stop could stand and core had nothing to replace it with: the model's
+     * `stopLoss` is not below the entry zone's low edge and there is no usable ATR to derive a
+     * fallback from, or the zone is so wide (its mid more than four ATR above its low) that no
+     * stop fits one ATR below the low and within five ATR of the mid. Core never invents a
+     * level. `stopLoss` above is then absent, `exit` names no stop
      * and `riskReward` is `''`, so a consumer must treat the plan as having **no stop** and must
      * not fall back to `ActionRecommendation.stopLoss` (the rejected value). Absent otherwise.
      */
     readonly stopLossRejected?: true;
+    /**
+     * Present only when core moved the stop to meet the stop floor (one ATR below the zone
+     * low): `level` when it took the highest printed support in the allowed band, `atr` when
+     * it fell back to 1.5 ATR below the zone low. Absent when the model's own stop stood.
+     */
+    readonly stopBasis?: Exclude<StopBasis, 'model'>;
 }
 
 /**
@@ -1848,7 +1928,7 @@ export interface ActionRecommendation {
     exit: string;
     /** Korean prose: risk-reward ratio summary. */
     riskReward: string;
-    /** Verdict used by the UI to enable / disable the entry CTA. */
+    /** Verdict used by the UI to enable / disable the entry CTA. Computed from {@link PlanState} (`planState`); the model's own value is overwritten whenever a plan state exists. */
     entryRecommendation?: EntryRecommendation;
     /** Entry price range `[low, high]` or single `[price]`. */
     entryPrices?: number[];
@@ -1858,6 +1938,8 @@ export interface ActionRecommendation {
     takeProfitPrices?: number[];
     /** Domain-derived fallback levels attached when the AI's stopLoss / takeProfitPrices are invalid or missing. The original AI fields above are never mutated — consumers can compare and decide which values to display. Only core writes it: `postProcessAnalysisWithReconcile` drops any model-supplied value, so its presence means the domain corrected the AI's levels. */
     reconciledLevels?: ReconciledActionLevels;
+    /** Where the last close sits against the plan's zone (and why a plan is `no_setup`). Computed by core after reconciliation; a model-supplied value is dropped. Absent on results stored before the field existed and when no close was available. */
+    planState?: PlanState;
     /** Deterministic plan-vs-current-price arithmetic. Unlike `reconciledLevels` this is attached on every path, including the one where the AI's own levels passed validation — that path is precisely where a computed risk:reward was previously unavailable. */
     planCheck?: PlanCheck;
 }
@@ -1896,7 +1978,7 @@ export interface AnalysisResponse {
     trendBasis?: TrendBasis;
     /** Per-skill indicator guide interpretations. */
     indicatorResults: IndicatorGuideResult[];
-    /** Risk classification. */
+    /** Volatility grade (how far price typically moves; see {@link RiskLevel}). */
     riskLevel: RiskLevel;
     /** Support / resistance levels with explanations. */
     keyLevels: KeyLevels;
@@ -1935,7 +2017,7 @@ export interface FilteredAnalysisResponse {
     trendBasis?: TrendBasis | null;
     /** Per-skill indicator guide interpretations. */
     indicatorResults: IndicatorGuideResult[] | null;
-    /** Risk classification. */
+    /** Volatility grade (see {@link RiskLevel}), or `null` when locked. */
     riskLevel: RiskLevel | null;
     /** Support / resistance levels with explanations. */
     keyLevels: KeyLevels | null;
@@ -2104,6 +2186,13 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      * Returned so the caller overwrites the model's `trend` with the value the prompt stated, from one computation.
      */
     trend: AnalysisTrendReading | null;
+    /**
+     * The support prices this prompt printed beyond the at-price band (`### Stop & Target
+     * Spacing` draws its stop candidates from the same list), nearest first, one per quoted
+     * price. Handed to reconciliation as the stop-floor candidates, so a `level` stop is a
+     * price the model was shown, not a recomputation.
+     */
+    printedSupportPrices: readonly number[];
 }
 
 /**

@@ -140,7 +140,7 @@ function formatEntry(
     const plan =
         planParts.length > 0 ? planParts.join(', ') : 'no levels cited';
 
-    const headerLine = `- ${barsAgo} bars ago (${anchorDateTime}): ${entry.trend}, ${entry.riskLevel} risk | ${plan}`;
+    const headerLine = `- ${barsAgo} bars ago (${anchorDateTime}): ${entry.trend}, ${entry.riskLevel} volatility | ${plan}`;
 
     const subsequentBars = bars.slice(anchorIndex + 1);
     if (subsequentBars.length === 0) {

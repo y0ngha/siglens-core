@@ -2,6 +2,7 @@ import {
     DEFAULT_ANALYSIS_LOCALE,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
+import { parsePromptSupportPrices } from '@/domain/analysis/promptNumbers';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
 import { describe, it, expect, beforeAll, beforeEach } from 'vitest';
@@ -90,7 +91,15 @@ import type {
     SqueezeMomentumResult,
     Timeframe,
 } from '@/domain/types';
-import type { PriceQuoting } from '@/domain/analysis/promptFormat';
+import {
+    spellSmallInteger,
+    type PriceQuoting,
+} from '@/domain/analysis/promptFormat';
+import {
+    SL_FALLBACK_ATR_MULTIPLIER,
+    SL_MAX_ATR_MULTIPLIER,
+} from '@/domain/analysis/ai-levels';
+import { PLAN_MIN_ATR_SPACING } from '@/domain/analysis/planCheck';
 import { US_EQUITY_SESSION } from '@/domain/session';
 
 const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
@@ -5191,32 +5200,32 @@ describe('prompt', () => {
                 makeIndicators()
             );
 
-        it('"enter"는 bullish confluence 대신 지지 근처를 근거로 받고, 옛 규칙 문구는 남지 않는다', () => {
+        it('Step 1은 진입 구간 배치이고, 코드가 계획 상태에서 판정을 정한다고 정확히 말한다', () => {
             const out = result();
             expect(out).toContain(
-                '"enter" (other charts): price near support and no high-risk warning sign (very high ATR, a company event in the last sessions, a close under MA200).'
+                `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the close is inside the zone (or within 1% of its edges), "wait" when the zone lies below the close (a pullback plan) or above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value.`
             );
+        });
+
+        it('경고 신호로 판정을 가르던 옛 enter/wait/avoid 정의는 남지 않는다', () => {
+            const out = result();
+            expect(out).not.toContain('"enter" (other charts)');
+            expect(out).not.toContain(
+                '"wait": setup forming but not confirmed'
+            );
+            expect(out).not.toContain('"avoid": price extended from support');
             expect(out).not.toContain('bullish confluence from 2+ categories');
-        });
-
-        it('"avoid"는 약세 집계만으로 정하지 않는다', () => {
-            const out = result();
-            expect(out).toContain(
-                'A bearish indicator tally alone is not a reason for "avoid"'
-            );
             expect(out).not.toContain('bearish confluence dominates');
+            expect(out).not.toContain('Determine entryRecommendation');
         });
 
-        it('risk:reward 1.0 미만이면 "wait"를 우선하는 규칙은 단기 급락 경로 밖으로 한정한다', () => {
+        it('risk:reward 1.0 미만은 구간을 되돌림 가격대에 두는 이유이고, 단기 급락 경로 밖으로 한정한다', () => {
             const out = result();
             expect(out).toContain(
-                'Outside the short-term sell-off path, before settling on "enter", check the structural risk:reward'
+                'Outside the short-term sell-off path, check the structural risk:reward in ## Deterministic Metrics when you place the zone. A ratio below 1.0 means the nearest obstacle above is closer than the support below; it is a reason to put the zone at a named pullback level rather than at the price'
             );
             expect(out).toContain(
                 'A met indicator-agreement entry condition does not override this'
-            );
-            expect(out).not.toContain(
-                '  - Before settling on "enter", check the structural risk:reward'
             );
         });
     });
@@ -5231,14 +5240,18 @@ describe('prompt', () => {
                 makeIndicators()
             );
 
-        it('washout 경로를 가장 먼저 판정하고, 룰 엔진 판정을 재판단 없이 복사하게 한다', () => {
+        it('washout 경로는 구간을 종가 영역에 두게 하고, Step 1 바로 뒤에 온다', () => {
             const out = result();
             const washoutAt = out.indexOf(
-                '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", entryRecommendation is "enter". Copy it; do not re-judge it'
+                '  - Short-term sell-off path: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", put the entry zone at the snapshot close area so the close is inside it'
             );
             expect(washoutAt).toBeGreaterThan(-1);
+            // Step 1 states the rule first, the sell-off path is its exception that follows.
+            expect(washoutAt).toBeGreaterThan(
+                out.indexOf('- Step 1 — Place the entry zone.')
+            );
             expect(washoutAt).toBeLessThan(
-                out.indexOf('  - "enter" (other charts):')
+                out.indexOf('- Contingent Plan Mandate:')
             );
         });
 
@@ -5248,13 +5261,13 @@ describe('prompt', () => {
                 'do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone)'
             );
             expect(out).toContain(
-                'name them as risks in the prose, never as reasons to change the verdict'
+                'name them as risks in the prose, never as reasons to move the zone away from the close'
             );
         });
 
-        it('뉴스성 급락으로 판정이 보류되면 모델이 직접 판단하고 기저율을 근거로 쓰지 않는다', () => {
+        it('뉴스성 급락으로 판정이 보류되면 모델이 구간을 직접 잡고 기저율을 근거로 쓰지 않는다', () => {
             expect(result()).toContain(
-                'When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.'
+                'When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: place the zone yourself from the event and the chart, and do not cite the sell-off base rate as support.'
             );
         });
 
@@ -5312,11 +5325,147 @@ describe('prompt', () => {
                 'The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.'
             );
         });
+    });
 
-        it('near-washout 판독은 "wait"로 분류한다', () => {
-            expect(result()).toContain(
-                '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a reading that is close to a sharp short-term sell-off inside a longer-term uptrend.'
+    describe('손절 하한·목표 여유 문구와 후보 목록 (WP-15 core-2)', () => {
+        const DAY = 86_400;
+        const closes = Array.from(
+            { length: 260 },
+            (_, i) => 100 + i * 0.3 + Math.sin(i / 5) * 6
+        );
+        const daily = closes.map((close, i) => ({
+            time: 1_700_006_400 + i * DAY,
+            open: close,
+            high: close + 1.5,
+            low: close - 1.5,
+            close,
+            volume: 1000 + i,
+        }));
+        const built = () =>
+            buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                daily,
+                makeIndicators()
             );
+
+        it('Step 2의 손절 문장은 하한과 코드의 이동 규칙을 정확히 말한다', () => {
+            const { stable, dynamic } = built();
+            const out = `${stable}\n${dynamic}`;
+            expect(out).toContain(
+                `stopLoss: single number at a support level at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the low of entryPrices`
+            );
+            expect(out).toContain(
+                `Code moves a stop that is closer than ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the zone low, or more than ${spellSmallInteger(SL_MAX_ATR_MULTIPLIER)} ATR below the zone's middle, to the first printed support at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the zone low (or ${SL_FALLBACK_ATR_MULTIPLIER} ATR below the zone low when no printed support lies between ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the zone low and ${spellSmallInteger(SL_MAX_ATR_MULTIPLIER)} ATR below its middle; a zone too wide for any stop to fit in that range is left with no stop), so pick the level yourself.`
+            );
+            expect(out).not.toContain(
+                'stopLoss: single number below the nearest support that lies beyond bar noise'
+            );
+        });
+
+        it('손절 문장은 ATR 기반 가격을 직접 쓰지 말고 인쇄된 가장 낮은 지지선을 쓰게 한다', () => {
+            const { stable, dynamic } = built();
+            const out = `${stable}\n${dynamic}`;
+            expect(out).toContain(
+                'Never write that ATR-based price into stopLoss or exit: it is not a printed price; when no support lies that far below, use the lowest printed support below the zone and code replaces it. When that block says no support lies that far below, say so in exit. Must match'
+            );
+            expect(out).not.toContain(
+                'say so in exit instead of placing the stop closer'
+            );
+        });
+
+        it('takeProfitPrices는 priceTargets.bullish의 복사가 아니고, 가까운 목표는 priceTargets에만 남긴다', () => {
+            const { stable, dynamic } = built();
+            const out = `${stable}\n${dynamic}`;
+            expect(out).toContain(
+                `  - takeProfitPrices: ascending order (lowest first). It is not a copy of priceTargets.bullish: keep only the levels at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the high of entryPrices (see the same block); a nearer bullish target stays in priceTargets and is left out of takeProfitPrices.`
+            );
+            expect(out).not.toContain(
+                'skip a closer resistance rather than using it as the first target'
+            );
+        });
+
+        it('priceTargets를 그대로 쓰라는 규칙과 첫 목표 규칙은 Step 2 예외를 말한다', () => {
+            const { stable, dynamic } = built();
+            const out = `${stable}\n${dynamic}`;
+            expect(out).toContain(
+                `Use those values directly, except that takeProfitPrices leaves out every level closer than ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the high of entryPrices (Step 2), even the first priceTargets.bullish target.`
+            );
+            expect(out).toContain(
+                "(the scenario's first target, not the plan's first take-profit; see Step 2)"
+            );
+        });
+
+        it('Step 2의 첫 목표 문장은 목표를 옮기지 않고 여유가 없으면 avoid로 읽힌다고 말한다', () => {
+            const { stable, dynamic } = built();
+            expect(`${stable}\n${dynamic}`).toContain(
+                'code never moves a target, and a plan with no target that far above its zone is read as "avoid"'
+            );
+        });
+
+        it('Contingent Plan Mandate는 Step 2 간격을 따르게 하고 Market Reference 레벨을 근거로 허용한다', () => {
+            const { stable, dynamic } = built();
+            const out = `${stable}\n${dynamic}`;
+            expect(out).toContain(
+                '(with the stop and first target spaced as Step 2 requires)'
+            );
+            expect(out).toContain(
+                'a stated keyLevels/priceTargets value or a ## Market Reference level'
+            );
+        });
+
+        it('결정론 섹션에 Stop & Target Spacing 블록이 손익비 블록 뒤에 실린다', () => {
+            const { dynamic } = built();
+            expect(dynamic).toContain('### Stop & Target Spacing');
+            expect(
+                dynamic.indexOf('### Risk:Reward From Current Price')
+            ).toBeLessThan(dynamic.indexOf('### Stop & Target Spacing'));
+        });
+
+        it('printedSupportPrices는 프롬프트 텍스트에서 다시 읽은 지지선과 같다', () => {
+            const { dynamic, printedSupportPrices } = built();
+            expect(printedSupportPrices.length).toBeGreaterThan(0);
+            expect([...printedSupportPrices]).toEqual([
+                ...parsePromptSupportPrices(dynamic),
+            ]);
+        });
+
+        it('printedSupportPrices는 프롬프트가 인쇄한 지지선과 같은 목록이다', () => {
+            const { dynamic, printedSupportPrices } = built();
+            expect(printedSupportPrices.length).toBeGreaterThan(0);
+            // Nearest first, so strictly descending; each is printed under a Support heading.
+            expect(
+                printedSupportPrices.every(
+                    (price, i) => i === 0 || price < printedSupportPrices[i - 1]
+                )
+            ).toBe(true);
+            // CP-5: the heading's state carries across lines, so one reduce keeps it.
+            const priceOf = (line: string): string[] => {
+                const found = /^-\s+([\d,]+(?:\.\d+)?)/.exec(line.trim())?.[1];
+                return found === undefined ? [] : [found];
+            };
+            const supportBlocks = dynamic
+                .split('\n')
+                .reduce<{ inSupport: boolean; prices: string[] }>(
+                    (acc, line) =>
+                        line.trim() === 'Support (below):'
+                            ? { ...acc, inSupport: true }
+                            : acc.inSupport && line.trim().startsWith('- ')
+                              ? {
+                                    ...acc,
+                                    prices: [...acc.prices, ...priceOf(line)],
+                                }
+                              : { ...acc, inSupport: false },
+                    { inSupport: false, prices: [] }
+                ).prices;
+            const printed = new Set(
+                supportBlocks.map(p => Number(p.replaceAll(',', '')))
+            );
+            expect(
+                printedSupportPrices.every(price =>
+                    printed.has(Math.round(price * 100) / 100)
+                )
+            ).toBe(true);
         });
     });
 

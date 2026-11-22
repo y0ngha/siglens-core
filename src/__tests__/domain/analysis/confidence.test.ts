@@ -1567,7 +1567,8 @@ describe('unlisted chart pattern with geometry survives end-to-end (skills are g
         const reconciled = postProcessAnalysisWithReconcile(
             enriched,
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(reconciled.patternSummaries[0].keyPrices).toEqual([
             { label: '측정 목표가', price: 115 }, // height 15, up -> breakout + height

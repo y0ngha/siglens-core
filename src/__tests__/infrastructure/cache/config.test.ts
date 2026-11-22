@@ -548,13 +548,13 @@ describe('buildFinancialsCacheKey', () => {
 });
 
 describe('currency wording template versions (p32 bump set)', () => {
-    // p34 (technical) and p11 (overall) bumped again after the currency rule; p34 is the
-    // reference-level correctness change (2026-11-20). The other six still sit at their
+    // p34 (technical) and p12 (overall) bumped again after the currency rule; p34 is the
+    // reference-level correctness change (2026-11-20), p12 relabels the volatility grade. The other six still sit at their
     // currency-rule versions.
     it('pins every version whose non-Korean prompt bytes gained the currency rule', () => {
         expect(PROMPT_TEMPLATE_VERSION).toBe('p34');
         expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).toBe('f7');
-        expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p11');
+        expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p12');
         expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p12');
         expect(FINANCIALS_PROMPT_TEMPLATE_VERSION).toBe('p9');
         expect(CONGRESS_PROMPT_TEMPLATE_VERSION).toBe('p5');

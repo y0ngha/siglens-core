@@ -5,6 +5,7 @@ import type {
     FilteredActionRecommendation,
     FilteredAnalysisResponse,
     FilteredAnalysisResult,
+    PlanState,
     ReconciledActionLevels,
     Tier,
     TierConfig,
@@ -12,12 +13,20 @@ import type {
 } from '@/domain/types';
 
 type OptionalActionFieldKey =
-    'entryRecommendation' | 'entryPrices' | 'stopLoss' | 'takeProfitPrices';
+    | 'entryRecommendation'
+    | 'planState'
+    | 'entryPrices'
+    | 'stopLoss'
+    | 'takeProfitPrices';
 
 type OptionalActionField =
     | readonly [
           'entryRecommendation',
           NonNullable<FilteredActionRecommendation['entryRecommendation']>,
+      ]
+    | readonly [
+          'planState',
+          NonNullable<FilteredActionRecommendation['planState']>,
       ]
     | readonly [
           'entryPrices',
@@ -58,6 +67,19 @@ function optionalActionField<Key extends OptionalActionFieldKey>(
     return [key, value] as OptionalActionField;
 }
 
+/**
+ * The plan state a tier with the `entry` depth sees. `stopDistanceAtr` and `stopBasis`
+ * describe the stop, so they follow the `stoploss` depth: without it they are `null`
+ * (position, reason, `distanceAtr` and `atr` stay: they describe the zone and the price).
+ */
+function planStateForDepth(
+    state: PlanState | undefined,
+    allowStoploss: boolean
+): PlanState | undefined {
+    if (state === undefined || allowStoploss) return state;
+    return { ...state, stopDistanceAtr: null, stopBasis: null };
+}
+
 function filterOptionalActionFields(
     recommendation: ActionRecommendation,
     allowEntry: boolean,
@@ -69,6 +91,13 @@ function filterOptionalActionFields(
             allowEntry,
             'entryRecommendation',
             recommendation.entryRecommendation
+        ),
+        // The plan state is what `entryRecommendation` is computed from, so it rides the
+        // same `entry` depth: a tier that cannot see the verdict cannot see its basis.
+        optionalActionField(
+            allowEntry,
+            'planState',
+            planStateForDepth(recommendation.planState, allowStoploss)
         ),
         optionalActionField(
             allowEntry,
@@ -103,6 +132,9 @@ function filterReconciledLevels(
         riskReward: levels.riskReward,
         reason: levels.reason,
         ...(levels.stopLossRejected === true ? { stopLossRejected: true } : {}),
+        ...(levels.stopBasis !== undefined
+            ? { stopBasis: levels.stopBasis }
+            : {}),
     };
 }
 

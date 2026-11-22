@@ -5,6 +5,7 @@ import {
 } from '@/domain/analysis/planCheck';
 import {
     VALID_ENTRY_RECOMMENDATIONS,
+    VALID_PLAN_POSITIONS,
     VALID_RISK_LEVELS,
     VALID_TRENDS,
 } from '@/domain/analysis/normalize';
@@ -101,6 +102,13 @@ function extractPlan(rawRecommendation: unknown): OutcomeSubject['plan'] {
             asOptionalEnum(
                 raw.entryRecommendation,
                 VALID_ENTRY_RECOMMENDATIONS
+            ) ?? null,
+        // Read as stored, without validating the rest of the state: the label only needs
+        // the position, and an invalid one is `null` like an absent one.
+        position:
+            asOptionalEnum(
+                asObject(raw.planState)?.position,
+                VALID_PLAN_POSITIONS
             ) ?? null,
         entryLow,
         entryHigh,

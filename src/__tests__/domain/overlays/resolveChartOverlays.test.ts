@@ -993,7 +993,8 @@ describe('resolveChartOverlays', () => {
                 const processed = postProcessAnalysisWithReconcile(
                     alignPatternGeometry(a, [], GEOMETRIES),
                     41.35,
-                    1
+                    1,
+                    []
                 );
                 expect(
                     (processed.patternSummaries[0]?.keyPrices ?? []).map(
@@ -1067,7 +1068,8 @@ describe('resolveChartOverlays', () => {
                 const processed = postProcessAnalysisWithReconcile(
                     alignPatternGeometry(a, chartOverlays, UNDIRECTED),
                     100,
-                    1
+                    1,
+                    []
                 );
                 const labels = (
                     processed.patternSummaries[0]?.keyPrices ?? []

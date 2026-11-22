@@ -1,6 +1,7 @@
 import type {
     EntryRecommendation,
     PatternBreakoutDirection,
+    PlanPosition,
     RiskLevel,
     Trend,
 } from '@/domain/types';
@@ -26,6 +27,12 @@ export interface OutcomeSubject {
     /** `null` when the result carried no `actionRecommendation`. */
     plan: {
         recommendation: EntryRecommendation | null;
+        /**
+         * `planState.position` of the stored result. `null` when the result carries none;
+         * absent on subjects stored before the field existed (`v` is unchanged, the field is
+         * additive), so a reader treats absent and `null` alike.
+         */
+        position?: PlanPosition | null;
         entryLow: number | null;
         entryHigh: number | null;
         /** The effective stop; `null` when missing or rejected by core. Never a guessed value. */

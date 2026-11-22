@@ -1254,7 +1254,7 @@ interface AnalysisResponse {
     trend: Trend;                   // 계산값: EMA20의 20봉 변화(ATR 단위)와 종가 위치로 결정. 측정 불가일 때만 모델 값 유지
     trendBasis?: TrendBasis;        // trend를 결정한 근거 { slopeAtr, lookbackBars, emaPeriod }. 측정 불가·이전 캐시에는 없음
     indicatorResults: IndicatorGuideResult[]; // indicator_guide skill 기반 신호 (indicatorName별 그룹핑) — "보조지표" 섹션에 렌더링
-    riskLevel: RiskLevel;
+    riskLevel: RiskLevel;           // 변동성 등급(필드명은 그대로): 가격이 보통 얼마나 움직이는가이며 방향·하방 위험이 아니다
     keyLevels: KeyLevels;
     priceTargets: PriceTargets;     // 강세/약세 시나리오별 가격 목표
     patternSummaries: PatternSummary[];         // 차트 패턴 결과 (type='pattern' skill) — "차트 패턴" 섹션에 렌더링
@@ -1284,7 +1284,7 @@ summary         → summary
 partial_detail  → indicatorResults, riskLevel, keyLevels, candlePatterns
 full_detail     → patternSummaries, strategyResults, trendlines,
                   actionRecommendation.positionAnalysis
-entry           → actionRecommendation.entry, entryRecommendation, entryPrices
+entry           → actionRecommendation.entry, entryRecommendation, planState, entryPrices
 stoploss        → actionRecommendation.stopLoss
 target          → priceTargets, actionRecommendation.takeProfitPrices
 confidence      → patternSummaries[].confidenceWeight,
@@ -1308,6 +1308,36 @@ trend               계산값(모델의 선택이 아님). `computeAnalysisTrend
                     `classifyTrend`(EMA20 20봉 기울기 3%)와 같은 EMA·같은 기간이고 기울기만 퍼센트 대신 ATR이다
                     (리플레이 세트 일봉 300번째 봉부터 전 일자에서 92.9% 같은 라벨). `classifyTrend`는 그대로 둔다.
                     봉이 40개(EMA20 기간 + 룩백) 미만이거나 ATR이 없거나 0 이하·비유한이거나 종가가 양수가 아니거나 지표 배열이 봉과 맞지 않으면 측정 불가라 모델의 값이 남고 `trendBasis`는 없다.
+
+riskLevel           변동성 등급(low/medium/high, 필드명은 API-5 때문에 그대로). `computeRiskLevel`: ATR%, MA200 위치,
+                    뉴스 이벤트, 최근 고점 대비 낙폭으로 점수를 매긴다. 상승·하락 양방향의 움직임 폭을 매기며
+                    방향이나 손실 위험이 아니다. 리플레이 세트 B(65종목 일봉, 838건)에서 10세션 고저 범위 평균이
+                    low 9.0% / medium 15.0% / high 21.9%였다. 소비자는 "변동성"으로 표기한다. 프롬프트의 이전 분석
+                    줄은 `<trend>, <riskLevel> volatility`, 종합 프롬프트는 `- Volatility grade:`(`p12`)로 쓴다.
+
+entryRecommendation 계산값(모델의 선택이 아님). `actionRecommendation.planState.position`에서 결정:
+                    in_zone→enter, above_zone·below_zone→wait, no_setup→avoid. 모델의 값은 덮어쓴다(종가가 없어
+                    상태를 못 만들 때만 모델 값이 남는다).
+
+planState           종가가 플랜 진입 구간 어디에 있는가(`buildPlanState`). 첫 일치 우선: 구간 없음/유효 손절 없음/
+                    종가가 손절 이하/구간 상단보다 1 ATR 이상 위의 목표가 없음은 `no_setup`(사유 `no_zone`,
+                    `no_stop`, `stopped`, `no_room_above`), 종가가 상단×1.01 초과면 `above_zone`, 하단×0.99
+                    미만이면 `below_zone`, 아니면 `in_zone`. 값은 사실만 말한다("구간 위"이지 "눌림을 기다려라"가
+                    아님). `atr`, `stopDistanceAtr`(구간 하단−손절, ATR 단위 2자리), `distanceAtr`(종가가 가까운
+                    구간 경계 밖으로 벗어난 거리, 구간 안 0), `stopBasis`(`model`/`level`/`atr`)를 함께 싣는다.
+                    손익비 하한은 상태 조건이 아니다(손절 하한 적용 뒤 가장 가까운 목표가 기준 손익비가 1 미만인
+                    플랜이 세트 B의 88%이고 감사에서 손익비는 예측력이 없었다). `entry` 깊이로 필터링되고, 손절을 말하는 `stopDistanceAtr`·`stopBasis`는
+                    `stoploss` 깊이가 없으면 `null`이다.
+                    모델이 보낸 `planState`·`reconciledLevels`는 버린다. 캐시 읽기는 유효한 값만 유지하고 멤버가
+                    하나라도 잘못이면 통째로 버린다.
+
+손절 하한            `reconciledLevels.stopLoss`: 모델 손절이 구간 하단−1 ATR 이하이고 구간 중앙−5 ATR 이상이면
+                    유지(`model`), 아니면 그 구간의 가장 높은 인쇄된 지지선(`level`, 프롬프트가 찍은 가격
+                    그대로), 없으면 하단−1.5 ATR(중앙−5 ATR보다 낮아지지 않게 제한, `atr`, KRX는 호가 단위 반올림이고
+                    제한선에 걸리면 구역 쪽(위)으로 올림, 호가 가격이 범위 안에 없으면 손절 없음). 구간 중앙이 하단보다 4 ATR 넘게 높으면 그 범위가 비어 손절 없음
+                    (`stopLossRejected`, `no_setup/no_stop`). 하단에서 1 ATR보다 가까운 손절은 한 봉의 보통 움직임에
+                    맞는다(10개 미국 대형주 2년 일봉 백테스트, 첫 청산이 손절이던 278건 중 87%가 2세션 안에
+                    손절). ATR이 없으면 구간 아래 양수 손절만 유효하고, 무효면 `stopLossRejected`.
 
 strategyResults[]   strategy skill의 분석 결과
                     strategyName으로 식별 (예: "엘리어트 파동")

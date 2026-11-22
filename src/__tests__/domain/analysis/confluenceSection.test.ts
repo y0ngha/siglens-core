@@ -308,7 +308,7 @@ describe('formatDeterministicMetricsSection', () => {
         expect(out).not.toMatch(/Agreeing indicator groups/);
     });
 
-    it('flags a sub-1.0 ratio as a reason to wait, not to enter', () => {
+    it('flags a sub-1.0 ratio as a reason to place the zone at a pullback level, not at the price', () => {
         // resistance +1%, support -4% → 0.25
         const out = formatDeterministicMetricsSection(
             enough,
@@ -319,7 +319,7 @@ describe('formatDeterministicMetricsSection', () => {
             'Structural risk:reward from current price = 0.25'
         );
         expect(out).toContain('Below 1.0');
-        expect(out).toContain('"wait"');
+        expect(out).toContain('put the entry zone at a named pullback level');
     });
 
     it('reports a healthy ratio without the warning', () => {

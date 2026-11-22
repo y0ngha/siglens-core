@@ -185,7 +185,13 @@ describe('roundAnalysisPrices', () => {
             entryPrices: [2_000],
             stopLoss: 2_000,
         });
-        const out = postProcessAnalysisWithReconcile(rounded, 2_000, 30, 'KRW');
+        const out = postProcessAnalysisWithReconcile(
+            rounded,
+            2_000,
+            30,
+            [],
+            'KRW'
+        );
         const stop = out.actionRecommendation?.reconciledLevels?.stopLoss;
         expect(stop).toBeDefined();
         expect(stop!).toBeLessThan(2_000);

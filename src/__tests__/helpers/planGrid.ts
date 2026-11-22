@@ -58,6 +58,10 @@ export const PLAN_GRID: readonly GridCase[] = STOPS.flatMap(stop =>
     )
 );
 
+/** The ATR the case's chain runs with; `null` when the case has none. */
+export const gridAtr = (c: GridCase): number | null =>
+    c.atr === 'usable' ? GRID_ATR : null;
+
 export const gridName = (c: GridCase): string =>
     `stop=${c.stop} targets=${c.targets} entries=${c.entries} verdict=${c.verdict} atr=${c.atr}`;
 
@@ -158,7 +162,8 @@ export function postProcessGridCase(c: GridCase): AnalysisResponse {
         overlayCandidates: [],
         patternGeometries: new Map(),
         lastClose: GRID_LAST_CLOSE,
-        atr: c.atr === 'usable' ? GRID_ATR : undefined,
+        atr: gridAtr(c) ?? undefined,
+        stopCandidates: [],
         currency: 'USD',
     });
     return reconciled;
@@ -257,6 +262,7 @@ export function postProcessEdgePlan(plan: EdgePlan): AnalysisResponse {
         patternGeometries: new Map(),
         lastClose: GRID_LAST_CLOSE,
         atr: plan.atr,
+        stopCandidates: [],
         currency: 'USD',
     }).reconciled;
 }

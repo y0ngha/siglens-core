@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { krxTickSize, roundToKrxTick } from '@/domain/analysis/krxTick';
+import {
+    ceilToKrxTick,
+    krxTickSize,
+    roundToKrxTick,
+} from '@/domain/analysis/krxTick';
 import {
     formatPrice,
     formatQuotedPrice,
@@ -57,6 +61,30 @@ describe('roundToKrxTick', () => {
         expect(roundToKrxTick(0)).toBe(0);
         expect(roundToKrxTick(-120)).toBe(-120);
         expect(roundToKrxTick(Number.NaN)).toBeNaN();
+    });
+});
+
+describe('ceilToKrxTick', () => {
+    it('rounds up to the next tick of the price own band and leaves a tick price alone', () => {
+        expect(ceilToKrxTick(67_430)).toBe(67_500);
+        expect(ceilToKrxTick(67_400)).toBe(67_400);
+        expect(ceilToKrxTick(67_401)).toBe(67_500);
+        expect(ceilToKrxTick(1_999.2)).toBe(2_000);
+    });
+
+    it('never lands below the input, unlike nearest-tick rounding', () => {
+        expect(roundToKrxTick(67_430)).toBeLessThan(67_430);
+        expect(ceilToKrxTick(67_430)).toBeGreaterThanOrEqual(67_430);
+    });
+
+    it('uses the ETF/ETN table when asked', () => {
+        expect(ceilToKrxTick(10_001, 'etp')).toBe(10_005);
+    });
+
+    it('returns a non-finite or non-positive value unchanged', () => {
+        expect(ceilToKrxTick(0)).toBe(0);
+        expect(ceilToKrxTick(-5)).toBe(-5);
+        expect(ceilToKrxTick(Number.NaN)).toBeNaN();
     });
 });
 

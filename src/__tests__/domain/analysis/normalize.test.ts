@@ -755,7 +755,8 @@ describe('normalizeActionRecommendation', () => {
             const withPlanCheck = postProcessAnalysisWithReconcile(
                 { ...baseResponse, actionRecommendation: baseRec },
                 100,
-                2
+                2,
+                []
             );
             const attached = withPlanCheck.actionRecommendation?.planCheck;
             expect(attached).toBeDefined();
@@ -764,6 +765,111 @@ describe('normalizeActionRecommendation', () => {
                 withPlanCheck.actionRecommendation
             );
             expect(renormalized?.planCheck).toEqual(attached);
+        });
+
+        describe('planState', () => {
+            const stored = {
+                position: 'above_zone',
+                atr: 2,
+                stopDistanceAtr: 1.5,
+                stopBasis: 'level',
+                distanceAtr: 1.25,
+            };
+            const normalize = (planState: unknown) =>
+                normalizeActionRecommendation({ entry: 'buy', planState })
+                    ?.planState;
+
+            it('survives a cache read: the stored state of a real post-processed plan round-trips deep-equal', () => {
+                const attached = postProcessAnalysisWithReconcile(
+                    { ...baseResponse, actionRecommendation: baseRec },
+                    100,
+                    2,
+                    []
+                ).actionRecommendation;
+                expect(attached?.planState).toBeDefined();
+                expect(
+                    normalizeActionRecommendation(attached)?.planState
+                ).toEqual(attached?.planState);
+            });
+
+            it('keeps a valid zone state and a valid no_setup state', () => {
+                expect(normalize(stored)).toEqual(stored);
+                const noSetup = {
+                    position: 'no_setup',
+                    reason: 'no_room_above',
+                    atr: null,
+                    stopDistanceAtr: null,
+                    stopBasis: null,
+                };
+                expect(normalize(noSetup)).toEqual(noSetup);
+            });
+
+            it.each([
+                ['an unknown position', { ...stored, position: 'chase' }],
+                ['a non-object', 'in_zone'],
+                ['a missing atr', { ...stored, atr: undefined }],
+                ['a non-finite atr', { ...stored, atr: Number.NaN }],
+                ['a string atr', { ...stored, atr: '2' }],
+                [
+                    'a non-finite stop distance',
+                    { ...stored, stopDistanceAtr: Infinity },
+                ],
+                ['an unknown stop basis', { ...stored, stopBasis: 'guess' }],
+                ['a missing stop basis', { ...stored, stopBasis: undefined }],
+                ['a missing distance', { ...stored, distanceAtr: undefined }],
+                ['a string distance', { ...stored, distanceAtr: '1' }],
+                [
+                    'a no_setup state with an unknown reason',
+                    {
+                        position: 'no_setup',
+                        reason: 'because',
+                        atr: 2,
+                        stopDistanceAtr: null,
+                        stopBasis: null,
+                    },
+                ],
+                [
+                    'a no_setup state with no reason',
+                    {
+                        position: 'no_setup',
+                        atr: 2,
+                        stopDistanceAtr: null,
+                        stopBasis: null,
+                    },
+                ],
+            ])(
+                'drops the whole state for %s, never coerces it',
+                (_name, raw) => {
+                    expect(normalize(raw)).toBeUndefined();
+                }
+            );
+
+            it('omits the key rather than assigning undefined when there is no state', () => {
+                const result = normalizeActionRecommendation({ entry: 'buy' });
+                expect(result).not.toHaveProperty('planState');
+            });
+        });
+
+        describe('reconciledLevels.stopBasis', () => {
+            const levels = (stopBasis: unknown) =>
+                normalizeActionRecommendation({
+                    entry: 'buy',
+                    reconciledLevels: {
+                        stopLoss: 95,
+                        exit: '',
+                        riskReward: '',
+                        reason: '',
+                        stopBasis,
+                    },
+                })?.reconciledLevels;
+
+            it('keeps level and atr, drops anything else', () => {
+                expect(levels('level')?.stopBasis).toBe('level');
+                expect(levels('atr')?.stopBasis).toBe('atr');
+                expect(levels('model')).not.toHaveProperty('stopBasis');
+                expect(levels(7)).not.toHaveProperty('stopBasis');
+                expect(levels(undefined)).not.toHaveProperty('stopBasis');
+            });
         });
 
         it('riskRewardAtCurrent: 0은 살아남는다 (0=타깃 소진, null=계산 불가는 다른 의미)', () => {

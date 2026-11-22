@@ -314,6 +314,11 @@ export {
 // against a LIVE price (not the analysis-time close) to build
 // `sinceAnalysis.planNow`. Pure/sync, so Tier 2.
 export { buildPlanCheck } from './domain/analysis/planCheck';
+// The plan state `runAnalysis` attaches as `actionRecommendation.planState` (and derives
+// `entryRecommendation` from). Tier 2 for the agent's live-price `sinceAnalysis`: it feeds
+// this a plan check built against a LIVE quote, so the state reads the same rule the stored
+// one did. Server entrypoint only (like `buildPlanCheck`).
+export { buildPlanState } from './domain/analysis/planState';
 // The entry-price reference buildPlanCheck/postProcessAnalysisWithReconcile
 // use internally — exported so a consumer computing its OWN plan check
 // against a live price (siglens `sinceAnalysis.planNow`) uses the exact same
@@ -1155,6 +1160,10 @@ export type {
     PollBriefingResult,
     PriceScenario,
     PlanCheck,
+    PlanPosition,
+    PlanState,
+    NoSetupReason,
+    StopBasis,
     PriceTarget,
     PriceTargets,
     PriceTrend,

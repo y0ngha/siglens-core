@@ -502,6 +502,7 @@ async function runAnalysisImpl(
         patternArbitration,
         patternGeometries,
         trend: trendReading,
+        printedSupportPrices,
     } = buildAnalysisPrompt(
         symbol,
         companyName,
@@ -622,6 +623,7 @@ async function runAnalysisImpl(
             patternGeometries,
             lastClose,
             atr,
+            stopCandidates: printedSupportPrices,
             currency: options.currency,
             locale,
             krxTickTable: options.krxTickTable,

@@ -37,6 +37,12 @@ export interface PostProcessRawAnalysisInput {
     /** Close of the last bar, the price the plan check measures against. */
     readonly lastClose: number | undefined;
     readonly atr: number | undefined;
+    /**
+     * `TechnicalAssembledPrompt.printedSupportPrices`: the support prices the prompt printed,
+     * the stop floor's candidates. Required: omitting it would turn every `level` stop into
+     * an ATR one without a trace.
+     */
+    readonly stopCandidates: readonly number[];
     readonly currency?: CurrencyCode;
     readonly locale?: AnalysisLocale;
     readonly krxTickTable?: KrxTickTable;
@@ -64,8 +70,8 @@ export interface PostProcessedRawAnalysis {
  *
  * Everything `runAnalysis` does to a parsed model reply before it adds the computed
  * fields (`riskLevel`, `analyzedAt`, `dataAsOf`): confidence enrichment, overlay
- * resolution, pattern-geometry alignment, KRX tick rounding, SL/TP reconciliation and
- * the plan check. One function so the deterministic checks and the replay tooling run
+ * resolution, pattern-geometry alignment, KRX tick rounding, SL/TP reconciliation, the
+ * plan check and the plan state (which also sets `entryRecommendation`). One function so the deterministic checks and the replay tooling run
  * the exact chain production runs, never a copy of it.
  *
  * Overlays are resolved against the enriched analysis **before** post-processing: the
@@ -89,6 +95,7 @@ export function postProcessRawAnalysis(
         patternGeometries,
         lastClose,
         atr,
+        stopCandidates,
         currency,
         locale = DEFAULT_ANALYSIS_LOCALE,
         krxTickTable,
@@ -110,6 +117,7 @@ export function postProcessRawAnalysis(
             roundAnalysisPrices(modelOutput, currency, krxTickTable),
             lastClose,
             atr,
+            stopCandidates,
             currency,
             locale,
             krxTickTable

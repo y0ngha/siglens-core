@@ -3,6 +3,7 @@ import { checkPlanInvariants } from '@/domain/analysis/planInvariants';
 import type { ActionRecommendation, PlanCheck } from '@/domain/types';
 
 const LAST_CLOSE = 100;
+const ATR = 2;
 
 function planCheck(overrides: Partial<PlanCheck> = {}): PlanCheck {
     return {
@@ -35,7 +36,10 @@ function plan(
 }
 
 const ids = (rec: ActionRecommendation | undefined) =>
-    checkPlanInvariants(rec, LAST_CLOSE).map(violation => violation.id);
+    checkPlanInvariants(rec, LAST_CLOSE, ATR).map(violation => violation.id);
+
+const idsNoAtr = (rec: ActionRecommendation | undefined) =>
+    checkPlanInvariants(rec, LAST_CLOSE, null).map(violation => violation.id);
 
 describe('checkPlanInvariants', () => {
     it('returns nothing for a plan that holds every rule', () => {
@@ -123,31 +127,38 @@ describe('checkPlanInvariants', () => {
     });
 
     describe('stop_below_zone', () => {
+        // No ATR here: the one-ATR floor (its own describe below) would flag these stops too.
         it('flags a stop inside the zone', () => {
-            expect(ids(plan({ stopLoss: 100 }))).toEqual(['stop_below_zone']);
+            expect(idsNoAtr(plan({ stopLoss: 100 }))).toEqual([
+                'stop_below_zone',
+            ]);
         });
 
         it('flags a stop at the zone low (inclusive boundary)', () => {
-            expect(ids(plan({ stopLoss: 99 }))).toEqual(['stop_below_zone']);
+            expect(idsNoAtr(plan({ stopLoss: 99 }))).toEqual([
+                'stop_below_zone',
+            ]);
         });
 
         it('accepts a stop just below the zone low', () => {
-            expect(ids(plan({ stopLoss: 98.99 }))).toEqual([]);
+            expect(idsNoAtr(plan({ stopLoss: 98.99 }))).toEqual([]);
         });
 
         it('flags a stop above the zone', () => {
-            expect(ids(plan({ stopLoss: 120 }))).toEqual(['stop_below_zone']);
+            expect(idsNoAtr(plan({ stopLoss: 120 }))).toEqual([
+                'stop_below_zone',
+            ]);
         });
 
         it('judges a reversed entry array by its min', () => {
-            expect(ids(plan({ entryPrices: [101, 99], stopLoss: 98 }))).toEqual(
-                []
-            );
+            expect(
+                idsNoAtr(plan({ entryPrices: [101, 99], stopLoss: 98 }))
+            ).toEqual([]);
         });
 
         it('reads the reconciled stop before the model stop', () => {
             expect(
-                ids(
+                idsNoAtr(
                     plan({
                         stopLoss: 120,
                         reconciledLevels: {
@@ -162,7 +173,7 @@ describe('checkPlanInvariants', () => {
         });
 
         it('is silent when the plan has no stop', () => {
-            expect(ids(plan({ stopLoss: undefined }))).toEqual([]);
+            expect(idsNoAtr(plan({ stopLoss: undefined }))).toEqual([]);
         });
     });
 
@@ -321,21 +332,8 @@ describe('checkPlanInvariants', () => {
         });
     });
 
-    describe('avoid_untouched', () => {
-        const reconciledLevels = {
-            stopLoss: 95,
-            exit: '',
-            riskReward: '',
-            reason: '',
-        };
-
-        it('flags reconciledLevels on an avoid verdict', () => {
-            expect(
-                ids(plan({ entryRecommendation: 'avoid', reconciledLevels }))
-            ).toEqual(['avoid_untouched']);
-        });
-
-        it('applies no other rule to an avoid verdict', () => {
+    describe('avoid verdicts are checked like any other', () => {
+        it('no longer exempts an avoid verdict (avoid_untouched is retired)', () => {
             expect(
                 ids(
                     plan({
@@ -345,7 +343,124 @@ describe('checkPlanInvariants', () => {
                         planCheck: undefined,
                     })
                 )
+            ).toEqual([
+                'stop_below_zone',
+                'targets_above_zone',
+                'plan_check_consistent',
+                'stop_floor',
+            ]);
+        });
+    });
+
+    describe('stop_floor', () => {
+        // Zone low 99, ATR 2: the stop must be at or below 97.
+        it('holds at exactly one ATR below the zone low and flags a hair above it', () => {
+            expect(ids(plan({ stopLoss: 97 }))).toEqual([]);
+            expect(ids(plan({ stopLoss: 97.01 }))).toEqual(['stop_floor']);
+        });
+
+        it('is not evaluated without a usable ATR', () => {
+            const rec = plan({ stopLoss: 98.9 });
+            const flagged = (atr: number | null) =>
+                checkPlanInvariants(rec, LAST_CLOSE, atr).map(v => v.id);
+            expect(flagged(ATR)).toEqual(['stop_floor']);
+            expect(flagged(null)).toEqual([]);
+            expect(flagged(0)).toEqual([]);
+            expect(flagged(Number.NaN)).toEqual([]);
+        });
+
+        it('judges the effective stop: a reconciled one wins over the model one', () => {
+            expect(
+                ids(
+                    plan({
+                        stopLoss: 98.9,
+                        reconciledLevels: {
+                            stopLoss: 95,
+                            exit: '',
+                            riskReward: '',
+                            reason: '',
+                        },
+                    })
+                )
             ).toEqual([]);
+        });
+    });
+
+    describe('stop_cap', () => {
+        // Zone [99, 101] has its mid at 100; with ATR 2 the stop may not sit below 90.
+        it('holds at exactly five ATR below the zone mid and flags a hair beyond it', () => {
+            expect(ids(plan({ stopLoss: 90 }))).toEqual([]);
+            expect(ids(plan({ stopLoss: 89.99 }))).toEqual(['stop_cap']);
+        });
+
+        it('is not evaluated without a usable ATR or a zone', () => {
+            const rec = plan({ stopLoss: 50 });
+            expect(
+                checkPlanInvariants(rec, LAST_CLOSE, null).map(v => v.id)
+            ).not.toContain('stop_cap');
+            expect(ids(plan({ stopLoss: 50, entryPrices: [] }))).not.toContain(
+                'stop_cap'
+            );
+        });
+    });
+
+    describe('verdict_matches_state', () => {
+        const state = (position: 'in_zone' | 'above_zone') =>
+            ({
+                position,
+                atr: ATR,
+                stopDistanceAtr: 2,
+                stopBasis: 'model',
+                distanceAtr: 0,
+            }) as const;
+
+        it('passes when the verdict is the one the position maps to', () => {
+            expect(
+                ids(
+                    plan({
+                        entryRecommendation: 'enter',
+                        planState: state('in_zone'),
+                    })
+                )
+            ).toEqual([]);
+        });
+
+        it('flags a verdict that differs, or is missing, with the state present', () => {
+            expect(
+                ids(
+                    plan({
+                        entryRecommendation: 'enter',
+                        planState: state('above_zone'),
+                    })
+                )
+            ).toEqual(['verdict_matches_state']);
+            expect(
+                ids(
+                    plan({
+                        entryRecommendation: undefined,
+                        planState: state('in_zone'),
+                    })
+                )
+            ).toEqual(['verdict_matches_state']);
+        });
+
+        it('is not evaluated for a result with no state, and applies without a zone', () => {
+            expect(ids(plan({ planState: undefined }))).toEqual([]);
+            expect(
+                ids(
+                    plan({
+                        entryPrices: [],
+                        entryRecommendation: 'enter',
+                        planState: {
+                            position: 'no_setup',
+                            reason: 'no_zone',
+                            atr: ATR,
+                            stopDistanceAtr: null,
+                            stopBasis: null,
+                        },
+                    })
+                )
+            ).toEqual(['verdict_matches_state']);
         });
     });
 
@@ -356,13 +471,15 @@ describe('checkPlanInvariants', () => {
                 takeProfitPrices: [110, 100],
                 planCheck: undefined,
             }),
-            LAST_CLOSE
+            LAST_CLOSE,
+            ATR
         );
         expect(violations.map(violation => violation.id)).toEqual([
             'stop_below_zone',
             'targets_above_zone',
             'targets_ascending',
             'plan_check_consistent',
+            'stop_floor',
         ]);
         expect(violations.every(violation => violation.detail !== '')).toBe(
             true

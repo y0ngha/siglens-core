@@ -34,6 +34,18 @@ import type {
 export const ENTRY_ZONE_TOLERANCE = 0.01;
 
 /**
+ * @internal Minimum distance, in ATR, between the entry zone and the stop below it, and
+ * between the zone's top and the nearest target above it.
+ *
+ * One constant for both sides on purpose (CP-11): the stop floor (`ai-levels.ts`), the
+ * `no_room_above` rule of `buildPlanState` and the `### Stop & Target Spacing` prompt block
+ * all state the same one-ATR distance. A stop closer than this is hit by one ordinary bar:
+ * in a two-year daily backtest of 10 U.S. large caps the stops a median 0.52 ATR below the
+ * zone were hit within two sessions in 87% of the 278 trades whose first exit was the stop.
+ */
+export const PLAN_MIN_ATR_SPACING = 1;
+
+/**
  * @internal
  *
  * The stop a plan is actually read with: the reconciled one where core wrote it, else the
@@ -232,9 +244,10 @@ export function buildPlanCheck(
 
     // A long's stop sits below its entry. One that does not is not a stop the plan could
     // ever act on, so it is dropped rather than measured against. The reconciled value
-    // above covers most of these, but not all: reconciliation is skipped entirely for an
-    // `avoid` verdict, which would otherwise leave the raw AI level to report a plan as
-    // "already stopped out" simply because its stop was nonsense.
+    // above covers most of these, but not all: a model stop with no usable ATR to replace it
+    // is rejected, and a caller can hand in an analysis that never went through
+    // reconciliation; the raw AI level would otherwise report a plan as "already stopped
+    // out" simply because its stop was nonsense.
     //
     // "Below its entry" is measured against the zone's low edge, not only the mid: a
     // stop inside the zone is hit by a fill at the zone's low.

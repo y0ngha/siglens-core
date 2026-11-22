@@ -482,7 +482,8 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
         },
         // Kept for backward compatibility with cached/parsed shapes; core
         // overwrites it with `computeRiskLevel` after normalization, so the
-        // model's pick is never shown.
+        // model's pick is never shown. The value is a volatility grade (how far price
+        // typically moves, not its direction); the prompt and consumers label it so.
         riskLevel: { type: 'string', enum: ['low', 'medium', 'high'] },
         keyLevels: {
             type: 'object',
@@ -624,6 +625,8 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                 entry: { type: 'string' },
                 exit: { type: 'string' },
                 riskReward: { type: 'string' },
+                // Required by the schema, but core overwrites it from the computed plan state
+                // (`planState`) after the reply; the model's pick is never shown.
                 entryRecommendation: {
                     type: ['string', 'null'],
                     enum: ['enter', 'wait', 'avoid', null],
