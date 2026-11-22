@@ -151,7 +151,7 @@ function formatTechnical(
         snapshotDistanceSuffix(price, snapshotPrice);
     const lines: string[] = [
         `- Overall Trend: ${tech.trend}`,
-        `- Risk Level: ${tech.riskLevel}`,
+        `- Volatility grade: ${tech.riskLevel}`,
         ...(snapshotPrice !== undefined
             ? [`- Snapshot Price: ${px(snapshotPrice)}`]
             : []),

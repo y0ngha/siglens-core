@@ -2,7 +2,10 @@ import {
     effectiveStopLoss,
     entryZoneBottom,
     entryZoneTop,
+    PLAN_MIN_ATR_SPACING,
 } from '@/domain/analysis/planCheck';
+import { SL_MAX_ATR_MULTIPLIER } from '@/domain/analysis/ai-levels';
+import { ENTRY_RECOMMENDATION_BY_POSITION } from '@/domain/analysis/planState';
 import type { ActionRecommendation } from '@/domain/types';
 
 /**
@@ -16,7 +19,9 @@ export type PlanInvariantId =
     | 'targets_ascending'
     | 'reconciled_subset'
     | 'plan_check_consistent'
-    | 'avoid_untouched';
+    | 'stop_floor'
+    | 'stop_cap'
+    | 'verdict_matches_state';
 
 /**
  * @internal
@@ -62,33 +67,39 @@ function isStrictlyAscending(values: readonly number[]): boolean {
  * when that array exists (else the model's), and the zone is the min/max of the finite
  * positive `entryPrices`.
  *
- * Rules other than `avoid_untouched` apply when `entryRecommendation !== 'avoid'` and a
- * zone exists. `avoid_untouched` applies to an `avoid` verdict regardless of zone.
+ * Every rule applies to every verdict when a zone exists (reconciliation no longer skips
+ * `avoid`; the former `avoid_untouched` rule is retired with that skip):
+ *
+ * - `stop_floor`: with a usable `atr`, the effective stop is at least
+ *   `PLAN_MIN_ATR_SPACING` ATR below the zone low. Without an ATR there is nothing to
+ *   measure in and the rule is not evaluated.
+ * - `stop_cap`: with a usable `atr`, the effective stop is at most `SL_MAX_ATR_MULTIPLIER` ATR
+ *   below the zone's mid (the mean of the usable entry prices).
+ * - `verdict_matches_state`: `entryRecommendation` is the one `planState.position` maps to
+ *   (not evaluated for a result without a plan state).
+ *
  * Pure measurement: a violation is reported, never repaired.
  *
  * @param rec - The post-processed recommendation, or `undefined` when the analysis has none.
  * @param lastClose - The close the analysis was anchored to (`planCheck.currentPrice`).
+ * @param atr - ATR(14) of the last bar, or `null` / non-positive when unusable (`stop_floor`
+ *   is then skipped). Required, like every parameter a rule's outcome depends on, so a
+ *   caller cannot silently skip the floor.
  * @returns The violated rules, `[]` for a plan that holds every rule.
  */
 export function checkPlanInvariants(
     rec: ActionRecommendation | undefined,
-    lastClose: number
+    lastClose: number,
+    atr: number | null
 ): readonly PlanInvariantViolation[] {
     if (rec === undefined) return [];
-    if (rec.entryRecommendation === 'avoid') {
-        return rec.reconciledLevels === undefined
-            ? []
-            : [
-                  {
-                      id: 'avoid_untouched',
-                      detail: 'an avoid verdict carries reconciledLevels',
-                  },
-              ];
-    }
 
     const zoneLow = entryZoneBottom(rec.entryPrices);
     const zoneHigh = entryZoneTop(rec.entryPrices);
-    if (zoneLow === null || zoneHigh === null) return [];
+    const verdict = verdictViolation(rec);
+    if (zoneLow === null || zoneHigh === null) {
+        return verdict === null ? [] : [verdict];
+    }
 
     const { stop, targets } = effectivePlan(rec);
     const modelTargets = rec.takeProfitPrices ?? [];
@@ -136,10 +147,72 @@ export function checkPlanInvariants(
               }
             : null,
         planCheckViolation(rec, lastClose, zoneHigh),
+        stopFloorViolation(stop, zoneLow, atr),
+        stopCapViolation(stop, rec.entryPrices, atr),
+        verdict,
     ];
     return findings.filter(
         (finding): finding is PlanInvariantViolation => finding !== null
     );
+}
+
+/** Slack on the one-ATR floor, so a stop exactly on it is not a float-noise violation. */
+const STOP_FLOOR_EPSILON = 1e-9;
+
+/** The stop sits closer than `PLAN_MIN_ATR_SPACING` ATR below the zone low, or `null`. */
+function stopFloorViolation(
+    stop: number | undefined,
+    zoneLow: number,
+    atr: number | null
+): PlanInvariantViolation | null {
+    if (stop === undefined || !finitePositive(stop)) return null;
+    if (!finitePositive(atr)) return null;
+    const ceiling = zoneLow - atr * PLAN_MIN_ATR_SPACING;
+    return stop > ceiling + STOP_FLOOR_EPSILON
+        ? {
+              id: 'stop_floor',
+              detail: `stop ${stop} is closer than ${PLAN_MIN_ATR_SPACING} ATR (${atr}) below zone low ${zoneLow}`,
+          }
+        : null;
+}
+
+/** The stop sits more than `SL_MAX_ATR_MULTIPLIER` ATR below the zone's mid, or `null`. */
+function stopCapViolation(
+    stop: number | undefined,
+    entryPrices: readonly number[] | undefined,
+    atr: number | null
+): PlanInvariantViolation | null {
+    if (stop === undefined || !finitePositive(stop)) return null;
+    if (!finitePositive(atr)) return null;
+    const usable = (entryPrices ?? []).filter(finitePositive);
+    if (usable.length === 0) return null;
+    const mid = usable.reduce((sum, p) => sum + p, 0) / usable.length;
+    const floor = mid - atr * SL_MAX_ATR_MULTIPLIER;
+    return stop < floor - STOP_FLOOR_EPSILON
+        ? {
+              id: 'stop_cap',
+              detail: `stop ${stop} is more than ${SL_MAX_ATR_MULTIPLIER} ATR (${atr}) below zone mid ${mid}`,
+          }
+        : null;
+}
+
+/**
+ * The verdict disagrees with the plan state it is computed from. A result without a plan
+ * state (stored before the state existed, or analysed without a close) has nothing to
+ * disagree with: the absence is `plan_check_consistent`'s business, not a verdict mismatch.
+ */
+function verdictViolation(
+    rec: ActionRecommendation
+): PlanInvariantViolation | null {
+    const { planState } = rec;
+    if (planState === undefined) return null;
+    const expected = ENTRY_RECOMMENDATION_BY_POSITION[planState.position];
+    return rec.entryRecommendation === expected
+        ? null
+        : {
+              id: 'verdict_matches_state',
+              detail: `entryRecommendation ${rec.entryRecommendation ?? 'missing'} !== ${expected} for ${planState.position}`,
+          };
 }
 
 function isNullOrNonNegative(value: number | null): boolean {

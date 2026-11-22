@@ -7,6 +7,7 @@
 import { jsonrepair } from 'jsonrepair';
 import { postProcessRawAnalysis } from '@/application/market/postProcessRawAnalysis';
 import { normalizeJsonResponse } from '@/infrastructure/ai/normalizeJsonResponse';
+import { parsePromptSupportPrices } from '@/domain/analysis/promptNumbers';
 import {
     checkPlanInvariants,
     type PlanInvariantViolation,
@@ -98,6 +99,9 @@ export function evaluateAnalysisExchange(
         patternGeometries: new Map(),
         lastClose: fixture.lastClose,
         atr: fixture.atr ?? undefined,
+        // The stop floor snaps to a support the stored prompt printed; the fixture keeps
+        // that prompt, so the candidates are read back from its text.
+        stopCandidates: parsePromptSupportPrices(fixture.dynamic),
         currency: 'USD',
     });
     return {
@@ -106,7 +110,8 @@ export function evaluateAnalysisExchange(
         modelOutput,
         invariants: checkPlanInvariants(
             reconciled.actionRecommendation,
-            fixture.lastClose
+            fixture.lastClose,
+            fixture.atr
         ),
         provenance: checkPriceProvenance({
             promptDynamic: fixture.dynamic,

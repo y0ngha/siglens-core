@@ -577,3 +577,33 @@ export function extractJsonFromLlmResponse(raw: string): unknown {
 export function parseLlmPayload(raw: unknown): unknown {
     return typeof raw === 'string' ? extractJsonFromLlmResponse(raw) : raw;
 }
+
+const SMALL_INTEGER_WORDS: Readonly<Record<number, string>> = {
+    1: 'one',
+    2: 'two',
+    3: 'three',
+    4: 'four',
+    5: 'five',
+    6: 'six',
+    7: 'seven',
+    8: 'eight',
+    9: 'nine',
+    10: 'ten',
+};
+
+/**
+ * @internal
+ * A whole number from 1 to 10 as the English word ("one", "five"), for prompt prose that
+ * states a code constant in words ("at least one ATR"). Throws for anything else, so a
+ * constant changed to a value with no word fails loudly instead of printing a number the
+ * sentence does not expect (or a stale word).
+ */
+export function spellSmallInteger(value: number): string {
+    const word = SMALL_INTEGER_WORDS[value];
+    if (word === undefined) {
+        throw new Error(
+            `spellSmallInteger: no English word for ${value} (a whole number from 1 to 10 is expected)`
+        );
+    }
+    return word;
+}

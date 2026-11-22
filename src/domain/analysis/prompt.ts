@@ -114,6 +114,17 @@ import type {
 } from '@/domain/types';
 import { computeAnalysisTrend } from '@/domain/analysis/analysisTrend';
 import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
+import {
+    HORIZON_KEYS,
+    printableLevels,
+    sameFibLegAs as sameFibLegOf,
+} from '@/domain/analysis/printedReferenceLevels';
+import { printedSupportLevels } from '@/domain/analysis/stopTargetSpacing';
+import {
+    SL_FALLBACK_ATR_MULTIPLIER,
+    SL_MAX_ATR_MULTIPLIER,
+} from '@/domain/analysis/ai-levels';
+import { PLAN_MIN_ATR_SPACING } from '@/domain/analysis/planCheck';
 import { buildIndicatorStateSection } from '@/domain/analysis/indicatorState';
 import {
     CHART_OVERLAY_CANDIDATES_SECTION_HEADER,
@@ -147,6 +158,7 @@ import {
     formatSignedNumber,
     formatSignedPercent,
     priceQuoting,
+    spellSmallInteger,
     TIMEFRAME_LABEL,
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
@@ -1135,12 +1147,6 @@ export const retracementDepthSuffix = (
     return `; price ${formatNullableNumber((pulledBack / range) * PERCENTAGE_FACTOR, RETRACEMENT_DEPTH_DP)}% retraced`;
 };
 
-/** Level kinds that come from a horizon's Fibonacci leg (not the ABC projection). */
-const FIB_LEG_LEVEL_KINDS: readonly ReferenceLevel['kind'][] = [
-    'fib_retracement',
-    'fib_extension',
-];
-
 const formatHorizonBlock = (
     key: HorizonKey,
     horizon: HorizonReference,
@@ -1199,12 +1205,11 @@ const formatHorizonBlock = (
     // set replaces "compute it yourself" with a number to quote.
     const fibTable = fib == null ? [] : [formatFibTableLine(fib, quoting)];
     const abcTable = abc == null ? [] : [formatAbcTableLine(abc, quoting)];
-    const printable = (levels: readonly ReferenceLevel[]): ReferenceLevel[] =>
-        sameFibLegAs === null
-            ? [...levels]
-            : levels.filter(l => !FIB_LEG_LEVEL_KINDS.includes(l.kind));
-    const resistanceLevels = printable(horizon.levels.resistance);
-    const supportLevels = printable(horizon.levels.support);
+    const resistanceLevels = printableLevels(
+        horizon.levels.resistance,
+        sameFibLegAs
+    );
+    const supportLevels = printableLevels(horizon.levels.support, sameFibLegAs);
     const resistance =
         resistanceLevels.length > 0
             ? ['Resistance (above):', ...resistanceLevels.map(levelLine)]
@@ -1260,18 +1265,6 @@ export const formatPivotTableLine = (
 // original production position (inline, once, right after the framing
 // sentence) keeps `dynamic` a faithful reproduction of the v0.31 section
 // order rather than introducing a new standalone stable line.
-const HORIZON_KEYS = ['short', 'medium', 'long'] as const;
-
-/** Whether two horizons resolved to the very same swing pair. */
-const isSameFibLeg = (
-    a: HorizonReference['fibProjection'],
-    b: HorizonReference['fibProjection']
-): boolean =>
-    a != null &&
-    b != null &&
-    a.highIndex === b.highIndex &&
-    a.lowIndex === b.lowIndex;
-
 const formatMarketReferenceSection = (
     reference: MarketReference,
     timeframe: Timeframe,
@@ -1283,7 +1276,7 @@ const formatMarketReferenceSection = (
         MARKET_REFERENCE_HEADER,
         MARKET_REFERENCE_FRAMING,
         ANTI_FABRICATION_GUARDRAIL,
-        ...HORIZON_KEYS.map((key, index) =>
+        ...HORIZON_KEYS.map(key =>
             formatHorizonBlock(
                 key,
                 reference[key],
@@ -1291,12 +1284,7 @@ const formatMarketReferenceSection = (
                 quoting,
                 assetClass,
                 currentPrice,
-                HORIZON_KEYS.slice(0, index).find(earlier =>
-                    isSameFibLeg(
-                        reference[earlier].fibProjection,
-                        reference[key].fibProjection
-                    )
-                ) ?? null
+                sameFibLegOf(reference, key)
             )
         ),
         formatPivotTableLine(reference.pivots, quoting),
@@ -1897,7 +1885,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '### Price Target Selection',
         '- Fill priceTargets for the bullish and the bearish scenario whenever the data offers a level on that side — do not leave a scenario empty when keyLevels or ## Market Reference hold levels in its direction.',
         '- Choose target prices from levels already in this prompt: keyLevels, ## Market Reference rows and its `Fib table:` / `Fib ABC table:` / `Pivot table:` lines, and the measured / conservative targets listed in ## Chart Pattern Candidates (computed). Never project a new target price yourself (e.g. adding a pattern height to a breakout level) — the app computes pattern targets from geometry.',
-        '- First target: the nearest meaningful level in the scenario direction; second target: the next one — a Fib/ABC extension, a pivot, or a listed pattern target.',
+        "- First target: the nearest meaningful level in the scenario direction; second target: the next one — a Fib/ABC extension, a pivot, or a listed pattern target (the scenario's first target, not the plan's first take-profit; see Step 2).",
         '- State the trigger condition (breakout/breakdown reference level) for each scenario',
         '- Strengthen target viability with supporting indicators (RSI extremes, Bollinger Band touch, MACD trend)',
         '- Sort targets by proximity to current price: bullish targets in ascending price order (closest first), bearish targets in descending price order (closest first). Never return targets in arbitrary order.',
@@ -1982,21 +1970,18 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '### Action Recommendation Decision Tree',
         '- Framing (see CORE PRINCIPLES → Descriptive, not prescriptive): this section maps price levels into a conditional plan. Describe the plan as structure and conditions, never as an instruction to the reader. Write "이 구간을 회복하기 전까지 구조는 유효하지 않습니다" or "손절 기준으로 삼는 자리는 122,000원입니다", not "사는 편이 낫습니다"/"기다리세요"/"나눠서 매수하세요". The entryRecommendation enum carries the verdict; the prose carries the reasoning.',
         '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
-        '- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly.',
-        '- Step 1 — Determine entryRecommendation (in this order):',
-        '  - Short-term sell-off path first: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", entryRecommendation is "enter". Copy it; do not re-judge it and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A sub-1.0 structural ratio, a bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading\'s normal state: name them as risks in the prose, never as reasons to change the verdict.',
-        '  - When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: judge entryRecommendation yourself from the event and the chart, and do not cite the sell-off base rate as support.',
-        '  - "enter" (other charts): price near support and no high-risk warning sign (very high ATR, a company event in the last sessions, a close under MA200).',
-        '  - "wait": setup forming but not confirmed (approaching key level, awaiting breakout, mixed signals), including a reading that is close to a sharp short-term sell-off inside a longer-term uptrend.',
-        '  - "avoid": price extended from support, strong resistance overhead, or a high-risk warning sign (very high ATR, a recent company event, a close under MA200). A bearish indicator tally alone is not a reason for "avoid" — it has no measured forward edge, and it is the normal state of a sharp short-term sell-off inside a longer-term uptrend.',
-        '  - Outside the short-term sell-off path, before settling on "enter", check the structural risk:reward in ## Deterministic Metrics. A ratio below 1.0 means the nearest obstacle above is closer than the support below; prefer "wait" with a named pullback level over "enter", and say which number drove the choice. A met indicator-agreement entry condition does not override this — the two were measured to be inversely related.',
+        `- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly, except that takeProfitPrices leaves out every level closer than ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the high of entryPrices (Step 2), even the first priceTargets.bullish target.`,
+        `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the close is inside the zone (or within 1% of its edges), "wait" when the zone lies below the close (a pullback plan) or above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value.`,
+        `  - Short-term sell-off path: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", put the entry zone at the snapshot close area so the close is inside it (the verdict then follows the Step 1 state: "enter" when the close is in the zone and a target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above it), and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A sub-1.0 structural ratio, a bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading's normal state: name them as risks in the prose, never as reasons to move the zone away from the close.`,
+        '  - When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: place the zone yourself from the event and the chart, and do not cite the sell-off base rate as support.',
+        '  - Outside the short-term sell-off path, check the structural risk:reward in ## Deterministic Metrics when you place the zone. A ratio below 1.0 means the nearest obstacle above is closer than the support below; it is a reason to put the zone at a named pullback level rather than at the price, and to say which number drove the choice. A met indicator-agreement entry condition does not override this — the two were measured to be inversely related.',
         '  - The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.',
-        '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels — conditional entry zone(s), stop-loss reference, take-profit target(s), and a description of what bounds the risk and the reward (no ratio — see Step 3 riskReward rule) — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
+        '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels (with the stop and first target spaced as Step 2 requires) — conditional entry zone(s), stop-loss reference, take-profit target(s), and a description of what bounds the risk and the reward (no ratio — see Step 3 riskReward rule) — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
         '- Step 2 — Compute prices:',
-        '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
+        '  - entryPrices, stopLoss, and takeProfitPrices are REQUIRED for "enter", "wait", and "avoid" alike, whenever a supporting keyLevels/priceTargets value exists. Do not use null, 0, or made-up placeholder prices — every price must trace back to a stated keyLevels/priceTargets value or a ## Market Reference level. If no such value exists for a component, do not fabricate one — state the gap explicitly in the matching text field instead (see Contingent Plan Mandate).',
         '  - entryPrices: [low, high] range near support — the actionable zone for "enter"/"wait", or the contingent trigger zone for "avoid". Must match the entry text field exactly.',
-        '  - stopLoss: single number below the nearest support that lies beyond bar noise (real or contingent) — never on a level tagged "at price". Must match the exit text field exactly.',
-        '  - takeProfitPrices: ascending order (lowest first). Must match the exit text field exactly.',
+        `  - stopLoss: single number at a support level at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the low of entryPrices (real or contingent) — take it from the stop candidates in ## Deterministic Metrics → Stop & Target Spacing when your entry zone matches one of its anchors, otherwise from the first support in the data at least that far below your zone — never on a level tagged "at price", and never closer than ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR because a closer support is the nearest one: a stop inside ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR is hit by ordinary bar noise. Code moves a stop that is closer than ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the zone low, or more than ${spellSmallInteger(SL_MAX_ATR_MULTIPLIER)} ATR below the zone's middle, to the first printed support at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the zone low (or ${SL_FALLBACK_ATR_MULTIPLIER} ATR below the zone low when no printed support lies between ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR below the zone low and ${spellSmallInteger(SL_MAX_ATR_MULTIPLIER)} ATR below its middle; a zone too wide for any stop to fit in that range is left with no stop), so pick the level yourself. Never write that ATR-based price into stopLoss or exit: it is not a printed price; when no support lies that far below, use the lowest printed support below the zone and code replaces it. When that block says no support lies that far below, say so in exit. Must match the exit text field exactly.`,
+        `  - takeProfitPrices: ascending order (lowest first). It is not a copy of priceTargets.bullish: keep only the levels at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the high of entryPrices (see the same block); a nearer bullish target stays in priceTargets and is left out of takeProfitPrices. When the block says no resistance lies that far above, say so in exit — code never moves a target, and a plan with no target that far above its zone is read as "avoid". Must match the exit text field exactly.`,
         `- Step 3 — Write text fields in plain ${outputLanguageName(locale)}:`,
         '  - positionAnalysis: current price position vs keyLevels (support, resistance, POC)',
         '  - entry: for "enter" and "wait", provide specific long buy price ranges with reasoning. For "avoid", state the conditional trigger explicitly (e.g. "OO 저항선을 거래량 동반 돌파 시") and give the contingent entry range tied to that trigger, using only a trigger level that is actually present in keyLevels — if none exists, say so instead of inventing one.',
@@ -2903,5 +2888,11 @@ export function buildAnalysisPrompt(
             patternCandidateGeometries
         ),
         trend: trendReading,
+        // Already the printed prices (`printedLevelsOnSide` replaces each level's price with
+        // the one the prompt prints), so the stop floor decides on what the model read.
+        printedSupportPrices: printedSupportLevels(
+            marketReference,
+            quoting
+        ).map(level => level.price),
     };
 }

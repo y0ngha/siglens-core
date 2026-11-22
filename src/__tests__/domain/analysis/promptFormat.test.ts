@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { SL_MAX_ATR_MULTIPLIER } from '@/domain/analysis/ai-levels';
+import { PLAN_MIN_ATR_SPACING } from '@/domain/analysis/planCheck';
 import {
     differenceDecimalPlaces,
     equityListingContext,
@@ -13,6 +15,7 @@ import {
     parseLlmPayload,
     priceDecimalPlaces,
     sharedPriceDecimalPlaces,
+    spellSmallInteger,
     stripLlmJsonFence,
     parseCalendarDate,
 } from '@/domain/analysis/promptFormat';
@@ -400,5 +403,28 @@ describe('parseCalendarDate', () => {
 
     it('returns null for an unparseable string', () => {
         expect(parseCalendarDate('not a date')).toBeNull();
+    });
+});
+
+describe('spellSmallInteger', () => {
+    it.each([
+        [1, 'one'],
+        [2, 'two'],
+        [5, 'five'],
+        [10, 'ten'],
+    ])('spells %s as %s', (value, word) => {
+        expect(spellSmallInteger(value)).toBe(word);
+    });
+
+    it.each([0, -1, 11, 1.5, Number.NaN, Number.POSITIVE_INFINITY])(
+        'throws for %s instead of printing a number the sentence does not expect',
+        value => {
+            expect(() => spellSmallInteger(value)).toThrow(/no English word/);
+        }
+    );
+
+    it('covers every word the prompt prose uses for the ATR constants', () => {
+        expect(spellSmallInteger(PLAN_MIN_ATR_SPACING)).toBe('one');
+        expect(spellSmallInteger(SL_MAX_ATR_MULTIPLIER)).toBe('five');
     });
 });

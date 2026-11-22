@@ -226,8 +226,8 @@ describe('formatPriorAnalysisSection', () => {
             '1Day'
         );
 
-        const newerPos = result.indexOf('high risk');
-        const olderPos = result.indexOf('low risk');
+        const newerPos = result.indexOf('high volatility');
+        const olderPos = result.indexOf('low volatility');
         expect(newerPos).toBeGreaterThan(-1);
         expect(olderPos).toBeGreaterThan(-1);
         expect(newerPos).toBeLessThan(olderPos);

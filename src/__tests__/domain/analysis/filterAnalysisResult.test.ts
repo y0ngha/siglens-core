@@ -604,6 +604,141 @@ describe('planCheck tier gating', () => {
     });
 });
 
+describe('planState tier gating', () => {
+    const planState = {
+        position: 'in_zone',
+        atr: 2,
+        stopDistanceAtr: 1.5,
+        stopBasis: 'atr',
+        distanceAtr: 0,
+    } as const;
+    const levels = {
+        stopLoss: 95,
+        exit: '',
+        riskReward: '',
+        reason: '',
+        stopBasis: 'atr',
+    } as const;
+
+    function withState(): AnalysisResponse {
+        const base = makeAnalysisResponse();
+        const rec = base.actionRecommendation;
+        if (!rec) throw new Error('fixture must carry an actionRecommendation');
+        return {
+            ...base,
+            actionRecommendation: {
+                ...rec,
+                planState,
+                reconciledLevels: levels,
+            },
+        };
+    }
+
+    it('rides the entry depth with entryRecommendation', () => {
+        const { result } = filterAnalysisResult(
+            withState(),
+            'pro',
+            restrictedConfig
+        );
+        expect(result.actionRecommendation?.planState).toEqual(planState);
+        expect(result.actionRecommendation?.entryRecommendation).toBeDefined();
+    });
+
+    it('is withheld from a tier without the entry depth', () => {
+        const { result } = filterAnalysisResult(
+            withState(),
+            'free',
+            restrictedConfig
+        );
+        expect(result.actionRecommendation?.planState).toBeUndefined();
+        expect(
+            result.actionRecommendation?.entryRecommendation
+        ).toBeUndefined();
+    });
+
+    it('is gated by entry alone: stoploss and target depth without entry do not show it', () => {
+        const config: TierConfig = {
+            ...restrictedConfig,
+            infoDepth: {
+                ...restrictedConfig.infoDepth,
+                member: ['direction', 'stoploss', 'target'],
+            },
+        };
+        const { result } = filterAnalysisResult(withState(), 'member', config);
+        expect(result.actionRecommendation?.planState).toBeUndefined();
+        expect(result.actionRecommendation?.stopLoss).toBeDefined();
+    });
+
+    it('hides the stop-describing members without the stoploss depth, keeping the zone and price ones (entry only)', () => {
+        const config: TierConfig = {
+            ...restrictedConfig,
+            infoDepth: {
+                ...restrictedConfig.infoDepth,
+                member: ['direction', 'entry'],
+            },
+        };
+        const { result } = filterAnalysisResult(withState(), 'member', config);
+        expect(result.actionRecommendation?.planState).toEqual({
+            ...planState,
+            stopDistanceAtr: null,
+            stopBasis: null,
+        });
+    });
+
+    it('hides them from no_setup states too, and shows them in full with the stoploss depth', () => {
+        const noSetup = {
+            position: 'no_setup',
+            reason: 'stopped',
+            atr: 2,
+            stopDistanceAtr: 1.5,
+            stopBasis: 'level',
+        } as const;
+        const base = withState();
+        const source: AnalysisResponse = {
+            ...base,
+            actionRecommendation: base.actionRecommendation && {
+                ...base.actionRecommendation,
+                planState: noSetup,
+            },
+        };
+        const entryOnly: TierConfig = {
+            ...restrictedConfig,
+            infoDepth: {
+                ...restrictedConfig.infoDepth,
+                member: ['direction', 'entry'],
+            },
+        };
+        expect(
+            filterAnalysisResult(source, 'member', entryOnly).result
+                .actionRecommendation?.planState
+        ).toEqual({ ...noSetup, stopDistanceAtr: null, stopBasis: null });
+        expect(
+            filterAnalysisResult(source, 'pro', restrictedConfig).result
+                .actionRecommendation?.planState
+        ).toEqual(noSetup);
+    });
+
+    it('omits the key when the source carries no plan state', () => {
+        const { result } = filterAnalysisResult(
+            makeAnalysisResponse(),
+            'pro',
+            restrictedConfig
+        );
+        expect(result.actionRecommendation).not.toHaveProperty('planState');
+    });
+
+    it('keeps the stop basis of the reconciled levels for a tier that sees them', () => {
+        const { result } = filterAnalysisResult(
+            withState(),
+            'pro',
+            restrictedConfig
+        );
+        expect(result.actionRecommendation?.reconciledLevels?.stopBasis).toBe(
+            'atr'
+        );
+    });
+});
+
 describe('dataAsOf passthrough', () => {
     const dataAsOf = { barTime: 1_705_312_200, close: 103 };
 

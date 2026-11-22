@@ -26,6 +26,7 @@ vi.mock('@/domain/analysis/prompt', () => ({
         patternArbitration: { kept: [], dropped: [] },
         patternGeometries: new Map(),
         trend: null,
+        printedSupportPrices: [],
     })),
 }));
 vi.mock('@/domain/indicators/fearGreed', async () => ({
@@ -476,6 +477,7 @@ describe('runAnalysis', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
                 trend,
+                printedSupportPrices: [],
             });
 
             it("overwrites the model's trend with the computed one and attaches trendBasis", async () => {
@@ -1788,6 +1790,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
                 trend: null,
+                printedSupportPrices: [],
             });
 
             await runAnalysis(
@@ -1834,6 +1837,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
                 trend: null,
+                printedSupportPrices: [],
             });
             const reconciledWithCandidate: AnalysisResponse = {
                 ...mockRawResult,
@@ -1959,6 +1963,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
                 trend: null,
+                printedSupportPrices: [],
             });
             const reconciledWithUnknownId: AnalysisResponse = {
                 ...mockRawResult,
@@ -2027,6 +2032,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
                 trend: null,
+                printedSupportPrices: [],
             });
             const citedByStrategy: AnalysisResponse = {
                 ...mockRawResult,
@@ -2083,6 +2089,32 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             infoSpy.mockRestore();
         });
 
+        it('프롬프트가 인쇄한 지지선 목록을 손절 하한 후보로 후처리에 그대로 넘긴다', async () => {
+            const printed = [98.5, 96, 91.25];
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: [],
+                patternScreenFailure: null,
+                patternArbitration: { kept: [], dropped: [] },
+                patternGeometries: new Map(),
+                trend: null,
+                printedSupportPrices: printed,
+            });
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            const postArgs =
+                mockPostProcessAnalysisWithReconcile.mock.lastCall!;
+            expect(postArgs[3]).toEqual(printed);
+        });
+
         it('krxTickTable 옵션을 프롬프트와 후처리에 그대로 넘긴다', async () => {
             await runAnalysis(
                 mockSymbol,
@@ -2105,8 +2137,8 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             ]);
             const postArgs =
                 mockPostProcessAnalysisWithReconcile.mock.lastCall!;
-            expect(postArgs[3]).toBe('KRW');
-            expect(postArgs[5]).toBe('etp');
+            expect(postArgs[4]).toBe('KRW');
+            expect(postArgs[6]).toBe('etp');
         });
 
         it('session이 있으면 같은 세션과 시각을 프롬프트 빌더에 시장 시계로 넘기고, 없으면 넘기지 않는다', async () => {
@@ -2147,6 +2179,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 patternArbitration: { kept: [], dropped: [] },
                 patternGeometries: new Map(),
                 trend: null,
+                printedSupportPrices: [],
             });
             const warnSpy = vi
                 .spyOn(console, 'warn')

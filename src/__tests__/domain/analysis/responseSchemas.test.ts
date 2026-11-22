@@ -609,14 +609,14 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         start: trendlinePointSample,
         end: { time: 2, price: 20 },
     };
-    // `planCheck` and `reconciledLevels` are computed by the domain after the model
+    // `planCheck`, `planState` and `reconciledLevels` are computed by the domain after the model
     // answers and are deliberately absent from the response schema — asking the model to
     // emit a field the domain owns spends tokens and invites it to author the very number
     // the field exists to take away from it (a model-filled `reconciledLevels` was shown
     // to readers as core's correction).
     type LlmAuthoredActionRecommendation = Omit<
         Required<ActionRecommendation>,
-        'planCheck' | 'reconciledLevels'
+        'planCheck' | 'planState' | 'reconciledLevels'
     >;
     const actionSample: LlmAuthoredActionRecommendation = {
         positionAnalysis: '포지션',

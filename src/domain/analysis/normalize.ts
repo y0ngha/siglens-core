@@ -9,7 +9,10 @@ import type {
     KeyLevels,
     KeyPrice,
     PatternTargetGeometry,
+    NoSetupReason,
     PlanCheck,
+    PlanPosition,
+    PlanState,
     PriceScenario,
     PriceTarget,
     PriceTargets,
@@ -18,6 +21,7 @@ import type {
     RawStrategyResult,
     RiskLevel,
     SignalStrength,
+    StopBasis,
     Trend,
     Trendline,
     TrendlineDirection,
@@ -357,7 +361,63 @@ function normalizeReconciledActionLevels(
         // Omitted rather than `false`: the marker is additive, so shapes without it
         // (every analysis cached before it existed) stay byte-identical.
         ...(o.stopLossRejected === true ? { stopLossRejected: true } : {}),
+        // Only the two moved-stop bases are stored; anything else is dropped, never coerced.
+        ...(o.stopBasis === 'level' || o.stopBasis === 'atr'
+            ? { stopBasis: o.stopBasis }
+            : {}),
     };
+}
+
+/** @internal Closed value set of the stored plan position, shared with readers of stored analyses. */
+export const VALID_PLAN_POSITIONS: readonly PlanPosition[] = [
+    'in_zone',
+    'above_zone',
+    'below_zone',
+    'no_setup',
+];
+const ZONE_POSITIONS = ['in_zone', 'above_zone', 'below_zone'] as const;
+const VALID_NO_SETUP_REASONS: readonly NoSetupReason[] = [
+    'no_zone',
+    'no_stop',
+    'stopped',
+    'no_room_above',
+];
+const VALID_STOP_BASES: readonly StopBasis[] = ['model', 'level', 'atr'];
+
+/** A finite number or an explicit `null` (a missing key or any other value is invalid). */
+const isFiniteOrNull = (v: unknown): v is number | null =>
+    v === null || (typeof v === 'number' && Number.isFinite(v));
+
+/**
+ * @internal Normalizes the plan state `postProcessAnalysisWithReconcile` attaches (see
+ * `PlanState`). Kept on a cache read, dropped (`undefined`) when **any** member is invalid:
+ * a half-formed state would drive a badge the stored plan does not support, so it is never
+ * repaired or coerced. Every member must be present (a missing `distanceAtr` is invalid
+ * too); `null` is a valid value only where the type allows it.
+ */
+function normalizePlanState(raw: unknown): PlanState | undefined {
+    const o = asObject(raw);
+    if (!o) return undefined;
+    const { atr, stopDistanceAtr, stopBasis, position } = o;
+    if (!isFiniteOrNull(atr) || !isFiniteOrNull(stopDistanceAtr)) {
+        return undefined;
+    }
+    const basis =
+        stopBasis === null
+            ? null
+            : (VALID_STOP_BASES.find(b => b === stopBasis) ?? undefined);
+    if (basis === undefined) return undefined;
+    const base = { atr, stopDistanceAtr, stopBasis: basis };
+
+    if (position === 'no_setup') {
+        const reason = VALID_NO_SETUP_REASONS.find(r => r === o.reason);
+        return reason === undefined ? undefined : { ...base, position, reason };
+    }
+    const zonePosition = ZONE_POSITIONS.find(p => p === position);
+    if (zonePosition === undefined || !isFiniteOrNull(o.distanceAtr)) {
+        return undefined;
+    }
+    return { ...base, position: zonePosition, distanceAtr: o.distanceAtr };
 }
 
 /**
@@ -402,6 +462,7 @@ export function normalizeActionRecommendation(
     if (!positionAnalysis && !entry && !exit && !riskReward) return undefined;
 
     const planCheck = normalizePlanCheck(o.planCheck);
+    const planState = normalizePlanState(o.planState);
 
     return {
         positionAnalysis,
@@ -428,6 +489,10 @@ export function normalizeActionRecommendation(
         // here would change a shape existing consumers and fixtures already see,
         // which is out of scope for this read-path fix.
         ...(planCheck !== undefined ? { planCheck } : {}),
+        // Same read-path reasoning as `planCheck`: attached after the model reply, so the raw
+        // path never has one (and `postProcessAnalysisWithReconcile` drops a model-supplied
+        // value), but a stored result does and must keep it.
+        ...(planState !== undefined ? { planState } : {}),
     };
 }
 

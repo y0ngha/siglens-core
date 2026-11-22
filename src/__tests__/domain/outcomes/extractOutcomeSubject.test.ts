@@ -107,6 +107,7 @@ describe('extractOutcomeSubject — plan', () => {
         expect(extract({ actionRecommendation: 'wait' })?.plan).toBeNull();
         expect(plan({})).toEqual({
             recommendation: null,
+            position: null,
             entryLow: null,
             entryHigh: null,
             stop: null,
@@ -123,6 +124,19 @@ describe('extractOutcomeSubject — plan', () => {
             ).toBe(recommendation);
         }
     );
+
+    it.each(['in_zone', 'above_zone', 'below_zone', 'no_setup'] as const)(
+        'keeps the %s plan position',
+        position => {
+            expect(plan({ planState: { position } })?.position).toBe(position);
+        }
+    );
+
+    it('has no position without a plan state, or with an unknown or malformed one', () => {
+        expect(plan({})?.position).toBeNull();
+        expect(plan({ planState: { position: 'chase' } })?.position).toBeNull();
+        expect(plan({ planState: 'in_zone' })?.position).toBeNull();
+    });
 
     it('drops an unknown verdict', () => {
         expect(plan({ entryRecommendation: 'buy' })?.recommendation).toBeNull();

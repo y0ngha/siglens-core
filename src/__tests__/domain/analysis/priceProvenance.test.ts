@@ -520,6 +520,7 @@ describe('checkPriceProvenance — KRW prompt built by buildAnalysisPrompt', () 
             patternGeometries: new Map(),
             lastClose,
             atr: undefined,
+            stopCandidates: [],
             currency: 'KRW',
             krxTickTable: 'share',
         });

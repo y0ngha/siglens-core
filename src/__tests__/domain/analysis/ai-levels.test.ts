@@ -2,9 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
     isValidBullishStopLoss,
     isValidBullishTakeProfit,
-    deriveFallbackStopLoss,
     deriveFallbackTakeProfit,
     resolveBullishStopLoss,
+    isStopBandEmpty,
     resolveBullishTakeProfit,
     buildBullishExitText,
     buildBullishRiskRewardText,
@@ -15,6 +15,8 @@ import {
     SL_MAX_ATR_MULTIPLIER,
     TP_MAX_ATR_MULTIPLIER,
 } from '@/domain/analysis/ai-levels';
+import { PLAN_MIN_ATR_SPACING } from '@/domain/analysis/planCheck';
+import { ceilToKrxTick, roundToKrxTick } from '@/domain/analysis/krxTick';
 import type {
     ActionRecommendation,
     AnalysisResponse,
@@ -108,21 +110,6 @@ describe('isValidBullishTakeProfit — 진입 구간 상단', () => {
     });
 });
 
-describe('deriveFallbackStopLoss', () => {
-    it('ATR이 있으면 entryPrice - ATR * SL_FALLBACK_ATR_MULTIPLIER를 반환한다', () => {
-        const expected = entryPrice - atr * SL_FALLBACK_ATR_MULTIPLIER;
-        expect(deriveFallbackStopLoss(entryPrice, atr)).toBeCloseTo(expected);
-    });
-
-    it('ATR이 없으면 undefined를 반환한다', () => {
-        expect(deriveFallbackStopLoss(entryPrice, undefined)).toBeUndefined();
-    });
-
-    it('ATR이 0이면 undefined를 반환한다', () => {
-        expect(deriveFallbackStopLoss(entryPrice, 0)).toBeUndefined();
-    });
-});
-
 describe('deriveFallbackTakeProfit', () => {
     it('ATR이 있으면 entryPrice + ATR * TP_FALLBACK_ATR_MULTIPLIER를 반환한다', () => {
         const expected = entryPrice + atr * TP_FALLBACK_ATR_MULTIPLIER;
@@ -134,23 +121,296 @@ describe('deriveFallbackTakeProfit', () => {
     });
 });
 
-describe('resolveBullishStopLoss', () => {
-    it('AI SL이 유효하면 ai source를 반환한다', () => {
-        const result = resolveBullishStopLoss(97, entryPrice, atr);
-        expect(result.source).toBe('ai');
-        expect(result.value).toBe(97);
+describe('resolveBullishStopLoss — the stop floor', () => {
+    // Zone [98, 102] around a mid of 100, ATR 2: the allowed band is [90, 96].
+    const mid = 100;
+    const low = 98;
+    const none: readonly number[] = [];
+    const identity = (price: number): number => price;
+    const resolve = (
+        aiValue: number | undefined,
+        candidates: readonly number[] = none,
+        quote: (price: number) => number = identity
+    ) => resolveBullishStopLoss(aiValue, mid, atr, low, candidates, quote);
+    const floorLow = mid - SL_MAX_ATR_MULTIPLIER * atr;
+    const floorHigh = low - PLAN_MIN_ATR_SPACING * atr;
+
+    it('keeps the model stop inside the band (basis model)', () => {
+        expect(resolve(95)).toEqual({
+            value: 95,
+            source: 'ai',
+            basis: 'model',
+        });
     });
 
-    it('AI SL이 무효하고 ATR이 있으면 fallback source를 반환한다', () => {
-        const result = resolveBullishStopLoss(200, entryPrice, atr);
-        expect(result.source).toBe('fallback');
-        expect(result.value).toBeGreaterThan(0);
+    it('accepts both band edges exactly and rejects a hair outside them', () => {
+        expect(resolve(floorHigh).basis).toBe('model');
+        expect(resolve(floorLow).basis).toBe('model');
+        expect(resolve(floorHigh + 0.01).basis).toBe('atr');
+        expect(resolve(floorLow - 0.01).basis).toBe('atr');
     });
 
-    it('AI SL이 무효하고 ATR도 없으면 missing source를 반환한다', () => {
-        const result = resolveBullishStopLoss(200, entryPrice, undefined);
-        expect(result.source).toBe('missing');
-        expect(result.value).toBeUndefined();
+    it('moves a stop closer than one ATR to the highest printed support in the band (basis level)', () => {
+        // 97.5 is inside the one-ATR gap, 85 beyond the 5-ATR cap; 94 beats 92.
+        const result = resolve(97, [92, 94, 97.5, 85]);
+        expect(result).toEqual({
+            value: 94,
+            source: 'fallback',
+            basis: 'level',
+        });
+    });
+
+    it('stores the printed price as the level stop and decides on it (raw outside the band, printed inside)', () => {
+        // Zone low 81.2212, ATR 2: the ceiling is 79.2212. The printed 79.22 is inside it.
+        const result = resolveBullishStopLoss(
+            undefined,
+            85,
+            atr,
+            81.2212,
+            [79.22],
+            identity
+        );
+        expect(result).toEqual({
+            value: 79.22,
+            source: 'fallback',
+            basis: 'level',
+        });
+        // A printed 79.23 is outside the same ceiling: no level, the ATR fallback instead.
+        expect(
+            resolveBullishStopLoss(
+                undefined,
+                85,
+                atr,
+                81.2212,
+                [79.23],
+                identity
+            ).basis
+        ).toBe('atr');
+    });
+
+    it('takes a candidate exactly on either band edge', () => {
+        expect(resolve(97, [floorHigh]).value).toBe(floorHigh);
+        expect(resolve(97, [floorLow]).value).toBe(floorLow);
+    });
+
+    it('falls back to 1.5 ATR below the zone low when no printed support is in the band (basis atr)', () => {
+        const result = resolve(97, [97.5, 85]);
+        expect(result).toEqual({
+            value: low - SL_FALLBACK_ATR_MULTIPLIER * atr,
+            source: 'fallback',
+            basis: 'atr',
+        });
+    });
+
+    it('measures the fallback from the zone low, not the zone mid', () => {
+        // The old rule took the mid-based value 100 - 3 = 97, inside a wide zone.
+        expect(resolve(undefined).value).toBe(95);
+    });
+
+    it('treats a missing stop like a too-close one', () => {
+        expect(resolve(undefined, [94]).basis).toBe('level');
+        expect(resolve(undefined).basis).toBe('atr');
+    });
+
+    it('replaces a stop beyond the five-ATR cap', () => {
+        expect(resolve(80, [93]).value).toBe(93);
+        expect(resolve(80).basis).toBe('atr');
+    });
+
+    it('replaces a stop above the zone low and a non-positive one', () => {
+        expect(resolve(99).basis).toBe('atr');
+        expect(resolve(0).basis).toBe('atr');
+        expect(resolve(Number.NaN).basis).toBe('atr');
+    });
+
+    it('ignores candidates that are not finite positive prices', () => {
+        expect(
+            resolve(97, [Number.NaN, -3, 0, Number.POSITIVE_INFINITY, 93])
+        ).toEqual({ value: 93, source: 'fallback', basis: 'level' });
+    });
+
+    describe('the fallback respects the five-ATR cap; an empty band leaves no stop', () => {
+        const atr1 = 1;
+        // Zone [low, 2 x mid - low]: half-width h puts the mid h ATR above the low.
+        const zone = (halfWidth: number) => ({
+            low: 100 - halfWidth,
+            mid: 100,
+        });
+        const run = (halfWidth: number) => {
+            const { low, mid } = zone(halfWidth);
+            return resolveBullishStopLoss(
+                undefined,
+                mid,
+                atr1,
+                low,
+                [],
+                identity
+            );
+        };
+
+        it('half-width 3.5 ATR: 1.5 ATR below the low is exactly the cap, so it stands', () => {
+            expect(run(3.5)).toEqual({
+                value: 100 - 3.5 - SL_FALLBACK_ATR_MULTIPLIER,
+                source: 'fallback',
+                basis: 'atr',
+            });
+        });
+
+        it('half-width 4 ATR: the band is the single price one ATR below the low', () => {
+            // mid - 5 = low - 1: the clamp lifts 1.5 ATR below the low up to the cap.
+            expect(run(4)).toEqual({
+                value: 100 - 4 - PLAN_MIN_ATR_SPACING,
+                source: 'fallback',
+                basis: 'atr',
+            });
+        });
+
+        it('half-width 3.9 ATR: the clamp keeps the fallback inside the band', () => {
+            const { value } = run(3.9);
+            expect(value).toBeCloseTo(100 - 5);
+        });
+
+        it('half-width just over 4 ATR: the band is empty, so there is no stop', () => {
+            expect(run(4.01)).toEqual({
+                value: undefined,
+                source: 'missing',
+                basis: null,
+            });
+            expect(isStopBandEmpty(100, 100 - 4.01, atr1)).toBe(true);
+            expect(isStopBandEmpty(100, 100 - 4, atr1)).toBe(false);
+            expect(isStopBandEmpty(100, 90, undefined)).toBe(false);
+        });
+
+        describe('KRX tick rounding never crosses the cap or the one-ATR gap', () => {
+            const quote = (price: number, round?: 'up') =>
+                round === 'up'
+                    ? ceilToKrxTick(price, 'share')
+                    : roundToKrxTick(price, 'share');
+            const krxAtr = 914;
+            const mid = 72_000;
+            const cap = mid - SL_MAX_ATR_MULTIPLIER * krxAtr; // 67,430: off the 100-won tick
+            const resolveAt = (halfWidth: number) =>
+                resolveBullishStopLoss(
+                    undefined,
+                    mid,
+                    krxAtr,
+                    mid - halfWidth * krxAtr,
+                    [],
+                    quote
+                );
+
+            it('rounds the cap-bound fallback up when the nearest tick lies below the cap', () => {
+                // Nearest-tick rounding of 67,430 is 67,400, below the cap.
+                expect(roundToKrxTick(cap, 'share')).toBeLessThan(cap);
+                const result = resolveAt(3.8);
+                expect(result.basis).toBe('atr');
+                expect(result.value).toBe(67_500);
+                expect(result.value).toBeGreaterThanOrEqual(cap);
+            });
+
+            it('keeps nearest-tick rounding when it already respects the cap', () => {
+                // Half-width 3: 1.5 ATR below the low is above the cap (the cap binds only
+                // above half-width 3.5), so nothing is lifted.
+                const { low, value } = {
+                    low: mid - 3 * krxAtr,
+                    value: resolveAt(3).value,
+                };
+                expect(value).toBe(roundToKrxTick(low - 1.5 * krxAtr, 'share'));
+            });
+
+            it('has no stop when no quotable price fits between the cap and the one-ATR gap', () => {
+                // Half-width 4: the band is the single price 67,430, which is not a tick.
+                expect(resolveAt(4)).toEqual({
+                    value: undefined,
+                    source: 'missing',
+                    basis: null,
+                });
+            });
+        });
+
+        it('an empty band beats a candidate and a model stop: nothing can satisfy both ends', () => {
+            const { low, mid } = zone(5);
+            const result = resolveBullishStopLoss(
+                low - 1,
+                mid,
+                atr1,
+                low,
+                [low - 2],
+                identity
+            );
+            expect(result.source).toBe('missing');
+        });
+    });
+
+    it('rounds the ATR fallback to the KRX tick but leaves a printed support as given', () => {
+        const quote = (price: number) => roundToKrxTick(price, 'share');
+        // 71,500 - 1.5 x 900 = 70,150: off the 100-won tick.
+        const fallback = resolveBullishStopLoss(
+            undefined,
+            72_000,
+            900,
+            71_500,
+            [],
+            quote
+        );
+        expect(fallback.basis).toBe('atr');
+        expect(fallback.value).toBe(quote(70_150));
+        expect(fallback.value).not.toBe(70_150);
+        const level = resolveBullishStopLoss(
+            undefined,
+            72_000,
+            900,
+            71_500,
+            [70_300],
+            quote
+        );
+        expect(level).toEqual({
+            value: 70_300,
+            source: 'fallback',
+            basis: 'level',
+        });
+    });
+
+    it('reports a missing stop when the fallback would not be a price', () => {
+        const result = resolveBullishStopLoss(undefined, 2, 5, 2, [], identity);
+        expect(result).toEqual({
+            value: undefined,
+            source: 'missing',
+            basis: null,
+        });
+    });
+
+    describe('without a usable ATR', () => {
+        const legacy = (aiValue: number | undefined, atrValue?: number) =>
+            resolveBullishStopLoss(aiValue, mid, atrValue, low, [94], identity);
+
+        it('keeps a stop that is positive and below the zone, whatever its distance', () => {
+            expect(legacy(97)).toEqual({
+                value: 97,
+                source: 'ai',
+                basis: 'model',
+            });
+            expect(legacy(1)).toEqual({
+                value: 1,
+                source: 'ai',
+                basis: 'model',
+            });
+        });
+
+        it('leaves an invalid stop missing, never snapping to a candidate', () => {
+            expect(legacy(99)).toEqual({
+                value: undefined,
+                source: 'missing',
+                basis: null,
+            });
+            expect(legacy(undefined)).toEqual({
+                value: undefined,
+                source: 'missing',
+                basis: null,
+            });
+            expect(legacy(99, 0).source).toBe('missing');
+            expect(legacy(99, Number.NaN).source).toBe('missing');
+        });
     });
 });
 
@@ -283,6 +543,7 @@ describe('reconcileBullishActionRecommendation', () => {
             rec,
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -295,6 +556,7 @@ describe('reconcileBullishActionRecommendation', () => {
             baseRec,
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -311,6 +573,7 @@ describe('reconcileBullishActionRecommendation', () => {
             rec,
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -331,6 +594,7 @@ describe('reconcileBullishActionRecommendation', () => {
             rec,
             entryPrice,
             atr,
+            [],
             'USD',
             'en'
         );
@@ -357,6 +621,7 @@ describe('reconcileBullishActionRecommendation', () => {
             rec,
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -381,6 +646,7 @@ describe('reconcileBullishActionRecommendation', () => {
             rec,
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -401,6 +667,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 rec,
                 105,
                 2,
+                [],
                 'USD'
             );
 
@@ -412,6 +679,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 { ...rec, takeProfitPrices: [108, 115, 140] },
                 105,
                 2,
+                [],
                 'USD'
             );
 
@@ -426,6 +694,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 { ...rec, takeProfitPrices: [140, 150] },
                 105,
                 2,
+                [],
                 'USD'
             );
 
@@ -446,6 +715,7 @@ describe('reconcileBullishActionRecommendation', () => {
             { ...baseRec, stopLoss: undefined, takeProfitPrices: [95, 106] },
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -460,11 +730,15 @@ describe('reconcileBullishActionRecommendation', () => {
             { ...baseRec, stopLoss: 200, takeProfitPrices: [95, 106] },
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
         const reason = result.recommendation.reconciledLevels?.reason ?? '';
-        expect(reason).toContain('손절가가 내부 기준을 벗어나 보정했습니다');
+        expect(reason).toContain(
+            // 200 is above the zone, not merely close to its low: out of range.
+            '손절가가 내부 기준을 벗어나 ATR 기준값으로 계산했습니다'
+        );
         expect(reason).toContain('진입 구간 위가 아닌');
     });
 
@@ -481,6 +755,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 { ...zoneRec, stopLoss: 98 },
                 100,
                 atr,
+                [],
                 'USD'
             );
 
@@ -489,11 +764,12 @@ describe('reconcileBullishActionRecommendation', () => {
             expect(stop).toBeLessThan(96);
         });
 
-        it('구간 하단 바로 아래 손절은 그대로 유효하다', () => {
+        it('구간 하단에서 1 ATR 아래에 놓인 손절은 그대로 유효하다', () => {
             const result = reconcileBullishActionRecommendation(
-                { ...zoneRec, stopLoss: 95.5 },
+                { ...zoneRec, stopLoss: 93.5 },
                 100,
                 atr,
+                [],
                 'USD'
             );
 
@@ -505,6 +781,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 { ...zoneRec, takeProfitPrices: [102, 104, 108, 112] },
                 100,
                 atr,
+                [],
                 'USD'
             );
 
@@ -519,6 +796,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 { ...zoneRec, takeProfitPrices: [112, 90, 108] },
                 100,
                 atr,
+                [],
                 'USD'
             );
 
@@ -532,6 +810,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 { ...zoneRec, entryPrices: [104, 96], takeProfitPrices: [103] },
                 100,
                 atr,
+                [],
                 'USD'
             );
 
@@ -551,13 +830,14 @@ describe('reconcileBullishActionRecommendation', () => {
                 },
                 100,
                 10,
+                [],
                 'USD'
             );
 
-            // mid-based fallback = 100 - 15 = 85 is already below 90 → kept as is
+            // the fallback is measured from the zone low: 90 - 1.5 x 10 = 75 (the old mid-based 85)
             expect(
                 result.recommendation.reconciledLevels?.stopLoss
-            ).toBeCloseTo(85);
+            ).toBeCloseTo(75);
 
             const wide = reconcileBullishActionRecommendation(
                 {
@@ -568,6 +848,7 @@ describe('reconcileBullishActionRecommendation', () => {
                 },
                 100,
                 10,
+                [],
                 'USD'
             );
             // mid-based 85 would sit inside [70, 130] → measured from the low edge: 70 - 15
@@ -589,10 +870,13 @@ describe('reconcileBullishActionRecommendation', () => {
             rec,
             0.09,
             0.005,
+            [],
             'USD'
         );
 
-        expect(result.changes).toContain('stopLoss: null → 0.08250 (fallback)');
+        expect(result.changes).toContain(
+            'stopLoss: null → 0.08250 (floor, atr)'
+        );
     });
 
     it('AI 원본 필드는 수정하지 않는다', () => {
@@ -605,6 +889,7 @@ describe('reconcileBullishActionRecommendation', () => {
             rec,
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -633,7 +918,8 @@ describe('postProcessAnalysisWithReconcile', () => {
         const result = postProcessAnalysisWithReconcile(
             baseResponse,
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         expect(result).toBe(baseResponse);
@@ -651,7 +937,8 @@ describe('postProcessAnalysisWithReconcile', () => {
         const result = postProcessAnalysisWithReconcile(
             response,
             undefined,
-            atr
+            atr,
+            []
         );
 
         expect(result).toBe(response);
@@ -670,7 +957,8 @@ describe('postProcessAnalysisWithReconcile', () => {
         const result = postProcessAnalysisWithReconcile(
             response,
             undefined,
-            atr
+            atr,
+            []
         );
 
         // entryPrice = (100 + 110) / 2 = 105
@@ -692,7 +980,8 @@ describe('postProcessAnalysisWithReconcile', () => {
         const result = postProcessAnalysisWithReconcile(
             response,
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         expect(result).not.toBe(response);
@@ -711,7 +1000,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 healthy,
                 entryPrice,
-                atr
+                atr,
+                []
             );
 
             expect(
@@ -729,7 +1019,12 @@ describe('postProcessAnalysisWithReconcile', () => {
         });
 
         it('현재가가 진입 구간을 벗어나면 두 손익비가 갈라진다', () => {
-            const result = postProcessAnalysisWithReconcile(healthy, 104, atr);
+            const result = postProcessAnalysisWithReconcile(
+                healthy,
+                104,
+                atr,
+                []
+            );
             const check = result.actionRecommendation?.planCheck;
 
             expect(check?.exceedsEntryZone).toBe(true);
@@ -739,14 +1034,19 @@ describe('postProcessAnalysisWithReconcile', () => {
         });
 
         it('목표가를 이미 지난 계획은 상방 0으로 보고한다', () => {
-            const result = postProcessAnalysisWithReconcile(healthy, 106, atr);
+            const result = postProcessAnalysisWithReconcile(
+                healthy,
+                106,
+                atr,
+                []
+            );
 
             expect(
                 result.actionRecommendation?.planCheck?.riskRewardAtCurrent
             ).toBe(0);
         });
 
-        it("'avoid' 판정에도 붙는다 — 보정은 건너뛰지만 검산은 여전히 유효하다", () => {
+        it("'avoid' 판정에도 붙는다 — 보정도 다른 판정과 같다", () => {
             const response: AnalysisResponse = {
                 ...baseResponse,
                 actionRecommendation: {
@@ -759,18 +1059,18 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                atr
+                atr,
+                []
             );
 
+            // avoid 판정도 보정한다. 진입가 위에 있는 손절가는 롱이 실행할 수 있는
+            // 손절가가 아니므로 floor 손절(100 - 1.5 x 2)로 바뀌고, 100에 거래되는
+            // 차트를 "이미 손절됐다"고 보고하지 않는다.
             expect(
-                result.actionRecommendation?.reconciledLevels
-            ).toBeUndefined();
-            // 보정을 건너뛰므로 폴백할 값이 없다. 진입가 위에 있는 손절가는 롱이
-            // 실행할 수 있는 손절가가 아니므로 버려야 한다 — 남겨 두면 100에
-            // 거래되는 차트를 "이미 손절됐다"고 보고한다.
+                result.actionRecommendation?.reconciledLevels?.stopLoss
+            ).toBeCloseTo(97);
             expect(result.actionRecommendation?.planCheck).toMatchObject({
                 belowStopLoss: false,
-                riskRewardAtCurrent: null,
             });
         });
 
@@ -783,7 +1083,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                atr
+                atr,
+                []
             );
 
             // entryPrice 100 − atr 2 × 1.5 = 97
@@ -807,7 +1108,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                atr
+                atr,
+                []
             );
             const riskReward = result.actionRecommendation?.riskReward ?? '';
             expect(riskReward.startsWith('손절')).toBe(true);
@@ -827,7 +1129,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                atr
+                atr,
+                []
             );
             expect(result.actionRecommendation?.riskReward).not.toContain(
                 '\n\n'
@@ -850,7 +1153,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                atr
+                atr,
+                []
             );
             expect(result.actionRecommendation?.riskReward).toBe(
                 '모델 산문만.'
@@ -866,6 +1170,7 @@ describe('postProcessAnalysisWithReconcile', () => {
                 response,
                 entryPrice,
                 atr,
+                [],
                 'USD',
                 'en'
             );
@@ -887,7 +1192,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                atr
+                atr,
+                []
             );
             // fallback SL = 100 − 2×1.5 = 97 (같은 리스크로 원본 SL 97과 동일 텍스트가 되진 않지만
             // 유효한 손절 퍼센트가 나와야 한다). 보정이 일어났으므로
@@ -915,6 +1221,7 @@ describe('postProcessAnalysisWithReconcile', () => {
                 response,
                 entryPrice,
                 atr,
+                [],
                 'USD',
                 'en'
             );
@@ -943,7 +1250,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                bigAtr
+                bigAtr,
+                []
             );
 
             expect(
@@ -978,7 +1286,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 response,
                 entryPrice,
-                undefined // no ATR → TP fallback also unavailable, nothing to reconcile
+                undefined, // no ATR → TP fallback also unavailable, nothing to reconcile
+                []
             );
 
             expect(
@@ -993,7 +1302,8 @@ describe('postProcessAnalysisWithReconcile', () => {
             const result = postProcessAnalysisWithReconcile(
                 healthy,
                 undefined,
-                atr
+                atr,
+                []
             );
 
             expect(result.actionRecommendation?.planCheck).toBeUndefined();
@@ -1047,7 +1357,8 @@ describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels i
         const result = postProcessAnalysisWithReconcile(
             response,
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         // No reconciliation happened, so the model's own object must not survive
@@ -1092,6 +1403,7 @@ describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels i
             response,
             entryPrice,
             atr,
+            [],
             'USD',
             'en'
         );
@@ -1121,7 +1433,8 @@ describe('postProcessAnalysisWithReconcile — model-authored reconciledLevels i
         const result = postProcessAnalysisWithReconcile(
             response,
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         // 95 sits below the entry and is dropped; nearest remaining target above
@@ -1156,7 +1469,8 @@ describe('postProcessAnalysisWithReconcile — plan edges and no fabricated targ
         const result = postProcessAnalysisWithReconcile(
             response({ takeProfitPrices: [95, 108] }),
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         const levels = result.actionRecommendation?.reconciledLevels;
@@ -1170,7 +1484,8 @@ describe('postProcessAnalysisWithReconcile — plan edges and no fabricated targ
         const result = postProcessAnalysisWithReconcile(
             response({ takeProfitPrices: [95, 99], riskReward: '' }),
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         const rec = result.actionRecommendation;
@@ -1189,11 +1504,12 @@ describe('postProcessAnalysisWithReconcile — plan edges and no fabricated targ
                 takeProfitPrices: [101, 106],
             }),
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         const levels = result.actionRecommendation?.reconciledLevels;
-        expect(levels?.stopLoss).toBeCloseTo(97); // 100 - 1.5 * 2 is below 98
+        expect(levels?.stopLoss).toBeCloseTo(95); // zone low 98 - 1.5 * 2
         expect(levels?.takeProfitPrices).toEqual([106]);
         expect(levels?.reason).toContain('제외');
     });
@@ -1206,7 +1522,8 @@ describe('postProcessAnalysisWithReconcile — plan edges and no fabricated targ
                 takeProfitPrices: [104, 108],
             }),
             entryPrice,
-            atr
+            atr,
+            []
         );
 
         expect(result.actionRecommendation?.reconciledLevels).toBeUndefined();
@@ -1269,7 +1586,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [tall] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         // height 15: measured 5 − 15 = −10 and conservative 5 − 7.5 = −2.5
         // are not prices, so neither keyPrice is appended.
@@ -1287,7 +1605,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [mixed] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(result.patternSummaries[0].keyPrices).toEqual([
             { label: '보수 목표가(50%)', price: 2.5 },
@@ -1298,7 +1617,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [downPattern] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(result.patternSummaries[0].keyPrices).toEqual([
             { label: '측정 목표가', price: 130 },
@@ -1310,7 +1630,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [upPattern] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(result.patternSummaries[0].keyPrices).toEqual([
             { label: '측정 목표가', price: 115 },
@@ -1326,7 +1647,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [withExisting] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(result.patternSummaries[0].keyPrices).toEqual([
             { label: '넥라인', price: 140 },
@@ -1339,12 +1661,14 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const once = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [downPattern] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         const twice = postProcessAnalysisWithReconcile(
             once,
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(twice.patternSummaries[0].keyPrices).toEqual([
             { label: '측정 목표가', price: 130 },
@@ -1357,6 +1681,7 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
             { ...baseResponse, patternSummaries: [downPattern] },
             undefined,
             undefined,
+            [],
             'USD',
             'en'
         );
@@ -1383,7 +1708,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [channel] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         const prices = result.patternSummaries[0].keyPrices!.map(k => k.price);
         expect(prices[0]).toBe(348.33);
@@ -1405,7 +1731,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             { ...baseResponse, patternSummaries: [noGeometry] },
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(result.patternSummaries[0]).toEqual(noGeometry);
     });
@@ -1414,7 +1741,8 @@ describe('postProcessAnalysisWithReconcile — pattern-geometry targets', () => 
         const result = postProcessAnalysisWithReconcile(
             baseResponse,
             undefined,
-            undefined
+            undefined,
+            []
         );
         expect(result).toBe(baseResponse);
     });
@@ -1474,6 +1802,7 @@ describe('exit text currency', () => {
             response,
             100000,
             2000,
+            [],
             'KRW'
         );
 
@@ -1521,6 +1850,7 @@ describe('KRX ETF/ETN tick table', () => {
             fallbackResponse,
             40_000,
             123,
+            [],
             'KRW',
             undefined,
             'etp'
@@ -1529,6 +1859,7 @@ describe('KRX ETF/ETN tick table', () => {
             fallbackResponse,
             40_000,
             123,
+            [],
             'KRW'
         ).actionRecommendation?.reconciledLevels;
 
@@ -1547,12 +1878,19 @@ describe('KRX ETF/ETN tick table', () => {
                 fallbackResponse,
                 100,
                 2.37,
+                [],
                 'USD',
                 undefined,
                 'etp'
             )
         ).toEqual(
-            postProcessAnalysisWithReconcile(fallbackResponse, 100, 2.37, 'USD')
+            postProcessAnalysisWithReconcile(
+                fallbackResponse,
+                100,
+                2.37,
+                [],
+                'USD'
+            )
         );
     });
 });
@@ -1593,6 +1931,7 @@ describe('reconcileBullishActionRecommendation — normalized targets', () => {
             { ...zoneRec, ...overrides },
             entryPrice,
             atrValue,
+            [],
             'USD'
         );
 
@@ -1690,6 +2029,7 @@ describe('reconcileBullishActionRecommendation — stop with no replacement', ()
             rejectedInput,
             entryPrice,
             undefined,
+            [],
             'USD'
         );
 
@@ -1713,6 +2053,7 @@ describe('reconcileBullishActionRecommendation — stop with no replacement', ()
             rejectedInput,
             entryPrice,
             undefined,
+            [],
             'USD'
         );
 
@@ -1727,6 +2068,7 @@ describe('reconcileBullishActionRecommendation — stop with no replacement', ()
             { ...rejectedInput, stopLoss: undefined },
             entryPrice,
             undefined,
+            [],
             'USD'
         );
 
@@ -1739,6 +2081,7 @@ describe('reconcileBullishActionRecommendation — stop with no replacement', ()
             rejectedInput,
             entryPrice,
             atr,
+            [],
             'USD'
         );
 
@@ -1768,7 +2111,8 @@ describe('reconcileBullishActionRecommendation — stop with no replacement', ()
         const rec = postProcessAnalysisWithReconcile(
             response,
             entryPrice,
-            undefined
+            undefined,
+            []
         ).actionRecommendation;
 
         expect(rec?.reconciledLevels?.stopLossRejected).toBe(true);
@@ -1776,5 +2120,296 @@ describe('reconcileBullishActionRecommendation — stop with no replacement', ()
         expect(rec?.planCheck?.riskRewardAtEntry).toBeNull();
         expect(rec?.planCheck?.riskRewardAtCurrent).toBeNull();
         expect(rec?.riskReward).toBe('모델 산문');
+    });
+});
+
+describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () => {
+    const response = (rec: ActionRecommendation): AnalysisResponse => ({
+        summary: 'test',
+        trend: 'bullish',
+        indicatorResults: [],
+        riskLevel: 'low',
+        keyLevels: { support: [], resistance: [] },
+        priceTargets: {
+            bullish: { targets: [], condition: '' },
+            bearish: { targets: [], condition: '' },
+        },
+        patternSummaries: [],
+        strategyResults: [],
+        candlePatterns: [],
+        trendlines: [],
+        actionRecommendation: rec,
+    });
+    // Zone [98, 102] (mid 100), ATR 2: the allowed stop band is [90, 96].
+    const zoneRec: ActionRecommendation = {
+        ...baseRec,
+        entryRecommendation: 'wait',
+        entryPrices: [98, 102],
+        stopLoss: 97,
+        takeProfitPrices: [105, 110],
+    };
+    const run = (
+        rec: ActionRecommendation,
+        close: number | null = 100,
+        candidates: readonly number[] = []
+    ) =>
+        postProcessAnalysisWithReconcile(
+            response(rec),
+            close ?? undefined,
+            atr,
+            candidates
+        ).actionRecommendation;
+
+    describe('reconciled levels, reason and changes', () => {
+        const reconcile = (
+            rec: ActionRecommendation,
+            candidates: readonly number[] = []
+        ) =>
+            reconcileBullishActionRecommendation(
+                rec,
+                100,
+                atr,
+                candidates,
+                'USD'
+            );
+
+        it('a stop closer than one ATR moves to a printed support: level basis, stamped, with its reason and change line', () => {
+            const result = reconcile(zoneRec, [94, 92]);
+            const levels = result.recommendation.reconciledLevels;
+            expect(levels?.stopLoss).toBe(94);
+            expect(levels?.stopBasis).toBe('level');
+            expect(levels?.reason).toBe(
+                'AI가 제시한 손절가가 진입 구간 하단에서 1 ATR보다 가까워 그 아래 기준 가격대로 옮겼습니다.'
+            );
+            expect(result.changes).toContain(
+                'stopLoss: 97 → 94.00 (floor, level)'
+            );
+            expect(result.recommendation.stopLoss).toBe(97);
+        });
+
+        it('with no printed support in the band it falls to 1.5 ATR below the zone low: atr basis', () => {
+            const result = reconcile(zoneRec, [97.5]);
+            const levels = result.recommendation.reconciledLevels;
+            expect(levels?.stopLoss).toBe(95);
+            expect(levels?.stopBasis).toBe('atr');
+            expect(levels?.reason).toBe(
+                'AI가 제시한 손절가가 진입 구간 하단에서 1 ATR보다 가까워 ATR 기준값으로 계산했습니다.'
+            );
+            expect(result.changes).toContain(
+                'stopLoss: 97 → 95.00 (floor, atr)'
+            );
+        });
+
+        it('says each way a stop is replaced exactly: missing, too far, closer than one ATR', () => {
+            const reason = (rec: ActionRecommendation, c: readonly number[]) =>
+                reconcile(rec, c).recommendation.reconciledLevels?.reason;
+            expect(reason({ ...zoneRec, stopLoss: undefined }, [93])).toBe(
+                'AI가 손절가를 제시하지 않아 진입 구간 하단에서 1 ATR 이상 아래의 기준 가격대를 손절가로 정했습니다.'
+            );
+            expect(reason({ ...zoneRec, stopLoss: undefined }, [])).toBe(
+                'AI가 손절가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.'
+            );
+            expect(reason({ ...zoneRec, stopLoss: 80 }, [93])).toBe(
+                'AI가 제시한 손절가가 내부 기준을 벗어나 진입 구간 하단에서 1 ATR 이상 아래의 기준 가격대로 옮겼습니다.'
+            );
+            expect(reason({ ...zoneRec, stopLoss: 80 }, [])).toBe(
+                'AI가 제시한 손절가가 내부 기준을 벗어나 ATR 기준값으로 계산했습니다.'
+            );
+        });
+
+        it('leaves a stop that clears the floor alone: no stamp, no reconciliation', () => {
+            const result = reconcile({ ...zoneRec, stopLoss: 95 }, [94]);
+            expect(result.wasReconciled).toBe(false);
+            expect(result.recommendation.reconciledLevels).toBeUndefined();
+        });
+
+        it('keeps the model stop but still stamps nothing when only the targets change', () => {
+            const result = reconcile(
+                { ...zoneRec, stopLoss: 95, takeProfitPrices: [101, 105] },
+                []
+            );
+            expect(result.wasReconciled).toBe(true);
+            expect(
+                result.recommendation.reconciledLevels?.stopBasis
+            ).toBeUndefined();
+        });
+
+        it('reconcile marks the plan stopLossRejected with its own reason, also when the model gave no stop', () => {
+            const wide = {
+                ...zoneRec,
+                entryPrices: [95, 105],
+                stopLoss: undefined,
+                takeProfitPrices: [130],
+            };
+            const result = reconcileBullishActionRecommendation(
+                wide,
+                100,
+                1,
+                [90],
+                'USD'
+            );
+            const levels = result.recommendation.reconciledLevels;
+            expect(levels?.stopLossRejected).toBe(true);
+            expect(levels?.stopLoss).toBeUndefined();
+            expect(levels?.reason).toContain('손절가를 정할 수 없습니다');
+            expect(result.changes.join(' ')).toContain('no stop fits the band');
+        });
+
+        it('a KRX listing gets the ATR fallback at its tick', () => {
+            const result = reconcileBullishActionRecommendation(
+                {
+                    ...zoneRec,
+                    entryPrices: [71_500, 72_500],
+                    stopLoss: 71_400,
+                    takeProfitPrices: [75_000],
+                },
+                72_000,
+                900,
+                [],
+                'KRW'
+            );
+            // 71,500 - 1.5 x 900 = 70,150 is off the 100-won tick.
+            expect(result.recommendation.reconciledLevels?.stopLoss).toBe(
+                roundToKrxTick(70_150, 'share')
+            );
+        });
+    });
+
+    describe('why a stop was moved', () => {
+        const reasonFor = (stopLoss: number) =>
+            reconcileBullishActionRecommendation(
+                { ...zoneRec, stopLoss },
+                100,
+                atr,
+                [],
+                'USD'
+            ).recommendation.reconciledLevels?.reason;
+
+        it('a stop below the zone low that has not cleared one ATR is closer than one ATR', () => {
+            expect(reasonFor(97.9)).toContain('1 ATR보다 가까워');
+        });
+
+        it.each([98, 99, 120])(
+            'a stop at %s, at or above the zone low, is out of range, not "closer than one ATR"',
+            stop => {
+                expect(reasonFor(stop)).toContain('내부 기준을 벗어나');
+                expect(reasonFor(stop)).not.toContain('1 ATR보다 가까워');
+            }
+        );
+    });
+
+    describe('plan state and verdict in the full chain', () => {
+        it('attaches the state next to the plan check and overwrites the model verdict', () => {
+            // Close 100 is inside [98, 102]; the model said wait.
+            const rec = run(zoneRec);
+            expect(rec?.planState).toMatchObject({
+                position: 'in_zone',
+                atr,
+                stopBasis: 'atr',
+            });
+            expect(rec?.entryRecommendation).toBe('enter');
+            expect(rec?.planCheck).toBeDefined();
+        });
+
+        it.each([
+            [108, 'above_zone', 'wait'],
+            [96.5, 'below_zone', 'wait'],
+        ] as const)(
+            'a close at %s is %s and the verdict is %s',
+            (close, position, verdict) => {
+                const rec = run(
+                    { ...zoneRec, entryRecommendation: 'enter' },
+                    close
+                );
+                expect(rec?.planState?.position).toBe(position);
+                expect(rec?.entryRecommendation).toBe(verdict);
+            }
+        );
+
+        it('no target one ATR above the zone is no_setup and avoid, whatever the model said', () => {
+            const rec = run({
+                ...zoneRec,
+                entryRecommendation: 'enter',
+                takeProfitPrices: [103],
+            });
+            expect(rec?.planState).toMatchObject({
+                position: 'no_setup',
+                reason: 'no_room_above',
+            });
+            expect(rec?.entryRecommendation).toBe('avoid');
+        });
+
+        it('a sell-off path plan whose zone is the close area reads in_zone / enter', () => {
+            const rec = run({
+                ...zoneRec,
+                entryRecommendation: 'wait',
+                entryPrices: [99.5, 100.5],
+                stopLoss: 95,
+                takeProfitPrices: [104, 106],
+            });
+            expect(rec?.planState?.position).toBe('in_zone');
+            expect(rec?.entryRecommendation).toBe('enter');
+        });
+
+        it('drops a model-supplied planState before deciding', () => {
+            const rec = run({
+                ...zoneRec,
+                planState: {
+                    position: 'no_setup',
+                    reason: 'stopped',
+                    atr: 1,
+                    stopDistanceAtr: null,
+                    stopBasis: null,
+                },
+            });
+            expect(rec?.planState?.position).toBe('in_zone');
+        });
+
+        it('drops a model-supplied planState even when no close exists to build one', () => {
+            const rec = run(
+                {
+                    ...zoneRec,
+                    planState: {
+                        position: 'in_zone',
+                        atr: 1,
+                        stopDistanceAtr: 1,
+                        stopBasis: 'model',
+                        distanceAtr: 0,
+                    },
+                },
+                null
+            );
+            expect(rec?.planState).toBeUndefined();
+        });
+
+        it('without a close there is no plan check, no state, and the model verdict stands', () => {
+            const rec = run(zoneRec, null);
+            expect(rec?.planCheck).toBeUndefined();
+            expect(rec?.planState).toBeUndefined();
+            expect(rec?.entryRecommendation).toBe('wait');
+        });
+
+        it('a plan with no stop and no ATR is no_stop / avoid', () => {
+            const rec = postProcessAnalysisWithReconcile(
+                response({ ...zoneRec, stopLoss: undefined }),
+                100,
+                undefined,
+                []
+            ).actionRecommendation;
+            expect(rec?.planState).toMatchObject({
+                position: 'no_setup',
+                reason: 'no_stop',
+                atr: null,
+            });
+            expect(rec?.entryRecommendation).toBe('avoid');
+        });
+
+        it('stopped: a close under the floored stop', () => {
+            const rec = run(zoneRec, 94, [94]);
+            expect(rec?.planState).toMatchObject({
+                position: 'no_setup',
+                reason: 'stopped',
+            });
+        });
     });
 });

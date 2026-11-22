@@ -67,7 +67,10 @@ export function scoreRisk(inputs: RiskLevelInputs): number {
 }
 
 /**
- * Deterministic `riskLevel`.
+ * Deterministic `riskLevel`, a **volatility grade**: how far price typically moves, in either
+ * direction (the field keeps its name, API-5). Measured on the 65-symbol daily replay set (838
+ * analyses, 2017 to 2026) it orders the mean 10-session high-low range (low 9.0% / medium 15.0% /
+ * high 21.9%); it is not a downside or direction measure.
  *
  * The model used to pick the enum freely: the schema gave no rubric, and every
  * locale is its own LLM run, so the same analysis time came back "high" in Korean

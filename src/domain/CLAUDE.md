@@ -260,6 +260,9 @@ computing derived values, so a recomputation from the rendered text matches.
   trigger conditions all held", not "every condition" when the exit side has no such gate).
 - Rules inside one prompt never contradict. Required wording (a mandated caveat) gets an
   explicit carve-out in any style rule that could suppress it.
+  A prompt line that describes a code-side fallback ("code then sets the stop") also says the
+  model must not compute it, and no other line may instruct the opposite; otherwise the model
+  computes the value itself and writes an ungrounded number.
 - A rule split by condition (depth level, tool availability) keeps null and absence handling
   in every branch; otherwise the uncovered branch fills the gap with an unsupported guess.
   A rule that quotes a field (a date "from the result's `asOf`") also states the absent case

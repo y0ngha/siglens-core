@@ -4,9 +4,18 @@ import {
     entryZoneBottom,
     entryZoneTop,
     nearestTargetAbove,
+    PLAN_MIN_ATR_SPACING,
 } from '@/domain/analysis/planCheck';
+import {
+    buildPlanState,
+    ENTRY_RECOMMENDATION_BY_POSITION,
+} from '@/domain/analysis/planState';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
-import { roundToKrxTick, type KrxTickTable } from '@/domain/analysis/krxTick';
+import {
+    ceilToKrxTick,
+    roundToKrxTick,
+    type KrxTickTable,
+} from '@/domain/analysis/krxTick';
 import {
     formatNullableNumber,
     formatPrice,
@@ -24,6 +33,7 @@ import type {
     ReconciledActionLevels,
     ReconcileResult,
     ResolvedLevel,
+    ResolvedStop,
 } from '@/domain/types';
 
 /** AI SL/TP 검증 + ATR 기반 fallback resolver. AI 원본 필드를 수정하지 않고 reconciledLevels에 보정값을 병기한다. */
@@ -42,7 +52,7 @@ export const TP_MAX_ATR_MULTIPLIER = 10;
 
 /**
  * @internal Fallback SL ATR 배수.
- * Fallback SL 배수 — entryPrice - ATR*1.5.
+ * 손절 하한을 만족하는 인쇄된 지지선이 없을 때의 ATR 기반 손절 — 진입 구간 하단 - ATR*1.5.
  */
 export const SL_FALLBACK_ATR_MULTIPLIER = 1.5;
 
@@ -51,11 +61,11 @@ export const SL_FALLBACK_ATR_MULTIPLIER = 1.5;
  * Fallback TP 배수 — entryPrice + ATR*2.0 (risk:reward ≈ 1:1.33).
  *
  * @deprecated No longer used by reconcile: a target that fails validation is dropped,
- * never replaced by an invented level. Kept only because the consumer's backtest
- * scripts (`siglens/scripts/backtests/generate-backtest.ts` and `flash-lite-ab.ts`)
- * import `resolveBullishTakeProfit`. Remove all three symbols (`resolveBullishTakeProfit`,
- * `deriveFallbackTakeProfit`, `TP_FALLBACK_ATR_MULTIPLIER`) after the consumer bump that
- * drops those imports.
+ * never replaced by an invented level. Neither entrypoint exports `resolveBullishTakeProfit`,
+ * `deriveFallbackTakeProfit` or `TP_FALLBACK_ATR_MULTIPLIER` any more; only this module's
+ * own tests reference them (siglens's `scripts/backtests/generate-backtest.ts` and
+ * `flash-lite-ab.ts` still import the resolvers from an older published build). Delete all
+ * three symbols with those tests once no consumer build that exports them is in use.
  */
 export const TP_FALLBACK_ATR_MULTIPLIER = 2.0;
 
@@ -110,24 +120,15 @@ export function isValidBullishTakeProfit(
     return true;
 }
 
-/** @internal Derives an ATR-based fallback stop-loss. */
-export function deriveFallbackStopLoss(
-    entryPrice: number,
-    atr: number | undefined
-): number | undefined {
-    if (!hasUsableAtr(atr)) return undefined;
-    return entryPrice - atr * SL_FALLBACK_ATR_MULTIPLIER;
-}
-
 /**
  * @internal Derives an ATR-based fallback take-profit.
  *
  * @deprecated No longer used by reconcile: a target that fails validation is dropped,
- * never replaced by an invented level. Kept only because the consumer's backtest
- * scripts (`siglens/scripts/backtests/generate-backtest.ts` and `flash-lite-ab.ts`)
- * import `resolveBullishTakeProfit`. Remove all three symbols (`resolveBullishTakeProfit`,
- * `deriveFallbackTakeProfit`, `TP_FALLBACK_ATR_MULTIPLIER`) after the consumer bump that
- * drops those imports.
+ * never replaced by an invented level. Neither entrypoint exports `resolveBullishTakeProfit`,
+ * `deriveFallbackTakeProfit` or `TP_FALLBACK_ATR_MULTIPLIER` any more; only this module's
+ * own tests reference them (siglens's `scripts/backtests/generate-backtest.ts` and
+ * `flash-lite-ab.ts` still import the resolvers from an older published build). Delete all
+ * three symbols with those tests once no consumer build that exports them is in use.
  */
 export function deriveFallbackTakeProfit(
     entryPrice: number,
@@ -137,38 +138,128 @@ export function deriveFallbackTakeProfit(
     return entryPrice + atr * TP_FALLBACK_ATR_MULTIPLIER;
 }
 
-/** @internal Resolves the effective bullish stop-loss (AI value or fallback). */
+/**
+ * @internal Rounds a computed stop to what the market quotes. `'up'` is for the cap-bound
+ * fallback: rounding to the nearest tick could land below the five-ATR cap, so that side
+ * rounds toward the zone. Identity for a listing without ticks.
+ */
+export type StopQuoter = (price: number, round?: 'up') => number;
+
+/**
+ * @internal Slack (in price) on the stop-floor band edges, so a stop sitting exactly on an
+ * edge is not rejected by float noise in `zoneLow - atr`. Far below any tick size.
+ */
+const STOP_BAND_EPSILON = 1e-9;
+
+/**
+ * @internal Whether no stop can satisfy both ends of the band: one ATR below the zone low
+ * and at most five ATR below the zone's mid, which happens when the mid is more than four
+ * ATR above the low (a zone wider than eight ATR). Without a usable ATR there is no band.
+ */
+export function isStopBandEmpty(
+    entryPrice: number,
+    entryLow: number,
+    atr: number | undefined
+): boolean {
+    return (
+        hasUsableAtr(atr) &&
+        entryPrice - atr * SL_MAX_ATR_MULTIPLIER >
+            entryLow - atr * PLAN_MIN_ATR_SPACING + STOP_BAND_EPSILON
+    );
+}
+
+/**
+ * @internal Resolves the effective bullish stop-loss: the model's value when it clears the
+ * stop floor, otherwise a printed support, otherwise an ATR multiple.
+ *
+ * With a usable ATR the effective stop is the first of:
+ *
+ * 1. the model's stop, when `entryPrice - 5·ATR <= stop <= entryLow - 1·ATR` (`'model'`);
+ * 2. the highest of `stopCandidates` in that same band (`'level'`);
+ * 3. `entryLow - 1.5·ATR` but no lower than `entryPrice - 5·ATR`, run through `quote` so a
+ *    KRX listing gets a quotable price (`'atr'`).
+ *
+ * When the band itself is empty (see {@link isStopBandEmpty}) there is no stop: the result is
+ * `missing`, and reconciliation marks the plan `stopLossRejected`.
+ *
+ * One rule for a stop that is missing and one that is too close: both are measured from the
+ * zone's **low** edge, because a stop closer than one ATR is hit by one ordinary bar. Without
+ * a usable ATR there is nothing to measure the floor in, so the legacy validity applies (a
+ * stop that is positive and below the zone) and an invalid stop stays missing — core never
+ * invents a level it cannot size.
+ *
+ * `stopCandidates` is required: it is the support list the prompt printed
+ * (`TechnicalAssembledPrompt.printedSupportPrices`), so a caller that omitted it would
+ * silently turn every `level` stop into an `atr` one.
+ *
+ * @param aiValue - The model's stop.
+ * @param entryPrice - The zone's reference (its mid).
+ * @param atr - ATR(14) of the last bar.
+ * @param entryLow - The zone's low edge.
+ * @param stopCandidates - Printed support prices, any order.
+ * @param quote - Rounds a computed price to what the market quotes (identity for USD).
+ */
 export function resolveBullishStopLoss(
     aiValue: number | undefined,
     entryPrice: number,
     atr: number | undefined,
-    entryLow: number = entryPrice
-): ResolvedLevel {
-    if (isValidBullishStopLoss(aiValue, entryPrice, atr, entryLow)) {
-        return { value: aiValue, source: 'ai' };
+    entryLow: number,
+    stopCandidates: readonly number[],
+    quote: StopQuoter
+): ResolvedStop {
+    if (!hasUsableAtr(atr)) {
+        return isValidBullishStopLoss(aiValue, entryPrice, undefined, entryLow)
+            ? { value: aiValue, source: 'ai', basis: 'model' }
+            : { value: undefined, source: 'missing', basis: null };
     }
-    // The fallback is measured from the zone's low edge when the mid-based one
-    // would land inside the zone (a zone wider than the fallback distance).
-    const fromMid = deriveFallbackStopLoss(entryPrice, atr);
+    if (isStopBandEmpty(entryPrice, entryLow, atr)) {
+        return { value: undefined, source: 'missing', basis: null };
+    }
+    const lowest = entryPrice - atr * SL_MAX_ATR_MULTIPLIER - STOP_BAND_EPSILON;
+    const highest = entryLow - atr * PLAN_MIN_ATR_SPACING + STOP_BAND_EPSILON;
+    const inBand = (price: number): boolean =>
+        isFinitePositive(price) && price >= lowest && price <= highest;
+
+    if (isFinitePositive(aiValue) && inBand(aiValue)) {
+        return { value: aiValue, source: 'ai', basis: 'model' };
+    }
+    const level = stopCandidates
+        .filter(inBand)
+        .reduce<number | undefined>(
+            (best, price) =>
+                best === undefined || price > best ? price : best,
+            undefined
+        );
+    if (level !== undefined) {
+        return { value: level, source: 'fallback', basis: 'level' };
+    }
+    // 1.5 ATR below the zone low, but never past the five-ATR cap from the mid: with a wide
+    // zone the plain value would break the cap the model's own stop is held to.
+    //
+    //
+    // Nearest-tick rounding could put the stop up to half a tick below the cap, so when it
+    // does the stop rounds up (toward the zone) instead. If no quotable price then fits under
+    // the one-ATR gap either, there is no stop.
+    const cap = entryPrice - atr * SL_MAX_ATR_MULTIPLIER;
+    const nearest = quote(
+        Math.max(entryLow - atr * SL_FALLBACK_ATR_MULTIPLIER, cap)
+    );
     const fallback =
-        fromMid !== undefined && fromMid >= entryLow
-            ? deriveFallbackStopLoss(entryLow, atr)
-            : fromMid;
-    if (fallback !== undefined) {
-        return { value: fallback, source: 'fallback' };
-    }
-    return { value: undefined, source: 'missing' };
+        nearest < cap - STOP_BAND_EPSILON ? quote(cap, 'up') : nearest;
+    return isFinitePositive(fallback) && fallback <= highest
+        ? { value: fallback, source: 'fallback', basis: 'atr' }
+        : { value: undefined, source: 'missing', basis: null };
 }
 
 /**
  * @internal Resolves the effective bullish take-profit (AI value or fallback).
  *
  * @deprecated No longer used by reconcile: a target that fails validation is dropped,
- * never replaced by an invented level. Kept only because the consumer's backtest
- * scripts (`siglens/scripts/backtests/generate-backtest.ts` and `flash-lite-ab.ts`)
- * import `resolveBullishTakeProfit`. Remove all three symbols (`resolveBullishTakeProfit`,
- * `deriveFallbackTakeProfit`, `TP_FALLBACK_ATR_MULTIPLIER`) after the consumer bump that
- * drops those imports.
+ * never replaced by an invented level. Neither entrypoint exports `resolveBullishTakeProfit`,
+ * `deriveFallbackTakeProfit` or `TP_FALLBACK_ATR_MULTIPLIER` any more; only this module's
+ * own tests reference them (siglens's `scripts/backtests/generate-backtest.ts` and
+ * `flash-lite-ab.ts` still import the resolvers from an older published build). Delete all
+ * three symbols with those tests once no consumer build that exports them is in use.
  */
 export function resolveBullishTakeProfit(
     aiValue: number | undefined,
@@ -360,17 +451,52 @@ export function buildBullishRiskRewardText(
     return template(slLabel, tpLabel, ratio);
 }
 
+/** Why core replaced the model's stop; `null` when the stop was not replaced. */
+type StopMove = {
+    readonly why: 'missing' | 'too_close' | 'out_of_range';
+    readonly basis: 'level' | 'atr';
+} | null;
+
+const STOP_MOVE_TARGET: Record<'level' | 'atr', string> = {
+    level: `진입 구간 하단에서 ${PLAN_MIN_ATR_SPACING} ATR 이상 아래의 기준 가격대`,
+    atr: 'ATR 기준값',
+};
+
 /**
- * 보정 경위 문장 생성 — 손절 보정(AI 값 무효 / 미제시)과 목표가 제외(진입 구간 위가 아님 /
- * 첫 목표가가 ATR 상한 초과)를 각각 정확한 문장으로 잇는다.
+ * One sentence per way a stop is replaced, each saying exactly what the code did (DOM-9): a
+ * stop closer than one ATR below the zone low is not "outside the internal range", and a
+ * missing stop was not "moved".
+ */
+function buildStopMoveSentence(move: NonNullable<StopMove>): string {
+    const target = STOP_MOVE_TARGET[move.basis];
+    switch (move.why) {
+        case 'missing':
+            return move.basis === 'atr'
+                ? 'AI가 손절가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.'
+                : `AI가 손절가를 제시하지 않아 ${target}를 손절가로 정했습니다.`;
+        case 'too_close':
+            return move.basis === 'atr'
+                ? `AI가 제시한 손절가가 진입 구간 하단에서 ${PLAN_MIN_ATR_SPACING} ATR보다 가까워 ${target}으로 계산했습니다.`
+                : `AI가 제시한 손절가가 진입 구간 하단에서 ${PLAN_MIN_ATR_SPACING} ATR보다 가까워 그 아래 기준 가격대로 옮겼습니다.`;
+        case 'out_of_range':
+            return move.basis === 'atr'
+                ? `AI가 제시한 손절가가 내부 기준을 벗어나 ${target}으로 계산했습니다.`
+                : `AI가 제시한 손절가가 내부 기준을 벗어나 ${target}로 옮겼습니다.`;
+    }
+}
+
+/**
+ * 보정 경위 문장 생성 — 손절 교체(AI 값 무효 / 미제시 / 1 ATR 하한 미달)와 목표가 제외(진입
+ * 구간 위가 아님 / 첫 목표가가 ATR 상한 초과)를 각각 정확한 문장으로 잇는다.
  *
  * 목표가는 값을 만들어 채우지 않고 기준을 벗어난 것만 제외하므로, 목표가 쪽 문장은
  * "계산했습니다"가 아니라 "제외했습니다"다.
  */
 function buildReconcileReason(parts: {
-    slWas: boolean;
-    aiSlMissing: boolean;
+    stopMove: StopMove;
     slRejected: boolean;
+    /** A usable ATR was given and still no stop fits the band (a zone too wide, or no quotable price inside it). */
+    bandEmpty: boolean;
     zoneDropped: boolean;
     capDropped: boolean;
     duplicatesRemoved: boolean;
@@ -378,13 +504,13 @@ function buildReconcileReason(parts: {
 }): string {
     const stopPart = parts.slRejected
         ? [
-              'AI가 제시한 손절가가 진입 구간 아래가 아니고 대체할 ATR 기준도 없어 제외했습니다. 손절가는 없는 것으로 봅니다.',
+              parts.bandEmpty
+                  ? `구간 하단에서 ${PLAN_MIN_ATR_SPACING} ATR 이상 아래이면서 중앙에서 ${SL_MAX_ATR_MULTIPLIER} ATR 이내인 손절가를 정할 수 없습니다. 손절가는 없는 것으로 봅니다.`
+                  : 'AI가 제시한 손절가가 진입 구간 아래가 아니고 대체할 ATR 기준도 없어 제외했습니다. 손절가는 없는 것으로 봅니다.',
           ]
-        : !parts.slWas
+        : parts.stopMove === null
           ? []
-          : parts.aiSlMissing
-            ? ['AI가 손절가를 제시하지 않아 ATR 기반 기본값을 계산했습니다.']
-            : ['AI가 제시한 손절가가 내부 기준을 벗어나 보정했습니다.'];
+          : [buildStopMoveSentence(parts.stopMove)];
     return [
         ...stopPart,
         ...(parts.zoneDropped
@@ -405,6 +531,25 @@ function buildReconcileReason(parts: {
 }
 
 /**
+ * Why the model's stop was replaced, judged against the same band `resolveBullishStopLoss`
+ * used. Only called with a usable ATR, where the replacement is a floor move.
+ */
+function stopMoveWhy(
+    aiValue: number | undefined,
+    entryLow: number,
+    atr: number
+): NonNullable<StopMove>['why'] {
+    if (aiValue === undefined) return 'missing';
+    // "Closer than one ATR" is a stop below the zone low that has not cleared the gap; a
+    // stop at or above the low is not close, it is inside or above the zone.
+    const tooClose =
+        isFinitePositive(aiValue) &&
+        aiValue < entryLow &&
+        aiValue > entryLow - atr * PLAN_MIN_ATR_SPACING + STOP_BAND_EPSILON;
+    return tooClose ? 'too_close' : 'out_of_range';
+}
+
+/**
  * @internal Applies SL/TP reconciliation to a bullish recommendation.
  * bullish 추천에 SL/TP 보정을 적용한다. AI 원본 필드는 수정하지 않고 reconciledLevels에만 보정값을 병기한다.
  */
@@ -412,28 +557,31 @@ export function reconcileBullishActionRecommendation(
     rec: ActionRecommendation,
     entryPrice: number,
     atr: number | undefined,
+    stopCandidates: readonly number[],
     currency: CurrencyCode,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     krxTick: KrxTickTable = 'share'
 ): ReconcileResult {
-    // avoid: AI가 의도적으로 레벨을 비운 것이므로 보정하지 않는다.
-    if (rec.entryRecommendation === 'avoid') {
-        return { recommendation: rec, wasReconciled: false, changes: [] };
-    }
-
     // A fallback is a computed price, so a KRX listing gets it at its tick —
     // here, not after post-processing, so the plan check and the risk:reward
     // line below read the same level the card shows (`roundAnalysisPrices`).
-    const quoted = <T extends { value?: number }>(r: T): T =>
-        currency === 'KRW' && r.value !== undefined
-            ? { ...r, value: roundToKrxTick(r.value, krxTick) }
-            : r;
+    const quote: StopQuoter = (price, round) =>
+        currency !== 'KRW'
+            ? price
+            : round === 'up'
+              ? ceilToKrxTick(price, krxTick)
+              : roundToKrxTick(price, krxTick);
     // Zone edges (order-independent); the single mid reference when the zone has no
     // usable element.
     const entryLow = entryZoneBottom(rec.entryPrices) ?? entryPrice;
     const entryHigh = entryZoneTop(rec.entryPrices) ?? entryPrice;
-    const slResolved = quoted(
-        resolveBullishStopLoss(rec.stopLoss, entryPrice, atr, entryLow)
+    const slResolved = resolveBullishStopLoss(
+        rec.stopLoss,
+        entryPrice,
+        atr,
+        entryLow,
+        stopCandidates,
+        quote
     );
 
     // Targets are filtered, never replaced: one that is not strictly above the zone's
@@ -466,12 +614,25 @@ export function reconcileBullishActionRecommendation(
     const tpChanged =
         zoneDropped || capDropped || duplicatesRemoved || reordered;
 
+    // The stop floor moved the stop: a printed support or the ATR multiple stands in for the
+    // model's value. The floor only exists with a usable ATR, so a model stop that stands
+    // (basis `model`) or no stop at all is never a "reconciliation".
+    const stopBasis =
+        slResolved.source === 'fallback' &&
+        (slResolved.basis === 'level' || slResolved.basis === 'atr')
+            ? slResolved.basis
+            : undefined;
     const slWasReconciled =
-        slResolved.source === 'fallback' && slResolved.value !== undefined;
-    // A stop was written but is unusable, and there is no ATR to derive a replacement
-    // from. Core never invents a level, so the plan is left with no stop and says so.
+        stopBasis !== undefined && slResolved.value !== undefined;
+    // No stop can stand: either one was written but is unusable and there is no ATR to
+    // derive a replacement from, or the zone is so wide that no stop fits the band. Core
+    // never invents a level, so the plan is left with no stop and says so.
+    // With a usable ATR a missing stop means no stop fits the band (too wide a zone, or no
+    // quotable price inside it): the plan is marked, even when the model gave none.
+    const bandEmpty = hasUsableAtr(atr) && slResolved.source === 'missing';
     const slRejected =
-        rec.stopLoss !== undefined && slResolved.source === 'missing';
+        slResolved.source === 'missing' &&
+        (rec.stopLoss !== undefined || bandEmpty);
 
     if (!slWasReconciled && !slRejected && !tpChanged) {
         return { recommendation: rec, wasReconciled: false, changes: [] };
@@ -487,7 +648,13 @@ export function reconcileBullishActionRecommendation(
           ? undefined
           : rec.stopLoss;
 
-    const aiSlMissing = rec.stopLoss === undefined;
+    const stopMove: StopMove =
+        slWasReconciled && hasUsableAtr(atr)
+            ? {
+                  why: stopMoveWhy(rec.stopLoss, entryLow, atr),
+                  basis: stopBasis,
+              }
+            : null;
 
     const reconciled: ReconciledActionLevels = {
         stopLoss: reconciledSl,
@@ -506,26 +673,29 @@ export function reconcileBullishActionRecommendation(
             locale
         ),
         reason: buildReconcileReason({
-            slWas: slWasReconciled,
-            aiSlMissing,
+            stopMove,
             slRejected,
+            bandEmpty,
             zoneDropped,
             capDropped,
             duplicatesRemoved,
             reordered,
         }),
         ...(slRejected ? { stopLossRejected: true as const } : {}),
+        ...(slWasReconciled ? { stopBasis } : {}),
     };
 
     const changes: readonly string[] = [
         ...(slWasReconciled
             ? [
-                  `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency, krxTick)} (fallback)`,
+                  `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency, krxTick)} (floor, ${stopBasis})`,
               ]
             : []),
         ...(slRejected
             ? [
-                  `stopLoss: ${rec.stopLoss} rejected (not below the entry zone, no usable ATR for a fallback)`,
+                  bandEmpty
+                      ? `stopLoss: ${rec.stopLoss ?? 'null'} rejected (no stop fits the band: at least ${PLAN_MIN_ATR_SPACING} ATR below the zone low and at most ${SL_MAX_ATR_MULTIPLIER} ATR below its mid)`
+                      : `stopLoss: ${rec.stopLoss} rejected (not below the entry zone, no usable ATR for a fallback)`,
               ]
             : []),
         ...(zoneDropped
@@ -683,17 +853,24 @@ function withPatternGeometryTargets<T extends AnalysisResponse>(
 
 /**
  * @internal
- * `reconciledLevels` is core's correction and nothing else writes it — but a
- * model that still returns the field (older schema, a provider that ignores
- * the schema) would have its own numbers shown as a system correction and
- * preferred over the levels its prose cites. Drop it before core decides.
+ * `reconciledLevels` and `planState` are core's computations and nothing else writes them —
+ * but a model that still returns either field (older schema, a provider that ignores the
+ * schema) would have its own numbers shown as a system correction and preferred over the
+ * levels its prose cites, or a state that contradicts the plan. Drop both before core decides
+ * (CP-13: a computed field is never trusted from the model).
  */
-function withoutModelReconciledLevels(
+function withoutModelComputedFields(
     response: AnalysisResponse
 ): AnalysisResponse {
     const rec = response.actionRecommendation;
-    if (rec?.reconciledLevels === undefined) return response;
-    const { reconciledLevels: _modelAuthored, ...rest } = rec;
+    if (rec?.reconciledLevels === undefined && rec?.planState === undefined) {
+        return response;
+    }
+    const {
+        reconciledLevels: _modelLevels,
+        planState: _modelState,
+        ...rest
+    } = rec;
     return { ...response, actionRecommendation: rest };
 }
 
@@ -706,6 +883,12 @@ export function postProcessAnalysisWithReconcile(
     response: AnalysisResponse,
     fallbackEntryPrice: number | undefined,
     atr: number | undefined,
+    /**
+     * The support prices the prompt printed (`TechnicalAssembledPrompt.printedSupportPrices`):
+     * the stop floor snaps to the highest one in its band. Required so a caller cannot
+     * silently skip the `level` step.
+     */
+    stopCandidates: readonly number[],
     /**
      * 이 모듈에서 통화 기본값이 정해지는 **유일한** 지점. 하위 헬퍼들은
      * 값을 요구하기만 한다.
@@ -725,7 +908,7 @@ export function postProcessAnalysisWithReconcile(
     // Independent of the action-recommendation reconciliation below — applies
     // (or no-ops, preserving identity) regardless of whether `actionRecommendation`
     // exists at all, so it must run before either early return.
-    const withTargets = withoutModelReconciledLevels(
+    const withTargets = withoutModelComputedFields(
         withPatternGeometryTargets(response, locale)
     );
 
@@ -741,6 +924,7 @@ export function postProcessAnalysisWithReconcile(
             rec,
             entryPrice,
             atr,
+            stopCandidates,
             currency,
             locale,
             krxTick
@@ -801,10 +985,30 @@ export function postProcessAnalysisWithReconcile(
         entryPrice
     );
 
+    if (!planCheck) {
+        return {
+            ...withTargets,
+            actionRecommendation: recommendationWithRiskReward,
+        };
+    }
+
+    // The plan state is read off the reconciled plan and the plan check just built, and the
+    // verdict is then overwritten from it (`ENTRY_RECOMMENDATION_BY_POSITION`): the model's
+    // own `entryRecommendation` had no rubric. With no close there is no plan check and so no
+    // state; the model's verdict then stands, because nothing was measured to replace it.
+    const planState = buildPlanState(
+        recommendationWithRiskReward,
+        planCheck,
+        atr ?? null
+    );
     return {
         ...withTargets,
-        actionRecommendation: planCheck
-            ? { ...recommendationWithRiskReward, planCheck }
-            : recommendationWithRiskReward,
+        actionRecommendation: {
+            ...recommendationWithRiskReward,
+            planCheck,
+            planState,
+            entryRecommendation:
+                ENTRY_RECOMMENDATION_BY_POSITION[planState.position],
+        },
     };
 }

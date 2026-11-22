@@ -3,6 +3,7 @@ import { postProcessRawAnalysis } from '@/application/market/postProcessRawAnaly
 import { postProcessAnalysisWithReconcile } from '@/domain/analysis/ai-levels';
 import { enrichAnalysisWithConfidence } from '@/domain/analysis/confidence';
 import { checkPlanInvariants } from '@/domain/analysis/planInvariants';
+import { ENTRY_RECOMMENDATION_BY_POSITION } from '@/domain/analysis/planState';
 import { roundAnalysisPrices } from '@/domain/analysis/roundAnalysisPrices';
 import { alignPatternGeometry, resolveChartOverlays } from '@/domain/overlays';
 import { normalizeIdList } from '@/domain/analysis/normalize';
@@ -16,6 +17,7 @@ import {
     EDGE_PLANS,
     GRID_LAST_CLOSE,
     PLAN_GRID,
+    gridAtr,
     gridName,
     postProcessEdgePlan,
     postProcessGridCase,
@@ -25,7 +27,8 @@ import {
 const violatedIds = (c: (typeof PLAN_GRID)[number]) =>
     checkPlanInvariants(
         postProcessGridCase(c).actionRecommendation,
-        GRID_LAST_CLOSE
+        GRID_LAST_CLOSE,
+        gridAtr(c)
     ).map(violation => violation.id);
 
 describe('plan invariants over the synthetic grid (post-processed)', () => {
@@ -47,7 +50,8 @@ describe('plan invariants over the synthetic grid (post-processed)', () => {
         const violating = EDGE_PLANS.flatMap(plan => {
             const ids = checkPlanInvariants(
                 postProcessEdgePlan(plan).actionRecommendation,
-                GRID_LAST_CLOSE
+                GRID_LAST_CLOSE,
+                plan.atr ?? null
             ).map(violation => violation.id);
             return ids.length === 0 ? [] : [`${plan.name}: ${ids.join(', ')}`];
         });
@@ -79,7 +83,6 @@ describe('plan invariants over the synthetic grid (post-processed)', () => {
         const expectedMarked = PLAN_GRID.filter(
             c =>
                 c.atr === 'undefined' &&
-                c.verdict !== 'avoid' &&
                 (c.stop === 'inside' || c.stop === 'above')
         );
         const marked = PLAN_GRID.filter(
@@ -91,15 +94,39 @@ describe('plan invariants over the synthetic grid (post-processed)', () => {
         expect(marked.map(gridName)).toEqual(expectedMarked.map(gridName));
     });
 
-    it('attaches no reconciled levels to an avoid verdict', () => {
-        const avoidCases = PLAN_GRID.filter(c => c.verdict === 'avoid');
-        const touched = avoidCases.filter(
+    it("reconciles an avoid verdict like any other: the stop floor applies to the model's own avoid plans", () => {
+        const avoidCases = PLAN_GRID.filter(
             c =>
-                postProcessGridCase(c).actionRecommendation
-                    ?.reconciledLevels !== undefined
+                c.verdict === 'avoid' &&
+                c.atr === 'usable' &&
+                c.entries === 'range' &&
+                c.stop === 'above'
+        );
+        const unfloored = avoidCases.filter(
+            c =>
+                postProcessGridCase(c).actionRecommendation?.reconciledLevels
+                    ?.stopBasis === undefined
         );
         expect(avoidCases.length).toBeGreaterThan(0);
-        expect(touched).toEqual([]);
+        expect(unfloored).toEqual([]);
+    });
+
+    it('overwrites entryRecommendation from planState in every case that has a state', () => {
+        const rows = PLAN_GRID.map(c => ({
+            c,
+            rec: postProcessGridCase(c).actionRecommendation,
+        }));
+        const withState = rows.filter(row => row.rec?.planState !== undefined);
+        const mismatched = withState.filter(
+            row =>
+                row.rec?.entryRecommendation !==
+                ENTRY_RECOMMENDATION_BY_POSITION[
+                    row.rec?.planState?.position ?? 'no_setup'
+                ]
+        );
+        // The model's verdict axis is irrelevant to the result: every case has a state.
+        expect(withState).toHaveLength(PLAN_GRID.length);
+        expect(mismatched.map(row => gridName(row.c))).toEqual([]);
     });
 
     it('keeps the model fields as written (core corrects through reconciledLevels only)', () => {
@@ -177,6 +204,7 @@ describe('postProcessRawAnalysis', () => {
                 ),
                 options.lastClose,
                 options.atr,
+                [],
                 'KRW',
                 options.locale,
                 'share'
@@ -200,6 +228,7 @@ describe('postProcessRawAnalysis', () => {
                 patternGeometries: new Map(),
                 lastClose: 71_700,
                 atr,
+                stopCandidates: [],
                 currency: 'KRW',
                 locale,
                 krxTickTable: 'share',
@@ -218,6 +247,7 @@ describe('postProcessRawAnalysis', () => {
             patternGeometries: new Map(),
             lastClose: 71_700,
             atr: 900,
+            stopCandidates: [],
             currency: 'KRW',
             krxTickTable: 'share',
         });
@@ -242,6 +272,7 @@ describe('postProcessRawAnalysis', () => {
             patternGeometries: new Map(),
             lastClose: 71_700,
             atr: undefined,
+            stopCandidates: [],
         });
         expect(resolvedOverlays.unknownIds).toEqual(['no-such-candidate']);
         expect(resolvedOverlays.chartOverlays).toEqual([]);
@@ -255,6 +286,7 @@ describe('postProcessRawAnalysis', () => {
             patternGeometries: new Map(),
             lastClose: 71_700,
             atr: 900,
+            stopCandidates: [],
         }).reconciled;
         const explicit = postProcessRawAnalysis({
             rawResult: rawAnalysis(),
@@ -263,6 +295,7 @@ describe('postProcessRawAnalysis', () => {
             patternGeometries: new Map(),
             lastClose: 71_700,
             atr: 900,
+            stopCandidates: [],
             currency: 'USD',
             locale: 'ko',
         }).reconciled;
@@ -320,6 +353,7 @@ describe('postProcessRawAnalysis', () => {
                 patternGeometries: new Map([[CANDIDATE_ID, printed]]),
                 lastClose: 71_700,
                 atr: 900,
+                stopCandidates: [],
                 currency: 'KRW',
                 krxTickTable: 'share',
             });

@@ -13,6 +13,7 @@ type Plan = NonNullable<OutcomeSubject['plan']>;
 /** Zone [97, 99], stop 95, targets 105 and 110; the reference price is 100 (above the zone). */
 const PLAN: Plan = {
     recommendation: 'enter',
+    position: 'in_zone',
     entryLow: 97,
     entryHigh: 99,
     stop: 95,
@@ -33,6 +34,17 @@ function label(
 
 /** From above: touches the zone at the high edge (fill 99) and reaches neither level. */
 const ENTRY_FOR_LONG: Ohlc = [100, 100, 98, 99];
+
+describe('a stored plan subject without the plan position', () => {
+    it('labels exactly like one that carries it (the field is additive, v is unchanged)', () => {
+        const { position: _position, ...stored } = PLAN;
+        const forward: readonly Ohlc[] = [ENTRY_FOR_LONG, [99, 106, 98, 105]];
+        const window = makeWindow({ forward });
+        expect(labelPlanOutcome(stored, window)).toEqual(
+            labelPlanOutcome(PLAN, window)
+        );
+    });
+});
 
 const NOT_EVALUATED = {
     target: null,

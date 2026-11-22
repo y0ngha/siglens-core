@@ -1119,6 +1119,16 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * 50/200 cross is excluded). Bytes change for technical prompts whose bars carry
  * either cross.
  *
+ * `entryRecommendation` is computed from the new `actionRecommendation.planState` (the
+ * close inside the entry zone is `enter`, above or below it `wait`, no stand-able plan
+ * `avoid`) and Step 1 of the action rules becomes zone placement. `## Deterministic
+ * Metrics` gains `### Stop & Target Spacing` (ATR(14) and the first printed supports and
+ * resistance at least one ATR away), Step 2 requires the stop one ATR below the zone low
+ * and the first target one ATR above its top, and reconciliation moves a closer stop to the
+ * highest printed support in the allowed band or 1.5 ATR below the zone low
+ * (`planState.stopBasis`). `## Prior Analyses` header lines read `<trend>, <riskLevel>
+ * volatility`. `riskLevel` is documented as a volatility grade (its values do not change).
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p34' as const;
@@ -2300,9 +2310,13 @@ export function buildNewsCacheKey(
  * and the history labels past levels by role instead of `entry`/`TP`/`SL`.
  * Bytes change for every overall prompt with a `## Prior Analyses` section.
  *
+ * **`p12`** — volatility grade (see {@link PROMPT_TEMPLATE_VERSION} `p34`). The
+ * technical axis line `- Risk Level:` reads `- Volatility grade:` (the values are
+ * unchanged); bytes change for every overall prompt.
+ *
  * @internal
  */
-export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p11' as const;
+export const OVERALL_PROMPT_TEMPLATE_VERSION = 'p12' as const;
 
 /**
  * Build the Redis key for a cached overall (3-axis) analysis result.

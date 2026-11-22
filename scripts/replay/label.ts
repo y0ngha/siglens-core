@@ -78,11 +78,17 @@ function safeProvenance(
 /** Distinct ids of the plan invariants a result breaks; none for a result too malformed to check. */
 function safeInvariants(result: AnalysisResponse, lastClose: number): string[] {
     try {
+        // The ATR the stop floor is judged with is the one the result's own plan state was
+        // measured with; a result without a state predates the floor, which then is not
+        // evaluated (the instrument's `plan` mode recomputes the ATR from the bars).
+        const atr = result.actionRecommendation?.planState?.atr ?? null;
         return [
             ...new Set(
-                checkPlanInvariants(result.actionRecommendation, lastClose).map(
-                    violation => violation.id
-                )
+                checkPlanInvariants(
+                    result.actionRecommendation,
+                    lastClose,
+                    atr
+                ).map(violation => violation.id)
             ),
         ];
     } catch {

@@ -403,6 +403,7 @@ describe('variance', () => {
                 riskLevel: 'low',
                 plan: {
                     recommendation: 'enter',
+                    position: 'in_zone',
                     entryLow: 98,
                     entryHigh: 100,
                     stop: over.stop ?? 95,
