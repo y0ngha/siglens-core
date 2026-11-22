@@ -1295,6 +1295,8 @@ interface AnalysisResponse {
     summary: string;
     trend: Trend;                   // 계산값: EMA20의 20봉 변화(ATR 단위)와 종가 위치로 결정. 측정 불가일 때만 모델 값 유지
     trendBasis?: TrendBasis;        // trend를 결정한 근거 { slopeAtr, lookbackBars, emaPeriod }. 측정 불가·이전 캐시에는 없음
+    higherTimeframe?: HigherTimeframeReading; // 한 단계 위 시간대의 계산된 추세·정렬(분봉→일봉, 일봉→주봉, 주봉→월봉). 코드가 모델 응답 뒤에 붙이며 모델에게 요청하지 않음. 빈 폴백·이전 캐시·위 시계열을 못 만든 경우에는 없음
+    marketBackdrop?: MarketBackdropReading;   // 지수(벤치마크)의 일봉 추세와 종목의 20·60거래일 상대 변화. `benchmark` 옵션이 있고 지수 봉을 읽었을 때만
     indicatorResults: IndicatorGuideResult[]; // 코어가 프롬프트의 줄에서 만든 지표 카드 (indicatorName별, 모델이 쓰지 않음) — "보조지표" 섹션에 렌더링
     riskLevel: RiskLevel;           // 변동성 등급(필드명은 그대로): 가격이 보통 얼마나 움직이는가이며 방향·하방 위험이 아니다
     keyLevels: KeyLevels;
@@ -1321,7 +1323,7 @@ interface AnalysisResponse {
 `lockedInfoDepth`를 보고 잠금 표시를 렌더링할 수 있다. 기본 매핑은 다음과 같다.
 
 ```
-direction       → trend, trendBasis
+direction       → trend, trendBasis, higherTimeframe, marketBackdrop
 summary         → summary
 partial_detail  → indicatorResults, riskLevel, keyLevels, candlePatterns
 full_detail     → patternSummaries, strategyResults, trendlines,
@@ -1478,6 +1480,41 @@ provider에 `'1Day'`를 `FEAR_GREED_LOOKBACK_DAYS`(약 5년) 구간으로 요청
 | `PATTERN_MIN_HEIGHT_PRICE_PCT` | 0.06(미측정) |
 | 측정 base rate, 수준 유지 문장 | `null` / `Not measured on weekly bars`(분·시간봉은 `intraday` 그대로) |
 | 종합(overall) 라벨·가중치 | `Weekly`, `1Day` 가중치 |
+
+---
+
+## 상위 시간대 블록과 시장 배경 (`### Higher Timeframe`, `### Market Backdrop`)
+
+`## Deterministic Metrics`의 `### Trend (computed)` 바로 뒤에 두 블록이 붙는다. 둘 다 서술용이다(DOM-12): 최상위
+`trend`, `planState`, 계획을 바꾸지 않고, 합류 게이트(`evaluateConfluence`의 상위 시간대 인자)에도 들어가지 않는다.
+측정 결과 일봉·주봉 추세의 일치는 이후 10거래일 수익률에 우위가 없었다(WP-19 M1, 리플레이 세트 65종목).
+
+| 분석 시간대 | 한 단계 위 | 원천(추가 조회 없음) |
+|---|---|---|
+| 5Min…4Hour | 일봉 | 이미 받는 일봉(공포·탐욕용), 표준 730일 `bars`·`indicators` |
+| 1Day | 주봉 | `fearGreedBars`(5년)를 `aggregateBarsToWeekly`로 묶고 그 위에서 지표 계산 |
+| 1Week | 월봉 | 같은 `fearGreedBars`를 `aggregateBarsToMonthly`로 묶고 지표 계산 |
+
+- **추세**: `computeAnalysisTrend`(WP-15의 규칙, 모든 시간대에서 하나)를 상위 봉에 그대로 적용한다. 문장은
+  `### Trend (computed)`의 포매터와 같은 말투다(`Weekly trend: bullish. EMA20 moved +1.62 ATR(14) over the last 20 weekly bars …`).
+  **일봉 분석이 인쇄하는 `### Trend (computed)`와 분봉 분석의 일봉 블록은 같은 봉·같은 규칙이라 같은 값**이다(게이트 H3).
+  측정 불가는 `Weekly trend: Not measurable: … received N bars.`로 말하고 "추세 없음"으로 읽히지 않는다(DOM-1).
+- **그 밖의 수치**: 상위 봉 RSI(14), 종가와 50봉 평균의 거리(소수 1자리), 정렬(`aligned`/`opposed`/`mixed`: 이 차트 추세와 상위 추세가
+  둘 다 상승 또는 둘 다 하락이면 aligned, 상승 대 하락이면 opposed, 한쪽이 neutral이면 mixed, 어느 쪽이든 측정 불가면 줄 없음).
+  가격 수준(상위 봉의 고저)은 싣지 않는다: 두 번째 수준 출처가 되어 모델이 핵심 가격대로 인용한다.
+- **형성 중인 마지막 봉**(DOM-12): 시계가 있을 때만 말한다. 주·월은 `The last weekly bar is the current week (3 of 5 sessions so far).`
+  ("so far"는 관측한 일봉 수, 총합은 거래소 캘린더의 세션 수이며 휴장 데이터가 없는 상장은 총합 없이 `(3 sessions so far)`),
+  일봉은 `The last daily bar is the current session, still open.`(스케줄 세션은 마감 전, 24/7은 UTC 당일). 시계가 없으면 아무 말도 하지 않고
+  `lastBarInProgress`는 `false`다(`false`는 끝났거나 모름).
+- **"측정된 우위 없음" 문장**은 측정한 범위에서만 인쇄한다: 일봉·주봉 짝, `assetClass === 'equity'`인 차트, 이후 10거래일 수익률 기준. 측정 세트는 미국 55·한국 10 종목·ETF(크립토 없음)를 **합쳐서** 본 것이고 시장별로 나누지 않았으며, 두 일치 칸(상승·상승, 하락·하락)만 게이트했다. 문장도 `a pooled SIGLENS sample of U.S. and Korean stocks and ETFs`, `next 10 sessions' return`로 그 범위만 말하고 시장별 주장은 하지 않는다. 범위 밖(크립토, 분봉→일봉, 주봉→월봉)은 `was not measured`로 쓴다.
+- **시장 배경**: `options.benchmark`(소비자가 시장 프로필에서 고른다: 미국 SPY, `.KS` KOSPI, `.KQ` KOSDAQ, 크립토는 없음)의 일봉을
+  같은 provider로 읽고(캐시 미스일 때, 일봉 조회와 병렬, 실패하면 블록만 빠진다), 지수 자체의 추세(같은 규칙)와 200일 평균 대비 거리,
+  종목의 최근 20·60거래일 종가 변화를 지수와 나란히 인쇄한다. 두 시계열은 **둘 다 가진 마지막 날짜**에서 끝나고(그 날짜를 `(both to YYYY-MM-DD)`로 밝힌다, DOM-13)
+  각 시계열의 자기 세션을 센다. 지수 가격은 인쇄하지 않는다(퍼센트만): 가격이 들어가면 계획 가격의 근거로 오인된다. 분석 심볼이 벤치마크면 읽지 않는다.
+- **결과 필드**: `AnalysisResponse.higherTimeframe` / `.marketBackdrop`은 프롬프트가 인쇄한 값과 같은 계산에서 나오며(한 번 계산) 모델 응답 뒤에 코드가 붙인다.
+  빈 폴백에는 붙이지 않고, 캐시 읽기에서 검증해 깨진 값은 통째로 버린다(보정하지 않는다). `direction` 깊이로 필터링된다(free도 본다: 코드가 낸 사실).
+  종합(overall) 분석은 읽지 않는다.
+- **캐시 키**: `benchmark.symbol`이 분석 키와 peek 키의 마지막 세그먼트(`:bm=<symbol>`, 벤치마크 없으면 접미 없음)다. 벤치마크가 프롬프트에 블록이 있는지를 정하므로 없음·SPY·KS11은 서로 다른 항목이다. peek 호출자는 `peekAnalysisCache`의 `benchmarkSymbol`로 쓰기 쪽과 같은 값을 넘겨야 한다. 지수 봉 조회가 일시 실패하면 그 항목은 `marketBackdrop` 없이 TTL 동안 캐시된다(블록은 선택적 맥락이라 재시도하지 않는다: 장애 때 재시도 폭주 방지).
 
 ---
 

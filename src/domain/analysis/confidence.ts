@@ -40,6 +40,10 @@ import {
 } from '@/domain/analysis/normalize';
 import { normalizeCycleReading } from '@/domain/analysis/normalizeCards';
 import {
+    normalizeHigherTimeframeReading,
+    normalizeMarketBackdropReading,
+} from '@/domain/analysis/normalizeHigherTimeframe';
+import {
     candleCardBaseRate,
     normalizeCachedBaseRate,
     patternCardBaseRate,
@@ -664,6 +668,10 @@ export function normalizeCachedAnalysisResponse(
     const analyzedAt = asString(raw.analyzedAt);
     const dataAsOf = normalizeDataAsOf(raw.dataAsOf);
     const trendBasis = normalizeTrendBasis(raw.trendBasis);
+    const higherTimeframe = normalizeHigherTimeframeReading(
+        raw.higherTimeframe
+    );
+    const marketBackdrop = normalizeMarketBackdropReading(raw.marketBackdrop);
 
     return {
         summary: asString(raw.summary, EMPTY_ANALYSIS_FALLBACK_SUMMARY),
@@ -671,6 +679,10 @@ export function normalizeCachedAnalysisResponse(
         // Kept on a cache read: `trendBasis` is attached after the model reply, so the
         // raw-reply path never has one, but a stored result does and must keep it.
         ...(trendBasis !== undefined ? { trendBasis } : {}),
+        // Same reason: both readings are attached after the model reply, so only a stored
+        // result carries them. An invalid one is dropped, never coerced.
+        ...(higherTimeframe !== undefined ? { higherTimeframe } : {}),
+        ...(marketBackdrop !== undefined ? { marketBackdrop } : {}),
         indicatorResults: compact(
             asArray(raw.indicatorResults).map(
                 normalizeCachedIndicatorGuideResult

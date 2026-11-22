@@ -21,8 +21,8 @@ const SLOPE_DECIMALS = 2;
  */
 export const ANALYSIS_TREND_MIN_BARS = TREND_EMA_PERIOD + TREND_SLOPE_LOOKBACK;
 
-/** Rounds half away from zero, so a negative slope rounds like its mirror image. */
-function roundHalfAwayFromZero(value: number, decimals: number): number {
+/** @internal Rounds half away from zero, so a negative slope rounds like its mirror image. */
+export function roundHalfAwayFromZero(value: number, decimals: number): number {
     const factor = 10 ** decimals;
     return (Math.sign(value) * Math.round(Math.abs(value) * factor)) / factor;
 }

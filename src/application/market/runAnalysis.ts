@@ -27,6 +27,11 @@ import { standardDailyWindow } from '@/domain/analysis/standardDailyWindow';
 import { computeRiskLevel } from '@/domain/analysis/riskLevel';
 import { trendBasisOf } from '@/domain/analysis/analysisTrend';
 import {
+    dailyHistoryOf,
+    higherTimeframeSeriesOf,
+    type HigherContextInput,
+} from '@/domain/analysis/higherTimeframe';
+import {
     isFallbackAnalysis,
     normalizeCachedAnalysisResponse,
 } from '@/domain/analysis/confidence';
@@ -54,6 +59,7 @@ import type {
     ActiveModelId,
     AnalysisResponse,
     AssembledPromptRecord,
+    BarsData,
     FearGreedSnapshot,
     Tier,
     TierConfig,
@@ -91,12 +97,34 @@ import {
  * Tier-level access control for the overall analysis is therefore enforced at
  * the overall layer (timeframe gate, usage gate, BYOK gate) rather than at the
  * per-field filtering level.
+ *
+ * @internal
  */
 export type RunAnalysisForOverallResult =
     | { status: 'cached'; result: AnalysisResponse }
     | { status: 'done'; result: AnalysisResponse }
     | SubmitAnalysisMissNoTrigger
     | SubmitAnalysisErrorResult;
+
+/**
+ * Fear & Greed from the run's daily data, `null` without it or when the computation throws
+ * (a missing sentiment section never fails the analysis).
+ */
+function computeFearGreedSafely(
+    daily: BarsData | null
+): FearGreedSnapshot | null {
+    if (daily === null) return null;
+    try {
+        const input = fearGreedInputs(daily);
+        return computeFearGreedIndex(input.bars, input.buySellVolume);
+    } catch (error) {
+        console.error(
+            '[RunAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+            error
+        );
+        return null;
+    }
+}
 
 /**
  * `options.modelId`가 없을 때 실제로 호출할 모델.
@@ -392,7 +420,8 @@ async function runAnalysisImpl(
         options.positionBucket,
         options.locale,
         historyFingerprint,
-        eventsFingerprint
+        eventsFingerprint,
+        options.benchmark?.symbol
     );
 
     if (!force && cache !== null) {
@@ -420,7 +449,8 @@ async function runAnalysisImpl(
                     tierCapKeyPart(tier),
                     options.reasoning,
                     options.positionBucket,
-                    options.locale
+                    options.locale,
+                    options.benchmark?.symbol
                 )
             );
             if (reused !== null) {
@@ -482,18 +512,51 @@ async function runAnalysisImpl(
               barsNow
           );
 
-    const fearGreed: FearGreedSnapshot | null = await dailyDataPromise
-        .then(d => {
-            const input = fearGreedInputs(d);
-            return computeFearGreedIndex(input.bars, input.buySellVolume);
-        })
-        .catch(error => {
-            console.error(
-                '[RunAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
-                error
-            );
-            return null;
-        });
+    // The benchmark's daily bars for the market backdrop, read in parallel with the daily fetch
+    // above. A backdrop is context: a failed read only drops its block, never the analysis.
+    const benchmarkPromise: Promise<BarsData | null> =
+        options.benchmark === undefined || options.benchmark.symbol === symbol
+            ? Promise.resolve(null)
+            : fetchBarsWithIndicators(
+                  marketDataProvider,
+                  options.benchmark.symbol,
+                  '1Day',
+                  options.benchmark.fmpSymbol,
+                  barsNow
+              ).catch(error => {
+                  console.error(
+                      '[RunAnalysis] Benchmark daily fetch failed; proceeding without a market backdrop:',
+                      error
+                  );
+                  return null;
+              });
+
+    const dailyData: BarsData | null = await dailyDataPromise.catch(error => {
+        console.error(
+            '[RunAnalysis] FearGreed daily fetch/compute failed; proceeding without sentiment:',
+            error
+        );
+        return null;
+    });
+    const fearGreed: FearGreedSnapshot | null =
+        computeFearGreedSafely(dailyData);
+    const benchmarkData = await benchmarkPromise;
+    const higherContext: HigherContextInput = {
+        higher:
+            dailyData === null
+                ? null
+                : higherTimeframeSeriesOf(timeframe, dailyData),
+        backdrop:
+            dailyData === null ||
+            benchmarkData === null ||
+            options.benchmark === undefined
+                ? null
+                : {
+                      label: options.benchmark.label,
+                      symbolDaily: dailyHistoryOf(timeframe, dailyData),
+                      benchmark: benchmarkData,
+                  },
+    };
 
     const locale = options.locale ?? DEFAULT_ANALYSIS_LOCALE;
     const {
@@ -505,6 +568,8 @@ async function runAnalysisImpl(
         patternArbitration,
         patternGeometries,
         trend: trendReading,
+        higherTimeframe,
+        marketBackdrop,
         printedSupportPrices,
         injectedSkills,
         patternSkillNames,
@@ -538,7 +603,8 @@ async function runAnalysisImpl(
         gatedSkillCap,
         // A weekly chart counts the sessions of its unfinished week from the daily
         // series it was built from.
-        timeframe === '1Week' ? barsData.fearGreedBars : undefined
+        timeframe === '1Week' ? barsData.fearGreedBars : undefined,
+        higherContext
     );
     // Logged here, before the model call, so a failure is reported even when
     // the generation itself fails: without it a throwing qualifier reads as
@@ -731,6 +797,7 @@ async function runAnalysisImpl(
         events: marketEventCandidates,
         earningsDates: options.earningsDates,
     });
+    const emptyFallback = isFallbackAnalysis(reconciled);
     // `trend` is computed too, from the same reading the prompt stated: EMA20's 20-bar
     // move in ATR and the close against EMA20. The model's value is overwritten, and
     // `trendBasis` records what decided it. When the reading is `null` (too little
@@ -745,6 +812,15 @@ async function runAnalysisImpl(
                   trendBasis: trendBasisOf(trendReading),
               }
             : {}),
+        // The readings the prompt stated, attached by code (the model is never asked for them
+        // and a value it sent does not survive normalization). Not attached to the empty
+        // fallback: a reply with no analysis would read as one the readings describe.
+        ...(!emptyFallback && higherTimeframe !== null
+            ? { higherTimeframe }
+            : {}),
+        ...(!emptyFallback && marketBackdrop !== null
+            ? { marketBackdrop }
+            : {}),
         riskLevel,
         trendlines: resolvedOverlays.trendlines,
         chartOverlays: resolvedOverlays.chartOverlays,
@@ -754,7 +830,7 @@ async function runAnalysisImpl(
             : {}),
     };
 
-    if (isFallbackAnalysis(reconciled)) {
+    if (emptyFallback) {
         console.warn(
             '[RunAnalysis] LLM returned empty analysis; skipping cache write',
             { symbol }
@@ -783,7 +859,8 @@ async function runAnalysisImpl(
                     tierCapKeyPart(tier),
                     options.reasoning,
                     options.positionBucket,
-                    options.locale
+                    options.locale,
+                    options.benchmark?.symbol
                 ),
                 { ...result, skillsDegraded },
                 ttl

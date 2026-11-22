@@ -666,6 +666,7 @@ export async function runOverallAnalysis(
         if (timeframe === '1Week') {
             // The weekly series is built from the daily history this run already
             // holds, so a weekly overall request needs no second fetch either.
+            // Without `fearGreedBars` the standard daily window yields fewer weeks.
             return dailyBarsPromise.then(d =>
                 d === null
                     ? undefined

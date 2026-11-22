@@ -335,6 +335,17 @@ function eventsKeySuffix(fingerprint?: string): string {
 }
 
 /**
+ * Cache-key segment for the market benchmark the prompt was written against (WP-19): the
+ * benchmark's symbol, absent without one (the repo's suffix convention: no benchmark, the key
+ * shape every caller without one reads today). The benchmark decides whether the prompt carries
+ * a `### Market Backdrop` block, so an entry written under one benchmark (or none) must not
+ * serve a request made under another: absent, `SPY` and `KS11` are three different keys.
+ */
+function benchmarkKeySuffix(benchmarkSymbol?: string): string {
+    return benchmarkSymbol === undefined ? '' : `:bm=${benchmarkSymbol}`;
+}
+
+/**
  * @internal
  * The latest session boundary at or before `now` — the instant the previous
  * session's analyses stopped being "current". Mirrors the expiry boundary
@@ -1229,6 +1240,29 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * keys), so no existing entry is touched. Weekly prompts say `Not measured on weekly bars`
  * where intraday ones say `intraday` (the same sentences, one label function).
  *
+ * Higher-timeframe block and market backdrop (WP-19 core-2, still `p34`, unreleased):
+ * `## Deterministic Metrics` gains `### Higher Timeframe (computed, ...)` right after
+ * `### Trend (computed)`: the trend of the timeframe above the chart (an intraday chart reads
+ * the daily bars, `1Day` the weekly ones, `1Week` the monthly ones, all built from the daily
+ * history the run already fetches) by the same rule and wording as the chart trend, its
+ * RSI(14), the close's distance from its 50-bar average, the sessions of a forming week or month
+ * when the clock proves it, and the alignment with the chart's trend. Descriptive only: it
+ * never changes the top-level `trend`, the plan or the entry zone. With a `benchmark` option it
+ * also gains `### Market Backdrop (computed, daily bars)`: the benchmark's own trend, its
+ * distance from the 200-day average and the symbol's 20- and 60-session change against it
+ * (percentages only, both to the latest shared date). Results carry optional
+ * `higherTimeframe` and `marketBackdrop` readings (the printed values, code-attached, not on
+ * the empty fallback). The dynamic bytes of every technical prompt change by those two
+ * blocks and, when either is printed, by the `## Deterministic Metrics` intro line, which then says
+ * "the same bars given to you, except the blocks that name their own bars" (a prompt with no
+ * block keeps the old line). The intro sits in the dynamic part, so the provider's cached stable
+ * prefix is untouched; every analysis cache entry is cold at the p34 deploy anyway. The analysis
+ * cache key and the peek key both gain a last `:bm=<benchmark symbol>` segment when a benchmark is given (the benchmark
+ * decides whether the prompt has a backdrop block), (a call with no benchmark keeps its key shape); entries are cold at the deploy anyway.
+ * Every other
+ * byte is as before. When the siglens `multi-timeframe` skill is edited
+ * to quote the block (a separate consumer change), the catalog fingerprint moves once.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p34' as const;
@@ -1245,7 +1279,7 @@ export const PROMPT_TEMPLATE_VERSION = 'p34' as const;
  * The pointer drops those and the skill fingerprint, keeping only what a
  * reader knows. Same design as {@link buildOverallPeekCacheKey}.
  *
- * Format: `analysis:peek:<SYM>:<TF>:<model>:<promptVersion>:<tier>[:reason=on][:pos=…][:lang=…]`.
+ * Format: `analysis:peek:<SYM>:<TF>:<model>:<promptVersion>:<tier>[:reason=on][:pos=…][:lang=…][:bm=<benchmark>]`.
  */
 export function buildAnalysisPeekCacheKey(
     symbol: string,
@@ -1254,9 +1288,10 @@ export function buildAnalysisPeekCacheKey(
     tier: string,
     reasoning?: boolean,
     positionBucket?: PositionBucket,
-    locale?: AnalysisLocale
+    locale?: AnalysisLocale,
+    benchmarkSymbol?: string
 ): string {
-    return `analysis:peek:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}:${tier}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}`;
+    return `analysis:peek:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}:${tier}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}${benchmarkKeySuffix(benchmarkSymbol)}`;
 }
 
 /**
@@ -1306,6 +1341,9 @@ export function buildAnalysisPeekCacheKey(
  *   the caller has no `marketEvents`, or none of them carried `high`/`medium`
  *   impact — produces no suffix at all, so a symbol with no market-moving news
  *   reads/writes the exact key it did before this feature existed.
+ * @param benchmarkSymbol - Symbol of the market benchmark the run reads (`SubmitAnalysisOptions.benchmark`).
+ *   The LAST segment, `:bm=<symbol>`; absent without one, so a request with a benchmark, without one,
+ *   or with another never shares an entry.
  * @returns The cache key.
  *
  * @example
@@ -1331,12 +1369,13 @@ export function buildAnalysisCacheKey(
     positionBucket?: PositionBucket,
     locale?: AnalysisLocale,
     historyFingerprint?: string,
-    eventsFingerprint?: string
+    eventsFingerprint?: string,
+    benchmarkSymbol?: string
 ): string {
     const base = `analysis:${symbol}:${timeframe}:${modelId}:${PROMPT_TEMPLATE_VERSION}`;
     const withFingerprint =
         skillFingerprint !== undefined ? `${base}:${skillFingerprint}` : base;
-    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}${historyKeySuffix(historyFingerprint)}${eventsKeySuffix(eventsFingerprint)}`;
+    return `${withFingerprint}${reasoningKeySuffix(reasoning)}${positionKeySuffix(positionBucket)}${localeKeySuffix(locale)}${historyKeySuffix(historyFingerprint)}${eventsKeySuffix(eventsFingerprint)}${benchmarkKeySuffix(benchmarkSymbol)}`;
 }
 
 /**
@@ -1396,6 +1435,7 @@ export function buildAnalysisCacheKey(
  */
 export const MARKET_BRIEFING_PROMPT_TEMPLATE_VERSION = 'p4' as const;
 
+/** @internal */
 export function buildBriefingCacheKey(
     dateHour: string,
     model: string,

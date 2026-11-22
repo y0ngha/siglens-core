@@ -192,7 +192,9 @@ validates before comparing).
   changed through the shared base. ✅ Bump every template whose rendered output differs.
 - A new input that changes the rendered bytes (a tier cap, a skill set) joins every key built
   from the same inputs together: the writer and reader, and the primary and the peek/pointer
-  keys. Grep each `build*Key` caller for the sibling key before reporting done.
+  keys. Grep each `build*Key` caller for the sibling key before reporting done. An input the
+  consumer chooses (a benchmark, a locale) is never exempt on the grounds that the symbol
+  determines it.
 - A read path that rebuilds a key tests each key argument with a case where a mismatch on
   that argument alone misses (`CONVENTIONS.md#TE-5`).
 - A second reader of an existing cache entry applies the same validity guards as the first

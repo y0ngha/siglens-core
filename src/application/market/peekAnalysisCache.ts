@@ -50,12 +50,18 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
     );
 }
 
+/** Options of {@link peekAnalysisCache}: the cache injection and the writer's benchmark symbol. */
+export interface PeekAnalysisOptions extends CacheOptions {
+    /** `benchmark.symbol` the writer was given for this symbol; omit when it was given none. */
+    benchmarkSymbol?: string;
+}
+
 /**
  * Read a cached technical analysis WITHOUT triggering any generation.
  *
  * This is the read-only twin of {@link runAnalysis}: it reuses the exact
  * same internal cache key (`buildAnalysisCacheKey`) and the exact same read +
- * validate path (the cache from `cacheOptions.cache`, or the env-configured
+ * validate path (the cache from `options.cache`, or the env-configured
  * Upstash default when omitted, plus the internal
  * `normalizeCachedAnalysisResponse` normalizer) that `runAnalysis`
  * runs on a cache hit — but it omits the enqueue/fetch/generate branch entirely.
@@ -119,8 +125,11 @@ export function isEmptyAnalysis(result: AnalysisResponse): boolean {
  *
  * @see runAnalysis
  *
- * @param cacheOptions - Optional `{ cache }` injection; omitted → the Upstash
- *   cache from env, `null` → no cache. See {@link CacheOptions}.
+ * @param options - Optional `{ cache, benchmarkSymbol }`. `cache`: injection; omitted → the Upstash
+ *   cache from env, `null` → no cache (see {@link CacheOptions}). `benchmarkSymbol`: the `symbol` of the
+ *   `benchmark` the writer (`runAnalysis`) was given for this symbol; omit when it was given none.
+ *   Part of the peek key (`:bm=`), so a peek made with a different benchmark than the writer's
+ *   reads a different entry and misses.
  */
 export async function peekAnalysisCache(
     symbol: string,
@@ -132,11 +141,11 @@ export async function peekAnalysisCache(
     tierConfig: TierConfig = TIER_CONFIG,
     positionBucket?: PositionBucket,
     locale?: AnalysisLocale,
-    cacheOptions?: CacheOptions
+    options?: PeekAnalysisOptions
 ): Promise<FilteredAnalysisResult | null> {
     if (!isTimeframeAllowed(tier, timeframe, tierConfig)) return null;
 
-    const cache = resolveCacheProvider(cacheOptions?.cache);
+    const cache = resolveCacheProvider(options?.cache);
     if (cache === null) return null;
 
     const effectiveModelId = modelId ?? DEFAULT_ANALYSIS_MODEL_ID;
@@ -149,7 +158,8 @@ export async function peekAnalysisCache(
         tierCapKeyPart(tier),
         reasoning,
         positionBucket,
-        locale
+        locale,
+        options?.benchmarkSymbol
     );
 
     const cached = await cache

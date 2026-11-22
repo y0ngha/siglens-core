@@ -110,6 +110,28 @@ describe('peekAnalysisCache 함수는', () => {
         );
     });
 
+    it('benchmarkSymbol을 넘기면 그 벤치마크의 :bm= 키로 읽고, 안 넘기면 접미가 없는 키로 읽는다', async () => {
+        await peekAnalysisCache(
+            SYMBOL,
+            TIMEFRAME,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            { benchmarkSymbol: 'SPY' }
+        );
+        const withBenchmark = mockCacheGet.mock.calls[0]?.[0];
+        mockCacheGet.mockClear();
+        await peekAnalysisCache(SYMBOL, TIMEFRAME);
+        const without = mockCacheGet.mock.calls[0]?.[0];
+
+        expect(withBenchmark).toBe(`${without}:bm=SPY`);
+        expect(without).not.toContain(':bm=');
+    });
+
     it('reasoning 미지정 시 기존 키(reasoning-off)와 동일한 키로 읽는다', async () => {
         mockCacheGet.mockResolvedValueOnce(cachedResult);
 

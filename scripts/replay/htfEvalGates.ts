@@ -23,7 +23,10 @@ import {
     backdropReading,
     hasHolidayCalendar,
     higherReading,
+    holidayAffectedPeriod,
     holidayAffectedWeek,
+    weekdaysInMonth,
+    isoDateSeconds,
     isoWeekStart,
     roundToKrxTick,
     matchesPrinted,
@@ -356,7 +359,8 @@ export function checkHigherBlock(
         ...progressFailures(
             block.progress,
             own.lastBarProgress,
-            hasHolidayCalendar(symbol)
+            hasHolidayCalendar(symbol),
+            closureCutShort(kind, symbol, status, data.replayCase.asOf)
         ),
         ...(own.alignment === null
             ? block.alignment === null
@@ -371,13 +375,43 @@ export function checkHigherBlock(
     return failed(failures);
 }
 
+/**
+ * A week or month the stored bars show cut short by a holiday or closure in a market with no
+ * holiday calendar (N3/N24): core cannot know the period ended, so it may still call it forming.
+ */
+function closureCutShort(
+    kind: HigherKind,
+    symbol: string,
+    status: ReturnType<typeof periodProgress>,
+    asOf: string
+): boolean {
+    if (kind === 'weekly') return holidayAffectedWeek(symbol, status);
+    if (kind === 'monthly') {
+        return holidayAffectedPeriod(
+            symbol,
+            status,
+            weekdaysInMonth(monthStart(isoDateSeconds(asOf)))
+        );
+    }
+    return false;
+}
+
 function progressFailures(
     printed: { sessionsSoFar: number; sessionsTotal: number | null } | null,
     own: ReturnType<typeof periodProgress>,
-    calendar: boolean
+    calendar: boolean,
+    mayBeTagged: boolean
 ): readonly string[] {
     if (own === null || !own.inProgress) {
-        return printed === null ? [] : ['progressPrintedButFinished'];
+        // Accepted only for a period the stored bars show cut short in a market with no
+        // calendar, and only as the observed count with no total (what core prints there).
+        return printed === null ||
+            (mayBeTagged &&
+                own !== null &&
+                printed.sessionsSoFar === own.sessionsSoFar &&
+                printed.sessionsTotal === null)
+            ? []
+            : ['progressPrintedButFinished'];
     }
     return printed !== null &&
         printed.sessionsSoFar === own.sessionsSoFar &&
@@ -664,7 +698,14 @@ export function checkAttachedReading(
         ...(near(reading.closeVsMa50Pct, own.closeVsMa50Pct, 1)
             ? []
             : ['closeVsMa50Pct']),
-        ...(reading.lastBarInProgress === (progress?.inProgress ?? false)
+        ...(reading.lastBarInProgress === (progress?.inProgress ?? false) ||
+        (reading.lastBarInProgress === true &&
+            closureCutShort(
+                kind,
+                data.replayCase.symbol,
+                status,
+                data.replayCase.asOf
+            ))
             ? []
             : ['lastBarInProgress']),
         ...(reading.bars === own.bars ? [] : ['bars']),

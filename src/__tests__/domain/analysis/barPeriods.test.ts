@@ -4,7 +4,7 @@ import { aggregateBarsToWeekly } from '@/domain/analysis/aggregateBarsToWeekly';
 import {
     barPeriodStartSeconds,
     isLastPeriodBarFinished,
-    lastWeekProgress,
+    lastPeriodProgress,
     type PeriodClock,
 } from '@/domain/analysis/barPeriods';
 import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
@@ -181,7 +181,7 @@ describe('isLastPeriodBarFinished', () => {
     });
 });
 
-describe('lastWeekProgress', () => {
+describe('lastPeriodProgress', () => {
     const wednesdayEvening = new Date(Date.UTC(2026, 10, 18, 22, 0));
     const days = [
         dailyBar(2026, 10, 16),
@@ -190,12 +190,12 @@ describe('lastWeekProgress', () => {
     ];
 
     it('counts the observed daily bars against the five scheduled sessions', () => {
-        expect(lastWeekProgress(WEEK, days, usClock(wednesdayEvening))).toEqual(
-            {
-                sessionsSoFar: 3,
-                sessionsTotal: 5,
-            }
-        );
+        expect(
+            lastPeriodProgress('week', WEEK, days, usClock(wednesdayEvening))
+        ).toEqual({
+            sessionsSoFar: 3,
+            sessionsTotal: 5,
+        });
     });
 
     it('does not count daily bars of other weeks', () => {
@@ -205,8 +205,12 @@ describe('lastWeekProgress', () => {
             ...days,
         ];
         expect(
-            lastWeekProgress(WEEK, withOthers, usClock(wednesdayEvening))
-                ?.sessionsSoFar
+            lastPeriodProgress(
+                'week',
+                WEEK,
+                withOthers,
+                usClock(wednesdayEvening)
+            )?.sessionsSoFar
         ).toBe(3);
     });
 
@@ -216,8 +220,12 @@ describe('lastWeekProgress', () => {
             { ...dailyBar(2026, 10, 19), open: 0, high: 0, low: 0 },
         ];
         expect(
-            lastWeekProgress(WEEK, withPlaceholder, usClock(wednesdayEvening))
-                ?.sessionsSoFar
+            lastPeriodProgress(
+                'week',
+                WEEK,
+                withPlaceholder,
+                usClock(wednesdayEvening)
+            )?.sessionsSoFar
         ).toBe(3);
     });
 
@@ -225,7 +233,8 @@ describe('lastWeekProgress', () => {
         const thanksgivingWeek = { time: utc(2026, 10, 23) };
         const tuesdayEvening = new Date(Date.UTC(2026, 10, 24, 22, 0));
         expect(
-            lastWeekProgress(
+            lastPeriodProgress(
+                'week',
                 thanksgivingWeek,
                 [dailyBar(2026, 10, 23), dailyBar(2026, 10, 24)],
                 usClock(tuesdayEvening)
@@ -240,7 +249,7 @@ describe('lastWeekProgress', () => {
                 { kind: 'scheduled' }
             >;
         expect(
-            lastWeekProgress(WEEK, days, {
+            lastPeriodProgress('week', WEEK, days, {
                 session: weekdayOnly,
                 now: wednesdayEvening,
             })
@@ -249,7 +258,7 @@ describe('lastWeekProgress', () => {
 
     it('totals seven days on a 24/7 session', () => {
         expect(
-            lastWeekProgress(WEEK, days, {
+            lastPeriodProgress('week', WEEK, days, {
                 session: CRYPTO_SESSION,
                 now: wednesdayEvening,
             })
@@ -258,13 +267,80 @@ describe('lastWeekProgress', () => {
 
     it('is null for a finished week, without a clock and without a bar', () => {
         const fridayEvening = new Date(Date.UTC(2026, 10, 20, 22, 0));
-        expect(lastWeekProgress(WEEK, days, usClock(fridayEvening))).toBeNull();
-        expect(lastWeekProgress(WEEK, days, undefined)).toBeNull();
         expect(
-            lastWeekProgress(WEEK, undefined, usClock(wednesdayEvening))
+            lastPeriodProgress('week', WEEK, days, usClock(fridayEvening))
+        ).toBeNull();
+        expect(lastPeriodProgress('week', WEEK, days, undefined)).toBeNull();
+        expect(
+            lastPeriodProgress(
+                'week',
+                WEEK,
+                undefined,
+                usClock(wednesdayEvening)
+            )
         ).toBeNull();
         expect(
-            lastWeekProgress(undefined, days, usClock(wednesdayEvening))
+            lastPeriodProgress(
+                'week',
+                undefined,
+                days,
+                usClock(wednesdayEvening)
+            )
         ).toBeNull();
+    });
+    describe('month', () => {
+        const NOVEMBER = { time: utc(2026, 10, 1) };
+        const novemberDays = [
+            dailyBar(2026, 10, 2),
+            ...days,
+            dailyBar(2026, 11, 1),
+        ];
+
+        it('counts the observed bars of the month against the calendar sessions (Thanksgiving is not one)', () => {
+            // 21 weekdays in November 2026, less Thanksgiving on the 26th.
+            expect(
+                lastPeriodProgress(
+                    'month',
+                    NOVEMBER,
+                    novemberDays,
+                    usClock(wednesdayEvening)
+                )
+            ).toEqual({ sessionsSoFar: 4, sessionsTotal: 20 });
+        });
+
+        it('claims no total without holiday data', () => {
+            const { closeMinuteFor: _calendar, ...weekdayOnly } =
+                US_EQUITY_SESSION as Extract<
+                    MarketSessionSpec,
+                    { kind: 'scheduled' }
+                >;
+            expect(
+                lastPeriodProgress('month', NOVEMBER, novemberDays, {
+                    session: weekdayOnly,
+                    now: wednesdayEvening,
+                })
+            ).toEqual({ sessionsSoFar: 4, sessionsTotal: null });
+        });
+
+        it('totals every calendar day of the month on a 24/7 session', () => {
+            expect(
+                lastPeriodProgress('month', NOVEMBER, novemberDays, {
+                    session: CRYPTO_SESSION,
+                    now: wednesdayEvening,
+                })?.sessionsTotal
+            ).toBe(30);
+        });
+
+        it('is null once the month is over', () => {
+            const december = new Date(Date.UTC(2026, 11, 1, 22, 0));
+            expect(
+                lastPeriodProgress(
+                    'month',
+                    NOVEMBER,
+                    novemberDays,
+                    usClock(december)
+                )
+            ).toBeNull();
+        });
     });
 });

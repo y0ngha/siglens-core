@@ -140,6 +140,15 @@ import type {
 import { computeAnalysisTrend } from '@/domain/analysis/analysisTrend';
 import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
 import {
+    computeHigherTimeframe,
+    computeMarketBackdrop,
+    type HigherContextInput,
+} from '@/domain/analysis/higherTimeframe';
+import {
+    formatHigherTimeframeBlock,
+    formatMarketBackdropBlock,
+} from '@/domain/analysis/higherTimeframeSection';
+import {
     HORIZON_KEYS,
     printableLevels,
     sameFibLegAs as sameFibLegOf,
@@ -172,8 +181,8 @@ import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
 import { formatMarketEventsSection } from '@/domain/analysis/marketEventsSection';
 import {
-    lastWeekProgress,
-    type WeekProgress,
+    lastPeriodProgress,
+    type PeriodProgress,
 } from '@/domain/analysis/barPeriods';
 import { formatPositionHintSection } from '@/domain/analysis/positionHintSection';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
@@ -485,7 +494,7 @@ const isCandleReliabilityMeasured = (
  * in the week, the total the sessions the exchange calendar schedules for it. A listing whose
  * session spec has no holiday data prints no total: it could not be proven (DOM-12).
  */
-const formatWeekProgressTag = (progress: WeekProgress): string =>
+const formatWeekProgressTag = (progress: PeriodProgress): string =>
     progress.sessionsTotal === null
         ? `(week in progress: ${progress.sessionsSoFar} sessions so far; its close is the latest price)`
         : `(week in progress: ${progress.sessionsSoFar} of ${progress.sessionsTotal} sessions so far; its close is the latest price)`;
@@ -498,7 +507,7 @@ const formatRecentBarsSection = (
     atrSeries: readonly (number | null)[],
     timeframe: Timeframe,
     assetClass: AssetClass,
-    weekProgress: WeekProgress | null
+    weekProgress: PeriodProgress | null
 ): string => {
     const recentBars = bars.slice(-recentBarsCount);
 
@@ -2741,7 +2750,12 @@ export const CORE_SKILL_REFERENCE_POINTER =
  *   With `marketClock` it lets the last weekly row say how far the current week is (observed
  *   daily bars against the calendar's sessions); ignored on every other timeframe, and with
  *   no clock the weekly bar is treated as still forming, with no tag.
- * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries, trend }` — see {@link TechnicalAssembledPrompt}.
+ * @param higherContext - The higher-timeframe series and the benchmark's daily bars (see
+ *   {@link HigherContextInput}). Each present member prints one block after `### Trend (computed)`
+ *   (`### Higher Timeframe (computed, ...)`, `### Market Backdrop (computed, ...)`) and comes back on
+ *   the result as the reading it printed; a `null` member prints nothing. Omitted, the prompt is
+ *   byte-identical to the one this builder emitted before the parameter existed.
+ * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries, trend, higherTimeframe, marketBackdrop }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
@@ -2764,7 +2778,8 @@ export function buildAnalysisPrompt(
     earningsDates?: readonly string[],
     marketClock?: MarketReferenceClock,
     gatedSkillCap?: number | null,
-    dailyBars?: readonly Bar[]
+    dailyBars?: readonly Bar[],
+    higherContext?: HigherContextInput
 ): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
@@ -2901,6 +2916,23 @@ export function buildAnalysisPrompt(
     });
     // Computed once: the prompt prints it and the caller overwrites the model's `trend` with it.
     const trendReading = computeAnalysisTrend(bars, indicators);
+    // The same one-computation rule for the two context blocks: the printed lines and the
+    // readings handed back to the caller come from these values.
+    const higher =
+        higherContext?.higher == null
+            ? null
+            : computeHigherTimeframe({
+                  series: higherContext.higher,
+                  analysisTrend: trendReading?.trend ?? null,
+                  clock: marketClock,
+              });
+    const backdrop =
+        higherContext?.backdrop == null
+            ? null
+            : {
+                  label: higherContext.backdrop.label,
+                  reading: computeMarketBackdrop(higherContext.backdrop),
+              };
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
     const overlayCandidatesSection =
         formatChartOverlayCandidatesSection(overlayCandidates);
@@ -3015,7 +3047,12 @@ export function buildAnalysisPrompt(
             timeframe,
             assetClass,
             timeframe === '1Week'
-                ? lastWeekProgress(bars.at(-1), dailyBars, marketClock)
+                ? lastPeriodProgress(
+                      'week',
+                      bars.at(-1),
+                      dailyBars,
+                      marketClock
+                  )
                 : null
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
@@ -3080,7 +3117,20 @@ export function buildAnalysisPrompt(
             marketEvents,
             earningsDates,
             trendReading,
-            signalFreshness ?? undefined
+            signalFreshness ?? undefined,
+            [
+                ...(higher === null
+                    ? []
+                    : formatHigherTimeframeBlock(
+                          higher,
+                          trendReading?.trend ?? null,
+                          quoting,
+                          assetClass === 'equity'
+                      )),
+                ...(backdrop === null
+                    ? []
+                    : formatMarketBackdropBlock(backdrop.reading, symbol)),
+            ]
         ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
         ...buildSkillContentSections(selectedGroups, timeframe),
@@ -3129,6 +3179,8 @@ export function buildAnalysisPrompt(
             patternCandidateGeometries
         ),
         trend: trendReading,
+        higherTimeframe: higher?.reading ?? null,
+        marketBackdrop: backdrop?.reading ?? null,
         // Already the printed prices (`printedLevelsOnSide` replaces each level's price with
         // the one the prompt prints), so the stop floor decides on what the model read.
         printedSupportPrices: printedSupportLevels(

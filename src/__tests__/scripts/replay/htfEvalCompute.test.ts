@@ -8,7 +8,9 @@ import {
     coreTimeframe,
     decimalsOf,
     hasHolidayCalendar,
+    holidayAffectedPeriod,
     holidayAffectedWeek,
+    weekdaysInMonth,
     higherReading,
     isoDateSeconds,
     isoWeekStart,
@@ -528,6 +530,32 @@ describe('coreTimeframe', () => {
         expect(coreTimeframe('1Week')).toBe('1Week');
         // A value core does not list is still refused (fail closed), with the known list.
         expect(() => coreTimeframe('2Week' as never)).toThrow(/known:/);
+    });
+});
+
+describe('weekdaysInMonth / holidayAffectedPeriod', () => {
+    const monthOf = (y: number, m: number): number => Date.UTC(y, m, 1) / 1000;
+    const progress = (sessionsTotal: number, totalKnown = true) => ({
+        sessionsTotal,
+        totalKnown,
+    });
+
+    it('counts Monday to Friday of a calendar month', () => {
+        expect(weekdaysInMonth(monthOf(2026, 10))).toBe(21);
+        expect(weekdaysInMonth(monthOf(2026, 1))).toBe(20);
+        expect(weekdaysInMonth(monthOf(2020, 11))).toBe(23);
+    });
+
+    it('flags a fully stored period shorter than its nominal sessions, for a market with no calendar only', () => {
+        expect(holidayAffectedPeriod('005930.KS', progress(21), 22)).toBe(true);
+        expect(holidayAffectedPeriod('005930.KS', progress(22), 22)).toBe(
+            false
+        );
+        expect(
+            holidayAffectedPeriod('005930.KS', progress(21, false), 22)
+        ).toBe(false);
+        expect(holidayAffectedPeriod('AAPL', progress(21), 22)).toBe(false);
+        expect(holidayAffectedPeriod('005930.KS', null, 22)).toBe(false);
     });
 });
 

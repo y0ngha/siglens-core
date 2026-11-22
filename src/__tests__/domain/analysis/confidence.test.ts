@@ -981,6 +981,37 @@ describe('confidence', () => {
         });
     });
 
+    describe('model-supplied higherTimeframe and marketBackdrop', () => {
+        it('are dropped on the raw-reply path: both readings are code-computed, never the model', () => {
+            const result = enrichAnalysisWithConfidence(
+                {
+                    trend: 'bullish',
+                    higherTimeframe: {
+                        kind: 'weekly',
+                        trend: 'bearish',
+                        slopeAtr: -3,
+                        rsi14: 20,
+                        closeVsMa50Pct: -9,
+                        lastBarInProgress: false,
+                        bars: 100,
+                        alignment: 'opposed',
+                    },
+                    marketBackdrop: {
+                        label: 'invented',
+                        trend: 'bearish',
+                        closeVsMa200Pct: -9,
+                        endDate: null,
+                        relative: [],
+                    },
+                },
+                []
+            );
+
+            expect('higherTimeframe' in result).toBe(false);
+            expect('marketBackdrop' in result).toBe(false);
+        });
+    });
+
     describe('normalizeCachedAnalysisResponse', () => {
         it('캐시된 id, confidenceWeight, renderConfig를 보존하면서 누락 필드를 정규화한다', () => {
             const renderConfig = makeSkillChartDisplay({ color: '#22c55e' });
@@ -1070,6 +1101,55 @@ describe('confidence', () => {
             });
 
             expect(result.trendBasis).toEqual(trendBasis);
+        });
+
+        it('higherTimeframe과 marketBackdrop을 보존한다 — 캐시 hit이 화면에 쓰는 읽기를 잃으면 안 된다', () => {
+            const higherTimeframe = {
+                kind: 'weekly',
+                trend: 'bullish',
+                slopeAtr: 1.62,
+                rsi14: 61.2,
+                closeVsMa50Pct: 12.4,
+                lastBarInProgress: true,
+                bars: 260,
+                alignment: 'aligned',
+            };
+            const marketBackdrop = {
+                label: 'S&P 500 (SPY)',
+                trend: 'bullish',
+                closeVsMa200Pct: 6.2,
+                endDate: '2026-11-20',
+                relative: [
+                    { sessions: 20, symbolPct: 4.1, benchmarkPct: 1.3 },
+                    { sessions: 60, symbolPct: 9.8, benchmarkPct: 5 },
+                ],
+            };
+            const result = normalizeCachedAnalysisResponse({
+                higherTimeframe,
+                marketBackdrop,
+            });
+
+            expect(result.higherTimeframe).toEqual(higherTimeframe);
+            expect(result.marketBackdrop).toEqual(marketBackdrop);
+        });
+
+        it('깨진 higherTimeframe·marketBackdrop은 키 자체를 만들지 않는다 (보정 없이 버린다)', () => {
+            const result = normalizeCachedAnalysisResponse({
+                higherTimeframe: { kind: 'weekly', trend: 'bullish' },
+                marketBackdrop: { label: '', relative: [] },
+            });
+
+            expect('higherTimeframe' in result).toBe(false);
+            expect('marketBackdrop' in result).toBe(false);
+        });
+
+        it('캐시 항목에 두 읽기가 없으면(필드 도입 전) 키도 없다', () => {
+            const result = normalizeCachedAnalysisResponse({
+                trend: 'bullish',
+            });
+
+            expect('higherTimeframe' in result).toBe(false);
+            expect('marketBackdrop' in result).toBe(false);
         });
 
         it.each([

@@ -1109,6 +1109,91 @@ export interface AnalysisTrendReading {
 }
 
 /**
+ * Which timeframe a {@link HigherTimeframeReading} describes: the one above the analysed chart.
+ * An intraday chart reads the daily series, `1Day` the weekly one, `1Week` the monthly one.
+ */
+export type HigherTimeframeKind = 'daily' | 'weekly' | 'monthly';
+
+/**
+ * How the analysed chart's trend sits against the higher timeframe's: both bullish or both
+ * bearish is `aligned`, bullish against bearish `opposed`, anything with a neutral side `mixed`.
+ */
+export type TrendAlignment = 'aligned' | 'opposed' | 'mixed';
+
+/**
+ * The computed higher-timeframe reading stored on {@link AnalysisResponse.higherTimeframe}: the
+ * same figures the prompt's `### Higher Timeframe (computed)` block printed, at the printed
+ * precision. Descriptive only: it never changes the top-level `trend`, the plan or the zone.
+ */
+export interface HigherTimeframeReading {
+    readonly kind: HigherTimeframeKind;
+    /**
+     * The analysis trend rule (EMA20 move in ATR(14), `computeAnalysisTrend`) applied to the
+     * higher-timeframe bars. `null` = not measurable (too few bars, no usable ATR or close),
+     * which is not the same as `neutral`.
+     */
+    readonly trend: Trend | null;
+    /** EMA20's move over 20 higher-timeframe bars in ATR(14), 2 dp (the value `trend` was decided on); `null` with `trend`. */
+    readonly slopeAtr: number | null;
+    /** RSI(14) on the higher-timeframe closes, 1 dp; `null` when not computable. */
+    readonly rsi14: number | null;
+    /** (close − SMA50) / SMA50 × 100 on the higher-timeframe bars, 1 dp; `null` under 50 bars. */
+    readonly closeVsMa50Pct: number | null;
+    /**
+     * `true` only when the clock proved the last higher-timeframe bar is still forming (the
+     * current week, month or session). `false` means finished **or** unknown (no clock supplied):
+     * the prompt states nothing about progress in the unknown case.
+     */
+    readonly lastBarInProgress: boolean;
+    /** Higher-timeframe bars the reading was computed on. */
+    readonly bars: number;
+    /** Analysed chart's trend against the higher one; `null` when either is not measurable. */
+    readonly alignment: TrendAlignment | null;
+}
+
+/** Sessions over which {@link MarketBackdropReading} compares the symbol with its benchmark. */
+export type MarketBackdropSessions = 20 | 60;
+
+/** One window of {@link MarketBackdropReading.relative}. */
+export interface MarketBackdropChange {
+    readonly sessions: MarketBackdropSessions;
+    /** The symbol's close-to-close change (percent, 1 dp) over the last `sessions` daily sessions to `endDate`; `null` with too little history. */
+    readonly symbolPct: number | null;
+    /** The benchmark's change over the same window, 1 dp; `null` with too little history. */
+    readonly benchmarkPct: number | null;
+}
+
+/**
+ * The computed market backdrop stored on {@link AnalysisResponse.marketBackdrop}: the benchmark's
+ * own daily trend and the symbol's change against it. Percentages only, never an index price.
+ */
+export interface MarketBackdropReading {
+    /** The consumer's name of the benchmark, e.g. `S&P 500 (SPY)`. */
+    readonly label: string;
+    /** The analysis trend rule on the benchmark's daily bars; `null` = not measurable. */
+    readonly trend: Trend | null;
+    /** (close − SMA200) / SMA200 × 100 on the benchmark's daily bars, 1 dp; `null` under 200 bars. */
+    readonly closeVsMa200Pct: number | null;
+    /** Latest `YYYY-MM-DD` both series have a session on: the end of every window in {@link relative}. `null` when they share none. */
+    readonly endDate: string | null;
+    /** The 20- and 60-session changes, both series ending on `endDate`. */
+    readonly relative: readonly MarketBackdropChange[];
+}
+
+/**
+ * The market a symbol is read against, chosen by the consumer's market profile (core never
+ * derives it from the symbol): a name to fetch daily bars under and a label to print.
+ */
+export interface MarketBenchmark {
+    /** Symbol the provider is asked for (the benchmark's own code, e.g. `SPY`). */
+    readonly symbol: string;
+    /** Provider-specific identifier when it differs from `symbol` (e.g. `^KS11` for `KS11`). */
+    readonly fmpSymbol?: string;
+    /** Name printed in the prompt, e.g. `S&P 500 (SPY)` or `KOSPI`. */
+    readonly label: string;
+}
+
+/**
  * Single-bar candle pattern label. See {@link detectCandlePattern}.
  */
 export type CandlePattern =
@@ -2093,7 +2178,7 @@ export interface CandlePatternSummary {
     baseRate?: MeasuredBaseRate | null;
 }
 
-/** Raw pattern summary before id/confidenceWeight enrichment. */
+/** @internal Raw pattern summary before id/confidenceWeight enrichment. */
 export type RawPatternSummary = Omit<PatternSummary, 'confidenceWeight' | 'id'>;
 /** Raw strategy result before id/confidenceWeight enrichment. */
 export type RawStrategyResult = Omit<StrategyResult, 'confidenceWeight' | 'id'>;
@@ -2365,6 +2450,15 @@ export interface AnalysisResponse {
     trend: Trend;
     /** What `trend` was computed from. Absent when it was not measurable and on entries cached before the field existed. */
     trendBasis?: TrendBasis;
+    /**
+     * The higher timeframe's computed trend and alignment the prompt stated (a weekly reading on
+     * a daily chart). Code-written after the model answers, never taken from the model. Absent on
+     * entries cached before the field existed, on the empty fallback, and when the higher series
+     * could not be built.
+     */
+    higherTimeframe?: HigherTimeframeReading;
+    /** The computed market backdrop the prompt stated. Absent without a `benchmark` option, on the empty fallback, and when the benchmark's bars could not be read. */
+    marketBackdrop?: MarketBackdropReading;
     /** Per-skill indicator guide interpretations. */
     indicatorResults: IndicatorGuideResult[];
     /** Volatility grade (how far price typically moves; see {@link RiskLevel}). */
@@ -2404,6 +2498,10 @@ export interface FilteredAnalysisResponse {
     trend: Trend | null;
     /** What `trend` was computed from, or `null` when the direction fragment is locked. Absent when it was not measurable. */
     trendBasis?: TrendBasis | null;
+    /** The higher-timeframe reading, or `null` when the direction fragment is locked. Absent when none was computed. */
+    higherTimeframe?: HigherTimeframeReading | null;
+    /** The market backdrop reading, or `null` when the direction fragment is locked. Absent when none was computed. */
+    marketBackdrop?: MarketBackdropReading | null;
     /** Per-skill indicator guide interpretations. */
     indicatorResults: IndicatorGuideResult[] | null;
     /** Volatility grade (see {@link RiskLevel}), or `null` when locked. */
@@ -2548,7 +2646,7 @@ export interface AssembledPrompt {
     dynamic: string;
 }
 
-/** {@link buildAnalysisPrompt}'s result: the prompt halves plus the overlay candidates (and printed pattern geometry) it offered, so the caller resolves the model's ids against the exact same list. */
+/** @internal {@link buildAnalysisPrompt}'s result: the prompt halves plus the overlay candidates (and printed pattern geometry) it offered, so the caller resolves the model's ids against the exact same list. */
 export interface TechnicalAssembledPrompt extends AssembledPrompt {
     overlayCandidates: readonly OverlayCandidate[];
     /** Overlay builders that threw during this prompt build (their kinds offered nothing). */
@@ -2586,6 +2684,15 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      * Returned so the caller overwrites the model's `trend` with the value the prompt stated, from one computation.
      */
     trend: AnalysisTrendReading | null;
+    /**
+     * The reading this prompt printed in `### Higher Timeframe (computed)`, or `null` when no
+     * higher-timeframe series was supplied (the block is then absent). A reading with a `null`
+     * trend is the printed "Not measurable" form. Returned so the caller attaches the printed
+     * values, from one computation.
+     */
+    higherTimeframe: HigherTimeframeReading | null;
+    /** The reading this prompt printed in `### Market Backdrop (computed)`, or `null` when no benchmark series was supplied. */
+    marketBackdrop: MarketBackdropReading | null;
     /**
      * The support prices this prompt printed beyond the at-price band (`### Stop & Target
      * Spacing` draws its stop candidates from the same list), nearest first, one per quoted
@@ -2675,6 +2782,8 @@ export interface RawAnalysisResponse {
     summary?: unknown;
     trend?: unknown;
     trendBasis?: unknown;
+    higherTimeframe?: unknown;
+    marketBackdrop?: unknown;
     indicatorResults?: unknown;
     riskLevel?: unknown;
     keyLevels?: unknown;
@@ -4223,7 +4332,7 @@ export interface PullbackEventCaveatInput {
     bars: readonly Bar[];
 }
 
-/** Input of `computeRiskLevel`: market data only, never model output. */
+/** @internal Input of `computeRiskLevel`: market data only, never model output. */
 export interface RiskLevelInputs {
     /** OHLCV history, oldest first. The last bar is the one being assessed. */
     bars: readonly Bar[];
@@ -5516,22 +5625,23 @@ export interface ChartOverlay extends Omit<OverlayCandidate, 'promptLine'> {
     variant: OverlayVariant;
 }
 
-/** Formatting context for candidate prompt lines. */
+/** @internal Formatting context for candidate prompt lines. */
 export interface OverlayFormat {
     timeframe: Timeframe;
     quoting: PriceQuoting;
 }
 
-/** Both pivots of a regular RSI divergence, as bars indices (first < second). */
+/** @internal Both pivots of a regular RSI divergence, as bars indices (first < second). */
 export interface RsiDivergencePair {
     first: number;
     second: number;
 }
 
+/** @internal */
 export type RsiDivergenceKind = 'bullish' | 'bearish';
 
 /** {@link resolveChartOverlays} output. */
-/** {@link buildOverlayCandidates} output: the candidates plus the kinds whose builder threw. */
+/** @internal {@link buildOverlayCandidates} output: the candidates plus the kinds whose builder threw. */
 export interface OverlayCandidateBuild {
     candidates: OverlayCandidate[];
     failedBuilders: OverlayKind[];
@@ -5544,6 +5654,7 @@ export interface MisplacedOverlayId {
     sourceRef: string;
 }
 
+/** @internal */
 export interface ResolvedChartOverlays {
     chartOverlays: ChartOverlay[];
     /** Trendlines derived from resolved trendline overlays (legacy `trendlines` field). */

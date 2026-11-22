@@ -14,6 +14,7 @@ import type {
     AssetClass,
     CurrencyCode,
     FilteredAnalysisResponse,
+    MarketBenchmark,
     MarketBriefingResponse,
     MarketEvent,
     MarketSessionSpec,
@@ -256,6 +257,26 @@ export interface SubmitAnalysisOptions
      * would change every key and drop the warm cache.
      */
     session?: MarketSessionSpec;
+
+    /**
+     * The market the symbol is read against (e.g. `{ symbol: 'SPY', label: 'S&P 500 (SPY)' }`), chosen
+     * by the consumer's market profile; core never derives it from the symbol. On a cache miss the
+     * run reads the benchmark's daily bars through the same `marketDataProvider` (in parallel with
+     * the daily fetch, a failure only drops the line) and the prompt gains a `### Market Backdrop
+     * (computed, daily bars)` block with the benchmark's trend and the symbol's 20- and 60-session
+     * change against it (percentages only); the result carries it as `marketBackdrop`. Skipped when
+     * `benchmark.symbol` is the analysed symbol. Omitted: no block, no field.
+     *
+     * Pass the same benchmark for a symbol on every call: its `symbol` is the last cache-key
+     * segment (`:bm=<symbol>`, absent without one) of the analysis key and the peek key, so a
+     * request made with another benchmark, or none, reads another entry. Peek callers
+     * (`peekAnalysisCache`'s `options.benchmarkSymbol`) must pass the writer's benchmark symbol or miss.
+     *
+     * A failed benchmark read only drops the backdrop block: that analysis is cached without
+     * `marketBackdrop` for its TTL (accepted: the block is optional context, and not retrying
+     * avoids a retry storm on a provider outage).
+     */
+    benchmark?: MarketBenchmark;
 
     /**
      * Callback that receives the exact prompt sent to the model, for a

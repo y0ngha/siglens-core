@@ -24,6 +24,7 @@ export { UserApiKeyMissingError } from './application/byok/errors';
 // Market analysis
 export { fetchBarsWithIndicators } from './application/market/barsApi';
 export { peekAnalysisCache } from './application/market/peekAnalysisCache';
+export type { PeekAnalysisOptions } from './application/market/peekAnalysisCache';
 export { peekBriefingCache } from './application/market/peekBriefingCache';
 export { runAnalysis } from './application/market/runAnalysis';
 export { runBriefing } from './application/market/runBriefing';
@@ -1285,6 +1286,14 @@ export type {
     TrendlineDirection,
     TrendlinePoint,
     TrendBasis,
+    // Higher-timeframe block and market backdrop (WP-19).
+    HigherTimeframeKind,
+    TrendAlignment,
+    HigherTimeframeReading,
+    MarketBackdropSessions,
+    MarketBackdropChange,
+    MarketBackdropReading,
+    MarketBenchmark,
     TrendState,
     // Computed cards (WP-16) — the structured readings of indicator and cycle cards.
     IndicatorCardKind,

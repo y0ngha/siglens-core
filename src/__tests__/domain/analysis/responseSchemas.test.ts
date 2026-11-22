@@ -625,6 +625,26 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
         summary: '요약',
         trend: 'bullish',
         trendBasis: { slopeAtr: 1.2, lookbackBars: 20, emaPeriod: 20 },
+        higherTimeframe: {
+            kind: 'weekly',
+            trend: 'bullish',
+            slopeAtr: 1.6,
+            rsi14: 61.2,
+            closeVsMa50Pct: 12.4,
+            lastBarInProgress: true,
+            bars: 260,
+            alignment: 'aligned',
+        },
+        marketBackdrop: {
+            label: 'S&P 500 (SPY)',
+            trend: 'bullish',
+            closeVsMa200Pct: 6.2,
+            endDate: '2026-11-20',
+            relative: [
+                { sessions: 20, symbolPct: 4.1, benchmarkPct: 1.3 },
+                { sessions: 60, symbolPct: 9.8, benchmarkPct: 5 },
+            ],
+        },
         indicatorResults: [indicatorSample],
         riskLevel: 'medium',
         keyLevels: keyLevelsSample,
@@ -658,6 +678,10 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
                 key !== 'dataAsOf' &&
                 // Computed by core from the bars (`computeAnalysisTrend`), never asked of the model.
                 key !== 'trendBasis' &&
+                // Attached by core after the model answers (`computeHigherTimeframe`,
+                // `computeMarketBackdrop`), never asked of the model.
+                key !== 'higherTimeframe' &&
+                key !== 'marketBackdrop' &&
                 // Built by core from the prompt's own lines (`buildIndicatorCards`), not asked of the model.
                 key !== 'indicatorResults' &&
                 key !== 'chartOverlays' &&
