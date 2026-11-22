@@ -521,8 +521,10 @@ export const TECHNICAL_RESPONSE_SCHEMA = {
                     },
                     // Id of the `## Chart Pattern Candidates (computed)` block
                     // this pattern was confirmed from;
-                    // `null` for a pattern that section does not list (the
-                    // qualified patterns only — not the loose pre-screener).
+                    // `null` for a listed pattern the section gave no Candidate
+                    // id (the qualified patterns only — not the loose
+                    // pre-screener). The prompt lists only those patterns;
+                    // with an allow-list core drops any other entry.
                     candidateId: { type: ['string', 'null'] },
                     confidenceWeight: { type: 'number' },
                     renderConfig: {

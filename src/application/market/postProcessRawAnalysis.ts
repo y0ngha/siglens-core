@@ -43,6 +43,13 @@ export interface PostProcessRawAnalysisInput {
      * an ATR one without a trace.
      */
     readonly stopCandidates: readonly number[];
+    /**
+     * `TechnicalAssembledPrompt.patternSkillNames`: the pattern skills the prompt listed. A
+     * `patternSummaries` entry whose skill is not among them is dropped (the prompt allows
+     * entries for the listed patterns only). Omitted keeps every entry, as for callers
+     * that have no prompt.
+     */
+    readonly allowedPatternSkills?: readonly string[];
     readonly currency?: CurrencyCode;
     readonly locale?: AnalysisLocale;
     readonly krxTickTable?: KrxTickTable;
@@ -96,11 +103,16 @@ export function postProcessRawAnalysis(
         lastClose,
         atr,
         stopCandidates,
+        allowedPatternSkills,
         currency,
         locale = DEFAULT_ANALYSIS_LOCALE,
         krxTickTable,
     } = input;
-    const enriched = enrichAnalysisWithConfidence(rawResult, skills);
+    const enriched = enrichAnalysisWithConfidence(
+        rawResult,
+        skills,
+        allowedPatternSkills
+    );
     const resolvedOverlays = resolveChartOverlays(
         overlayCandidates,
         enriched,

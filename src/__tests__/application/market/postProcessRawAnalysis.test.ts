@@ -239,6 +239,45 @@ describe('postProcessRawAnalysis', () => {
         }
     );
 
+    describe('allowedPatternSkills', () => {
+        const cup: Skill = {
+            name: 'Cup Guide',
+            description: 'd',
+            indicators: [],
+            confidenceWeight: 0.8,
+            content: '## Body',
+            type: 'pattern',
+        };
+        const card = (skillName: string) => ({
+            patternName: skillName,
+            skillName,
+            detected: false,
+            trend: 'neutral',
+            summary: 's',
+        });
+        const run = (allowedPatternSkills?: readonly string[]) =>
+            postProcessRawAnalysis({
+                rawResult: rawAnalysis({
+                    patternSummaries: [card('Cup Guide'), card('Made Up')],
+                }),
+                skills: [cup],
+                overlayCandidates: [],
+                patternGeometries: new Map(),
+                lastClose: 71_700,
+                atr: 900,
+                stopCandidates: [],
+                allowedPatternSkills,
+            }).reconciled.patternSummaries.map(p => p.skillName);
+
+        it('drops the entry of a pattern the prompt did not list', () => {
+            expect(run(['Cup Guide'])).toEqual(['Cup Guide']);
+        });
+
+        it('keeps every entry when the list is omitted', () => {
+            expect(run()).toEqual(['Cup Guide', 'Made Up']);
+        });
+    });
+
     it('returns the model output before tick rounding and reconciliation', () => {
         const { reconciled, modelOutput } = postProcessRawAnalysis({
             rawResult: rawAnalysis(),

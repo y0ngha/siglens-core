@@ -35,8 +35,8 @@ import {
  * @internal
  * Strict chart-pattern qualification — what may be drawn,
  * printed with numbers and offered as a Candidate id. The pre-screener
- * (`screenChartPatterns`) stays loose and only picks skill docs; its hits
- * that do not qualify come back as `shapeHints`.
+ * (`screenChartPatterns`) stays loose; its hits that do not qualify come back
+ * as `shapeHints`, which select no skill doc (only the qualified ids do).
  *
  * Runs every family's strict detector over the CONFIRMED pivots of the last
  * `SCREEN_LOOKBACK_BARS` bars. It does not start from the loose hits: the

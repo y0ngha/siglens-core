@@ -988,12 +988,16 @@ export interface SkillSelectionContext {
     signals: readonly Signal[];
     /** Timeframe of the analyzed bars; drives TF-aware thresholds. */
     timeframe: Timeframe;
-    /** Candle pattern names detected on the analyzed bars. */
+    /**
+     * Candle pattern names the prompt prints under `## Detected Candle Patterns
+     * (computed)` (the latest multi-bar and latest single-bar entry), not every
+     * entry in the detection window.
+     */
     detectedCandles: readonly string[];
     /**
-     * Chart-pattern IDs surfaced for the analyzed bars — the qualified
-     * patterns plus the pre-screener's ({@link screenChartPatterns}) loose
-     * shape hints, minus hits the price has already spent — a third
+     * Chart-pattern IDs the prompt prints under `## Chart Pattern Candidates
+     * (computed)` — the qualified patterns only (loose pre-screener shape hints
+     * and hits the price has already spent select nothing) — a third
      * event-trigger source alongside `signals` and `detectedCandles` (see
      * {@link ChartPatternId}). `[]` for chartless prompts (no bars in scope),
      * when nothing is found, or when ATR is unavailable/non-positive.
@@ -2165,6 +2169,14 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      * On a throw the prompt carries no patterns, exactly like a chart without any — this field is how the caller tells the two apart and logs it.
      */
     patternScreenFailure: string | null;
+    /**
+     * The names of the pattern skills this prompt lists under `### patternSummaries Writing
+     * Rules` (always-on and fired, after the tier cap). The caller hands them to
+     * `postProcessRawAnalysis` as `allowedPatternSkills`: a patternSummaries entry for any
+     * other pattern is dropped, matching the prompt's "list only the patterns below" rule.
+     * Empty when the prompt lists none (the block is then absent and the model writes `[]`).
+     */
+    patternSkillNames: readonly string[];
     /**
      * The chart-pattern overlap arbitration of this build: the ids drawn and
      * the patterns it dropped (with the id each lost to). For the caller to
@@ -4902,8 +4914,9 @@ export interface PatternQualification {
     qualified: QualifiedPattern[];
     /**
      * Ids of pre-screener hits with no qualified pattern of the same id (and
-     * not already spent). They only pick skill docs; the prompt does not name
-     * them (a named resemblance list was retold in user-facing text).
+     * not already spent). Informational (the engine evaluation reads them): they
+     * select no skill doc and the prompt does not name them (a named resemblance
+     * list was retold in user-facing text).
      */
     shapeHints: ChartPatternId[];
     /**

@@ -1036,6 +1036,14 @@ CANDLE_MIN_SETUP_BODY_ATR = 0.25  — 2·3봉 반전 첫 봉의 몸통 하한 (A
 `type: pattern`인 skill 파일이 활성화되면 AI가 해당 패턴 기준에 따라 직접 감지한다.
 별도의 도메인 감지 함수는 존재하지 않는다.
 
+**게이팅 (WP-16)**: 패턴 skill의 event 트리거는 프롬프트가 `## Chart Pattern Candidates (computed)`에
+인쇄한 엄격 후보(`qualifyPatterns`의 `qualified`)의 id와만 대조한다. 느슨한 프리스크리너가 낸 형태
+힌트(`shapeHints`)와 중첩 중재에서 진 패턴은 skill을 고르지 않는다. 그래서 `patternSummaries`는
+프롬프트가 나열한 패턴만 담는다(프롬프트가 "나열한 패턴만"이라 말하고, `enrichAnalysisWithConfidence`가
+`allowedPatternSkills` 밖 항목을 버린다). 목록 밖 모양은 `summary`에서만 서술한다. 캔들 skill도 같은
+방식으로 `## Detected Candle Patterns (computed)`에 인쇄된 캔들(가장 최근 멀티봉 1개와 단일봉 1개)과만
+대조한다.
+
 ### 현재 등록된 패턴 Skills
 
 | skill 파일 | 패턴 | 신뢰도 |
