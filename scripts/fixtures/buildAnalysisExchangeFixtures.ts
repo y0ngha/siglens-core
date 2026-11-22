@@ -42,6 +42,7 @@ import {
     type AnalysisExchangeEvaluation,
     type AnalysisExchangeFixture,
 } from './evaluateAnalysisExchange';
+import { maxOf, minOf } from '@/domain/extent';
 
 export type FixtureClass =
     | 'salvage'
@@ -208,8 +209,8 @@ export function classify(
     const entries = (rec?.entryPrices ?? []).filter(
         p => Number.isFinite(p) && p > 0
     );
-    const zoneLow = entries.length > 0 ? Math.min(...entries) : null;
-    const zoneHigh = entries.length > 0 ? Math.max(...entries) : null;
+    const zoneLow = entries.length > 0 ? minOf(entries) : null;
+    const zoneHigh = entries.length > 0 ? maxOf(entries) : null;
     const planned = rec?.entryRecommendation !== 'avoid' && zoneLow !== null;
     const firstTarget = rec?.takeProfitPrices?.[0];
     const stop = rec?.stopLoss;

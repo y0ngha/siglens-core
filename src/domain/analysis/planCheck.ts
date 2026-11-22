@@ -1,4 +1,5 @@
 import type { ActionRecommendation, PlanCheck } from '@/domain/types';
+import { maxOf, minOf } from '@/domain/extent';
 
 /**
  * Deterministic arithmetic comparing a trade plan against the price that actually exists.
@@ -84,7 +85,7 @@ export function nearestTargetAbove(
         (candidate): candidate is number =>
             Number.isFinite(candidate) && candidate > price
     );
-    return above.length === 0 ? undefined : Math.min(...above);
+    return above.length === 0 ? undefined : minOf(above);
 }
 
 /**
@@ -167,7 +168,7 @@ export function entryZoneTop(
     entryPrices: readonly number[] | undefined
 ): number | null {
     const usable = (entryPrices ?? []).filter(finitePositive);
-    return usable.length === 0 ? null : Math.max(...usable);
+    return usable.length === 0 ? null : maxOf(usable);
 }
 
 /**
@@ -180,7 +181,7 @@ export function entryZoneBottom(
     entryPrices: readonly number[] | undefined
 ): number | null {
     const usable = (entryPrices ?? []).filter(finitePositive);
-    return usable.length === 0 ? null : Math.min(...usable);
+    return usable.length === 0 ? null : minOf(usable);
 }
 
 /**

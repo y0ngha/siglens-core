@@ -1,4 +1,5 @@
 import { findLast } from '@/domain/arrayCompat';
+import { maxOf, minOf } from '@/domain/extent';
 
 /** @internal Simple moving average of the last `period` values. */
 export function sma(values: number[], period: number): number | null {
@@ -26,13 +27,13 @@ export function rollingHighest(
     period: number
 ): number | null {
     if (values.length < period) return null;
-    return Math.max(...values.slice(-period));
+    return maxOf(values.slice(-period));
 }
 
 /** @internal Lowest value within the last `period` values. */
 export function rollingLowest(values: number[], period: number): number | null {
     if (values.length < period) return null;
-    return Math.min(...values.slice(-period));
+    return minOf(values.slice(-period));
 }
 
 /** @internal O(N) sliding-window maximum via monotone deque. */

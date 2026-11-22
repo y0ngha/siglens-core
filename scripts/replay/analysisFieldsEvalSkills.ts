@@ -23,6 +23,7 @@ import {
 } from './analysisFieldsEvalCompute';
 import type { RunCallStats } from './analysisFieldsEvalPlan';
 import type { IndicatorGuideResult, RawStrategyResult } from '@/domain/types';
+import { maxOf, minOf } from '@/domain/extent';
 
 export type SkillTier = 'free' | 'member';
 export const SKILL_TIERS: readonly SkillTier[] = ['free', 'member'];
@@ -174,7 +175,7 @@ function tierStats(
                 );
                 return [
                     group,
-                    { ...quantilesOf(counts), max: Math.max(0, ...counts) },
+                    { ...quantilesOf(counts), max: Math.max(0, maxOf(counts)) },
                 ];
             })
         ),
@@ -396,7 +397,7 @@ export function skillsGates(input: SkillsGateInput): readonly GateResult[] {
     const g = C.gates;
     const { summary, live } = input;
     const coverage = Object.values(summary.tiers.free.alwaysOnCoverage);
-    const minCoverage = Math.min(...coverage.map(c => c.share ?? 0));
+    const minCoverage = minOf(coverage.map(c => c.share ?? 0));
     const base = [
         gate(
             'S1',

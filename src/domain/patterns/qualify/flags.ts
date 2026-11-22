@@ -42,6 +42,7 @@ import {
     isRecent,
     maxAgeBars,
 } from '@/domain/patterns/qualify/context';
+import { maxOf, minOf } from '@/domain/extent';
 
 // ─── Flags and pennants ─────────────────────────────────────────────────────
 
@@ -205,8 +206,8 @@ function fitFlag(
     // No flag bar runs past the pole's end (FLAG_MAX_BEYOND_POLE_ATR).
     const beyondPole =
         direction === 'up'
-            ? Math.max(...highs.map(p => p.price)) - top.price
-            : top.price - Math.min(...lows.map(p => p.price));
+            ? maxOf(highs.map(p => p.price)) - top.price
+            : top.price - minOf(lows.map(p => p.price));
     if (beyondPole > FLAG_MAX_BEYOND_POLE_ATR * ctx.atr) return null;
 
     const upper = fitBoundaryLine(

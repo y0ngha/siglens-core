@@ -10,6 +10,7 @@ import type { AssetClass, CurrencyCode, Timeframe } from '@/domain/types';
 import { isDailyOrLonger } from '@/domain/constants/market';
 import { MS_PER_DAY, MS_PER_SECOND } from '@/domain/constants/time';
 import { roundToKrxTick, type KrxTickTable } from '@/domain/analysis/krxTick';
+import { minOf } from '@/domain/extent';
 
 /**
  * Human-readable timeframe labels used in prompt headers.
@@ -420,7 +421,7 @@ export function sharedPriceQuoting(
 ): PriceQuoting {
     const usable = prices.filter(isPositiveFinite);
     return priceQuoting(
-        usable.length > 0 ? Math.min(...usable) : null,
+        usable.length > 0 ? minOf(usable) : null,
         currency,
         assetClass,
         krxTick

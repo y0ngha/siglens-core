@@ -26,6 +26,7 @@ import type {
     KrMajorHolderReport,
     LargeHolderAxis,
 } from '@/domain/investorFlows/types';
+import { maxOf } from '@/domain/extent';
 
 type KrHolderEvent = 'new' | 'increase' | 'reduction' | 'exit';
 
@@ -204,7 +205,7 @@ export function evaluateKrMajorHolderAxis(
         maxAbsRatioChangePct:
             groups.length === 0
                 ? null
-                : Math.max(...groups.map(g => Math.abs(netRatioChange(g)))),
+                : maxOf(groups.map(g => Math.abs(netRatioChange(g)))),
         latestReceiptDate: formatDay(visible[visible.length - 1].day),
     };
     if (inWindow.length === 0) {

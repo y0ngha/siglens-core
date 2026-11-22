@@ -4,6 +4,7 @@ import type { Bar, Timeframe } from '@/domain/types';
 import { calculateMA } from '@/domain/indicators';
 import { computeForwardEdge, findCrossIndices } from '@/domain/validation';
 import { fetchBarsCached } from './fetchData';
+import { maxOf } from '@/domain/extent';
 
 const TICKERS = [
     'AAPL',
@@ -78,7 +79,7 @@ async function run(): Promise<void> {
         for (const tf of TIMEFRAMES) {
             const bars = await tryFetchBars(ticker, tf, refresh);
             if (bars === null) continue;
-            if (bars.length < GC_SLOW + Math.max(...HORIZONS[tf], 1)) {
+            if (bars.length < GC_SLOW + Math.max(maxOf(HORIZONS[tf]), 1)) {
                 console.warn(
                     `  [skip] ${ticker} ${tf}: insufficient bars (${bars.length})`
                 );

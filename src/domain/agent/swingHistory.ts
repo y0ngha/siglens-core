@@ -1,6 +1,7 @@
 import { medianOfSorted, round2 } from '@/domain/agent/statsMath';
 import { MS_PER_DAY } from '@/domain/constants/time';
 import type { MarketDailyClose } from '@/domain/types';
+import { maxOf, minOf } from '@/domain/extent';
 
 /** `get_swing_history`'s `minSwingPct` bounds and default (percent, integer). */
 export const SWING_MIN_PCT = { min: 3, max: 50, default: 10 } as const;
@@ -375,8 +376,8 @@ function dayStats(values: readonly number[]): DayStats {
         samples: values.length,
         medianDays: median(values),
         avgDays: average(values),
-        minDays: values.length === 0 ? null : Math.min(...values),
-        maxDays: values.length === 0 ? null : Math.max(...values),
+        minDays: values.length === 0 ? null : minOf(values),
+        maxDays: values.length === 0 ? null : maxOf(values),
     };
 }
 
@@ -521,8 +522,8 @@ function changeStats(
             changes.length === 0
                 ? null
                 : direction === 'down'
-                  ? Math.min(...changes)
-                  : Math.max(...changes),
+                  ? minOf(changes)
+                  : maxOf(changes),
     };
 }
 

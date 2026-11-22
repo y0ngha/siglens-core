@@ -4,6 +4,18 @@ import tseslint from 'typescript-eslint';
 const SRC_DIR = path.resolve(import.meta.dirname, 'src');
 
 /**
+ * `Math.min(...arr)`·`Math.max(...arr)` 금지. 펼침 인자는 배열이 약 10만 개를 넘으면 호출
+ * 스택을 넘겨 RangeError를 낸다. flat config는 같은 규칙을 덮어쓰므로 `no-restricted-syntax`를
+ * 다시 쓰는 블록은 이 선택자를 함께 넣는다.
+ */
+const MATH_EXTENT_SPREAD_SELECTOR = {
+    selector:
+        "CallExpression[callee.object.name='Math'][callee.property.name=/^(min|max)$/] > SpreadElement",
+    message:
+        '배열을 Math.min/max에 펼치지 않는다(큰 배열에서 RangeError). @/domain/extent의 minOf/maxOf 또는 한 번 훑는 reduce를 쓴다.',
+};
+
+/**
  * import 지정자를 **해석된 경로**로 판정하는 레이어 경계 규칙.
  *
  * `no-restricted-imports`는 지정자 문자열만 보므로, 같은 파일에 닿는 다른 표기를 막지
@@ -191,6 +203,15 @@ export default tseslint.config(
             '@typescript-eslint/consistent-type-imports': 'error',
         },
     },
+    // 펼침 금지는 src와 scripts 전체에 건다. 테스트(`src/__tests__`)는 길이가 정해진 작은
+    // 픽스처 배열을 펼쳐 쓰므로 제외한다 — 운영 경로가 아니라 스택 한도에 닿지 않는다.
+    {
+        files: ['src/**/*.ts', 'scripts/**/*.ts'],
+        ignores: ['src/__tests__/**'],
+        rules: {
+            'no-restricted-syntax': ['error', MATH_EXTENT_SPREAD_SELECTOR],
+        },
+    },
     // domain은 순수 계산 레이어다(src/domain/CLAUDE.md "Dependency Rules"). 레이어 방향과
     // 함께 순수성도 여기서 강제한다 — 리뷰로만 지키던 규칙이라 사람이 놓치면 그대로 들어왔다.
     //
@@ -226,6 +247,7 @@ export default tseslint.config(
                     selector: "CallExpression[callee.name='Date']",
                     message: '현재 시각은 호출자가 값으로 넘긴다.',
                 },
+                MATH_EXTENT_SPREAD_SELECTOR,
             ],
         },
     },

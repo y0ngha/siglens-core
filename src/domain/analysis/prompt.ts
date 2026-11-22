@@ -202,6 +202,7 @@ import {
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
 import { formatLevelHoldFraming } from '@/domain/analysis/priceLevelBaseRate';
+import { maxOf, minOf } from '@/domain/extent';
 
 type SkillGroupKey = SkillType | 'regular';
 
@@ -368,8 +369,8 @@ const formatLongTermContext = (bars: Bar[], quoting: PriceQuoting): string => {
     // One non-finite high or low would turn the whole period extreme into NaN.
     const highs = bars.map(b => b.high).filter(Number.isFinite);
     const lows = bars.map(b => b.low).filter(Number.isFinite);
-    const periodHigh = highs.length > 0 ? Math.max(...highs) : Number.NaN;
-    const periodLow = lows.length > 0 ? Math.min(...lows) : Number.NaN;
+    const periodHigh = highs.length > 0 ? maxOf(highs) : Number.NaN;
+    const periodLow = lows.length > 0 ? minOf(lows) : Number.NaN;
     const firstClose = bars[0].close;
     const lastClose = bars[bars.length - 1].close;
     // The bar the extreme came from, so the model never has to guess its date —

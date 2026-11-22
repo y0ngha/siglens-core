@@ -1,5 +1,6 @@
 import type { Bar } from '@/domain/types';
 import { WILLIAMS_R_DEFAULT_PERIOD } from '@/domain/indicators/constants';
+import { maxOf, minOf } from '@/domain/extent';
 
 const WILLIAMS_R_MIDPOINT = -50;
 const WILLIAMS_R_SCALE = -100;
@@ -15,8 +16,8 @@ export function calculateWilliamsR(
     return bars.map((bar, i) => {
         if (i < period - 1) return null;
         const window = bars.slice(i - period + 1, i + 1);
-        const highestHigh = Math.max(...window.map(b => b.high));
-        const lowestLow = Math.min(...window.map(b => b.low));
+        const highestHigh = maxOf(window.map(b => b.high));
+        const lowestLow = minOf(window.map(b => b.low));
         const range = highestHigh - lowestLow;
         if (range === 0) return WILLIAMS_R_MIDPOINT;
         return ((highestHigh - bar.close) / range) * WILLIAMS_R_SCALE;

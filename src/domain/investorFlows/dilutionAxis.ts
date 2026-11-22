@@ -18,6 +18,7 @@ import type {
     OfferingFiling,
     OfferingKind,
 } from '@/domain/investorFlows/types';
+import { minOf } from '@/domain/extent';
 
 interface DatedOffering {
     readonly filing: OfferingFiling;
@@ -79,7 +80,7 @@ function ruleSignal(
 ): InvestorFlowsSignal[] {
     const matched = inWindow.filter(o => rule.kinds.includes(o.filing.kind));
     if (matched.length === 0) return [];
-    const latestDaysAgo = Math.min(...matched.map(o => o.age));
+    const latestDaysAgo = minOf(matched.map(o => o.age));
     const split: InvestorFlowsEvidence =
         rule.id === 'underwritten_offering'
             ? {

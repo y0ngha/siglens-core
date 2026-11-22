@@ -51,6 +51,7 @@ import { extractJsonWithRepair } from '@/infrastructure/ai/extractJsonWithRepair
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import { parseArgs, parsePositiveIntArg } from './cliArgs';
 import type { ModelRunResult } from './runModels';
+import { maxOf, minOf } from '@/domain/extent';
 
 /**
  * Judge model — Claude Opus, resolved from `MODEL_SPECS['claude-opus-4-8']`
@@ -917,10 +918,10 @@ export function aggregateBatchEntries(
                 full: mean(sampleMediansFull),
                 digest: mean(sampleMediansDigest),
                 fullSpread: allFullRaw.length
-                    ? [Math.min(...allFullRaw), Math.max(...allFullRaw)]
+                    ? [minOf(allFullRaw), maxOf(allFullRaw)]
                     : [0, 0],
                 digestSpread: allDigestRaw.length
-                    ? [Math.min(...allDigestRaw), Math.max(...allDigestRaw)]
+                    ? [minOf(allDigestRaw), maxOf(allDigestRaw)]
                     : [0, 0],
                 passCount: allFullRaw.length,
                 sampleCount: sampleMediansFull.length,

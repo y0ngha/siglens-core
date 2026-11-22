@@ -47,6 +47,7 @@ import {
 import { profileOf } from './markets';
 import { mean, median } from './stats';
 import { quantile } from '@/domain/outcomes/weekClusterBootstrap';
+import { maxOf, minOf } from '@/domain/extent';
 
 const HORIZONS: readonly HorizonKey[] = ['short', 'medium', 'long'];
 const SIDES: readonly LevelSideName[] = ['support', 'resistance'];
@@ -211,8 +212,8 @@ function historyOfLevel(
 }
 
 function meanVolumeDensity(hist: readonly Bar[]): number | null {
-    const low = Math.min(...hist.map(b => b.low));
-    const high = Math.max(...hist.map(b => b.high));
+    const low = minOf(hist.map(b => b.low));
+    const high = maxOf(hist.map(b => b.high));
     const volume = hist.reduce((sum, b) => sum + (b.volume || 0), 0);
     return high > low && volume > 0 ? volume / (high - low) : null;
 }
@@ -733,7 +734,7 @@ export function fitLogistic(
         step.forEach((s, j) => {
             w[j] -= s;
         });
-        if (Math.max(...step.map(Math.abs)) < 1e-9) break;
+        if (maxOf(step.map(Math.abs)) < 1e-9) break;
     }
     return w;
 }
