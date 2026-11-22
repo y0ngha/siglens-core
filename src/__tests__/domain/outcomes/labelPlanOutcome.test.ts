@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { buildPlanCheck } from '@/domain/analysis/planCheck';
+import { buildPlanState } from '@/domain/analysis/planState';
 import { labelPlanOutcome } from '@/domain/outcomes/labelPlanOutcome';
 import type { OutcomeSubject, PlanOutcomeLabel } from '@/domain/outcomes/types';
 import {
@@ -157,6 +159,42 @@ describe('labelPlanOutcome — approach (a stratification label only)', () => {
             entryOffset: 1,
             fill: 98,
         });
+    });
+});
+
+describe('labelPlanOutcome approach and planState are one zone rule (WP-18 N46)', () => {
+    // The zone [97, 99] with a 95 stop and targets 105 / 110, read at the same close by both.
+    const ZONE_RECOMMENDATION = {
+        positionAnalysis: '',
+        entry: '',
+        exit: '',
+        riskReward: '',
+        entryPrices: [97, 99],
+        stopLoss: 95,
+        takeProfitPrices: [105, 110],
+    };
+    it.each([
+        ['far above the top', 103, 'above_zone', 'from_above'],
+        [
+            'inside the old 1% band above the top',
+            99.5,
+            'above_zone',
+            'from_above',
+        ],
+        ['one tick above the top', 99.01, 'above_zone', 'from_above'],
+        ['exactly at the top', 99, 'in_zone', 'inside'],
+        ['inside the zone', 98, 'in_zone', 'inside'],
+        ['exactly at the low', 97, 'in_zone', 'inside'],
+        ['one tick below the low', 96.99, 'below_zone', 'from_below'],
+        ['below the low, above the stop', 96, 'below_zone', 'from_below'],
+    ] as const)('%s', (_name, close, position, approach) => {
+        const check = buildPlanCheck(ZONE_RECOMMENDATION, close, 98);
+        if (check === null) throw new Error('fixture close must be usable');
+        expect(buildPlanState(ZONE_RECOMMENDATION, check, 1).position).toBe(
+            position
+        );
+        const window = makeWindow({ referencePrice: close, pad: close });
+        expect(labelPlanOutcome(PLAN, window).approach).toBe(approach);
     });
 });
 

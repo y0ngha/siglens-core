@@ -255,6 +255,7 @@ const baseArgs = (overrides: Partial<FieldsEvalArgs>): FieldsEvalArgs => ({
     repeat: null,
     lang: 'ko',
     restate: false,
+    legacyZone: false,
     ...overrides,
 });
 
@@ -1302,6 +1303,50 @@ describe('runFieldsEval: plan', () => {
         await expect(pair('twice', { meta: { repeat: 2 } })).rejects.toThrow(
             'is incomplete'
         );
+    });
+
+    it('--legacy-zone recomputes a run from before the exact-edge rule with its 1% band (P1)', async () => {
+        const world = makeWorld();
+        const clean = cleanBody(world);
+        // A zone ending 0.5% under the close: the old rule stored in_zone, exact edges say above.
+        const legacy = (c: { symbol: string; asOf: string; close: number }) => {
+            const body = clean(c);
+            const ar = body.actionRecommendation as Record<string, unknown>;
+            const prices = ar.entryPrices as number[];
+            const shifted = prices.map(p => p * 0.995);
+            const stop = ar.stopLoss as number;
+            return {
+                ...body,
+                actionRecommendation: {
+                    ...ar,
+                    entryPrices: shifted,
+                    stopLoss: stop - (prices[0] - shifted[0]),
+                },
+            };
+        };
+        const run = writeRun(world, { name: 'legacy', body: legacy });
+        const p1 = async (legacyZone: boolean) => {
+            const out = join(world.dir, `out-${legacyZone}`);
+            const deps = makeDeps();
+            await runFieldsEval(
+                baseArgs({
+                    mode: 'plan',
+                    set: world.setDir,
+                    run,
+                    out,
+                    gate: ['P1'],
+                    legacyZone,
+                }),
+                deps
+            );
+            return { lines: deps.lines(), inputs: readRun(out).inputs };
+        };
+        const exact = await p1(false);
+        expect(exact.lines).toContain('state mismatch 14/14');
+        expect(exact.inputs.zoneRule).toBe('exact edges');
+        const legacyRun = await p1(true);
+        expect(legacyRun.lines).toContain('state mismatch 0/14');
+        expect(String(legacyRun.inputs.zoneRule)).toContain('legacy');
     });
 
     it('exits 2 for a selected gate that fails (no stored plan state to equal the recomputed one)', async () => {
@@ -2477,6 +2522,26 @@ describe('the arguments of claims and zone', () => {
         expect(
             parseFieldsEvalArgs([...claims, '--gate', 'C1,O1']).gate
         ).toEqual(['C1', 'O1']);
+    });
+
+    it('reads --legacy-zone for plan mode only', () => {
+        const plan = [
+            '--mode',
+            'plan',
+            '--set',
+            's',
+            '--run',
+            'r',
+            '--out',
+            'o',
+        ];
+        expect(parseFieldsEvalArgs(plan).legacyZone).toBe(false);
+        expect(parseFieldsEvalArgs([...plan, '--legacy-zone']).legacyZone).toBe(
+            true
+        );
+        expect(() => parseFieldsEvalArgs([...zone, '--legacy-zone'])).toThrow(
+            '--legacy-zone applies to plan only'
+        );
     });
 
     it('refuses what does not apply', () => {

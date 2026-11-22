@@ -1,3 +1,4 @@
+import { positionAgainstZone } from '@/domain/analysis/planCheck';
 import type {
     EvaluablePlan,
     OutcomePlanSubject,
@@ -57,8 +58,10 @@ function approachOf(
     low: number,
     high: number
 ): PlanApproach {
-    if (referencePrice > high) return 'from_above';
-    if (referencePrice < low) return 'from_below';
+    // The exact-edge rule `buildPlanState` reads: `inside` is `in_zone`.
+    const position = positionAgainstZone(referencePrice, low, high);
+    if (position === 'above') return 'from_above';
+    if (position === 'below') return 'from_below';
     return 'inside';
 }
 
@@ -204,7 +207,9 @@ function resolve(
  *   (`none`), an `avoid` verdict, no zone (`no_entry`), no stop (`no_stop`; also a stop core
  *   rejected), no target, a stop at or above the zone's low (`stop_inside_zone`).
  *   `wait` plans are evaluated like any other; `recommendation` is on every label.
- * - `approach`: the reference price against the zone, kept for stratification only.
+ * - `approach`: the reference price against the zone, kept for stratification only. It reads
+ *   the raw reference close, while plan state reads the printed (KRX tick-rounded) close, so
+ *   for an off-grid KRW close the two can differ by one tick at a zone edge.
  * - Entry: see {@link findEntry}. The fill is always inside the zone. None by the end of
  *   the window is `not_triggered`; a gap that jumps the zone from above is `void_at_entry`
  *   (`gap_below_stop` or `gap_below_zone`, no fill). The `target` is the first one above

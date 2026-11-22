@@ -212,7 +212,7 @@ describe('formatStopTargetSpacing', () => {
 });
 
 describe('formatDeterministicMetricsSection — spacing block', () => {
-    it('ends the section with the spacing block', () => {
+    it('carries the spacing block without a risk:reward block', () => {
         const section = formatDeterministicMetricsSection(
             flatBars(60),
             '1Day',
@@ -223,9 +223,7 @@ describe('formatDeterministicMetricsSection — spacing block', () => {
             null
         );
         expect(section).toContain('### Stop & Target Spacing');
-        expect(
-            section.indexOf('### Risk:Reward From Current Price')
-        ).toBeLessThan(section.indexOf('### Stop & Target Spacing'));
+        expect(section).not.toContain('### Risk:Reward From Current Price');
     });
 });
 

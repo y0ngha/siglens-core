@@ -15,7 +15,11 @@ import type {
     ReferenceLevel,
     Timeframe,
 } from '@/domain/types';
-import type { PriceQuoting } from '@/domain/analysis/promptFormat';
+import {
+    formatQuotedPrice,
+    roundQuotedPrice,
+    type PriceQuoting,
+} from '@/domain/analysis/promptFormat';
 
 const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
 
@@ -181,9 +185,9 @@ describe('formatDeterministicMetricsSection', () => {
         expect(out).toContain('Reliability: Daily, descriptive only');
     });
 
-    it('skips levels inside half the mean bar range when picking the risk:reward pair', () => {
-        // bars() spans 0.4% per bar, so the floor is 0.20%. The 0.10% / -0.05% levels sit
-        // inside it; a ratio built from them would read 2.00 on pure noise.
+    it('prints the noise sentence in the spacing block: half the mean bar range, no anchors on at-price levels', () => {
+        // bars() spans 0.4% per bar, so the band is 0.20%. The sentence moved here from the
+        // removed risk:reward block and sits with the lists it describes.
         const out = formatDeterministicMetricsSection(
             enough,
             '30Min',
@@ -192,27 +196,41 @@ describe('formatDeterministicMetricsSection', () => {
                 [level(99.95, -0.05), level(98, -2)]
             )
         );
-        expect(out).toContain('Levels within 0.20% of the current price');
-        expect(out).toContain('Nearest resistance MA50 at 103.00 (3.00%)');
-        expect(out).toContain('Nearest support MA50 at 98.00 (-2.00%)');
+        const spacingAt = out.indexOf('### Stop & Target Spacing');
+        const noiseAt = out.indexOf('Levels within 0.20% of the current price');
+        expect(spacingAt).toBeGreaterThan(-1);
+        expect(noiseAt).toBeGreaterThan(spacingAt);
         expect(out).toContain(
-            'Structural risk:reward from current price = 1.50'
+            'are skipped in the lists below. Do not anchor a stop-loss or an entry trigger on such an at-price level.'
         );
     });
 
-    it('renders prices at the precision it is given', () => {
+    it('carries no structural risk:reward block, ratio or verdict sentence on any timeframe', () => {
+        for (const timeframe of ['1Day', '30Min'] as const) {
+            const out = formatDeterministicMetricsSection(
+                enough,
+                timeframe,
+                reference([level(101, 1)], [level(96, -4)])
+            );
+            expect(out).not.toContain('Risk:Reward From Current Price');
+            expect(out).not.toMatch(/structural/i);
+            expect(out).not.toContain('Nearest resistance');
+            expect(out).not.toContain('Below 1.0');
+            expect(out).not.toContain('named pullback level');
+        }
+    });
+
+    it('renders the spacing candidates at the precision it is given', () => {
         const out = formatDeterministicMetricsSection(
             enough,
             '30Min',
             reference([level(0.08423, 1)], [level(0.0826, -2)]),
             { dp: 5, krxTick: null }
         );
-        expect(out).toContain('MA50 at 0.08423 (1.00%)');
-        expect(out).toContain('MA50 at 0.08260 (-2.00%)');
+        expect(out).toContain('(MA50 at 0.08260)');
     });
 
-    it('skips no level and prints no noise line when the bars have zero range', () => {
-        // A zero-range history gives a 0% floor: the nearest levels are used as-is.
+    it('prints no noise line when the bars have zero range', () => {
         const flat = enough.map(b => ({ ...b, high: b.close, low: b.close }));
         const out = formatDeterministicMetricsSection(
             flat,
@@ -220,12 +238,9 @@ describe('formatDeterministicMetricsSection', () => {
             reference()
         );
         expect(out).not.toContain('Levels within');
-        expect(out).toContain(
-            'Structural risk:reward from current price = 0.25'
-        );
     });
 
-    it('treats a history with no usable bar range as a 0% floor', () => {
+    it('prints no noise line when no bar range is usable', () => {
         // Every bar fails the `high >= low` guard, so no range is measurable at all —
         // a separate branch from zero-width bars, which still produce a (zero) range.
         const inverted = enough.map(b => ({
@@ -239,9 +254,58 @@ describe('formatDeterministicMetricsSection', () => {
             reference()
         );
         expect(out).not.toContain('Levels within');
-        expect(out).toContain(
-            'Structural risk:reward from current price = 0.25'
+    });
+
+    it('prints the last close with the zone formatter and the exact-edge entry rule', () => {
+        const out = formatDeterministicMetricsSection(
+            enough,
+            '30Min',
+            reference(),
+            { dp: 3, krxTick: null }
         );
+        const close = enough.at(-1)?.close ?? 0;
+        expect(out).toContain('### Entry Zone vs Last Close');
+        expect(out).toContain(`Last close ${close.toFixed(3)}.`);
+        expect(out).toContain('its low <= close <= its high');
+        expect(out).toContain(
+            'a zone whose high is below the close is a pullback plan'
+        );
+        expect(out).toContain('Step 1 of the action rules gives');
+        // The verdict words live in Step 1 only; the block prints the close and the rule.
+        const block = out.slice(out.indexOf('### Entry Zone vs Last Close'));
+        expect(block).not.toMatch(/"enter"|"wait"|"avoid"/);
+        expect(out).toContain(
+            'To plan an entry at the price, make the zone contain the last close.'
+        );
+    });
+
+    it('prints the last close at the KRX tick for a Korean listing', () => {
+        const krw = enough.map(b => ({
+            ...b,
+            open: b.open * 700,
+            high: b.high * 700,
+            low: b.low * 700,
+            close: b.close * 700,
+        }));
+        const close = krw.at(-1)?.close ?? 0;
+        const quoting: PriceQuoting = { dp: 0, krxTick: 'share' };
+        const out = formatDeterministicMetricsSection(
+            krw,
+            '30Min',
+            reference(),
+            quoting
+        );
+        // The raw close is off the tick grid, so the printed one proves the tick rounding.
+        expect(roundQuotedPrice(close, quoting)).not.toBe(close);
+        expect(out).toContain(
+            `Last close ${formatQuotedPrice(close, quoting)}.`
+        );
+    });
+
+    it('omits the entry-zone block without a usable last close', () => {
+        expect(
+            formatDeterministicMetricsSection([], '1Day', EMPTY_REFERENCE)
+        ).not.toContain('### Entry Zone vs Last Close');
     });
 
     it('renders the daily rule as descriptive, with the re-measurement instead of the old win rate', () => {
@@ -308,58 +372,6 @@ describe('formatDeterministicMetricsSection', () => {
         expect(out).not.toMatch(/Agreeing indicator groups/);
     });
 
-    it('flags a sub-1.0 ratio as a reason to place the zone at a pullback level, not at the price', () => {
-        // resistance +1%, support -4% → 0.25
-        const out = formatDeterministicMetricsSection(
-            enough,
-            '30Min',
-            reference([level(101, 1)], [level(96, -4)])
-        );
-        expect(out).toContain(
-            'Structural risk:reward from current price = 0.25'
-        );
-        expect(out).toContain('Below 1.0');
-        expect(out).toContain('put the entry zone at a named pullback level');
-    });
-
-    it('reports a healthy ratio without the warning', () => {
-        const out = formatDeterministicMetricsSection(
-            enough,
-            '30Min',
-            reference([level(104, 4)], [level(99, -1)])
-        );
-        expect(out).toContain(
-            'Structural risk:reward from current price = 4.00'
-        );
-        expect(out).toContain('At or above 1.0');
-        expect(out).not.toContain('Below 1.0');
-    });
-
-    it('falls back to a wider horizon when the nearest one has no levels', () => {
-        const mixed: MarketReference = {
-            short: horizon([], []),
-            medium: horizon([level(104, 4)], [level(99, -1)]),
-            long: horizon([level(120, 20)], [level(80, -20)]),
-        };
-        const out = formatDeterministicMetricsSection(enough, '30Min', mixed);
-        expect(out).toContain(
-            'Structural risk:reward from current price = 4.00'
-        );
-    });
-
-    it('says the risk:reward is not measurable when no horizon has both sides', () => {
-        // A silently missing block reads to the model as "nothing to worry about".
-        const out = formatDeterministicMetricsSection(
-            enough,
-            '30Min',
-            EMPTY_REFERENCE
-        );
-        expect(out).toContain('### Indicator Agreement');
-        expect(out).toContain('### Risk:Reward From Current Price');
-        expect(out).toContain('Not measurable:');
-        expect(out).not.toContain('Structural risk:reward from current price');
-    });
-
     it('skips levels the reference builder flagged at price', () => {
         const flagged: MarketReference = {
             short: horizon(
@@ -408,23 +420,6 @@ describe('formatDeterministicMetricsSection', () => {
         expect(() =>
             formatDeterministicMetricsSection([], '1Day', EMPTY_REFERENCE)
         ).not.toThrow();
-    });
-});
-
-describe('formatDeterministicMetricsSection — risk leg', () => {
-    it('divides by the support distance itself, with no extra floor', () => {
-        // `bars()` ranges ±0.2%: mean range 0.4%, at-price band 0.2%. A support 0.3% away
-        // clears the band, so the ratio is 4 / 0.3 = 13.33. A full-bar-range floor on the
-        // risk leg alone flipped 34 of 90 real-chart verdicts and was removed.
-        const out = formatDeterministicMetricsSection(
-            bars(CONFLUENCE_MIN_BARS + 5),
-            '30Min',
-            reference([level(104, 4)], [level(99.7, -0.3)])
-        );
-        expect(out).toContain(
-            'Structural risk:reward from current price = 13.33'
-        );
-        expect(out).not.toContain('floored');
     });
 });
 
@@ -527,7 +522,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
         }
     });
 
-    it('renders the reading, its inputs and the measured base rate on a daily washout, between the tally and risk:reward', () => {
+    it('renders the reading, its inputs and the measured base rate on a daily washout, between the tally and the stop and target spacing', () => {
         const out = formatDeterministicMetricsSection(
             washoutBars(),
             '1Day',
@@ -548,7 +543,7 @@ describe('formatDeterministicMetricsSection — Short-Term Washout', () => {
             out.indexOf('### Indicator Agreement')
         );
         expect(washoutAt).toBeLessThan(
-            out.indexOf('### Risk:Reward From Current Price')
+            out.indexOf('### Stop & Target Spacing')
         );
     });
 

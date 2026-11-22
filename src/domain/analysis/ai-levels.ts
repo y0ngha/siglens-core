@@ -19,6 +19,8 @@ import {
 import {
     formatNullableNumber,
     formatPrice,
+    priceQuoting,
+    roundQuotedPrice,
 } from '@/domain/analysis/promptFormat';
 import {
     DEFAULT_ANALYSIS_LOCALE,
@@ -875,6 +877,28 @@ function withoutModelComputedFields(
 }
 
 /**
+ * The last close as the prompt printed it: a KRW close is rounded to its KRX tick, every
+ * other price is unchanged (`roundQuotedPrice`, the computation behind `formatQuotedPrice`).
+ * The plan check and the plan state compare this value against the entry zone, so the
+ * `### Entry Zone vs Last Close` line the model read and the state code derives from it are one
+ * value (DOM-8): an off-grid raw close above a zone whose high is the printed close would
+ * otherwise read `above_zone`.
+ */
+function printedClose(
+    close: number | undefined,
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
+): number | undefined {
+    if (close === undefined || !Number.isFinite(close) || close <= 0) {
+        return close;
+    }
+    return roundQuotedPrice(
+        close,
+        priceQuoting(close, currency, 'equity', krxTick)
+    );
+}
+
+/**
  * @internal Reconciles AI key levels into the analysis.
  *
  * AnalysisResponse에 reconciledLevels를 병기한다. entryPrice 결정 불가 시 원본 반환.
@@ -981,7 +1005,7 @@ export function postProcessAnalysisWithReconcile(
     // returns `null` in that case and the field is simply absent.
     const planCheck = buildPlanCheck(
         recommendation,
-        fallbackEntryPrice,
+        printedClose(fallbackEntryPrice, currency, krxTick),
         entryPrice
     );
 

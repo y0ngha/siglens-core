@@ -4,27 +4,11 @@ import {
     effectiveStopLoss,
     entryZoneTop,
     exceedsEntryZone,
-    ENTRY_ZONE_TOLERANCE,
     nearestTargetAbove,
+    positionAgainstZone,
     riskRewardFrom,
-    structuralRiskReward,
 } from '@/domain/analysis/planCheck';
-import type {
-    ActionRecommendation,
-    ReferenceLevel,
-    ReferenceLevels,
-} from '@/domain/types';
-
-function level(price: number, distancePercent: number): ReferenceLevel {
-    return { price, label: 'MA50', kind: 'ma', distancePercent };
-}
-
-function levels(
-    resistance: ReferenceLevel[],
-    support: ReferenceLevel[]
-): ReferenceLevels {
-    return { resistance, support };
-}
+import type { ActionRecommendation } from '@/domain/types';
 
 function rec(over: Partial<ActionRecommendation> = {}): ActionRecommendation {
     return {
@@ -99,54 +83,34 @@ describe('riskRewardFrom', () => {
     });
 });
 
-describe('structuralRiskReward', () => {
-    it('divides the nearest upside distance by the nearest downside distance', () => {
-        expect(
-            structuralRiskReward(levels([level(105, 5)], [level(95, -5)]))
-        ).toBe(1);
-        expect(
-            structuralRiskReward(levels([level(101, 1)], [level(96, -4)]))
-        ).toBeCloseTo(0.25);
+describe('positionAgainstZone', () => {
+    it('reads both edges as inside (zoneLow <= close <= zoneTop)', () => {
+        expect(positionAgainstZone(100, 98, 100)).toBe('inside');
+        expect(positionAgainstZone(98, 98, 100)).toBe('inside');
+        expect(positionAgainstZone(99, 98, 100)).toBe('inside');
     });
 
-    it('returns null when either side is missing', () => {
-        expect(structuralRiskReward(levels([], [level(95, -5)]))).toBeNull();
-        expect(structuralRiskReward(levels([level(105, 5)], []))).toBeNull();
-    });
-
-    it('returns null rather than dividing by a zero-distance support', () => {
-        expect(
-            structuralRiskReward(levels([level(105, 5)], [level(100, 0)]))
-        ).toBeNull();
-    });
-
-    it('returns null when a "support" is not actually below the price', () => {
-        // Math.abs() would otherwise launder an inconsistent positive distance into a
-        // plausible-looking ratio. Symmetric with the resistance guard below.
-        expect(
-            structuralRiskReward(levels([level(105, 5)], [level(102, 2)]))
-        ).toBeNull();
-    });
-
-    it('returns null when a "resistance" is not actually above the price', () => {
-        // The collector defines resistance as levels above current price; a non-positive
-        // distance means its output is inconsistent, which is not the same claim as
-        // "there is no upside" and must not be reported as a ratio of 0.
-        expect(
-            structuralRiskReward(levels([level(99, -1)], [level(95, -5)]))
-        ).toBeNull();
+    it('reads one tick beyond an edge as outside, with no tolerance band', () => {
+        expect(positionAgainstZone(100.01, 98, 100)).toBe('above');
+        expect(positionAgainstZone(97.99, 98, 100)).toBe('below');
+        // Inside the old 1% band above the top: still above.
+        expect(positionAgainstZone(100.5, 98, 100)).toBe('above');
     });
 });
 
 describe('exceedsEntryZone', () => {
-    it('flags a price above the zone top beyond tolerance', () => {
+    it('flags a price above the zone top', () => {
         expect(exceedsEntryZone(102, [98, 100])).toBe(true);
     });
 
-    it('tolerates a price sitting just on the zone top', () => {
-        expect(exceedsEntryZone(100 * (1 + ENTRY_ZONE_TOLERANCE), [100])).toBe(
-            false
-        );
+    it('flags a price just above the top, where the old 1% band said no', () => {
+        expect(exceedsEntryZone(100.01, [100])).toBe(true);
+        expect(exceedsEntryZone(100.5, [98, 100])).toBe(true);
+    });
+
+    it('does not flag a price at the zone top or inside the zone', () => {
+        expect(exceedsEntryZone(100, [98, 100])).toBe(false);
+        expect(exceedsEntryZone(99, [98, 100])).toBe(false);
     });
 
     it('never flags a price BELOW the zone — cheaper is not the failure mode', () => {
@@ -158,11 +122,6 @@ describe('exceedsEntryZone', () => {
         expect(exceedsEntryZone(102, [])).toBe(false);
         expect(exceedsEntryZone(102, [Number.NaN, -5])).toBe(false);
         expect(exceedsEntryZone(Number.NaN, [100])).toBe(false);
-    });
-
-    it('treats a negative or non-finite tolerance as zero rather than inverting the test', () => {
-        expect(exceedsEntryZone(100.5, [100], -1)).toBe(true);
-        expect(exceedsEntryZone(100.5, [100], Number.NaN)).toBe(true);
     });
 });
 

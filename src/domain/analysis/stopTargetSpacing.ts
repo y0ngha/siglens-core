@@ -5,6 +5,10 @@ import {
 import { printedLevelsOnSide } from '@/domain/analysis/printedReferenceLevels';
 import { PLAN_MIN_ATR_SPACING } from '@/domain/analysis/planCheck';
 import {
+    AT_PRICE_BAR_RANGE_FRACTION,
+    meanBarRangePercent,
+} from '@/domain/analysis/referenceLevels';
+import {
     differenceDecimalPlaces,
     formatNullableNumber,
     formatQuotedPrice,
@@ -119,6 +123,16 @@ export function formatStopTargetSpacing(
         differenceDecimalPlaces(atr, quoting.dp)
     );
     const atrPercent = formatNullableNumber((atr / close) * 100, 2);
+    // The noise band the printed lists skip (`atPrice` levels): said here, where the lists
+    // are, so a stop or an entry trigger is not anchored on a level inside one bar's noise.
+    const noiseFloorPercent =
+        meanBarRangePercent(bars) * AT_PRICE_BAR_RANGE_FRACTION;
+    const noiseNote =
+        noiseFloorPercent > 0
+            ? [
+                  `Levels within ${formatNullableNumber(noiseFloorPercent)}% of the current price (half the mean bar range over the last ${ATR_DEFAULT_PERIOD} bars) sit inside ordinary bar noise and are skipped in the lists below. Do not anchor a stop-loss or an entry trigger on such an at-price level.`,
+              ]
+            : [];
 
     const stopsBelow = (anchor: number): string => {
         const found = supports
@@ -148,6 +162,7 @@ export function formatStopTargetSpacing(
     return [
         SPACING_HEADER,
         `ATR(${ATR_DEFAULT_PERIOD}) = ${atrText} (${atrPercent}% of the last close): one ordinary bar's range. The stop must sit at least ${PLAN_MIN_ATR_SPACING}×ATR below the low of entryPrices (code moves a closer stop), and the first take-profit at least ${PLAN_MIN_ATR_SPACING}×ATR above its high; a level closer than that is skipped, not used.`,
+        ...noiseNote,
         'First levels clearing one ATR (all are reference levels from the data):',
         `- Entry zone at the current price: stop candidates ${stopsBelow(close)}; first target from ${targetAbove(close)} upward.`,
         ...pullbackLines,

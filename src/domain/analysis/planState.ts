@@ -2,8 +2,8 @@ import {
     effectiveStopLoss,
     entryZoneBottom,
     entryZoneTop,
-    ENTRY_ZONE_TOLERANCE,
     PLAN_MIN_ATR_SPACING,
+    positionAgainstZone,
 } from '@/domain/analysis/planCheck';
 import type {
     ActionRecommendation,
@@ -104,9 +104,13 @@ function hasTargetRoom(
  * 3. `planCheck.belowStopLoss` (close at or below the stop): `no_setup` / `stopped`
  * 4. no reconciled target at least one ATR above the zone top (any target above it when
  *    there is no usable ATR): `no_setup` / `no_room_above`
- * 5. `planCheck.exceedsEntryZone` (close more than 1% above the zone top): `above_zone`
- * 6. close more than 1% below the zone low: `below_zone`
- * 7. otherwise `in_zone`
+ * 5. `planCheck.exceedsEntryZone` (close above the zone top): `above_zone`
+ * 6. close below the zone low: `below_zone`
+ * 7. otherwise `in_zone` (`zoneLow <= close <= zoneTop`)
+ *
+ * Rows 5-7 are {@link positionAgainstZone}'s exact edges, with no tolerance: the same
+ * comparison the outcome labeller's approach uses, so `in_zone` and a plan filled at the open
+ * are the same fact (WP-18, N46).
  *
  * A risk:reward floor is deliberately **not** a row: after the stop floor the nearest
  * target gives a ratio below 1.0 on 88% of the plans of the 65-symbol daily replay set, so
@@ -156,7 +160,7 @@ export function buildPlanState(
             distanceAtr: inAtr(close - zoneTop, usableAtr),
         };
     }
-    if (close < zoneLow * (1 - ENTRY_ZONE_TOLERANCE)) {
+    if (positionAgainstZone(close, zoneLow, zoneTop) === 'below') {
         return {
             ...base,
             position: 'below_zone',

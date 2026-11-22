@@ -177,6 +177,7 @@ import {
     TIMEFRAME_LABEL,
     type PriceQuoting,
 } from '@/domain/analysis/promptFormat';
+import { formatLevelHoldFraming } from '@/domain/analysis/priceLevelBaseRate';
 
 type SkillGroupKey = SkillType | 'regular';
 
@@ -996,8 +997,13 @@ const formatSmcConceptNote = (
 const MARKET_REFERENCE_HEADER =
     '## Market Reference (deterministic · advisory)';
 
-const MARKET_REFERENCE_FRAMING =
-    "The values below are a deterministic computation of reference levels and structure that market participants commonly watch. They are NOT validated forward predictors — backtesting shows precise level/trend prediction is near-random. Use them as context to weigh alongside detected patterns, skills, and your own reasoning; never treat them as guarantees. You may identify additional or better support/resistance from patterns, SMC, and volume that these references do not cover. Volume-profile levels (POC, VAH, VAL) inside a horizon block are computed over that block's own bar window, so they can differ from the whole-history profile printed under Indicator Values.";
+/**
+ * The market reference framing sentence. The measured statement about the printed levels
+ * (`formatLevelHoldFraming`) replaces "backtesting shows precise level/trend prediction is
+ * near-random": it carries the number, its sample and its comparison, daily bars only.
+ */
+const marketReferenceFraming = (timeframe: Timeframe): string =>
+    `The values below are a deterministic computation of reference levels and structure that market participants commonly watch. They are NOT validated forward predictors. ${formatLevelHoldFraming(timeframe)} Use them as context to weigh alongside detected patterns, skills, and your own reasoning; never treat them as guarantees. You may identify additional or better support/resistance from patterns, SMC, and volume that these references do not cover. Volume-profile levels (POC, VAH, VAL) inside a horizon block are computed over that block's own bar window, so they can differ from the whole-history profile printed under Indicator Values.`;
 
 const EFFICIENCY_DECIMAL_PLACES = 2;
 
@@ -1245,7 +1251,7 @@ const formatMarketReferenceSection = (
 ): string =>
     [
         MARKET_REFERENCE_HEADER,
-        MARKET_REFERENCE_FRAMING,
+        marketReferenceFraming(timeframe),
         ANTI_FABRICATION_GUARDRAIL,
         ...HORIZON_KEYS.map(key =>
             formatHorizonBlock(
@@ -1942,10 +1948,9 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Framing (see CORE PRINCIPLES → Descriptive, not prescriptive): this section maps price levels into a conditional plan. Describe the plan as structure and conditions, never as an instruction to the reader. Write "이 구간을 회복하기 전까지 구조는 유효하지 않습니다" or "손절 기준으로 삼는 자리는 122,000원입니다", not "사는 편이 낫습니다"/"기다리세요"/"나눠서 매수하세요". The entryRecommendation enum carries the verdict; the prose carries the reasoning.',
         '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
         `- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly, except that takeProfitPrices leaves out every level closer than ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the high of entryPrices (Step 2), even the first priceTargets.bullish target.`,
-        `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the close is inside the zone (or within 1% of its edges), "wait" when the zone lies below the close (a pullback plan) or above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value.`,
-        `  - Short-term sell-off path: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", put the entry zone at the snapshot close area so the close is inside it (the verdict then follows the Step 1 state: "enter" when the close is in the zone and a target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above it), and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A sub-1.0 structural ratio, a bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading's normal state: name them as risks in the prose, never as reasons to move the zone away from the close.`,
+        `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the last close is inside the zone (its low <= close <= its high, edges included), "wait" when the zone lies wholly below the close (a pullback plan) or wholly above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value. To plan an entry at the price, make the zone contain the last close (printed in ## Deterministic Metrics → Entry Zone vs Last Close); a zone whose high is below it is a pullback plan and reads "wait".`,
+        `  - Short-term sell-off path: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", put the entry zone at the snapshot close area so the close is inside it (the verdict then follows the Step 1 state: "enter" when the close is in the zone and a target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above it), and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading's normal state: name them as risks in the prose, never as reasons to move the zone away from the close.`,
         '  - When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: place the zone yourself from the event and the chart, and do not cite the sell-off base rate as support.',
-        '  - Outside the short-term sell-off path, check the structural risk:reward in ## Deterministic Metrics when you place the zone. A ratio below 1.0 means the nearest obstacle above is closer than the support below; it is a reason to put the zone at a named pullback level rather than at the price, and to say which number drove the choice. A met indicator-agreement entry condition does not override this — the two were measured to be inversely related.',
         '  - The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.',
         '- Contingent Plan Mandate: even when entryRecommendation is "wait" or "avoid", ALWAYS derive a CONTINGENT plan from the nearest meaningful keyLevels (with the stop and first target spaced as Step 2 requires) — conditional entry zone(s), stop-loss reference, take-profit target(s), and a description of what bounds the risk and the reward (no ratio — see Step 3 riskReward rule) — clearly framed as conditional on the stated trigger (e.g. "if price reclaims X with volume"). Never leave entryPrices, stopLoss, or takeProfitPrices empty when keyLevels exist; an "avoid" verdict changes the framing, not the obligation to map levels into a plan. Ground every number: use ONLY price levels that already appear in keyLevels or the provided market data — never invent or extrapolate a level to satisfy this mandate. If a component genuinely has no supporting level (e.g. no meaningful resistance above), state explicitly which component lacks data instead of fabricating one; an honest gap beats an invented number.',
         '- Step 2 — Compute prices:',
@@ -2933,9 +2938,8 @@ export function buildAnalysisPrompt(
             assetClass,
             bars.length > 0 ? bars[bars.length - 1].close : null
         ),
-        // Placed after the reference levels it quotes: the risk:reward half is arithmetic
-        // over the levels rendered immediately above, and reading the inputs before the
-        // conclusion is what lets the model check the conclusion instead of trusting it.
+        // Placed after the reference levels its spacing block quotes: the model reads the
+        // inputs before the conclusions computed from them.
         formatDeterministicMetricsSection(
             bars,
             timeframe,

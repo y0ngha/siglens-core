@@ -7,6 +7,7 @@ import {
     exactPosition,
     geometryOf,
     targetRoomComparison,
+    tolerancePositionOf,
     zoneGates,
     zoneReport,
     type ZoneCase,
@@ -39,6 +40,23 @@ describe('geometryOf', () => {
         [96, 'below'],
     ])('puts a close of %s at %s of the zone 98-100', (close, expected) => {
         expect(geometryOf(close, 98, 100)).toBe(expected);
+    });
+});
+
+describe('tolerancePositionOf (WP-15 rule, kept to restate old runs)', () => {
+    it.each([
+        ['at the top', 100, 'in_zone'],
+        ['inside the 1% band above the top', 100.9, 'in_zone'],
+        ['beyond the 1% band above the top', 101.1, 'above_zone'],
+        ['inside the 1% band below the low', 97.1, 'in_zone'],
+        ['beyond the 1% band below the low', 96.9, 'below_zone'],
+    ] as const)('%s', (_name, close, position) => {
+        expect(tolerancePositionOf('in_zone', close, 98, 100)).toBe(position);
+    });
+
+    it('keeps a no_setup row and a plan without a zone as they are', () => {
+        expect(tolerancePositionOf('no_setup', 120, 98, 100)).toBe('no_setup');
+        expect(tolerancePositionOf('in_zone', 120, null, null)).toBe('in_zone');
     });
 });
 

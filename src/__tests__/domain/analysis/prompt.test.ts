@@ -101,6 +101,10 @@ import {
     SL_MAX_ATR_MULTIPLIER,
 } from '@/domain/analysis/ai-levels';
 import { PLAN_MIN_ATR_SPACING } from '@/domain/analysis/planCheck';
+import {
+    formatLevelHoldFraming,
+    PRICE_LEVEL_HOLD_RATE,
+} from '@/domain/analysis/priceLevelBaseRate';
 import { US_EQUITY_SESSION } from '@/domain/session';
 
 const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
@@ -5080,7 +5084,7 @@ describe('prompt', () => {
         it('Step 1은 진입 구간 배치이고, 코드가 계획 상태에서 판정을 정한다고 정확히 말한다', () => {
             const out = result();
             expect(out).toContain(
-                `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the close is inside the zone (or within 1% of its edges), "wait" when the zone lies below the close (a pullback plan) or above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value.`
+                `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the last close is inside the zone (its low <= close <= its high, edges included), "wait" when the zone lies wholly below the close (a pullback plan) or wholly above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value. To plan an entry at the price, make the zone contain the last close (printed in ## Deterministic Metrics → Entry Zone vs Last Close); a zone whose high is below it is a pullback plan and reads "wait".`
             );
         });
 
@@ -5096,14 +5100,31 @@ describe('prompt', () => {
             expect(out).not.toContain('Determine entryRecommendation');
         });
 
-        it('risk:reward 1.0 미만은 구간을 되돌림 가격대에 두는 이유이고, 단기 급락 경로 밖으로 한정한다', () => {
+        it('구조적 risk:reward 블록과 되돌림 가격대 불릿은 어느 프롬프트에도 없다', () => {
             const out = result();
+            expect(out).not.toContain('Risk:Reward From Current Price');
+            expect(out).not.toContain('structural risk:reward');
+            expect(out).not.toContain('structural ratio');
+            expect(out).not.toContain('sub-1.0');
+            expect(out).not.toContain('named pullback level');
+            expect(out).not.toContain('within 1% of its edges');
             expect(out).toContain(
-                'Outside the short-term sell-off path, check the structural risk:reward in ## Deterministic Metrics when you place the zone. A ratio below 1.0 means the nearest obstacle above is closer than the support below; it is a reason to put the zone at a named pullback level rather than at the price'
+                'The indicator-agreement entry and exit conditions are descriptive tallies'
             );
-            expect(out).toContain(
-                'A met indicator-agreement entry condition does not override this'
+        });
+
+        it('Step 1의 종가 문장은 고정 접두부에, 종가 숫자는 동적 블록에 있다', () => {
+            const { stable, dynamic } = buildAnalysisPromptRaw(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                bars,
+                makeIndicators()
             );
+            expect(stable + dynamic).toContain(
+                'To plan an entry at the price, make the zone contain the last close'
+            );
+            expect(dynamic).toContain('### Entry Zone vs Last Close');
+            expect(stable).not.toContain('Last close ');
         });
     });
 
@@ -5291,12 +5312,10 @@ describe('prompt', () => {
             );
         });
 
-        it('결정론 섹션에 Stop & Target Spacing 블록이 손익비 블록 뒤에 실린다', () => {
+        it('결정론 섹션에 Stop & Target Spacing 블록이 손익비 블록 없이 실린다', () => {
             const { dynamic } = built();
             expect(dynamic).toContain('### Stop & Target Spacing');
-            expect(
-                dynamic.indexOf('### Risk:Reward From Current Price')
-            ).toBeLessThan(dynamic.indexOf('### Stop & Target Spacing'));
+            expect(dynamic).not.toContain('### Risk:Reward From Current Price');
         });
 
         it('printedSupportPrices는 프롬프트 텍스트에서 다시 읽은 지지선과 같다', () => {
@@ -5863,6 +5882,31 @@ describe('prompt', () => {
         const makeMarketReferenceBars = (): Bar[] =>
             Array.from({ length: 30 }, (_, i) => makeBar(i, MR_PRICE + i));
 
+        it('prints the measured level statement with its numbers on 1Day and without them on an intraday chart', () => {
+            const render = (timeframe: '1Day' | '1Hour') =>
+                buildAnalysisPrompt(
+                    TEST_SYMBOL,
+                    TEST_COMPANY_NAME,
+                    makeMarketReferenceBars(),
+                    makeIndicators(),
+                    [],
+                    timeframe
+                );
+            const daily = render('1Day');
+            expect(daily).toContain(
+                `in ${(PRICE_LEVEL_HOLD_RATE.heldShare * 100).toFixed(1)}% of ${PRICE_LEVEL_HOLD_RATE.touches.toLocaleString('en-US')} touches`
+            );
+            expect(daily).toContain('550,171 touches');
+            expect(daily).toContain(
+                'do not call a level strong, firm or key because several references coincide there'
+            );
+            const hourly = render('1Hour');
+            expect(hourly).toContain(formatLevelHoldFraming('1Hour'));
+            expect(hourly).toContain('Not measured on intraday bars.');
+            expect(hourly).not.toContain('touches —');
+            expect(hourly).not.toContain('550,171');
+        });
+
         it('renders the advisory market-reference section with honest framing', () => {
             const prompt = buildAnalysisPrompt(
                 TEST_SYMBOL,
@@ -5876,6 +5920,8 @@ describe('prompt', () => {
                 '## Market Reference (deterministic · advisory)'
             );
             expect(prompt).toContain('NOT validated forward predictors');
+            expect(prompt).not.toContain('precise level/trend prediction');
+            expect(prompt).toContain(formatLevelHoldFraming('1Day'));
             expect(prompt).not.toContain(
                 '## Support/Resistance Candidates (precomputed)'
             );

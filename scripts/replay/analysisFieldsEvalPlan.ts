@@ -133,10 +133,8 @@ export interface PlanMeasure {
     /** The stored planState differs from the recomputed one in these fields; `null` without a stored state. */
     stateDiffs: readonly string[] | null;
     verdictEqual: boolean;
-    /** Where the close sits against the zone, with the state table's tolerance on both sides. */
+    /** Where the close sits against the zone, by the state table's edges (exact; WP-15's 1% band under `legacyZone`). */
     closeVsZone: 'in' | 'above' | 'below' | null;
-    /** The same as WP-15 section 1 measured it: above beyond the top x 1.01, below under the low with no tolerance. */
-    closeVsZoneSection1: 'in' | 'above' | 'below' | null;
     forward: PlanCase['forward'];
     rrAtEntry: number | null;
 }
@@ -175,8 +173,13 @@ export function stateOf(input: {
     targets: readonly number[];
     close: number;
     atr: number | null;
+    /**
+     * Share of the zone edge the close may overshoot and still read `in_zone`. 0 (exact edges)
+     * unless the run predates WP-18 (`--legacy-zone`, WP-15's 0.01).
+     */
+    tolerance?: number;
 }): State {
-    const { zone, stop, targets, close, atr } = input;
+    const { zone, stop, targets, close, atr, tolerance = 0 } = input;
     if (zone.length === 0) return { position: 'no_setup', reason: 'no_zone' };
     const lo = Math.min(...zone);
     const hi = Math.max(...zone);
@@ -186,10 +189,11 @@ export function stateOf(input: {
         atr === null ? t > hi : t >= hi + C.planMinAtrSpacing * atr
     );
     if (!room) return { position: 'no_setup', reason: 'no_room_above' };
-    if (close > hi * (1 + C.zoneTolerance)) {
+    // Exact edges (WP-18 N46): `lo <= close <= hi` is `in_zone`, with no tolerance band.
+    if (close > hi * (1 + tolerance)) {
         return { position: 'above_zone', reason: null };
     }
-    if (close < lo * (1 - C.zoneTolerance)) {
+    if (close < lo * (1 - tolerance)) {
         return { position: 'below_zone', reason: null };
     }
     return { position: 'in_zone', reason: null };
@@ -329,7 +333,10 @@ function stateDiffs(
 }
 
 /** One case's recomputed state, stop checks and spacing. */
-export function measurePlan(plan: PlanCase): PlanMeasure {
+export function measurePlan(
+    plan: PlanCase,
+    tolerance: number = 0
+): PlanMeasure {
     const atr = usableAtr(plan.atr);
     const zone = plan.entryPrices.filter(positive);
     const stop = plan.stop !== null && positive(plan.stop) ? plan.stop : null;
@@ -340,6 +347,7 @@ export function measurePlan(plan: PlanCase): PlanMeasure {
         targets,
         close: plan.close,
         atr,
+        tolerance,
     });
     const lo = zone.length === 0 ? null : Math.min(...zone);
     const hi = zone.length === 0 ? null : Math.max(...zone);
@@ -350,10 +358,8 @@ export function measurePlan(plan: PlanCase): PlanMeasure {
             : zone.reduce((a, b) => a + b, 0) / zone.length;
     const inAtr = (distance: number | null): number | null =>
         distance === null || atr === null ? null : distance / atr;
-    const above = hi !== null && plan.close > hi * (1 + C.zoneTolerance);
-    const below = lo !== null && plan.close < lo * (1 - C.zoneTolerance);
-    // WP-15 section 1 measured "below the zone" with no tolerance (close under the low).
-    const belowSection1 = lo !== null && plan.close < lo;
+    const above = hi !== null && plan.close > hi * (1 + tolerance);
+    const below = lo !== null && plan.close < lo * (1 - tolerance);
     const firstTarget =
         hi === null
             ? null
@@ -457,14 +463,6 @@ export function measurePlan(plan: PlanCase): PlanMeasure {
                   : below
                     ? 'below'
                     : 'in',
-        closeVsZoneSection1:
-            lo === null || hi === null
-                ? null
-                : above
-                  ? 'above'
-                  : belowSection1
-                    ? 'below'
-                    : 'in',
         forward: plan.forward,
         rrAtEntry: plan.rrAtEntry,
     };
@@ -537,7 +535,6 @@ export interface PlanRunSummary {
     /** The WP-15 §1 view: where the close sits against the zone, by stored verdict. */
     closeVsZoneByVerdict: Record<string, Record<string, number>>;
     /** The section 1 view (no tolerance below the zone); reproduces the design's figures. */
-    closeVsZoneByVerdictSection1: Record<string, Record<string, number>>;
     volatility: {
         byLevel: Record<string, VolatilityRow>;
         monotonic: boolean | null;
@@ -706,7 +703,6 @@ export function summarizePlanRun(
             ),
         },
         closeVsZoneByVerdict: closeCountsBy(m => m.closeVsZone),
-        closeVsZoneByVerdictSection1: closeCountsBy(m => m.closeVsZoneSection1),
         volatility: volatilityOf(rows),
         riskReward: quantilesOf(
             rows.flatMap(m => (m.rrAtEntry === null ? [] : [m.rrAtEntry]))
