@@ -36,9 +36,11 @@ two checkouts.
 | `engineEvalCandles.ts`, `engineEvalPatterns.ts` | The candle and chart-pattern passes (pure). |
 | `engineEvalCompute.ts`, `engineEvalStats.ts`, `engineEvalTypes.ts` | Pools, bootstrap, seeded randomness and the pre-registered constants. |
 | `engineEvalCompare.ts` | Before/after comparison of two evaluation runs (G2). |
-| `analysisFieldsEval.ts` | Analysis-fields evaluation CLI (WP-15): `trend`, `skills` and `plan` modes, gates T1-T5, P1-P6, S1-S3, S5, S6. |
+| `analysisFieldsEval.ts` | Analysis-fields evaluation CLI: `trend`, `skills` and `plan` modes (WP-15, gates T1-T5, P1-P6, S1-S3, S5, S6) and `gating` and `output` modes (WP-16, gates D1-D3, D5, D6, D8, D9 and D7, O1, O2, F1, F2, L1, L2, V1-V5). |
 | `analysisFieldsEvalCompute.ts`, `analysisFieldsEvalPlan.ts`, `analysisFieldsEvalSkills.ts`, `analysisFieldsEvalTypes.ts` | The pure parts per mode and the pre-registered constants. |
-| `analysisFieldsEvalRender.ts` | Renders the technical prompt of a case for both tiers through `runAnalysis` without a model call (the `skills` mode). |
+| `analysisFieldsEvalGating.ts`, `analysisFieldsEvalCards.ts`, `analysisFieldsEvalPrompt.ts` | `gating` mode: which pattern and candle guides reach a prompt against what it prints, the card checks recomputed from the printed lines and OHLC, and the readers of the prompt text. |
+| `analysisFieldsEvalOutput.ts`, `analysisFieldsEvalCatalog.ts` | `output` mode: paired comparison of an after, a before and a repeat run with bootstrap intervals, and the skill-file frontmatter reader it matches pattern names with. |
+| `analysisFieldsEvalRender.ts` | Renders the technical prompt of a case for both tiers through `runAnalysis` without a model call (the `skills` and `gating` modes). |
 
 ## The set
 
@@ -336,7 +338,7 @@ The WP-17 thresholds are the instrument's own copy (`engineEvalTypes.ts`), delib
 independent of the arm under test; everything the engine defines (the 500-bar window, the
 detection window, the pivot reversal multiple) is read from core and recorded in `run.json`.
 
-## Analysis-fields evaluation (`trend`, `skills`, `plan`)
+## Analysis-fields evaluation (`trend`, `skills`, `plan`, `gating`, `output`)
 
 Deterministic measurement of the fields a consumer reads as conclusions: `trend`, the plan
 state with its stop and `entryRecommendation`, and the skills a tier's prompt carries. It
@@ -415,6 +417,60 @@ symbol without bars, a result whose analysed bar is not in the set, and an empty
 (no measurable day, no stored label, no plan, no rendered prompt). `--noise-pp <n>` is the
 run-to-run noise floor in percentage points added to the 1 pp margin of P6 and S5 (read it
 off `report.ts --noise`).
+
+### `gating` and `output` (WP-16)
+
+```bash
+# gating: render every case (no model call) and read which pattern and candle guides, and
+# which computed cards, a prompt carries; --baseline compares the member prompts with an
+# earlier gating output byte for byte once the guide parts are removed (D3)
+npx tsx scripts/replay/analysisFieldsEval.ts --mode gating --set <set-dir> --skills <app>/skills --out <dir> [--tier free|member] [--limit N] [--baseline <gating out dir>]
+# output: per-case pairs of an after and a before run; --repeat (a second run of the before arm)
+# gives the noise floor the non-inferiority gates need
+npx tsx scripts/replay/analysisFieldsEval.ts --mode output --set <set-dir> --skills <app>/skills --run <after> --before <before> [--repeat <run>] --out <dir>
+```
+
+- **`gating`.** Per prompt: the chart-pattern ids printed under `## Chart Pattern Candidates`
+  and the candle names printed under `## Detected Candle Patterns`, the pattern and candle
+  guides whose heading the prompt carries, and the guides no printed id selects (hint-only
+  patterns, unprinted candles) or that a printed id lacks (free: within the cap of 3). D1 and
+  D2 are zero such prompts. D3 compares `sha256` of the dynamic prompt without exactly the pattern
+  and candle sections, the four pattern and candle rule blocks (each with its list) and the
+  candidate instruction paragraph, and of the stable part, with the baseline output. Blank
+  lines are folded only where a removal joined them; the hash of the plain remainder is
+  reported beside it. D1 and D2 are undecided when the catalog has no gated guide of the family. D9 needs the indicator rule
+  block and the cycle strategies gone from the prompt and `indicatorResults` gone from the
+  response schema. D5, D6 and D8 read the cards of the assembled prompt (`indicatorCards`,
+  `cycleCards` on the prompt record, core-2 on): one card per injected tagged guide, and per kind with a
+  reader (`ma`, `ema`, `adx`, `atr`, `obv`, `volume_profile`, `stochastic`, `stoch_rsi`,
+  `williams_r`, `buy_sell_volume`) values that are printed on the kind's own lines and the state
+  recomputed from them, then the cycle stage against the printed line and its history
+  recomputed from the closes of the bars the prompt saw. They are `null` ("core without
+  cards") while the catalog has no `computed_card` tag, and D6 is `null` while a card is of a
+  kind without a reader: add the reader to `analysisFieldsEvalCards.ts` rather than reading
+  the card as its own reference. The cycle history (the orchestrator's decision): window = the
+  last 120 bars by count including the current bar, bars with no stage are ignored (they
+  neither end a run nor count as a change), `previousStage` is the stage of the run before
+  the current one, `barsInStage` counts the bars of the current run and is `null` when it
+  reaches the first bar of the window.
+- **`output`.** Needs `--set` (key levels are measured in ATR of the case's bar) and
+  `--skills` (pattern names and trigger ids, read from the files). Model-written characters
+  are the result minus what code attaches (`id`, `confidenceWeight`, `renderConfig`,
+  `reconciledLevels`, `planCheck`, `planState`, and the cards that carry a `reading` or a
+  `cycle`), compact JSON, an absent field counting 0; the figures of WP-16 §1 are reproduced
+  within ~0.4 pp of share (the design's script counted `null` as 4 characters). Intervals are
+  percentile bootstraps (2000 resamples, seed in `analysisFieldsEvalTypes.ts`). L1, L2 and the
+  detected-candidate part of V3 are non-inferiority differences against the repeat run and
+  are `null` without `--repeat`; the rate gates (F1, F2, V5) use the repeat run's drift from
+  the before run as their floor, else `--noise-pp`. A `--repeat` run whose `skillsSha256`
+  differs from the before run is accepted only when every prompt hash matches. D7 reads the
+  before run's per-card trends against the rule of the skill's kind (`computed_card` tag,
+  else the core-0 baseline names) on its stored prompt lines; a skill with at least 30
+  readings and more than 5% opposite maps to `neutral` before the live run. A tagged kind
+  without a trend rule makes D7 undecided. O1, O2, L1, L2 and V1 to V5 are undecided when
+  fewer than 90% of the cases are paired. An unknown run tier is an error. `proseSample` lists the 40 cases the manual prose read (P)
+  takes. Both modes: gates `D1`, `D2`, `D3`, `D5`, `D6`, `D8`, `D9` and `D7`, `O1`, `O2`, `F1`, `F2`, `L1`, `L2`,
+  `V1` to `V5` respectively; a baseline on `main` is expected to fail D1, D2 and D9.
 
 Headline numbers use one row per case (repeat 1) and, for plans, the rows a report counts
 (`labels.jsonl` headline). The `T1` "every B day" part of the design (the shipped function

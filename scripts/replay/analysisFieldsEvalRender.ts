@@ -26,6 +26,8 @@ export interface RenderInput {
     cases: readonly ReplayCase[];
     storedOf: (symbol: string) => StoredBars;
     log: (line: string) => void;
+    /** The tiers to render; both when absent. */
+    tiers?: readonly ('free' | 'member')[];
 }
 
 export interface Rendered {
@@ -38,6 +40,27 @@ export type RenderSkills = (input: RenderInput) => Promise<Rendered>;
 /** Injection group of a skill: `type ?? category ?? 'regular'`. */
 export function groupOf(skill: Pick<Skill, 'type' | 'category'>): string {
     return skill.type ?? skill.category ?? 'regular';
+}
+
+/**
+ * The `computedCard` tag of a skill (WP-16 core-2 on). Read structurally: the field does not
+ * exist on a core without it, and the instrument must run on that core too.
+ */
+function computedCardOf(skill: Skill): string | undefined {
+    const tag: unknown = Reflect.get(skill, 'computedCard');
+    return typeof tag === 'string' ? tag : undefined;
+}
+
+/**
+ * The computed cards an assembled prompt carries (`indicatorCards` and `cycleCards`, WP-16
+ * core-2 on), or `null` on a core that computes none.
+ */
+function cardsOf(record: AssembledPromptRecord): PromptSample['cards'] {
+    const indicator: unknown = Reflect.get(record, 'indicatorCards');
+    const cycle: unknown = Reflect.get(record, 'cycleCards');
+    return indicator === undefined && cycle === undefined
+        ? null
+        : { indicator, cycle };
 }
 
 const OFFLINE_KEY = 'offline-evaluation-no-network';
@@ -93,6 +116,12 @@ export const renderWithCore: RenderSkills = async input => {
         group: groupOf(skill),
         alwaysOn: skill.gating?.tier === 'always_on',
         injected: skill.smcFullGuide !== true,
+        triggers:
+            skill.gating?.tier === 'gated' &&
+            skill.gating.signalKind === 'event'
+                ? skill.gating.triggers
+                : undefined,
+        computedCard: computedCardOf(skill),
     }));
 
     // The DeepSeek client only checks that a key exists before the request; the request
@@ -110,7 +139,7 @@ export const renderWithCore: RenderSkills = async input => {
         for (const [i, replayCase] of input.cases.entries()) {
             const stored = input.storedOf(replayCase.symbol);
             const profile = profileOf(marketOfSymbol(replayCase.symbol));
-            for (const tier of ['free', 'member'] as const) {
+            for (const tier of input.tiers ?? (['free', 'member'] as const)) {
                 const controller = new AbortController();
                 const captured: { prompt: AssembledPromptRecord | null } = {
                     prompt: null,
@@ -155,6 +184,7 @@ export const renderWithCore: RenderSkills = async input => {
                     tier,
                     stable: captured.prompt.stable,
                     dynamic: captured.prompt.dynamic,
+                    cards: cardsOf(captured.prompt),
                 });
             }
             if ((i + 1) % 50 === 0) {

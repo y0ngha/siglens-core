@@ -8,17 +8,27 @@ import {
     liveSkillsInput,
     loadSetData,
     parseFieldsEvalArgs,
+    readBaselineRows,
     runFieldsEval,
     splitCsvLine,
     trendRowsOfCsv,
     type FieldsEvalArgs,
     type FieldsEvalDeps,
 } from '../../../../scripts/replay/analysisFieldsEval';
+import {
+    dynamicPrompt,
+    STABLE,
+    PATTERN_GUIDE_A,
+    PATTERN_GUIDE_B,
+    CANDLE_GUIDE_DOJI,
+    CATALOG,
+} from './wp16Fixtures';
 import { wilderAtrSeries } from '../../../../scripts/replay/analysisFieldsEvalCompute';
 import { renderWithCore } from '../../../../scripts/replay/analysisFieldsEvalRender';
 import type {
     CatalogSkill,
     PromptSample,
+    SkillTier,
 } from '../../../../scripts/replay/analysisFieldsEvalSkills';
 import { writeSet } from '../../../../scripts/replay/buildSet';
 import { REPO_ROOT, sha256Hex } from '../../../../scripts/replay/fsUtil';
@@ -110,6 +120,10 @@ interface RunOptions {
     extraResults?: readonly Partial<CaseResultFile>[];
     labels?: (rows: readonly CaseResultFile[]) => readonly LabelRow[];
     usage?: CaseResultFile['usage'];
+    /** The stored dynamic prompt (default: a short fixed text). */
+    prompt?: string;
+    /** The stored prompt hashes (default: none). */
+    hashes?: CaseResultFile['promptHashes'];
 }
 
 /** Writes `<dir>/<name>` as a run of the world's set and returns its path. */
@@ -156,8 +170,8 @@ function writeRun(world: World, options: RunOptions): string {
                         ? null
                         : { dataAsOf: { barTime: asOfTime, close }, ...body },
                 promptVersion: 'p34',
-                promptHashes: null,
-                promptDynamic: 'support 100.00',
+                promptHashes: options.hashes ?? null,
+                promptDynamic: options.prompt ?? 'support 100.00',
                 usage: options.usage ?? {
                     inputTokens: 1000,
                     outputTokens: 200,
@@ -236,6 +250,9 @@ const baseArgs = (overrides: Partial<FieldsEvalArgs>): FieldsEvalArgs => ({
     gate: null,
     allowSkippedCases: false,
     noisePp: 0,
+    tier: null,
+    baseline: null,
+    repeat: null,
     ...overrides,
 });
 
@@ -252,6 +269,7 @@ function makeDeps(
         gitSha: () => 'abc123+dirty',
         dirtyDiffSha256: () => 'f'.repeat(64),
         render,
+        schemaAsksIndicatorResults: async () => false,
         lines: () => log.mock.calls.map(([line]) => line).join('\n'),
     };
 }
@@ -316,7 +334,7 @@ describe('parseFieldsEvalArgs', () => {
 
     it('needs a valid mode and an output directory', () => {
         expect(() => parseFieldsEvalArgs(['--out', 'o'])).toThrow(
-            '--mode must be one of trend, skills, plan'
+            '--mode must be one of trend, skills, plan, gating, output'
         );
         expect(() =>
             parseFieldsEvalArgs(['--mode', 'x', '--out', 'o'])
@@ -1614,6 +1632,540 @@ describe('runFieldsEval: skills', () => {
             })
         ).rejects.toThrow();
         expect(process.cwd()).toBe(cwd);
+    });
+});
+
+describe('the arguments of gating and output', () => {
+    const gating = ['--mode', 'gating', '--out', 'o', '--set', 's'];
+    const output = [
+        '--mode',
+        'output',
+        '--out',
+        'o',
+        '--set',
+        's',
+        '--run',
+        'r',
+        '--before',
+        'b',
+        '--skills',
+        'k',
+    ];
+
+    it('gating needs a set and a skills directory and reads --tier, --baseline and --limit', () => {
+        expect(() => parseFieldsEvalArgs(gating)).toThrow(
+            'gating: --skills is required'
+        );
+        const args = parseFieldsEvalArgs([
+            ...gating,
+            '--skills',
+            'k',
+            '--tier',
+            'free',
+            '--baseline',
+            'g',
+            '--limit',
+            '4',
+            '--gate',
+            'D1,D2',
+        ]);
+        expect(args).toMatchObject({
+            tier: 'free',
+            limit: 4,
+            gate: ['D1', 'D2'],
+        });
+        expect(args.baseline).toMatch(/\/g$/);
+    });
+
+    it('gating refuses runs, a bad tier, a missing set and gate ids of other modes', () => {
+        expect(() =>
+            parseFieldsEvalArgs([...gating, '--skills', 'k', '--run', 'r'])
+        ).toThrow('gating: --run, --before and --member-run do not apply');
+        expect(() =>
+            parseFieldsEvalArgs([...gating, '--skills', 'k', '--tier', 'x'])
+        ).toThrow('--tier must be free or member');
+        expect(() =>
+            parseFieldsEvalArgs([
+                '--mode',
+                'gating',
+                '--out',
+                'o',
+                '--skills',
+                'k',
+            ])
+        ).toThrow('gating: --set is required');
+        expect(() =>
+            parseFieldsEvalArgs([...gating, '--skills', 'k', '--gate', 'S1'])
+        ).toThrow('--gate ids not in mode gating: S1');
+    });
+
+    it('output needs a set, both runs and a skills directory, and reads --repeat', () => {
+        expect(() =>
+            parseFieldsEvalArgs([
+                '--mode',
+                'output',
+                '--out',
+                'o',
+                '--set',
+                's',
+                '--run',
+                'r',
+            ])
+        ).toThrow('output: --run, --before and --skills are required');
+        const args = parseFieldsEvalArgs([
+            ...output,
+            '--repeat',
+            'p',
+            '--gate',
+            'O1,V5',
+        ]);
+        expect(args.repeat).toMatch(/\/p$/);
+        expect(args.gate).toEqual(['O1', 'V5']);
+    });
+
+    it('output refuses --limit and --member-run, and the options of other modes are refused elsewhere', () => {
+        expect(() => parseFieldsEvalArgs([...output, '--limit', '3'])).toThrow(
+            'output: --member-run and --limit do not apply'
+        );
+        expect(() =>
+            parseFieldsEvalArgs([...output, '--tier', 'free'])
+        ).toThrow('output: --tier and --baseline apply to gating only');
+        expect(() =>
+            parseFieldsEvalArgs([
+                '--mode',
+                'skills',
+                '--out',
+                'o',
+                '--set',
+                's',
+                '--skills',
+                'k',
+                '--repeat',
+                'p',
+            ])
+        ).toThrow('skills: --repeat applies to output only');
+    });
+});
+
+describe('runFieldsEval: gating', () => {
+    /** Renders every case with the given guides, qualified ids and candles. */
+    const renderWith = (
+        sampleOf: (tier: SkillTier) => { stable?: string; dynamic: string }
+    ) =>
+        vi.fn<FieldsEvalDeps['render']>(async input => ({
+            catalog: CATALOG,
+            samples: input.cases.flatMap(c =>
+                (input.tiers ?? ['free', 'member']).map(
+                    (tier): PromptSample => ({
+                        caseId: c.caseId,
+                        tier,
+                        stable: sampleOf(tier).stable ?? STABLE,
+                        dynamic: sampleOf(tier).dynamic,
+                    })
+                )
+            ),
+        }));
+    const followed = dynamicPrompt({
+        qualified: ['double_top'],
+        candles: ['doji'],
+        patternGuides: [PATTERN_GUIDE_A],
+        candleGuides: [CANDLE_GUIDE_DOJI],
+        indicatorRules: false,
+        strategies: ['Strategy One'],
+    });
+    const gatingArgs = (world: World, over: Partial<FieldsEvalArgs>) =>
+        baseArgs({
+            mode: 'gating',
+            set: world.setDir,
+            skills: join(world.dir, 'skills'),
+            out: join(world.dir, 'out'),
+            ...over,
+        });
+
+    it('renders the selected cases and tiers and writes the gating summary and one row per prompt', async () => {
+        const world = makeWorld();
+        const renderer = renderWith(() => ({ dynamic: followed }));
+        const code = await runFieldsEval(
+            gatingArgs(world, {
+                limit: 3,
+                tier: 'member',
+                gate: ['D1', 'D2', 'D9'],
+            }),
+            makeDeps(renderer)
+        );
+        expect(code).toBe(0);
+        const input = renderer.mock.calls[0][0];
+        expect(input.cases).toHaveLength(3);
+        expect(input.tiers).toEqual(['member']);
+        expect(input.storedOf('NVDA').ticker).toBe('NVDA');
+        expect(() => input.storedOf('ZZZ')).toThrow('no bars for ZZZ');
+        const out = join(world.dir, 'out');
+        const { gates } = readSummary(out);
+        expect(gates.map(g => g.id)).toEqual([
+            'D1',
+            'D2',
+            'D3',
+            'D5',
+            'D6',
+            'D8',
+            'D9',
+        ]);
+        expect(readRun(out).inputs).toMatchObject({
+            limit: 3,
+            tiers: ['member'],
+        });
+        expect(
+            readFileSync(join(out, 'rows.jsonl'), 'utf-8').trim().split('\n')
+        ).toHaveLength(3);
+    });
+
+    it('renders both tiers by default and exits 2 when a selected gate fails', async () => {
+        const world = makeWorld();
+        const renderer = renderWith(() => ({
+            dynamic: dynamicPrompt({
+                patternGuides: [PATTERN_GUIDE_B],
+                indicatorRules: false,
+            }),
+        }));
+        const deps = makeDeps(renderer);
+        const code = await runFieldsEval(
+            gatingArgs(world, { limit: 2, gate: ['D1'] }),
+            deps
+        );
+        expect(code).toBe(2);
+        expect(renderer.mock.calls[0][0].tiers).toEqual(['free', 'member']);
+        expect(deps.lines()).toContain('GATE D1 FAIL');
+    });
+
+    it('compares member prompts with the hashes of an earlier gating output (D3)', async () => {
+        const world = makeWorld();
+        const first = renderWith(() => ({
+            dynamic: dynamicPrompt({
+                qualified: ['double_top'],
+                patternGuides: [PATTERN_GUIDE_A, PATTERN_GUIDE_B],
+            }),
+        }));
+        await runFieldsEval(
+            gatingArgs(world, { limit: 2, out: join(world.dir, 'first') }),
+            makeDeps(first)
+        );
+        const run = async (dynamic: string) => {
+            const out = join(
+                world.dir,
+                `second-${sha256Hex(dynamic).slice(0, 6)}`
+            );
+            const code = await runFieldsEval(
+                gatingArgs(world, {
+                    limit: 2,
+                    out,
+                    baseline: join(world.dir, 'first'),
+                    gate: ['D3'],
+                }),
+                makeDeps(renderWith(() => ({ dynamic })))
+            );
+            return { code, gates: readSummary(out).gates };
+        };
+        const gated = await run(
+            dynamicPrompt({
+                qualified: ['double_top'],
+                patternGuides: [PATTERN_GUIDE_A],
+            })
+        );
+        expect(gated.code).toBe(0);
+        expect(gated.gates.find(g => g.id === 'D3')?.pass).toBe(true);
+        const changed = await run(
+            dynamicPrompt({
+                qualified: ['double_top'],
+                patternGuides: [PATTERN_GUIDE_A],
+            }).replace('Symbol: TEST', 'Symbol: OTHER')
+        );
+        expect(changed.code).toBe(2);
+    });
+
+    it('reads a baseline only from a gating output of the same set', () => {
+        const world = makeWorld();
+        const dir = join(world.dir, 'base');
+        mkdirSync(dir);
+        const write = (run: unknown, rows: readonly unknown[]) => {
+            writeFileSync(join(dir, 'run.json'), JSON.stringify(run));
+            writeFileSync(
+                join(dir, 'rows.jsonl'),
+                rows.map(r => `${JSON.stringify(r)}\n`).join('')
+            );
+        };
+        const ok = {
+            tool: 'analysisFieldsEval',
+            mode: 'gating',
+            inputs: { fingerprint: 'fp' },
+        };
+        const row = {
+            caseId: 'C',
+            tier: 'member',
+            strippedSha256: 'a',
+            stableSha256: 'b',
+        };
+        write(ok, [row]);
+        expect(readBaselineRows(dir, 'fp')).toEqual([row]);
+        write({ ...ok, mode: 'skills' }, [row]);
+        expect(() => readBaselineRows(dir, 'fp')).toThrow(
+            'not an analysisFieldsEval gating output'
+        );
+        write(ok, [row]);
+        expect(() => readBaselineRows(dir, 'other')).toThrow('different set');
+        write(ok, [{ ...row, strippedSha256: undefined }]);
+        expect(() => readBaselineRows(dir, 'fp')).toThrow(
+            'a row without hashes'
+        );
+        write(ok, [{ ...row, tier: 'x' }]);
+        expect(() => readBaselineRows(dir, 'fp')).toThrow(
+            'a row without hashes'
+        );
+    });
+
+    it('computes the card gates from the cards of an assembled prompt and the case bars', async () => {
+        const world = makeWorld();
+        const tagged: readonly CatalogSkill[] = [
+            ...CATALOG,
+            {
+                name: 'MA Signal Guide',
+                group: 'indicator_guide',
+                alwaysOn: true,
+                injected: true,
+                computedCard: 'ma',
+            },
+        ];
+        const cardRender = vi.fn<FieldsEvalDeps['render']>(async input => ({
+            catalog: tagged,
+            samples: input.cases.map((c): PromptSample => ({
+                caseId: c.caseId,
+                tier: 'member',
+                stable: `${STABLE}### MA Signal Guide [High Confidence]\nbody\n`,
+                dynamic: dynamicPrompt({
+                    stateLines: ['- MA: MA(5): 10', '- MA stack: mixed (x)'],
+                    indicatorRules: false,
+                }),
+                cards: {
+                    indicator: [
+                        {
+                            indicatorName: 'MA Signal Guide',
+                            signals: [
+                                {
+                                    trend: 'neutral',
+                                    reading: {
+                                        kind: 'ma',
+                                        state: 'mixed',
+                                        values: { ma5: 10 },
+                                    },
+                                },
+                            ],
+                        },
+                    ],
+                    cycle: [],
+                },
+            })),
+        }));
+        const out = join(world.dir, 'out');
+        await runFieldsEval(
+            gatingArgs(world, { limit: 2, tier: 'member', gate: ['D5', 'D6'] }),
+            makeDeps(cardRender)
+        );
+        const { gates } = readSummary(out);
+        expect(gates.find(g => g.id === 'D5')?.pass).toBe(true);
+        expect(gates.find(g => g.id === 'D6')?.pass).toBe(true);
+    });
+});
+
+describe('runFieldsEval: output', () => {
+    const body =
+        (summary: string, extra: ResultBody = {}) =>
+        (c: { close: number }): ResultBody => ({
+            ...asBody(defaultBody(c)),
+            summary,
+            indicatorResults: [],
+            strategyResults: [],
+            patternSummaries: [],
+            candlePatterns: [],
+            ...extra,
+        });
+    const prompt = dynamicPrompt({
+        qualified: ['double_top'],
+        strategies: ['Strategy One'],
+    });
+    const skills = (world: World): string => {
+        const dir = join(world.dir, 'skills');
+        mkdirSync(join(dir, 'patterns'), { recursive: true });
+        writeFileSync(
+            join(dir, 'patterns', 'double-top.md'),
+            '---\nname: 이중천장\ntype: pattern\ngating:\n  tier: gated\n  triggers: [double_top]\n---\nbody'
+        );
+        writeFileSync(
+            join(dir, 'patterns', 'double-bottom.md'),
+            '---\nname: 이중바닥\ntype: pattern\ngating:\n  tier: gated\n  triggers: [double_bottom]\n---\nbody'
+        );
+        return dir;
+    };
+    const outputArgs = (world: World, over: Partial<FieldsEvalArgs>) =>
+        baseArgs({
+            mode: 'output',
+            set: world.setDir,
+            skills: skills(world),
+            out: join(world.dir, 'out'),
+            ...over,
+        });
+
+    it('pairs two runs case by case and writes the comparison, the gates and one row per case', async () => {
+        const world = makeWorld();
+        const after = writeRun(world, {
+            name: 'after',
+            prompt,
+            usage: { inputTokens: 1000, outputTokens: 150, cachedTokens: 400 },
+            labels: labelsOf,
+            body: body('이중바닥이 보입니다'),
+        });
+        const before = writeRun(world, {
+            name: 'before',
+            prompt,
+            labels: labelsOf,
+            body: body('조용한 장입니다'),
+        });
+        const out = join(world.dir, 'out');
+        const deps = makeDeps();
+        const code = await runFieldsEval(
+            outputArgs(world, { run: after, before, gate: ['O1', 'V5'] }),
+            deps
+        );
+        expect(code).toBe(2);
+        const { summary, gates } = readSummary(out);
+        expect(gates.map(g => g.id)).toEqual([
+            'D7',
+            'O1',
+            'O2',
+            'F1',
+            'F2',
+            'L1',
+            'L2',
+            'V1',
+            'V2',
+            'V3',
+            'V4',
+            'V5',
+        ]);
+        expect(gates.find(g => g.id === 'O1')?.pass).toBe(true);
+        expect(gates.find(g => g.id === 'V5')?.pass).toBe(false);
+        expect(JSON.stringify(summary)).toContain('"ratio"');
+        expect(
+            readFileSync(join(out, 'rows.jsonl'), 'utf-8').trim().split('\n')
+        ).toHaveLength(world.manifest.cases.length);
+        expect(deps.lines()).toContain('GATE V5 FAIL');
+        expect(readRun(out).inputs).toMatchObject({ repeat: null });
+    });
+
+    it('uses a repeat run as the noise floor and refuses one with other prompts under another catalog', async () => {
+        const world = makeWorld();
+        const hashes = (full: string) => ({
+            system: 's',
+            stable: 'a',
+            dynamic: 'b',
+            full,
+        });
+        const after = writeRun(world, {
+            name: 'after',
+            prompt,
+            body: body('요약'),
+        });
+        const before = writeRun(world, {
+            name: 'before',
+            prompt,
+            body: body('요약'),
+            hashes: hashes('h1'),
+        });
+        const same = writeRun(world, {
+            name: 'repeat-same',
+            prompt,
+            body: body('요약'),
+            hashes: hashes('h1'),
+            meta: { skillsSha256: 'y' },
+        });
+        const code = await runFieldsEval(
+            outputArgs(world, {
+                run: after,
+                before,
+                repeat: same,
+                gate: ['L1'],
+            }),
+            makeDeps()
+        );
+        expect(code).toBe(0);
+        expect(readRun(join(world.dir, 'out')).inputs.repeat).toMatchObject({
+            dir: same,
+        });
+        const other = writeRun(world, {
+            name: 'repeat-other',
+            prompt,
+            body: body('요약'),
+            hashes: hashes('h2'),
+            meta: { skillsSha256: 'y' },
+        });
+        await expect(
+            runFieldsEval(
+                outputArgs(world, { run: after, before, repeat: other }),
+                makeDeps()
+            )
+        ).rejects.toThrow('not a repeat pair');
+        const unhashed = writeRun(world, {
+            name: 'repeat-unhashed',
+            prompt,
+            body: body('요약'),
+            meta: { skillsSha256: 'y' },
+        });
+        await expect(
+            runFieldsEval(
+                outputArgs(world, { run: after, before, repeat: unhashed }),
+                makeDeps()
+            )
+        ).rejects.toThrow('not a repeat pair');
+    });
+
+    it('refuses a run of an unknown tier', async () => {
+        const world = makeWorld();
+        const odd = writeRun(world, {
+            name: 'odd',
+            tier: 'paid',
+            body: body('요약'),
+        });
+        await expect(
+            runFieldsEval(
+                outputArgs(world, { run: odd, before: odd }),
+                makeDeps()
+            )
+        ).rejects.toThrow('"paid" is neither free nor member');
+    });
+
+    it('refuses runs of different tiers and a skills directory with no skill', async () => {
+        const world = makeWorld();
+        const member = writeRun(world, { name: 'member', body: body('요약') });
+        const free = writeRun(world, {
+            name: 'free',
+            tier: 'free',
+            body: body('요약'),
+        });
+        await expect(
+            runFieldsEval(
+                outputArgs(world, { run: member, before: free }),
+                makeDeps()
+            )
+        ).rejects.toThrow('tier differ');
+        mkdirSync(join(world.dir, 'empty'));
+        await expect(
+            runFieldsEval(
+                outputArgs(world, {
+                    run: member,
+                    before: member,
+                    skills: join(world.dir, 'empty'),
+                }),
+                makeDeps()
+            )
+        ).rejects.toThrow('no skill file found');
     });
 });
 
