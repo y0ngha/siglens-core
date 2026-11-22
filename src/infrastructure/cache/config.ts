@@ -1205,6 +1205,22 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * byte-stable prefix and cannot carry it). Stable bytes change for every technical prompt
  * (Step 1 and the sell-off bullet), dynamic bytes for every technical prompt.
  *
+ * Pattern and candle guides carry measured base rates, not literature weights (WP-18, still
+ * `p34`, unreleased). A pattern or candlestick skill header reads
+ * `[Measured: no edge over placebo, n=612]` (a family below the sample floor reads
+ * `[Measured over every chart pattern: …, n=3,594]`; `[Not measured on intraday bars]` off
+ * daily bars) instead of `[High|Medium|Low Confidence]`; each qualified pattern block gains a
+ * `- Measured on this engine (...)` line after its targets with the family's target-first
+ * share against a date-transplant placebo (`- Not measured on intraday bars.` off daily
+ * bars); the pattern and candle writing rules gain a reliability sentence (one variant per
+ * block, naming only what that block prints; off daily bars it says reliability was not
+ * measured), and the candle rule no longer asks for "statistical reliability".
+ * The numbers come from the generated `measuredBaseRates.ts`, which also replaces the
+ * placeholder hold rate in the market reference framing (the sentence now says "U.S. and
+ * Korean" instead of the 55/10 split). Stable bytes change for every technical prompt that
+ * injects a pattern or candle guide (the guides and rule blocks), dynamic bytes for every
+ * daily prompt with a qualified pattern and for every prompt whose framing numbers moved.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p34' as const;

@@ -579,6 +579,7 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             direction: 'down',
             invalidationLevel: 155,
         },
+        baseRate: null,
     };
     const strategySample: Omit<Required<StrategyResult>, 'cycle'> = {
         id: 's1',
@@ -739,7 +740,11 @@ describe('TECHNICAL_RESPONSE_SCHEMA drift guard', () => {
             TECHNICAL_RESPONSE_SCHEMA,
             'patternSummaries'
         );
-        const patternSampleKeys = sortedKeys(patternSample);
+        // `baseRate` is attached by code from the measured table (CP-13): the model's schema
+        // never asks for it.
+        const patternSampleKeys = sortedKeys(patternSample).filter(
+            key => key !== 'baseRate'
+        );
         expect(sortedRequired(pattern)).toEqual(patternSampleKeys);
         expect(propertyKeys(pattern)).toEqual(patternSampleKeys);
         expect(pattern.additionalProperties).toBe(false);

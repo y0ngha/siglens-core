@@ -369,6 +369,51 @@ describe('renderBaseRateTable', () => {
         expect(source).toContain('export function measuredBaseRateFor(');
         expect(source).toContain("if (timeframe !== '1Day') return null;");
     });
+
+    it('gives every exported symbol its own doc, never a doc that belongs to the next one', () => {
+        const row = priceLevelRow(
+            {
+                overall: {
+                    held: { n: 1000, share: 0.5 },
+                    transplant: { n: 3000, share: 0.5 },
+                    difference: { mean: 0, low: -0.01, high: 0.01 },
+                },
+                tables: { market: {}, half: {} },
+            },
+            scope
+        ).row;
+        const pattern = patternTable(
+            patterns('a', 120, () => true),
+            WEEKS,
+            scope
+        );
+        const source = renderBaseRateTable({
+            header: {
+                setId: 's',
+                fingerprint: 'f',
+                coreSha: 'a',
+                definitions: 'd',
+                date: '2026-11-22',
+                command: 'cmd',
+            },
+            patterns: pattern,
+            candles: candleTable(
+                candles('hammer', 120, () => true),
+                WEEKS,
+                scope
+            ),
+            priceLevel: row,
+        });
+        // No doc block is directly followed by another declaration's doc or by a blank line,
+        // and the two union types each carry a doc about themselves.
+        expect(source).not.toMatch(/\*\/\n\s*\/\*\*/);
+        expect(source).toMatch(
+            /\/\*\* What a base-rate row measures[^\n]*\*\/\nexport type BaseRateSubject =/
+        );
+        expect(source).toMatch(
+            /\/\*\* Whether a row beats its placebo[^\n]*\*\/\nexport type BaseRateVerdict =/
+        );
+    });
 });
 
 // ─── The runs it reads ────────────────────────────────────────────────────────

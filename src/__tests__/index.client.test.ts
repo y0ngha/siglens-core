@@ -41,6 +41,33 @@ import type {
 } from '@/index.client';
 
 describe('browser public API exports', () => {
+    it('exports the measured base rates and their lookup (WP-18 C4, API-1: both entrypoints)', () => {
+        expect(typeof clientApi.measuredBaseRateFor).toBe('function');
+        expect(clientApi.BASE_RATE_MIN_N).toBe(100);
+        expect(clientApi.PRICE_LEVEL_BASE_RATE.subject).toBe('price_level');
+        expect(Object.keys(clientApi.PATTERN_BASE_RATES)).toContain(
+            'double_bottom'
+        );
+        expect(Object.keys(clientApi.CANDLE_BASE_RATES)).toContain('hammer');
+        expect(
+            clientApi.measuredBaseRateFor(
+                'chart_pattern',
+                'double_bottom',
+                '1Day'
+            )
+        ).toBe(clientApi.PATTERN_BASE_RATES.double_bottom);
+        expect(
+            clientApi.measuredBaseRateFor('candle_pattern', 'hammer', '1Day')
+        ).toBe(clientApi.CANDLE_BASE_RATES.hammer);
+        expect(
+            clientApi.measuredBaseRateFor(
+                'chart_pattern',
+                'double_bottom',
+                '1Hour'
+            )
+        ).toBeNull();
+    });
+
     it('exports domain values used by browser consumers', () => {
         const skillType: SkillType = 'indicator_guide';
         const modelId: ModelId = 'gemini-3.1-pro-preview';

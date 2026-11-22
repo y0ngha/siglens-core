@@ -1250,7 +1250,8 @@ interface PatternSummary {
     summary: string;                     // AI가 작성한 패턴별 요약
     keyPrices?: KeyPrice[];              // 패턴의 주요 가격대 목록 (선택적)
     timeRange?: { start: number; end: number }; // 패턴이 감지된 시간 범위 (Unix timestamp, 선택적)
-    confidenceWeight: number;            // skill의 confidence_weight 값 (0~1)
+    confidenceWeight: number;            // skill의 confidence_weight 값 (0~1). 카탈로그 표시용 문헌 값이며 차트 패턴은 baseRate가 대신한다
+    baseRate?: MeasuredBaseRate | null;  // 코드가 붙이는 측정 기준율(일봉만, 일봉이 아니면 null, 저장 전 결과는 없음). 모델이 쓴 값은 버린다
 }
 
 // 캔들 패턴별 감지 결과
@@ -1260,6 +1261,7 @@ interface CandlePatternSummary {
     detected: boolean;     // 현재 차트에서 감지 여부
     trend: Trend;          // 해당 패턴이 시사하는 방향
     summary: string;       // AI가 작성한 패턴별 요약
+    baseRate?: MeasuredBaseRate | null; // 다음 5봉이 라벨 방향으로 움직인 비율과 가짜 기준 비교(일봉만). 코드가 붙인다
 }
 
 // 전략 skill별 분석 결과 (type='strategy' skill)
@@ -1327,6 +1329,13 @@ confidence      → patternSummaries[].confidenceWeight,
 ### 필드별 의미
 
 ```
+patternSummaries[].baseRate / candlePatterns[].baseRate
+                    코드가 `measuredBaseRateFor`로 붙이는 측정 기준율(WP-18). 패턴: 목표가가 무효화보다 먼저 닿은
+                    비율(60봉)과 같은 거리의 다른 날 가격 비율, 캔들: 다음 5봉이 라벨 방향으로 움직인 비율.
+                    `verdict`가 `beats_placebo`가 아니면 그 카드의 목표가는 "측정된 거리"다(오늘은 전부 해당).
+                    일봉만 측정했다: 일봉이 아니면 null, 이 필드가 생기기 전에 저장된 결과는 필드 없음.
+                    `skill_detection` 깊이를 따른다(`confidence`가 아님)
+
 indicatorResults[]  indicator_guide skill의 카드. 모델이 쓰지 않고 `buildIndicatorCards`가 만든다
                     (주입된 `computed_card` 태그 스킬당 하나, 소스 줄이 N/A인 상시 가이드는 없음)
                     indicatorName으로 그룹핑 (예: "RSI Signal Guide"), signals[0].reading이 표시의 원천
@@ -1643,7 +1652,7 @@ domain/analysis/prompt.ts
   → type='support_resistance' skills → "Support/Resistance Tool Guides" 섹션
   → type='strategy' skills → "Strategy Analysis" 섹션
   → 나머지 skills (type 없음) → "Active Skills" 섹션
-  → confidenceWeight에 따라 "[낮은 신뢰도]" / "[중간 신뢰도]" / "[높은 신뢰도]" 라벨 추가
+  → confidenceWeight에 따라 "[Low Confidence]" / "[Medium Confidence]" / "[High Confidence]" 라벨 추가 (type='pattern'·'candlestick'은 예외: 문헌 가중치 대신 측정 라벨 "[Measured: no edge over placebo, n=612]", 일봉이 아니면 "[Not measured on intraday bars]", `measuredBaseRates.ts`의 같은 행)
   → 순수 함수 — 파일 접근 없음
 
 infrastructure/ai/claude.ts

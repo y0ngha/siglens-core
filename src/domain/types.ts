@@ -1,5 +1,6 @@
 import type { OptionsAnalysisResponse } from './options/types';
 import type { PriceQuoting } from './analysis/promptFormat';
+import type { MeasuredBaseRate } from './analysis/measuredBaseRates';
 
 /** Bar resolution literal accepted by the market data providers and indicator pipeline. */
 export type Timeframe = '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour' | '1Day';
@@ -1850,7 +1851,10 @@ export interface PatternSummary {
      * (computed)`; absent for a pattern the pre-screener did not list.
      */
     candidateId?: string;
-    /** Confidence weight inherited from the matching skill. */
+    /**
+     * Display weight from the skill catalog (a literature value, not a measurement). For
+     * chart patterns it is superseded by {@link PatternResult.baseRate}.
+     */
     confidenceWeight: number;
     /**
      * Model-authored geometry for THIS pattern — the
@@ -1887,6 +1891,14 @@ export interface PatternTargetGeometry {
 export interface PatternResult extends PatternSummary {
     /** Chart-render directive copied from the skill, if any. */
     renderConfig?: SkillChartDisplay;
+    /**
+     * What this engine measured for the pattern's family on daily bars: how often its target
+     * came before its invalidation, against a matched placebo, and whether that beats it.
+     * Attached by code (never the model's) from `measuredBaseRateFor`; `null` off daily bars
+     * (not measured), absent on a result stored before it existed. A target of a card whose
+     * `verdict` is not `beats_placebo` is a measured distance, not a likely outcome.
+     */
+    baseRate?: MeasuredBaseRate | null;
 }
 
 /** AI summary of a strategy skill. */
@@ -2034,6 +2046,11 @@ export interface EnrichOptions {
      * the model).
      */
     readonly withoutModelCards?: boolean;
+    /**
+     * The timeframe the analysis was made on. With it every pattern and candle card carries
+     * its measured `baseRate` (`null` off daily bars); without it the field is left off.
+     */
+    readonly timeframe?: Timeframe;
 }
 
 /** @internal The cards core computed for a prompt (see `attachComputedCards`). */
@@ -2057,6 +2074,12 @@ export interface CandlePatternSummary {
     trend: Trend;
     /** Korean interpretation enriched with the candlestick guide. */
     summary: string;
+    /**
+     * What this engine measured for the candle on daily bars: how often the next five bars
+     * moved in its direction, against a prior-move-matched placebo. Attached by code; `null`
+     * off daily bars, absent on a result stored before it existed.
+     */
+    baseRate?: MeasuredBaseRate | null;
 }
 
 /** Raw pattern summary before id/confidenceWeight enrichment. */

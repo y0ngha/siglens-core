@@ -5,6 +5,10 @@ import {
     enrichAnalysisWithConfidence,
     isFallbackAnalysis,
 } from '@/domain/analysis/confidence';
+import {
+    CANDLE_BASE_RATES,
+    PATTERN_BASE_RATES,
+} from '@/domain/analysis/measuredBaseRates';
 import { checkPlanInvariants } from '@/domain/analysis/planInvariants';
 import { ENTRY_RECOMMENDATION_BY_POSITION } from '@/domain/analysis/planState';
 import { roundAnalysisPrices } from '@/domain/analysis/roundAnalysisPrices';
@@ -284,6 +288,70 @@ describe('postProcessRawAnalysis', () => {
 
         it('keeps every entry when the list is omitted', () => {
             expect(run()).toEqual(['Cup Guide', 'Made Up']);
+        });
+    });
+
+    describe('timeframe: the measured base rate of the cards (WP-18 C4)', () => {
+        const wedge: Skill = {
+            name: 'Double Bottom Guide',
+            description: 'd',
+            indicators: [],
+            confidenceWeight: 0.8,
+            content: '## Body',
+            type: 'pattern',
+            pattern: 'double_bottom',
+        };
+        const run = (timeframe?: '1Day' | '1Hour') =>
+            postProcessRawAnalysis({
+                rawResult: rawAnalysis({
+                    patternSummaries: [
+                        {
+                            patternName: 'Double Bottom',
+                            skillName: 'Double Bottom Guide',
+                            detected: true,
+                            trend: 'bullish',
+                            summary: 's',
+                        },
+                    ],
+                    candlePatterns: [
+                        {
+                            patternName: 'hammer',
+                            detected: true,
+                            trend: 'bullish',
+                            summary: 's',
+                        },
+                    ],
+                }),
+                skills: [wedge],
+                overlayCandidates: [],
+                patternGeometries: new Map(),
+                lastClose: 71_700,
+                atr: 900,
+                stopCandidates: [],
+                computedIndicatorResults: [],
+                computedStrategyResults: [],
+                timeframe,
+            }).reconciled;
+
+        it('carries each card its table row on a daily chart, through rounding and reconciliation', () => {
+            const reconciled = run('1Day');
+            expect(reconciled.patternSummaries[0].baseRate).toBe(
+                PATTERN_BASE_RATES.double_bottom
+            );
+            expect(reconciled.candlePatterns[0].baseRate).toBe(
+                CANDLE_BASE_RATES.hammer
+            );
+        });
+
+        it('carries null on an intraday chart', () => {
+            const reconciled = run('1Hour');
+            expect(reconciled.patternSummaries[0].baseRate).toBeNull();
+            expect(reconciled.candlePatterns[0].baseRate).toBeNull();
+        });
+
+        it('leaves the field off when the caller gives no timeframe', () => {
+            const reconciled = run();
+            expect('baseRate' in reconciled.patternSummaries[0]).toBe(false);
         });
     });
 

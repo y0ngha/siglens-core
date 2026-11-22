@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+    BASE_RATE_NOT_MEASURED_LINE,
+    formatBaseRateLine,
     CHART_PATTERN_CANDIDATES_SECTION_HEADER,
     CHART_PATTERN_CANDIDATES_SECTION_INTRO,
     NO_CHART_PATTERNS_LINE,
@@ -18,6 +20,11 @@ import {
     buildPatternOverlayCandidates,
     patternOverlayId,
 } from '@/domain/overlays/patternOverlays';
+import {
+    PATTERN_BASE_RATES,
+    PATTERN_POOLED_BASE_RATE,
+    type MeasuredBaseRate,
+} from '@/domain/analysis/measuredBaseRates';
 import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
 import { makeBars } from '@/__tests__/domain/patterns/helpers';
 import type { PriceQuoting } from '@/domain/analysis/promptFormat';
@@ -855,5 +862,116 @@ describe('a pair or flag broken out of is judged against its frozen breakout lev
         // 96 close would still be over the line.
         expect(isFailedBreakout(flag(9), up, bars, 1)).toBe(true);
         expect(isFailedBreakout(flag(11), up, bars, 1)).toBe(false);
+    });
+});
+
+describe('the measured base-rate line of a block (WP-18 C4)', () => {
+    const percent = (share: number): string => `${(share * 100).toFixed(1)}%`;
+
+    it('prints the family row on a daily block: its target share, the placebo share, its n and the no-edge advice', () => {
+        const f = ascendingTriangle as Fixture;
+        const row = PATTERN_BASE_RATES.ascending_triangle;
+        if (row === undefined) throw new Error('no ascending_triangle row');
+        const b = block(
+            render(qualifiedOf(f), f.bars, f.atr),
+            'ascending_triangle'
+        );
+        expect(b).toContain(
+            `- Measured on this engine (${row.scope.symbols} symbols, daily ${row.scope.from.slice(0, 4)}–${row.scope.to.slice(0, 4)}): the measured target came before the invalidation within 60 bars in ${percent(row.eventShare)} of ${row.n.toLocaleString('en-US')} ascending triangles; a target at the same distance on other dates came first in ${percent(row.placeboShare)}.`
+        );
+        expect(b).toContain(
+            'No edge: present the target as a measured distance, not as a likely outcome.'
+        );
+    });
+
+    it('prints it after the targets and before the invalidation level', () => {
+        const f = ascendingTriangle as Fixture;
+        const lines = render(qualifiedOf(f), f.bars, f.atr).split('\n');
+        const measured = lines.findIndex(l =>
+            l.startsWith('- Measured on this')
+        );
+        expect(measured).toBeGreaterThan(
+            lines.findIndex(l => l.startsWith('- Conservative target'))
+        );
+        expect(measured).toBeLessThan(
+            lines.findIndex(l => l.startsWith('- Invalidation level'))
+        );
+    });
+
+    it('prints no line on a block with no target (an undirected pair)', () => {
+        const b = block(
+            render(
+                [undirectedRectangle],
+                makeBars([15, 15, 15, 15, 15, 15]),
+                1
+            ),
+            'rectangle'
+        );
+        expect(b).not.toContain('Measured on this engine');
+        expect(b).not.toContain(BASE_RATE_NOT_MEASURED_LINE);
+    });
+
+    it('says "not measured" on intraday bars and prints no number', () => {
+        const f = ascendingTriangle as Fixture;
+        const candidates = qualifiedOf(f);
+        const section = formatChartPatternCandidatesSection(
+            candidates,
+            f.bars,
+            f.atr,
+            USD_QUOTING,
+            '1Hour',
+            offeredIdsFor(candidates, f.bars, f.atr)
+        );
+        expect(block(section, 'ascending_triangle')).toContain(
+            BASE_RATE_NOT_MEASURED_LINE
+        );
+        expect(section).not.toContain('Measured on this engine');
+    });
+
+    describe('formatBaseRateLine', () => {
+        it('reads the pooled row as all chart patterns', () => {
+            const line = formatBaseRateLine(
+                PATTERN_POOLED_BASE_RATE,
+                'ascending_wedge'
+            );
+            expect(line).toContain(
+                `of ${PATTERN_POOLED_BASE_RATE.n.toLocaleString('en-US')} chart patterns of all kinds;`
+            );
+        });
+
+        it('says a family below the sample floor is shown pooled, for the insufficient_sample verdict', () => {
+            const row: MeasuredBaseRate = {
+                ...PATTERN_POOLED_BASE_RATE,
+                verdict: 'insufficient_sample',
+            };
+            const line = formatBaseRateLine(row, 'ascending_wedge');
+            expect(line).toContain(
+                'Too few of this pattern were measured, so the figure is for chart patterns of all kinds'
+            );
+            expect(line).not.toContain('No edge:');
+        });
+
+        it('keeps a name that already ends in s as it is', () => {
+            const row: MeasuredBaseRate = {
+                ...PATTERN_POOLED_BASE_RATE,
+                key: 'head_and_shoulders',
+            };
+            expect(formatBaseRateLine(row, 'head_and_shoulders')).toContain(
+                'head and shoulders;'
+            );
+        });
+
+        it('says the family beat the placebo, and not "No edge", for a beats_placebo row', () => {
+            const row: MeasuredBaseRate = {
+                ...PATTERN_POOLED_BASE_RATE,
+                key: 'double_top',
+                verdict: 'beats_placebo',
+            };
+            const line = formatBaseRateLine(row, 'double_top');
+            expect(line).toContain(
+                'This family beat the placebo; the measured distance is still not a promise.'
+            );
+            expect(line).not.toContain('No edge');
+        });
     });
 });

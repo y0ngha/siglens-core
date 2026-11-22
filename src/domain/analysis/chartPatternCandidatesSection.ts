@@ -16,6 +16,8 @@ import {
 } from '@/domain/analysis/promptFormat';
 import { patternOverlayId } from '@/domain/overlays/patternOverlays';
 import { COMPUTED_SECTIONS_HEADING } from '@/domain/analysis/computedSectionsHeading';
+import { patternCardBaseRate } from '@/domain/analysis/baseRateCards';
+import type { MeasuredBaseRate } from '@/domain/analysis/measuredBaseRates';
 import type {
     Bar,
     PatternGeometry,
@@ -228,6 +230,47 @@ function keyPointsLine(
         : '- Key points: N/A';
 }
 
+/** The line a block prints on intraday bars: the base rate was measured on daily bars only (DOM-12). */
+export const BASE_RATE_NOT_MEASURED_LINE = '- Not measured on intraday bars.';
+
+const percentOf = (share: number): string => `${(share * 100).toFixed(1)}%`;
+
+/** `double bottom` -> `double bottoms`; the pooled row reads `chart patterns of all kinds`. */
+function patternNamePlural(row: MeasuredBaseRate, id: string): string {
+    if (row.key === 'pooled') return 'chart patterns of all kinds';
+    const name = id.replaceAll('_', ' ');
+    return name.endsWith('s') ? name : `${name}s`;
+}
+
+/**
+ * @internal
+ * `- Measured on this engine (65 symbols, daily 2018–2026): the measured target came before
+ * the invalidation in 22.6% of 612 double bottoms; a target at the same distance on other
+ * dates came first in 22.4%. …` — what the engine measured for the family, from a row of
+ * the generated table (one source, CP-11), and what that licenses: a measured distance,
+ * never a likely outcome unless the family beat its placebo.
+ */
+export function formatBaseRateLine(row: MeasuredBaseRate, id: string): string {
+    const { scope } = row;
+    const advice: Record<MeasuredBaseRate['verdict'], string> = {
+        beats_placebo:
+            'This family beat the placebo; the measured distance is still not a promise.',
+        no_edge:
+            'No edge: present the target as a measured distance, not as a likely outcome.',
+        insufficient_sample:
+            'Too few of this pattern were measured, so the figure is for chart patterns of all kinds: present the target as a measured distance, not as a likely outcome.',
+    };
+    return `- Measured on this engine (${scope.symbols} symbols, daily ${scope.from.slice(0, 4)}–${scope.to.slice(0, 4)}): the measured target came before the invalidation within 60 bars in ${percentOf(row.eventShare)} of ${row.n.toLocaleString('en-US')} ${patternNamePlural(row, id)}; a target at the same distance on other dates came first in ${percentOf(row.placeboShare)}. ${advice[row.verdict]}`;
+}
+
+/** The base-rate line of a block: {@link formatBaseRateLine}, or {@link BASE_RATE_NOT_MEASURED_LINE} off daily bars. */
+function baseRateLine(id: string, timeframe: Timeframe): string {
+    const row = patternCardBaseRate(id, timeframe);
+    return row === null
+        ? BASE_RATE_NOT_MEASURED_LINE
+        : formatBaseRateLine(row, id);
+}
+
 /**
  * A boundary pair with no prior trend: both
  * boundaries as they stood at the pair's break bar (the first close beyond
@@ -356,6 +399,7 @@ function formatCandidate(
             lastClose,
             { ...quoting, dp: conservativeDp }
         ),
+        baseRateLine(candidate.id, timeframe),
         formatLevelLine(
             'Invalidation level',
             geometry.invalidationLevel,

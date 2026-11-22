@@ -102,9 +102,12 @@ import {
 } from '@/domain/analysis/ai-levels';
 import { PLAN_MIN_ATR_SPACING } from '@/domain/analysis/planCheck';
 import {
-    formatLevelHoldFraming,
-    PRICE_LEVEL_HOLD_RATE,
-} from '@/domain/analysis/priceLevelBaseRate';
+    CANDLE_POOLED_BASE_RATE,
+    PATTERN_BASE_RATES,
+    PATTERN_POOLED_BASE_RATE,
+    PRICE_LEVEL_BASE_RATE,
+} from '@/domain/analysis/measuredBaseRates';
+import { formatLevelHoldFraming } from '@/domain/analysis/priceLevelBaseRate';
 import { US_EQUITY_SESSION } from '@/domain/session';
 
 const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
@@ -1653,6 +1656,130 @@ describe('prompt', () => {
                 '### MACD-V Signal Guide [Low Confidence] [Roles: Confirmation]'
             );
             expect(prompt).toContain('macd-v body');
+        });
+    });
+
+    describe('Skills 섹션 - 측정된 기준율 레이블 (WP-18 C4)', () => {
+        const render = (skill: Skill, timeframe: '1Day' | '1Hour' = '1Day') =>
+            buildAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                [],
+                makeIndicators(),
+                [skill],
+                timeframe
+            );
+
+        it('labels a pattern skill with its own measured row instead of a confidence label', () => {
+            const row = PATTERN_BASE_RATES.double_bottom;
+            const prompt = render(
+                makeSkill({
+                    type: 'pattern',
+                    name: 'Double Bottom Guide',
+                    pattern: 'double_bottom',
+                    confidenceWeight: TEST_ABOVE_HIGH_CONFIDENCE,
+                })
+            );
+            expect(prompt).toContain(
+                `### Double Bottom Guide [Measured: no edge over placebo, n=${row?.n}]`
+            );
+            expect(prompt).not.toContain('[High Confidence]');
+        });
+
+        it('says a pooled row is pooled and never calls its large n a small sample', () => {
+            const prompt = render(
+                makeSkill({
+                    type: 'pattern',
+                    name: 'Wedge Guide',
+                    pattern: 'ascending_wedge',
+                })
+            );
+            expect(prompt).toContain(
+                `### Wedge Guide [Measured over every chart pattern: no edge over placebo, n=${PATTERN_POOLED_BASE_RATE.n.toLocaleString('en-US')}]`
+            );
+        });
+
+        it('labels a candlestick skill with the pooled candle row', () => {
+            const prompt = render(
+                makeSkill({
+                    type: 'candlestick',
+                    name: 'Engulfing Pattern Guide',
+                    confidenceWeight: TEST_ABOVE_HIGH_CONFIDENCE,
+                })
+            );
+            expect(prompt).toContain(
+                `### Engulfing Pattern Guide [Measured over every candle: no edge over placebo, n=${CANDLE_POOLED_BASE_RATE.n.toLocaleString('en-US')}]`
+            );
+            expect(prompt).not.toContain('[High Confidence]');
+        });
+
+        it('says "not measured" on intraday bars, for both kinds', () => {
+            for (const type of ['pattern', 'candlestick'] as const) {
+                const prompt = render(
+                    makeSkill({ type, name: 'Some Guide' }),
+                    '1Hour'
+                );
+                expect(prompt).toContain(
+                    '### Some Guide [Not measured on intraday bars]'
+                );
+                expect(prompt).not.toContain('Some Guide [High Confidence]');
+            }
+        });
+
+        it('keeps the confidence label on every other skill type', () => {
+            const prompt = render(
+                makeSkill({
+                    type: 'strategy',
+                    name: 'Some Strategy',
+                    confidenceWeight: TEST_ABOVE_HIGH_CONFIDENCE,
+                })
+            );
+            expect(prompt).toContain('### Some Strategy [High Confidence]');
+            expect(prompt).not.toContain('[Measured:');
+        });
+
+        const PATTERN_RULE =
+            '- Do not call a pattern reliable, high-confidence or likely to reach its target; when you mention reliability, cite the Measured label on its guide or the Measured line of its candidate instead.';
+        const CANDLE_RULE =
+            '- Do not call a candle reliable, high-confidence or likely to play out; when you mention reliability, cite the Measured label on its guide instead.';
+        const INTRADAY_SUFFIX =
+            '; reliability was not measured on intraday bars, so do not state any.';
+
+        it('puts each variant of the reliability rule in its own writing block, naming only what that block prints', () => {
+            const pattern = render(makeSkill({ type: 'pattern' }));
+            const candle = render(makeSkill({ type: 'candlestick' }));
+            expect(pattern).toContain(PATTERN_RULE);
+            expect(pattern).not.toContain(CANDLE_RULE);
+            expect(candle).toContain(CANDLE_RULE);
+            expect(candle).not.toContain(PATTERN_RULE);
+            expect(candle).not.toContain('Measured line of its candidate');
+        });
+
+        it('adds the rule only with such a guide injected', () => {
+            for (const type of ['strategy', 'indicator_guide'] as const) {
+                const prompt = render(makeSkill({ type }));
+                expect(prompt).not.toContain('Do not call a pattern reliable');
+                expect(prompt).not.toContain('Do not call a candle reliable');
+            }
+        });
+
+        it('says reliability was not measured on intraday bars instead of pointing at numbers', () => {
+            for (const [type, subject] of [
+                ['pattern', 'pattern'],
+                ['candlestick', 'candle'],
+            ] as const) {
+                const prompt = render(makeSkill({ type }), '1Hour');
+                expect(prompt).toContain(
+                    `- Do not call a ${subject} reliable, high-confidence or likely to ${subject === 'pattern' ? 'reach its target' : 'play out'}${INTRADAY_SUFFIX}`
+                );
+                expect(prompt).not.toContain('cite the Measured');
+            }
+        });
+
+        it('no longer asks the model to weigh a candle by "statistical reliability"', () => {
+            expect(render(makeSkill({ type: 'candlestick' }))).not.toContain(
+                'statistical reliability'
+            );
         });
     });
 
@@ -5894,9 +6021,8 @@ describe('prompt', () => {
                 );
             const daily = render('1Day');
             expect(daily).toContain(
-                `in ${(PRICE_LEVEL_HOLD_RATE.heldShare * 100).toFixed(1)}% of ${PRICE_LEVEL_HOLD_RATE.touches.toLocaleString('en-US')} touches`
+                `in ${(PRICE_LEVEL_BASE_RATE.eventShare * 100).toFixed(1)}% of ${PRICE_LEVEL_BASE_RATE.n.toLocaleString('en-US')} touches`
             );
-            expect(daily).toContain('550,171 touches');
             expect(daily).toContain(
                 'do not call a level strong, firm or key because several references coincide there'
             );
@@ -5904,7 +6030,9 @@ describe('prompt', () => {
             expect(hourly).toContain(formatLevelHoldFraming('1Hour'));
             expect(hourly).toContain('Not measured on intraday bars.');
             expect(hourly).not.toContain('touches —');
-            expect(hourly).not.toContain('550,171');
+            expect(hourly).not.toContain(
+                PRICE_LEVEL_BASE_RATE.n.toLocaleString('en-US')
+            );
         });
 
         it('renders the advisory market-reference section with honest framing', () => {
