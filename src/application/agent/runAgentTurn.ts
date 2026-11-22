@@ -10,12 +10,12 @@ import {
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
 import { isSmallTalkMessage } from '@/domain/agent/smallTalk';
+import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import {
-    findToolSpec,
-    isFreshAnalysisKind,
-    selectTools,
-    type FreshAnalysisKind,
-} from '@/domain/agent/tools';
+    selectToolSetSpecs,
+    type AgentToolPerTurnCap,
+    type AgentToolSet,
+} from '@/domain/agent/toolSet';
 import {
     localizeTimestamps,
     resolveAgentTimeZone,
@@ -67,13 +67,6 @@ const HISTORY_WINDOW = {
     // once per `toolResultStride` turns (the flip turns), by design.
     toolResultStride: 2,
 } as const;
-/** Measured medians surfaced to the UI as a progress hint. */
-const FRESH_ANALYSIS_ESTIMATED_SECONDS: Record<FreshAnalysisKind, number> = {
-    technical: 40,
-    overall: 120,
-    news: 90,
-    options: 60,
-};
 const GLOBAL_SUBJECT = 'global';
 const MAX_SUMMARY_LENGTH = 120;
 
@@ -182,22 +175,6 @@ async function safeRefund(store: CounterStore, subject: string): Promise<void> {
     }
 }
 
-/**
- * A `get_company_filings` call that reads a filing's text (non-empty
- * `accession`), as opposed to listing filings. Only reads count toward
- * `AGENT_TURN_CAPS.maxFilingReads`: a text is thousands of characters, the
- * list is not. Counted here rather than in the consumer executor because the
- * executor has no turn identity and a step's calls run in parallel — this
- * reservation is synchronous, so parallel reads are counted in model order.
- */
-function isFilingRead(name: string, args: Record<string, unknown>): boolean {
-    return (
-        name === 'get_company_filings' &&
-        typeof args.accession === 'string' &&
-        args.accession.trim() !== ''
-    );
-}
-
 const SENDABLE_IMAGE_TYPES: ReadonlySet<string> = new Set<AgentImageMediaType>([
     'image/webp',
     'image/jpeg',
@@ -264,50 +241,38 @@ function withTurnNote(
           };
 }
 
-/** Per-turn budget: caps from `AGENT_TURN_CAPS`, all pure and local to one turn. */
+/**
+ * Per-turn budget, pure and local to one turn: the global caps from
+ * `AGENT_TURN_CAPS` (`maxToolCalls`, `maxDistinctSymbols`) and each tool's own
+ * `perTurn` cap from its definition. Counted here rather than in the consumer
+ * executor because the executor has no turn identity and a step's calls run in
+ * parallel — this reservation is synchronous, so they are counted in model
+ * order.
+ */
 class TurnBudget {
     private toolCalls = 0;
-    private webSearches = 0;
-    private freshRuns = 0;
-    private filingReads = 0;
-    private xPostCalls = 0;
-    private charts = 0;
+    private readonly capped = new Map<string, number>();
     private readonly symbols = new Set<string>();
 
     /** Returns a quota scope when the call must be refused, else null. */
-    reserve(name: string, args: Record<string, unknown>): string | null {
+    reserve(
+        name: string,
+        perTurn: AgentToolPerTurnCap | undefined,
+        args: Record<string, unknown>
+    ): string | null {
         if (this.toolCalls >= AGENT_TURN_CAPS.maxToolCalls)
             return 'per_turn_tools';
-        if (
-            name === 'web_search' &&
-            this.webSearches >= AGENT_TURN_CAPS.maxWebSearch
-        )
-            return 'per_turn';
-        if (
-            name === 'run_fresh_analysis' &&
-            this.freshRuns >= AGENT_TURN_CAPS.maxFreshAnalysis
-        )
-            return 'per_turn';
-        const filingRead = isFilingRead(name, args);
-        if (filingRead && this.filingReads >= AGENT_TURN_CAPS.maxFilingReads)
-            return 'per_turn';
-        if (
-            name === 'get_x_posts' &&
-            this.xPostCalls >= AGENT_TURN_CAPS.maxXPostCalls
-        )
-            return 'per_turn';
-        if (name === 'show_chart' && this.charts >= AGENT_TURN_CAPS.maxCharts)
+        const capCounted =
+            perTurn !== undefined &&
+            (perTurn.counts === undefined || perTurn.counts(args));
+        if (capCounted && (this.capped.get(name) ?? 0) >= perTurn.max)
             return 'per_turn';
         const next = new Set(this.symbols);
         for (const s of symbolsOf(args)) next.add(s);
         if (next.size > AGENT_TURN_CAPS.maxDistinctSymbols)
             return 'per_turn_symbols';
         this.toolCalls += 1;
-        if (name === 'web_search') this.webSearches += 1;
-        if (name === 'run_fresh_analysis') this.freshRuns += 1;
-        if (filingRead) this.filingReads += 1;
-        if (name === 'get_x_posts') this.xPostCalls += 1;
-        if (name === 'show_chart') this.charts += 1;
+        if (capCounted) this.capped.set(name, (this.capped.get(name) ?? 0) + 1);
         for (const s of next) this.symbols.add(s);
         return null;
     }
@@ -392,7 +357,8 @@ export async function runAgentTurn(
         : deadline.signal;
 
     // 2–3. Prompt and window.
-    const tools = selectTools(params.availableTools);
+    const toolSet: AgentToolSet = params.toolSet ?? BUILT_IN_AGENT_TOOL_SET;
+    const tools = selectToolSetSpecs(toolSet, params.availableTools);
     const timeZone = resolveAgentTimeZone(params.timeZone, params.locale);
     // Prefix-cache layout (DeepSeek caches the longest byte-identical request
     // prefix): system prompt → tool defs → history are stable across turns;
@@ -411,6 +377,7 @@ export async function runAgentTurn(
     const system = buildAgentSystemPrompt({
         locale: params.locale,
         tools,
+        toolSet,
         portfolioSymbols: params.portfolioSymbols,
         guest: tier === 'free',
     });
@@ -484,7 +451,10 @@ export async function runAgentTurn(
      * Daily/global counters for metered tools. Counters already consumed in
      * this gate are refunded when a later one refuses or the store is down.
      */
-    const consumeToolQuota = async (name: string): Promise<ToolQuotaResult> => {
+    const consumeToolQuota = async (
+        name: string,
+        metered: boolean
+    ): Promise<ToolQuotaResult> => {
         const claimed: Array<[CounterStore, string]> = [];
         const claim = async (
             store: CounterStore,
@@ -516,6 +486,10 @@ export async function runAgentTurn(
         // shared Brave budget (`deps.globalLimits`, default `AGENT_GLOBAL_LIMITS`)
         // is still enforced here.
         try {
+            // Deliberately keyed by tool name, not by definition metadata: the
+            // per-user fresh-analysis counter is a no-op while `freshAnalysisPerDay`
+            // is `Infinity`, and it moves into the tool definition in the major that
+            // removes the built-in tool set.
             if (name === 'run_fresh_analysis') {
                 if (
                     !(await claim(
@@ -526,7 +500,7 @@ export async function runAgentTurn(
                 )
                     return refuse({ error: 'quota', scope: 'daily' });
             }
-            if (name === 'web_search') {
+            if (metered) {
                 if (
                     !(await claim(
                         counters.webSearchUser,
@@ -643,6 +617,7 @@ export async function runAgentTurn(
                 return { ok: true };
             } catch (error) {
                 if (!(error instanceof CounterStoreUnavailableError)) {
+                    // Log-only label: this closure exists for metered (web search) calls.
                     console.warn('[runAgentTurn] tool quota check failed', {
                         name: 'web_search',
                         error,
@@ -662,7 +637,7 @@ export async function runAgentTurn(
 
     /** Returns the serialized tool message content. */
     const executeOne = async (call: AgentToolCall): Promise<string> => {
-        const spec = findToolSpec(call.name);
+        const spec = toolSet.tools.find(t => t.name === call.name);
         if (spec === undefined || !params.availableTools.has(call.name)) {
             return serialize({ error: 'unknown_tool' });
         }
@@ -674,9 +649,10 @@ export async function runAgentTurn(
             });
         }
         // Synchronous up to here, so parallel calls reserve in model order.
-        const scope = budget.reserve(call.name, validated.value);
+        const scope = budget.reserve(call.name, spec.perTurn, validated.value);
         if (scope !== null) return serialize({ error: 'quota', scope });
-        const quota = await consumeToolQuota(call.name);
+        const metered = spec.meter === 'webSearch';
+        const quota = await consumeToolQuota(call.name, metered);
         if ('refusal' in quota) return serialize(quota.refusal);
         // The turn may have stopped while the counters were being claimed:
         // give the daily units back and never start the executor.
@@ -685,11 +661,7 @@ export async function runAgentTurn(
             return serialize({ error: 'aborted' });
         }
 
-        const kind = validated.value.kind;
-        const estimatedSeconds =
-            call.name === 'run_fresh_analysis' && isFreshAnalysisKind(kind)
-                ? FRESH_ANALYSIS_ESTIMATED_SECONDS[kind]
-                : undefined;
+        const estimatedSeconds = spec.estimatedSeconds?.(validated.value);
         deps.onEvent({
             type: 'tool_start',
             id: call.id,
@@ -709,7 +681,7 @@ export async function runAgentTurn(
                         tier,
                         locale: params.locale,
                         signal: turnSignal,
-                        ...(executorMetering && call.name === 'web_search'
+                        ...(executorMetering && metered
                             ? { claimWebSearchUnit: createWebSearchClaim() }
                             : {}),
                     }),

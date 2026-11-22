@@ -62,28 +62,54 @@ export function isFreshAnalysisKind(
 // Output contract numbers of `get_x_posts`: the description quotes them and
 // the consumer executor implements them.
 
-/** Most posts one `get_x_posts` call returns across the company and CEO accounts; the executor uses the same value. */
+/**
+ * Most posts one `get_x_posts` call returns across the company and CEO accounts; the executor uses the same value.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_X_POSTS_MAX = 12;
-/** How far back `get_x_posts` looks, in days; the executor uses the same value. */
+/**
+ * How far back `get_x_posts` looks, in days; the executor uses the same value.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_X_POSTS_WINDOW_DAYS = 14;
 /**
  * Posts the executor asks X for per account. X bills per post read and returns a timeline in pages, so the
  * executor reads one page of this size and reports whether the period holds more (`moreInWindow`) instead of
  * paying to count them.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
  */
 export const AGENT_X_POSTS_PAGE_SIZE = 10;
-/** Longest post `text` returned, in characters; a longer post is cut and flagged `truncated`. */
+/**
+ * Longest post `text` returned, in characters; a longer post is cut and flagged `truncated`.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_X_POST_TEXT_MAX_CHARS = 600;
 
 // Output contract numbers of `get_company_filings`: the description quotes
 // them and the consumer executor implements them, so "the last 120 days" in
 // the description is the window the executor actually covers.
 
-/** Most filings the `get_company_filings` list call returns (newest first); the executor uses the same value. */
+/**
+ * Most filings the `get_company_filings` list call returns (newest first); the executor uses the same value.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_FILINGS_LIST_MAX = 10;
-/** How far back the `get_company_filings` list call looks, in days; the executor uses the same value. */
+/**
+ * How far back the `get_company_filings` list call looks, in days; the executor uses the same value.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_FILINGS_WINDOW_DAYS = 120;
-/** Most characters of filed text one `get_company_filings` read returns before `truncated` is set; the executor uses the same value. */
+/**
+ * Most characters of filed text one `get_company_filings` read returns before `truncated` is set; the executor uses the same value.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_FILING_TEXT_MAX_CHARS = 12_000;
 
 /**
@@ -92,6 +118,8 @@ export const AGENT_FILING_TEXT_MAX_CHARS = 12_000;
  * symbol page, and a futures ticker such as `CL=F` does not pass the
  * consumer's symbol-shape check), so the model picks from this closed list and
  * the consumer maps each key to its provider symbol.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
  */
 export const AGENT_MACRO_INSTRUMENTS = [
     'wti',
@@ -120,10 +148,16 @@ const MACRO_INSTRUMENT_ENUM: readonly string[] = AGENT_MACRO_INSTRUMENTS;
  * rejected (`too_many_instruments`) rather than cut: a silent cut left the
  * model with no row for the dropped instruments, so it either skipped them
  * without saying so or filled them in from memory.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
  */
 export const AGENT_MACRO_QUOTES_MAX = 8;
 
-/** Kinds of display-only chart `show_chart` draws under an answer. */
+/**
+ * Kinds of display-only chart `show_chart` draws under an answer.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_CHART_KINDS = [
     'compare',
     'financials',
@@ -135,12 +169,23 @@ export const AGENT_CHART_KINDS = [
 ] as const;
 export type AgentChartKind = (typeof AGENT_CHART_KINDS)[number];
 
-/** Look-back windows a `compare` chart accepts; the consumer defaults to `6M`. */
+/**
+ * Look-back windows a `compare` chart accepts; the consumer defaults to `6M`.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_CHART_PERIODS = ['1M', '3M', '6M', '1Y'] as const;
 export type AgentChartPeriod = (typeof AGENT_CHART_PERIODS)[number];
 
-/** Symbols one `compare` chart may hold — more lines than this stop being readable at chat width. */
+/**
+ * Symbols one `compare` chart may hold — more lines than this stop being readable at chat width.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const AGENT_COMPARE_SYMBOLS_MIN = 2;
+/** Most symbols one `compare` chart holds.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major. */
 export const AGENT_COMPARE_SYMBOLS_MAX = 5;
 
 /** Calendar years `get_price_stats` accepts for `year`: the earliest index history to a far upper bound. */
@@ -156,6 +201,8 @@ const symbolProp = {
  * Tool catalog. Descriptions are the only thing the model reads —
  * keep them imperative and say WHEN to call the tool, not just what it does.
  * Executors live in siglens (`app/api/ai/chat/tools/*`).
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
  */
 export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     {
@@ -685,6 +732,7 @@ export const AGENT_TOOL_SPECS: readonly AgentToolSpec[] = [
     },
 ];
 
+/** @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major. */
 export const AGENT_TOOL_NAMES: readonly string[] = AGENT_TOOL_SPECS.map(
     s => s.name
 );
@@ -694,6 +742,7 @@ export const AGENT_TOOL_NAMES: readonly string[] = AGENT_TOOL_SPECS.map(
  *
  * @param name - The tool name (matches `AgentToolSpec.name`).
  * @returns The matching spec, or `undefined` if no tool has that name.
+ * @deprecated Look the tool up in your own `AgentToolSet.tools`. Removed in the next major.
  */
 export function findToolSpec(name: string): AgentToolSpec | undefined {
     return AGENT_TOOL_SPECS.find(s => s.name === name);
@@ -706,6 +755,7 @@ export function findToolSpec(name: string): AgentToolSpec | undefined {
  *
  * @param available - Names of tools the consumer can currently execute.
  * @returns The subset of {@link AGENT_TOOL_SPECS} whose name is in `available`.
+ * @deprecated Use `selectToolSetSpecs` with your own `AgentToolSet`. Removed in the next major.
  */
 export function selectTools(available: ReadonlySet<string>): AgentToolSpec[] {
     return AGENT_TOOL_SPECS.filter(s => available.has(s.name));
