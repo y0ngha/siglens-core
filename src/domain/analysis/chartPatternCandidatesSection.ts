@@ -32,9 +32,12 @@ export const CHART_PATTERN_CANDIDATES_SECTION_HEADER =
     '## Chart Pattern Candidates (computed)';
 
 /**
- * @internal Section intro ("hints not a verdict" for pre-screener\n * hits; the measured patterns are qualified). The listing must never read as
- * a cap on what the model may report. Exported so the test can assert the
- * exact wording survives edits.
+ * @internal Section intro ("not a verdict": each listed pattern is confirmed
+ * or rejected by the shape). Since WP-16 the listing is also the whole set of
+ * patternSummaries entries — patterns the section does not name are described
+ * in the summary only — and the pattern guides in the prompt follow it, so the
+ * intro no longer invites reporting other patterns. Exported so the test can
+ * assert the exact wording survives edits.
  *
  * Model-facing wording only: it never names how the list is produced
  * (screening, qualification, drawing checks), and how to write about it is
@@ -43,10 +46,10 @@ export const CHART_PATTERN_CANDIDATES_SECTION_HEADER =
  * process wording copied into user-facing text (8 of 18 runs: "사전 스크리너가
  * … 그리기 검증을 통과하지 못해"), and a later run retold the one-line list of
  * unconfirmed shape resemblances that used to close this section (4 of 18:
- * "확정 경계 없는 모양 유사 수준으로만 잡혀 있어 …"). Those loose hits still pick
- * skill docs (`selectionIds` in prompt.ts); they are no longer named here.
+ * "확정 경계 없는 모양 유사 수준으로만 잡혀 있어 …"). Those loose hits no longer
+ * pick skill docs either (only the qualified ids do) and are not named here.
  */
-export const CHART_PATTERN_CANDIDATES_SECTION_INTRO = `Each pattern below is measured from confirmed swing points. The list is not exhaustive and not a verdict: confirm or reject each by the actual shape, and you may also report a pattern this section does not name if you can clearly see it in the bars. For a listed pattern you confirm, copy its geometry and set its candidateId to its Candidate id; for any other pattern you report, leave candidateId empty and set geometry to null — only listed patterns carry levels and targets. Write about them as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says.`;
+export const CHART_PATTERN_CANDIDATES_SECTION_INTRO = `Each pattern below is measured from confirmed swing points. The list is not a verdict: confirm or reject each by the actual shape. For a listed pattern you confirm, copy its geometry and set its candidateId to its Candidate id — only listed patterns carry levels and targets. Write about them as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says.`;
 
 /** @internal Block status of a pattern whose breakout failed (see {@link isFailedBreakout}). */
 export const FAILED_BREAKOUT_STATUS = 'failed breakout';

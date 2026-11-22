@@ -2138,6 +2138,38 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
             );
         });
 
+        it('프롬프트가 나열한 패턴 skill 이름을 enrich에 허용 목록으로 넘긴다', async () => {
+            mockBuildAnalysisPrompt.mockReturnValueOnce({
+                stable: 'mock-stable',
+                dynamic: 'mock-dynamic',
+                overlayCandidates: [],
+                overlayBuildFailures: [],
+                patternScreenFailure: null,
+                patternSkillNames: ['Cup Guide'],
+                patternArbitration: { kept: [], dropped: [] },
+                patternGeometries: new Map(),
+                trend: null,
+                printedSupportPrices: [],
+                injectedSkills: [],
+            });
+            mockCallAnalysisAi.mockResolvedValueOnce(
+                JSON.stringify(mockRawResult)
+            );
+            await runAnalysis(
+                mockSymbol,
+                mockCompanyName,
+                mockTimeframe,
+                false,
+                undefined,
+                { marketDataProvider: fakeProvider }
+            );
+            expect(mockEnrichAnalysisWithConfidence).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.anything(),
+                ['Cup Guide']
+            );
+        });
+
         it('offered 후보에 없는 id는 chartOverlays에서 빠지고 unknown id 경고를 남긴다', async () => {
             mockBuildAnalysisPrompt.mockReturnValueOnce({
                 stable: 'mock-stable',

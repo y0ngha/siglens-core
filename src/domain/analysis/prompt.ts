@@ -101,6 +101,7 @@ import type {
     PromptConfig,
     ReferenceLevel,
     Skill,
+    QualifiedPattern,
     SkillSelectionContext,
     SkillType,
     SMCEqualLevel,
@@ -2043,12 +2044,12 @@ const buildAnalysisRequest = (
                   '',
                   '### patternSummaries Writing Rules',
                   '- patternSummaries must include detection results for **every** Skills pattern listed below.',
+                  `- List only the patterns in the Skills pattern list below; a shape you see that ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} does not list may be described in summary, not as a patternSummaries entry.`,
                   '- For each Skills pattern, assess whether it is detected in the current chart data and set the detected value accordingly.',
                   '- Patterns that are not detected must still be included with detected: false.',
                   `- In summary and every other text field, write about patterns as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says — the reader sees the chart, not this prompt.`,
-                  "- You may also add any other chart pattern you can clearly see in the bars — one from the Pattern Index that was not listed here, or a well-established pattern outside the catalog (e.g. broadening formation, diamond, island reversal) — as a detected: true entry. For such an entry set skillName to the pattern's catalog id as the Pattern Index lists it (e.g. cup_and_handle) — or its standard English name when it is outside the catalog, never the name of the Pattern Index or of any other skill — ground every key price in the bars, and set candidateId and geometry to null. Do not add detected: false entries for unlisted patterns.",
-                  '- **Do not include candle patterns (single/multi candle) in patternSummaries** — e.g. tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns, even when you add patterns beyond the listed ones. Candle patterns belong only in candlePatterns.',
-                  '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. For a listed Skills pattern it MUST exactly match its pattern skill name from the list below; for an additional pattern you add, use its catalog id or standard English name as described above.',
+                  '- **Do not include candle patterns (single/multi candle) in patternSummaries** — e.g. tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns, even when you describe other shapes. Candle patterns belong only in candlePatterns.',
+                  '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match its pattern skill name from the list below.',
                   // Schema-restatement dedup: the response schema's `required`
                   // list only API-enforces this for the forced-tool providers
                   // (Gemini/OpenAI/haiku). The thinking-Claude path (sonnet/opus,
@@ -2062,11 +2063,11 @@ const buildAnalysisRequest = (
                   `- Never compute a measured or conservative target yourself — the app derives both from geometry, and only for a pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}.`,
                   `- Only a detected: true pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} carries geometry: { breakoutLevel, extremeLevel, direction, invalidationLevel? }. breakoutLevel = the neckline/boundary/rim/handle resistance/flag channel edge the pattern breaks through; extremeLevel = the textbook measured-move anchor (head, peak/trough average, cup/saucer bottom, flagpole start, or the opposite boundary); direction = the expected breakout direction ("up" or "down"); invalidationLevel = the right-shoulder high / second peak / opposite boundary / handle low, when you can name one.`,
                   '- Copy its breakout level / extreme level / direction / invalidation level from that section verbatim rather than re-reading the chart.',
-                  `- Every other pattern — detected: false, or one you read from the bars that has no Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} — sets geometry to null; describe its structure with keyPrices instead.`,
+                  `- Every other pattern — detected: false, or a listed pattern that has no Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} — sets geometry to null; describe its structure with keyPrices instead.`,
                   '',
                   '### candidateId Writing Rules',
                   `- For a detected: true pattern that matches a candidate in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}, set candidateId to that candidate's "Candidate id" verbatim.`,
-                  '- Otherwise (detected: false, or a pattern that section does not list) set candidateId to null. Never invent an id.',
+                  '- Otherwise (detected: false, or a listed pattern that section gives no Candidate id) set candidateId to null. Never invent an id.',
                   '',
                   'Skills pattern list to analyze:',
                   ...patternSkills.map(s => `- ${s.name}`),
@@ -2244,15 +2245,16 @@ const ATR_EXTREME_VOLATILITY_NOTE = [
 ].join('\n');
 
 /**
- * Pattern names of every candle formation detected in the recent window — the
- * candle equivalent of a signal event, used by {@link selectSkills} to gate
- * candle guides. Includes all detected entries (not just the last two shown in
- * the prompt) so a guide gates on its candle's presence anywhere in the window.
+ * Pattern names of the candle formations the prompt prints under `## Detected
+ * Candle Patterns (computed)` — the candle equivalent of a signal event, used
+ * by {@link selectSkills} to gate candle guides. Only the entries
+ * {@link selectLastCandlePatternEntries} keeps (the latest multi-bar and the
+ * latest single-bar one) count: a candle detected earlier in the window is
+ * never shown to the model, so its guide would explain something the prompt
+ * does not mention.
  */
-const collectDetectedCandleNames = (
-    entries: CandlePatternEntry[]
-): string[] => {
-    const names = entries
+const collectPrintedCandleNames = (entries: CandlePatternEntry[]): string[] => {
+    const names = selectLastCandlePatternEntries(entries)
         .map(entry =>
             entry.patternType === 'multi'
                 ? entry.multiPattern
@@ -2264,7 +2266,7 @@ const collectDetectedCandleNames = (
 
 /** The chart patterns one prompt build works from — see {@link screenPatternCandidatesSafely}. */
 interface ChartPatternScreen extends PatternQualification {
-    /** Ids that drive skill selection: every qualified id plus every shape hint. */
+    /** Ids that drive skill selection: the qualified ids, each once. Shape hints select nothing. */
     selectionIds: ChartPatternId[];
     /** What the screener or qualifier threw, or `null` — see {@link TechnicalAssembledPrompt.patternScreenFailure}. */
     failure: string | null;
@@ -2289,13 +2291,13 @@ function describeThrown(error: unknown): string {
  * The chart patterns for this chart, computed once and shared by skill
  * selection, `## Chart Pattern Candidates (computed)` and the pattern
  * overlays (the screener used to run twice per prompt
- * build). The loose pre-screener (`screenChartPatterns`) only feeds skill
- * selection (its unqualified hits are the shape hints, which never reach the
- * model-facing text); `qualifyPatterns` decides what is drawn,
- * printed with numbers and offered as a Candidate id, and has already
- * dropped hits the price failed or fulfilled. Skill
- * selection sees the qualified ids and the shape hints, so a drawn pattern's
- * skill doc is always in the prompt.
+ * build). The loose pre-screener (`screenChartPatterns`) only feeds
+ * `qualifyPatterns`, which decides what is drawn, printed with numbers and
+ * offered as a Candidate id, and has already dropped hits the price failed or
+ * fulfilled. Skill selection sees the qualified ids only, so a pattern guide
+ * is injected exactly when its pattern is printed under `## Chart Pattern
+ * Candidates`; a loose shape hint (`shapeHints`) names nothing in the prompt
+ * and selects nothing.
  *
  * Guards `atr` unavailable/non-positive the same way {@link
  * screenChartPatterns} itself does, and additionally wraps the calls
@@ -2325,14 +2327,43 @@ const screenPatternCandidatesSafely = (
             qualified,
             shapeHints,
             arbitrationDropped,
-            selectionIds: [
-                ...new Set([...qualified.map(q => q.id), ...shapeHints]),
-            ],
+            selectionIds: [...new Set(qualified.map(q => q.id))],
             failure: null,
         };
     } catch (error) {
         return { ...NO_CHART_PATTERNS, failure: describeThrown(error) };
     }
+};
+
+/**
+ * The qualified patterns minus those whose only guide was dropped by the tier
+ * cap: a guide that fired for the pattern's id but is not among `injected`,
+ * while no injected skill is triggered by that id. Without a cap nothing is
+ * dropped, and a pattern no catalog skill answers to is kept (it has no guide
+ * to lose).
+ */
+const withoutCappedOutPatterns = (
+    qualified: readonly QualifiedPattern[],
+    skills: readonly Skill[],
+    ctx: SkillSelectionContext,
+    cap: number | null,
+    injected: readonly Skill[]
+): QualifiedPattern[] => {
+    if (cap === null) return [...qualified];
+    const uncapped = selectSkills(skills, ctx, 'technical');
+    const injectedNames = new Set(injected.map(skill => skill.name));
+    const triggeredBy = (skill: Skill, id: string): boolean =>
+        skill.gating?.tier === 'gated' &&
+        skill.gating.signalKind === 'event' &&
+        skill.gating.triggers.includes(id);
+    const cappedOut = uncapped.selected.filter(
+        skill => !injectedNames.has(skill.name)
+    );
+    return qualified.filter(
+        q =>
+            injected.some(skill => triggeredBy(skill, q.id)) ||
+            !cappedOut.some(skill => triggeredBy(skill, q.id))
+    );
 };
 
 /** Build the pure, read-only selection context from data already in scope. */
@@ -2351,7 +2382,7 @@ const buildSkillSelectionContext = (
         indicators,
         signals: detectSignals(bars, indicators),
         timeframe,
-        detectedCandles: collectDetectedCandleNames(candleEntries),
+        detectedCandles: collectPrintedCandleNames(candleEntries),
         patternCandidates: patternIds,
         price,
         atrPercent,
@@ -2599,7 +2630,6 @@ export function buildAnalysisPrompt(
         indicators.atr,
         timeframe
     );
-    const patternCandidates = chartPatterns.qualified;
 
     // Dynamic gating (chart only): whitelist to chart skills, then split into
     // `core` (always_on, catalog-only — byte-stable across calls) and
@@ -2617,6 +2647,18 @@ export function buildAnalysisPrompt(
         selectionContext,
         'technical',
         { gatedPerGroupCap: gatedSkillCap }
+    );
+    // What the prompt prints, draws and offers as a Candidate id is the set of
+    // qualified patterns whose guide survived the tier cap, so the candidate
+    // list, the "Skills pattern list to analyze" and the result's allowed
+    // pattern skills are one set (a capped-out guide would otherwise leave a
+    // printed candidate without its entry rule). Uncapped tiers keep them all.
+    const patternCandidates = withoutCappedOutPatterns(
+        chartPatterns.qualified,
+        skills,
+        selectionContext,
+        gatedSkillCap ?? null,
+        [...core, ...selected]
     );
     // The SMC full guide is never injected (fabrication source); it is replaced
     // by the deterministic SMC data section + a compressed concept note. Drop it
@@ -2877,6 +2919,7 @@ export function buildAnalysisPrompt(
         overlayCandidates,
         overlayBuildFailures,
         patternScreenFailure: chartPatterns.failure,
+        patternSkillNames: combinedGroups.pattern.map(skill => skill.name),
         patternArbitration: {
             kept: patternCandidates.map(q => q.id),
             dropped: chartPatterns.arbitrationDropped.map(d => ({

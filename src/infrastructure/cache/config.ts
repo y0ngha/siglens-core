@@ -1119,6 +1119,18 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * 50/200 cross is excluded). Bytes change for technical prompts whose bars carry
  * either cross.
  *
+ * Pattern and candle guides follow what the prompt prints (WP-16, still `p34`,
+ * unreleased): a chart-pattern guide is injected only for a pattern qualified
+ * under `## Chart Pattern Candidates (computed)` (loose shape hints and
+ * arbitration losers select nothing), a gated candle guide only for the latest
+ * multi-bar and latest single-bar candle under `## Detected Candle Patterns
+ * (computed)`. The candidate section intro no longer invites reporting a pattern
+ * it does not list, the patternSummaries rules say to list only the listed
+ * patterns, and the result drops a patternSummaries entry for any other pattern
+ * (`TechnicalAssembledPrompt.patternSkillNames`). Dynamic bytes change for
+ * technical prompts whose chart carried a hint-only pattern guide or an unprinted
+ * candle guide, and for every technical prompt (the candidate section intro wording).
+ *
  * `entryRecommendation` is computed from the new `actionRecommendation.planState` (the
  * close inside the entry zone is `enter`, above or below it `wait`, no stand-able plan
  * `avoid`) and Step 1 of the action rules becomes zone placement. `## Deterministic

@@ -1538,7 +1538,85 @@ describe('confidence', () => {
     });
 });
 
-describe('unlisted chart pattern with geometry survives end-to-end (skills are guidance, not a boundary)', () => {
+describe('enrichAnalysisWithConfidence — allowedPatternSkills (WP-16)', () => {
+    const skills = [
+        makeSkill({
+            name: 'Cup Guide',
+            type: 'pattern',
+            pattern: 'cup_and_handle',
+        }),
+        makeSkill({
+            name: 'Flag Guide',
+            type: 'pattern',
+            pattern: 'bull_flag',
+        }),
+    ];
+    const raw = makeAnalysisResponse({
+        patternSummaries: [
+            makePatternSummary({ patternName: 'Cup', skillName: 'Cup Guide' }),
+            makePatternSummary({
+                patternName: 'Flag',
+                skillName: 'Flag Guide',
+            }),
+            makePatternSummary({
+                patternName: 'Broadening Formation',
+                skillName: 'Broadening Formation',
+            }),
+        ],
+    });
+    const names = (allowed?: readonly string[]) =>
+        enrichAnalysisWithConfidence(raw, skills, allowed).patternSummaries.map(
+            p => p.skillName
+        );
+
+    it('keeps every entry when the list is omitted', () => {
+        expect(names()).toEqual([
+            'Cup Guide',
+            'Flag Guide',
+            'Broadening Formation',
+        ]);
+    });
+
+    it('keeps only entries of listed pattern skills and drops an unlisted catalog pattern and an unknown one', () => {
+        expect(names(['Cup Guide'])).toEqual(['Cup Guide']);
+    });
+
+    it('matches the listed name ignoring case, spaces and separators, and by the pattern id fallback', () => {
+        const byId = enrichAnalysisWithConfidence(
+            makeAnalysisResponse({
+                patternSummaries: [
+                    makePatternSummary({
+                        patternName: 'bull_flag',
+                        skillName: 'bull_flag',
+                    }),
+                ],
+            }),
+            skills,
+            ['flag-guide']
+        );
+        expect(byId.patternSummaries.map(p => p.skillName)).toEqual([
+            'Flag Guide',
+        ]);
+    });
+
+    it('drops every pattern entry when the prompt listed none', () => {
+        expect(names([])).toEqual([]);
+    });
+
+    it('leaves the other card lists alone', () => {
+        const result = enrichAnalysisWithConfidence(
+            makeAnalysisResponse({
+                patternSummaries: [makePatternSummary()],
+                strategyResults: [makeStrategyResult()],
+            }),
+            skills,
+            []
+        );
+        expect(result.strategyResults).toHaveLength(1);
+    });
+});
+
+describe('unlisted chart pattern with geometry survives end-to-end when no allow-list is given (legacy path, allowedPatternSkills omitted)', () => {
     it('keeps a pattern whose skillName matches no active skill (UNMATCHED weight, not dropped), and appends its measured/conservative targets after post-processing', () => {
         const raw = makeAnalysisResponse({
             patternSummaries: [

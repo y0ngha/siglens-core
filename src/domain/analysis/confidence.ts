@@ -199,9 +199,12 @@ type NormalizedPatternCard = Omit<PatternSummary, 'confidenceWeight' | 'id'>;
  *   whose pattern has a skill (`pattern:cup_and_handle:…` → that skill's
  *   name). Without either it is dropped — its title would be the other
  *   skill's name and there is no pattern to name it after.
- * - Its skill is unknown (a pattern outside the catalog the model may add)
- *   and its candidateId belongs to another overlay kind (`tl:`, `div:`,
- *   `fib:`, `ew:`): dropped — it describes that drawing, not a pattern.
+ * - Its skill is unknown (matches no catalog skill) and its candidateId belongs
+ *   to another overlay kind (`tl:`, `div:`, `fib:`, `ew:`): dropped — it
+ *   describes that drawing, not a pattern. An unknown skill with a pattern or
+ *   no candidateId is kept here (legacy behaviour, callers without a prompt);
+ *   when `enrichAnalysisWithConfidence` gets the prompt's `allowedPatternSkills`
+ *   it then drops every card outside that list, unknown ones included.
  *
  * Dropped rather than stripped: a card is only a title, a summary and key
  * prices, and here the title itself is wrong.
@@ -229,6 +232,21 @@ function patternCardOrNull(
         .map(name => findSkill(lookup, name))
         .find(s => s !== undefined && !isNonPatternSkill(s));
     return named === undefined ? null : { ...p, skillName: named.name };
+}
+
+/**
+ * Whether a pattern card names one of the pattern skills the prompt listed.
+ * `undefined` (no prompt to compare with) lists everything. A card whose name
+ * matches no catalog skill is not listed: the model made it up.
+ */
+function isListedPattern(
+    p: NormalizedPatternCard,
+    lookup: SkillLookup,
+    allowed: ReadonlySet<string> | undefined
+): boolean {
+    if (allowed === undefined) return true;
+    const skill = findSkill(lookup, p.skillName, p.patternName);
+    return skill !== undefined && allowed.has(skillKey(skill.name));
 }
 
 /** `${name}_${n}`, where `n` counts earlier occurrences of the same name in `names`. */
@@ -272,13 +290,18 @@ function buildUniqueIds(names: readonly string[]): string[] {
  *   public boundary; cast internally to the worker response shape.
  * @param skills - The skills active when the prompt was built; used for the
  *   confidence-weight lookup.
+ * @param allowedPatternSkills - Names of the pattern skills the prompt listed.
+ *   When given, a pattern card whose skill is not one of them is dropped (the
+ *   prompt allows entries for the listed patterns only); omitted keeps every
+ *   card.
  * @returns A fully-validated, weight-enriched {@link AnalysisResponse}.
  *
  * @see buildAnalysisPrompt
  */
 export function enrichAnalysisWithConfidence(
     rawInput: unknown,
-    skills: Skill[]
+    skills: Skill[],
+    allowedPatternSkills?: readonly string[]
 ): AnalysisResponse {
     // rawInput is typed `unknown` at the public boundary so consumers do not
     // need to import the internal RawAnalysisResponse shape (which mirrors the
@@ -290,11 +313,15 @@ export function enrichAnalysisWithConfidence(
 
     // 모든 배열 필드를 타입 검증하며 정규화한다.
     // 잘못된 항목(null 반환)은 탈락시킨다.
+    const allowedPatterns =
+        allowedPatternSkills === undefined
+            ? undefined
+            : new Set(allowedPatternSkills.map(skillKey));
     const patternSummaries = compact(
         compact(asArray(raw.patternSummaries).map(normalizePatternSummary)).map(
             p => patternCardOrNull(p, lookup)
         )
-    );
+    ).filter(p => isListedPattern(p, lookup, allowedPatterns));
     const strategyResults = compact(
         asArray(raw.strategyResults).map(normalizeStrategyResult)
     );

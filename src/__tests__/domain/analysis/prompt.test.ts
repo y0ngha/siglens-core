@@ -2370,10 +2370,11 @@ describe('prompt', () => {
             expect(result).toContain(
                 'tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns'
             );
-            // The strict skill-name match applies to listed patterns only.
+            // Every entry is a listed pattern, so the match is strict for all of them.
             expect(result).toContain(
-                'For a listed Skills pattern it MUST exactly match its pattern skill name'
+                'It MUST exactly match its pattern skill name from the list below.'
             );
+            expect(result).not.toContain('for an additional pattern you add');
         });
 
         it('패턴 skill이 있을 때 감지되지 않은 패턴도 detected: false로 포함하라는 지시가 있다', () => {
@@ -3238,7 +3239,7 @@ describe('prompt', () => {
     });
 
     describe('분석 요청 섹션 - patternSummaries: skill 카탈로그는 경계가 아니다', () => {
-        it('미등재 패턴 추가를 허용하는 문구가 포함된다', () => {
+        it('목록 밖 패턴은 patternSummaries가 아니라 summary에만 쓰라고 말한다', () => {
             const skill = makeSkill({
                 type: 'pattern',
                 name: 'Head and Shoulders',
@@ -3251,11 +3252,12 @@ describe('prompt', () => {
                 [skill]
             );
             expect(result).toContain(
-                'You may also add any other chart pattern you can clearly see in the bars'
+                `- List only the patterns in the Skills pattern list below; a shape you see that ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} does not list may be described in summary, not as a patternSummaries entry.`
             );
-            expect(result).toContain(
-                'broadening formation, diamond, island reversal'
+            expect(result).not.toContain(
+                'You may also add any other chart pattern'
             );
+            expect(result).not.toContain('broadening formation');
         });
 
         it('"Do not include any patterns not listed" 금칙 문구는 더 이상 나타나지 않는다', () => {
@@ -3275,7 +3277,7 @@ describe('prompt', () => {
             );
         });
 
-        it('Chart Pattern Candidates 섹션 인트로는 목록이 경계가 아니라고 말한다', () => {
+        it('Chart Pattern Candidates 섹션 인트로는 목록이 판정이 아니라고 말하되 다른 패턴 보고는 권하지 않는다', () => {
             const result = buildAnalysisPrompt(
                 TEST_SYMBOL,
                 TEST_COMPANY_NAME,
@@ -3284,15 +3286,14 @@ describe('prompt', () => {
                 []
             );
             expect(result).toContain(
-                'The list is not exhaustive and not a verdict'
+                'The list is not a verdict: confirm or reject each by the actual shape.'
             );
             expect(result).toContain(
-                'you may also report a pattern this section does not name if you can clearly see it in the bars'
+                'only listed patterns carry levels and targets'
             );
-            // 목록 밖 패턴은 서술만 — 앱이 그 geometry를 버리므로(alignPatternGeometry) 채우게 하지 않는다.
-            expect(result).toContain(
-                'leave candidateId empty and set geometry to null'
-            );
+            expect(result).not.toContain('not exhaustive');
+            expect(result).not.toContain('you may also report a pattern');
+            expect(result).not.toContain('leave candidateId empty');
         });
 
         it('patternSummaries 규칙은 계산 섹션 서술의 일반 규칙을 가리킨다', () => {
@@ -3342,8 +3343,8 @@ describe('prompt', () => {
                 expect(result).toContain(
                     `has no Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} — sets geometry to null; describe its structure with keyPrices instead.`
                 );
-                expect(result).toContain(
-                    'ground every key price in the bars, and set candidateId and geometry to null.'
+                expect(result).not.toContain(
+                    'ground every key price in the bars'
                 );
             });
 

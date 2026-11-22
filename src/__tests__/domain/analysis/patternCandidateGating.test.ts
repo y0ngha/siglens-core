@@ -221,7 +221,7 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         expect(withCandidates.toLowerCase()).not.toContain('resemblance');
     });
 
-    it('a shape hint still injects its gated pattern skill, and the prompt names no hint id', async () => {
+    it('a shape hint injects no pattern skill and the prompt names no hint id', async () => {
         vi.resetModules();
         mockNothingQualifies();
         vi.doMock('@/domain/patterns', () => ({
@@ -249,9 +249,10 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
                 '1Day'
             )
         );
-        expect(out).toContain('Double Top Guide');
+        expect(out).not.toContain('Double Top Guide');
         expect(out).not.toContain('double_top');
         expect(out).toContain(NO_CHART_PATTERNS_LINE);
+        expect(out).not.toContain('### patternSummaries Writing Rules');
     });
 });
 
@@ -306,6 +307,114 @@ describe('buildAnalysisPrompt — skill selection sees qualified patterns the sc
     });
 });
 
+describe('buildAnalysisPrompt — printed candidates, listed skills and allowed skills are one set (WP-16)', () => {
+    const IDS = ['bull_flag', 'bear_flag', 'double_top', 'double_bottom'];
+    const GUIDE_BY_ID = new Map(
+        IDS.map((id, i) => [id, `Guide ${'ABCD'[i]}`] as const)
+    );
+    const skills = IDS.map(id =>
+        makeSkill({
+            name: GUIDE_BY_ID.get(id) ?? id,
+            type: 'pattern',
+            gating: eventGated([id]),
+        })
+    );
+    const qualifiedShape = {
+        kind: 'high_tight_flag',
+        poleBase: { index: 0, price: 1, kind: 'low' },
+        poleTop: { index: 1, price: 2, kind: 'high' },
+        flagLow: { index: 1, price: 1.5 },
+    };
+
+    const buildWith = async (cap: number | null) => {
+        vi.resetModules();
+        // The loose screener reports nothing: every id is a strict-only hit.
+        vi.doMock('@/domain/patterns', () => ({
+            screenChartPatterns: () => [],
+            computeCandidateGeometry: () => null,
+        }));
+        vi.doMock('@/domain/patterns/qualify/qualifyPatterns', () => ({
+            qualifyPatterns: () => ({
+                qualified: IDS.map(id => ({
+                    id,
+                    startIndex: 0,
+                    endIndex: 1,
+                    pivots: [],
+                    shape: qualifiedShape,
+                    touches: 2,
+                })),
+                shapeHints: [],
+                arbitrationDropped: [],
+            }),
+        }));
+        const { buildAnalysisPrompt: build } =
+            await import('@/domain/analysis/prompt');
+        const fixture = doubleTop as Fixture;
+        return build(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            fixture.bars,
+            calculateIndicators(fixture.bars),
+            skills,
+            '1Day',
+            undefined,
+            'equity',
+            undefined,
+            'ko',
+            undefined,
+            undefined,
+            'USD',
+            'share',
+            undefined,
+            undefined,
+            cap
+        );
+    };
+
+    const printedCandidateIds = (dynamic: string): string[] => {
+        const start = dynamic.indexOf('## Chart Pattern Candidates (computed)');
+        const end = dynamic.indexOf('\n## ', start + 1);
+        return [...dynamic.slice(start, end).matchAll(/^### (\w+) — /gm)].map(
+            match => match[1]
+        );
+    };
+
+    const listedSkills = (dynamic: string): string[] =>
+        (
+            /Skills pattern list to analyze:\n((?:- .*(?:\n|$))+)/.exec(
+                dynamic
+            )?.[1] ?? ''
+        )
+            .split('\n')
+            .filter(line => line.startsWith('- '))
+            .map(line => line.slice(2));
+
+    it('member: every strict-only qualified pattern is printed, listed and allowed', async () => {
+        const result = await buildWith(null);
+        expect(printedCandidateIds(result.dynamic)).toEqual(IDS);
+        expect(listedSkills(result.dynamic)).toEqual(
+            IDS.map(id => GUIDE_BY_ID.get(id))
+        );
+        expect(result.patternSkillNames).toEqual(
+            IDS.map(id => GUIDE_BY_ID.get(id))
+        );
+    });
+
+    it('free cap still applies after gating: the capped-out pattern is neither printed, listed nor allowed', async () => {
+        const result = await buildWith(3);
+        const kept = ['bull_flag', 'bear_flag', 'double_top'];
+        const keptNames = kept.map(id => GUIDE_BY_ID.get(id));
+        expect(result.patternSkillNames).toEqual(keptNames);
+        expect(listedSkills(result.dynamic)).toEqual(keptNames);
+        expect(printedCandidateIds(result.dynamic)).toEqual(kept);
+        expect(result.dynamic).not.toContain('double_bottom');
+        expect(result.patternArbitration.kept).toEqual(kept);
+        expect([...result.patternGeometries.keys()].join()).not.toContain(
+            'double_bottom'
+        );
+    });
+});
+
 describe('buildAnalysisPrompt — a throwing pattern qualifier', () => {
     it('degrades to no patterns and returns what it threw as patternScreenFailure', async () => {
         vi.resetModules();
@@ -342,6 +451,78 @@ describe('buildAnalysisPrompt — a throwing pattern qualifier', () => {
             '1Day'
         );
         expect(result.patternScreenFailure).toBeNull();
+    });
+});
+
+describe('buildAnalysisPrompt — pattern guides follow the printed candidates (WP-16)', () => {
+    const guides = [
+        makeSkill({
+            name: 'Cup Guide',
+            type: 'pattern',
+            gating: eventGated(['cup_and_handle']),
+        }),
+        makeSkill({
+            name: 'Rounding Guide',
+            type: 'pattern',
+            gating: eventGated(['rounding_bottom']),
+        }),
+    ];
+
+    it('injects the qualified pattern guide, not the one that lost the overlap arbitration', () => {
+        const f = cupAndHandle as Fixture;
+        const result = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            f.bars,
+            calculateIndicators(f.bars),
+            guides,
+            '1Day'
+        );
+        expect(result.patternArbitration.dropped.map(d => d.id)).toEqual([
+            'rounding_bottom',
+        ]);
+        expect(result.injectedSkills.map(s => s.name)).toEqual(['Cup Guide']);
+        expect(result.patternSkillNames).toEqual(['Cup Guide']);
+        expect(result.dynamic).toContain('Cup Guide');
+        expect(result.dynamic).not.toContain('Rounding Guide');
+    });
+
+    it('injects no pattern guide when the qualifier throws', async () => {
+        vi.resetModules();
+        vi.doMock('@/domain/patterns/qualify/qualifyPatterns', () => ({
+            qualifyPatterns: () => {
+                throw new Error('qualifier exploded');
+            },
+        }));
+        const { buildAnalysisPrompt: build } =
+            await import('@/domain/analysis/prompt');
+        const f = cupAndHandle as Fixture;
+        const result = build(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            f.bars,
+            calculateIndicators(f.bars),
+            guides,
+            '1Day'
+        );
+        expect(result.patternScreenFailure).not.toBeNull();
+        expect(result.injectedSkills).toEqual([]);
+        expect(result.patternSkillNames).toEqual([]);
+    });
+
+    it('lists no pattern skill for a chart without bars', () => {
+        const result = buildAnalysisPromptRaw(
+            TEST_SYMBOL,
+            TEST_COMPANY,
+            [],
+            calculateIndicators([]),
+            guides,
+            '1Day'
+        );
+        expect(result.patternSkillNames).toEqual([]);
+        expect(result.dynamic).not.toContain(
+            '### patternSummaries Writing Rules'
+        );
     });
 });
 

@@ -165,9 +165,16 @@ describe('formatChartPatternCandidatesSection', () => {
         );
     });
 
-    it('the intro tells the model to leave candidateId empty for an unlisted pattern', () => {
-        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
+    // WP-16: the listing is the whole set of patternSummaries entries.
+    it('the intro does not invite reporting a pattern the section does not name', () => {
+        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).not.toContain(
+            'you may also report'
+        );
+        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).not.toContain(
             'leave candidateId empty'
+        );
+        expect(CHART_PATTERN_CANDIDATES_SECTION_INTRO).toContain(
+            'only listed patterns carry levels and targets'
         );
     });
 
