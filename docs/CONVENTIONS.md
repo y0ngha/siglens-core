@@ -678,7 +678,7 @@ Test structure allows **2 to 5 levels**. Choose the appropriate depth based on m
 Besides sign and shape, every period-based indicator test checks values with
 `toBeCloseTo` against expected numbers computed independently. Warm-up constants are
 imported from source, and boundary constants account for the whole dependency chain of
-the algorithm (nested windows).
+the algorithm (nested windows). Published statistics (shares, percentiles, confidence intervals) follow the same rule with hand-determined fixtures: a range-only assertion (`0 ≤ share ≤ 1`, `p5 ≤ median ≤ p95`) passes a strict→non-strict or wrong-baseline mutation, and TE-16 oracles must fail if reverted.
 
 ```typescript
 // ❌ expect(values[idx]).toBeGreaterThan(0);          // no actual value verified

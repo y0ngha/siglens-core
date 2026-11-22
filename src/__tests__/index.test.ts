@@ -1,4 +1,8 @@
 import type {
+    BacktestBenchmarks,
+    BacktestDistribution,
+    BacktestRunData,
+    BacktestTickerBaseline,
     MeasuredSignalBaseRate,
     MeasuredSignalHorizon,
     MeasuredSignalScope,
@@ -116,6 +120,16 @@ describe('public API exports', () => {
                 '1Hour'
             )
         ).toBeNull();
+    });
+
+    it('exports the canonical serializer behind tradesSha256 (WP-26, API-1: both entrypoints)', () => {
+        expect(
+            coreApi.canonicalJson({
+                b: [2, undefined],
+                a: { y: 1, x: undefined },
+            })
+        ).toBe('{"a":{"y":1},"b":[2,null]}');
+        expect(() => coreApi.canonicalJson(Number.NaN)).toThrow(TypeError);
     });
 
     it('exports the measured signal base rates and their lookup (WP-32 G14, API-1: both entrypoints)', () => {
@@ -515,6 +529,61 @@ describe('public API exports', () => {
         void result;
     });
 
+    it('exports the backtest benchmark types with the optional run fields (WP-26 core-1, API-3: both entrypoints)', () => {
+        // Compile-time: the benchmark rides on the run data and the baselines as optional additions.
+        const distribution: BacktestDistribution = {
+            p5: -1,
+            median: 0,
+            p95: 1,
+        };
+        const benchmarks: BacktestBenchmarks = {
+            version: 1,
+            tradesSha256: 'sha',
+            barsFingerprint: 'bars',
+            coreSha: 'core',
+            holdPortfolio: { returnPct: 1, maxDrawdownPct: -1 },
+            exposureMatchedHold: {
+                exposurePct: 50,
+                returnPct: 1,
+                maxDrawdownPct: -1,
+            },
+            strategyMarkToMarketMaxDrawdownPct: -1,
+            perTradeExcess: {
+                basis: 'same_length_drift',
+                n: 1,
+                meanPct: 0,
+                ci95: { low: -1, high: 1 },
+                clusters: 'week',
+            },
+            randomEntry: {
+                draws: 1,
+                seed: 1,
+                returnPct: distribution,
+                maxDrawdownPct: distribution,
+                shareAboveStrategyReturn: 0.5,
+                shareWithSmallerDrawdown: 0.5,
+            },
+            bracket: {
+                n: 1,
+                initialPlan: { resolvedRaces: 1, targetFirstShare: 0.5 },
+                placebo: { resolvedRaces: 1, targetFirstShare: 0.5 },
+                storedTargetFirstShare: 0.5,
+            },
+        };
+        const older = {} as BacktestRunData;
+        const withBenchmarks: BacktestRunData = { ...older, benchmarks };
+        const baseline: BacktestTickerBaseline = {
+            ticker: 'AAA',
+            buyHoldPct: 1,
+            buyHoldMaxDrawdownPct: -1,
+            tradingDays: 1,
+            exposureMatchedHoldPct: 1,
+            markToMarketMaxDrawdownPct: -1,
+        };
+        expect(withBenchmarks.benchmarks?.version).toBe(1);
+        expect(baseline.tradingDays).toBe(1);
+    });
+
     it('keeps investor-flows prompt, schema and cache-key internals private (API-2)', () => {
         expect('buildInvestorFlowsAnalysisPrompt' in coreApi).toBe(false);
         expect('investorFlowsSystemPrompt' in coreApi).toBe(false);
@@ -539,6 +608,7 @@ describe('package entrypoint export presence (API-1)', () => {
     const exportsByName = coreApi as Record<string, unknown>;
 
     const FUNCTION_EXPORTS: readonly string[] = [
+        'canonicalJson',
         'callAnalysisAi',
         'callBriefingAi',
         'resolveBriefingModel',
