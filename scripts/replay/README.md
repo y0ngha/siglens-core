@@ -36,11 +36,15 @@ two checkouts.
 | `engineEvalCandles.ts`, `engineEvalPatterns.ts` | The candle and chart-pattern passes (pure). |
 | `engineEvalCompute.ts`, `engineEvalStats.ts`, `engineEvalTypes.ts` | Pools, bootstrap, seeded randomness and the pre-registered constants. |
 | `engineEvalCompare.ts` | Before/after comparison of two evaluation runs (G2). |
-| `analysisFieldsEval.ts` | Analysis-fields evaluation CLI: `trend`, `skills` and `plan` modes (WP-15, gates T1-T5, P1-P6, S1-S3, S5, S6) and `gating` and `output` modes (WP-16, gates D1-D3, D5, D6, D8, D9 and D7, O1, O2, F1, F2, L1, L2, V1-V5). |
+| `analysisFieldsEval.ts` | Analysis-fields evaluation CLI: `trend`, `skills` and `plan` modes (WP-15, gates T1-T5, P1-P6, S1-S3, S5, S6), `gating` and `output` modes (WP-16, gates D1-D3, D5, D6, D8, D9 and D7, O1, O2, F1, F2, L1, L2, V1-V5) and `claims` and `zone` modes (WP-18, gates C1, C2, F1, F2, L1, O1, V1 and Z1, Z2, N2, N3). |
 | `analysisFieldsEvalCompute.ts`, `analysisFieldsEvalPlan.ts`, `analysisFieldsEvalSkills.ts`, `analysisFieldsEvalTypes.ts` | The pure parts per mode and the pre-registered constants. |
 | `analysisFieldsEvalGating.ts`, `analysisFieldsEvalCards.ts`, `analysisFieldsEvalPrompt.ts` | `gating` mode: which pattern and candle guides reach a prompt against what it prints, the card checks recomputed from the printed lines and OHLC, and the readers of the prompt text. |
 | `analysisFieldsEvalOutput.ts`, `analysisFieldsEvalCatalog.ts` | `output` mode: paired comparison of an after, a before and a repeat run with bootstrap intervals, and the skill-file frontmatter reader it matches pattern names with. |
 | `analysisFieldsEvalRender.ts` | Renders the technical prompt of a case for both tiers through `runAnalysis` without a model call (the `skills` and `gating` modes). |
+| `analysisFieldsEvalClaims.ts`, `analysisFieldsEvalZone.ts` | `claims` and `zone` modes (WP-18): positive reliability claims and strong-level wording (C1, C2), and where the close sits against the entry zone under the 1% tolerance and under exact edges (Z1, Z2, N2, N3). |
+| `levelEval.ts` | Price-level evaluation CLI (WP-18): held rate of the printed levels against a date-transplant placebo, the score fit with a time split, the structural-ratio anchors and the non-positive-level count (gates L0, L-gate, G42). |
+| `levelEvalCompute.ts`, `levelEvalTypes.ts` | The pure parts of `levelEval.ts` and its pre-registered constants. |
+| `baseRateTable.ts`, `baseRateTableCompute.ts`, `baseRateTableRender.ts` | Generator of `src/domain/analysis/measuredBaseRates.ts` from the engine and level evaluations of one set (WP-18 §4.1). |
 
 ## The set
 
@@ -476,3 +480,88 @@ Headline numbers use one row per case (repeat 1) and, for plans, the rows a repo
 (`labels.jsonl` headline). The `T1` "every B day" part of the design (the shipped function
 against the rule on every day) is a unit test of the PR that ships the function; the
 instrument checks the results a run returned.
+
+## Price levels and measured base rates (WP-18)
+
+A placebo-controlled measurement of the levels a prompt prints, and the generator of the table
+that replaces literature weights and verdict-bearing ratios with measured base rates. Offline,
+no model call, no network, no cost; output outside the repository.
+
+```bash
+# the level evaluation: ~7 minutes on set B (65 symbols, step 3), ~5 GB of heap
+NODE_OPTIONS=--max-old-space-size=12288 npx tsx scripts/replay/levelEval.ts --set <set-dir> --out <dir> [--step 3] [--arm <name>] [--gate L0,L-gate,G42|all]
+# the table, from clean runs of one set and one commit (engineEval --gate geometry, engineEval --gate c9, levelEval)
+npx tsx scripts/replay/baseRateTable.ts --engine <dir> --candles <dir> --levels <dir> --date <YYYY-MM-DD> --out <file> [--json <file>]
+# claims: an after run against a before run (and an optional repeat of the before arm)
+npx tsx scripts/replay/analysisFieldsEval.ts --mode claims --set <set> --skills <app>/skills --run <after> --before <before> [--repeat <run>] [--lang ko|en] --out <dir>
+# zone: where the close sits against the entry zone; --restate exact re-derives an old run's positions
+npx tsx scripts/replay/analysisFieldsEval.ts --mode zone --set <set> --run <run> [--before <run>] [--restate exact] [--lang ko|en] --out <dir>
+```
+
+- **`levelEval`.** Every `--step`-th bar from bar 300 (20 forward bars needed) is a study day. The
+  production 500-bar window ending at the bar gives `computeMarketReference` (the bar is a finished
+  session); every level `printedLevelsOnSide` returns gets features from `bars[0..t]` only (distinct
+  kind families within 0.25 ATR, touch episodes and reactions over 120 bars, recency, volume density
+  at the level, side, distance) and its outcome from `labelLevelOutcome` on the 20 bars after (touch
+  within 0.1 ATR; held = a close 0.5 ATR back on the level's side before a close 0.5 ATR through it,
+  within 10 bars). The placebo is the date transplant: the same side and distance in ATR from the close
+  on 3 other study days of the symbol more than 30 and at most 250 bars away (a nearer day shares the real
+  level's outcome window) (picks keyed by `sha256(symbol|t|side|rank)`),
+  labelled with the instrument's own copy of the labeller (`labelAgreement` counts how often it differs
+  from `labelLevelOutcome` on the real levels; 0 expected). A feature function that read a bar after `t`
+  would change when the future is poisoned, and a unit test does exactly that.
+  - Tables: held rate with `n`, the transplant rate and their difference with an ISO-week cluster
+    interval, by kind family, confluence, touch episodes, reactions, side, distance, volume quintile,
+    recency, market and period; the labeller's own 0.5 ATR shift placebos beside them; the touch rate
+    by distance; a barrier sweep (0.5 and 1.0 ATR, the groups of WP-18 section 1, on one level in five).
+  - The score: a logistic model fitted on days before 2022-01-01 minus a 20-bar embargo, scored from
+    2022-01-01, banded by the training quintiles; AUC, top minus bottom, top minus its own transplant
+    placebo, by market and by half of the test period.
+  - `structural`: the anchors the removed structural R:R block chose (nearest level each side), its
+    ratio and Spearman against the 10-session return. `nonPositive`: levels with a price that is not
+    positive in a horizon, in `printedLevelsOnSide` and in the Fibonacci overlay levels, per day.
+  - Gates: **L0** (not computable while the instrument and `labelLevelOutcome` disagree on a real level) the instrument reproduces WP-18 section 1 (held 49.65%, transplant 49.70%, test AUC
+    0.515, top minus transplant -0.6 pp, each within 0.2 pp) and is `null` for any other set, step or a
+    `--symbols` subset; **L-gate** a score's top quintile beats its own transplant placebo out of sample
+    (interval low bound above 0, the wider of the week and 13-week-block intervals, positive point estimate
+    in both markets and both halves of the test period, split 2024-07-01); **G42** no non-positive level anywhere. `--gate` picks the gates that
+    decide the exit code (2 on a failed or uncomputable one, 1 on an error).
+- **`baseRateTable`.** `--engine` is an `engineEval` run with `--gate geometry`, `--candles` one with
+  `--gate c9`, `--levels` a `levelEval` of the whole set at step 3; each is a run directory or its
+  `summary.json`, and the engine runs need their `events.jsonl` (per-family shares are recomputed from
+  it and its counts are checked against the summary). It refuses (exit 1) a dirty checkout (`+dirty` sha
+  or a dirty-diff hash), runs of different bars or different core commits, a run whose own gate did not
+  pass, a level run that is not the reference population and events that do not match their summary.
+  `--allow-dirty` lets uncommitted runs through for a look (never to the committed path, and the header
+  keeps the `+dirty` sha). `--out` outside the repository, or exactly
+  `src/domain/analysis/measuredBaseRates.ts`; `--json` (outside) keeps every number the verdict rule
+  read. The file is formatted with the repository's prettier config and is byte-identical for the same
+  inputs and `--date`.
+  - Verdict (WP-17 G3, one rule): `insufficient_sample` below 100 events (the row then carries the
+    pooled figures under `key: 'pooled'`); `beats_placebo` iff the Holm-adjusted test rejects zero at
+    5%, the difference is positive, its interval's low bound is above zero (patterns: the wider of the
+    week and 13-week-block intervals) and the sign holds in both time halves and in the US and Korean
+    markets; otherwise `no_edge`. A half or market the data does not cover fails the rule.
+  - The `measuredBaseRates.ts` the generator writes holds the types, the tables (aggregate statistics
+    only), `PATTERN_POOLED_BASE_RATE` / `CANDLE_POOLED_BASE_RATE` for a key without an own row, and
+    `measuredBaseRateFor`; the template lives in `baseRateTableRender.ts`.
+- **`claims`.** C1: positive reliability claims per detected pattern and candle card (`신뢰도가 높`,
+  `높은 신뢰`, `확률이 높`, `신뢰할 만`, `승률` not preceded by `상`, `적중률`; English equivalents with
+  `--lang en`), a sentence with a negation (`높지 않`, `낮`, `차이가 없`) or a condition ahead of the match
+  (`면`) does not count; the raw count of the pre-registered list is reported beside it, after minus before,
+  case-clustered bootstrap, pass iff the 95% upper bound is below 0. C2: results calling a level strong,
+  firm or heavy (`강한|강력한|견고한|두터운` + `지지|저항`, in the summary or a level reason), the same test;
+  the broad wording (`핵심`, `중요한`) is reported beside it. Both are `null` below 90% paired cases. The
+  mode also decides F1, F2, L1 and V1 as `output` mode does and O1 with the WP-18 bound (median
+  output-token ratio at most 1.05). Needs `--set`, `--skills`, `--run` and `--before`.
+- **`zone`.** For each plan of a run: the position under the 1% tolerance (WP-15), under exact edges
+  (`zoneLow <= close <= zoneTop`) and as stored, the geometry of the close for the plans the tolerance
+  calls `in_zone` (strictly inside, at the top, at the low, within the 1% band above or below), the
+  distance above the top and the zone width in ATR, and the share of plans whose prose reads as a
+  pullback plan (`되돌림|눌림|조정 시|조정을|조정이|조정 후|지지 확인 후|대기`, English with `--lang en`) by group. Gates: **Z1**
+  the stored state equals the exact rule, `in_zone` is inside the edges and the labeller's approach
+  `inside` agrees (100% of each; needs `labels.jsonl` for the last part); **Z2** (with `--before`) the share of exact-edge `in_zone` plans written as pullbacks is no higher in the after arm than in the before arm, same regex and rule, on the paired cases (null below 90% paired); **N3** no position above 85% of the headline rows (stored
+  positions, or exact ones with `--restate exact`), `in_zone` reported with its interval; **N2** (with
+  `--before`) the share of plans whose first target is at least 1 ATR above the zone top does not fall by
+  more than 5 pp. `n1Sample` lists the 40 cases the manual read (N1) takes: 15 `in_zone`, 15 `above_zone`
+  within 0.5 ATR, 10 others, by smallest `sha256(caseId|group)`.

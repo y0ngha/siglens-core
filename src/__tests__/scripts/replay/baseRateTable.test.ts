@@ -1,0 +1,811 @@
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { format, resolveConfig } from 'prettier';
+import { ModuleKind, transpileModule } from 'typescript';
+import { afterEach, describe, expect, it } from 'vitest';
+import {
+    TABLE_PATH,
+    generateTable,
+    isEvalEvent,
+    inputProblems,
+    parseBaseRateTableArgs,
+    readEngineInput,
+    readLevelInput,
+    runBaseRateTable,
+    type BaseRateTableArgs,
+} from '../../../../scripts/replay/baseRateTable';
+import {
+    BASE_RATE_MIN_N,
+    candleTable,
+    patternTable,
+    priceLevelRow,
+    verdictOf,
+    type BaseRateScope,
+    type LevelSummaryInput,
+    type VerdictInputs,
+} from '../../../../scripts/replay/baseRateTableCompute';
+import { renderBaseRateTable } from '../../../../scripts/replay/baseRateTableRender';
+import { summarizeArm } from '../../../../scripts/replay/engineEvalCompute';
+import type {
+    CandleEvent,
+    EvalEvent,
+    PatternEvent,
+} from '../../../../scripts/replay/engineEvalTypes';
+import { makeTempDir } from './replayFixtures';
+import { candleEvent, patternEvent } from './engineEvalFixtures';
+
+const temps = new Set<() => void>();
+afterEach(() => {
+    [...temps].forEach(remove => remove());
+    temps.clear();
+});
+
+const WEEKS = Array.from(
+    { length: 52 },
+    (_, i) => `2021-W${String(i + 1).padStart(2, '0')}`
+);
+
+const scope: BaseRateScope = {
+    timeframe: '1Day',
+    symbols: 2,
+    from: '2021-01-04',
+    to: '2021-12-30',
+};
+
+/** Where event `i` falls: spread over the weeks, alternating market and time half. */
+const slotOf = (
+    i: number
+): { week: string; market: 'us' | 'kr'; half: 'early' | 'late' } => ({
+    week: WEEKS[i % WEEKS.length],
+    market: i % 2 === 0 ? 'us' : 'kr',
+    half: Math.floor(i / 2) % 2 === 0 ? 'early' : 'late',
+});
+
+const patterns = (
+    id: string,
+    count: number,
+    hit: (i: number) => boolean,
+    placebo = 0.25
+): PatternEvent[] =>
+    Array.from({ length: count }, (_, i) =>
+        patternEvent({
+            id,
+            target60: hit(i) ? 'hit' : 'inval',
+            placeboTargetHit: placebo,
+            ...slotOf(i),
+        })
+    );
+
+const candles = (
+    pattern: string,
+    count: number,
+    moves: (i: number) => boolean,
+    placeboHit = 0.5
+): CandleEvent[] =>
+    Array.from({ length: count }, (_, i) => {
+        const event = candleEvent({
+            pattern,
+            y: moves(i) ? 1 : -1,
+            placeboY: 0,
+            ...slotOf(i),
+        });
+        return {
+            ...event,
+            matched: event.matched && {
+                ...event.matched,
+                hit: { h1: placeboHit, h5: placeboHit, h10: placeboHit },
+            },
+        };
+    });
+
+const verdictInputs = (over: Partial<VerdictInputs> = {}): VerdictInputs => ({
+    n: 200,
+    significant: true,
+    mean: 0.05,
+    low: 0.01,
+    splits: { early: 0.04, late: 0.06, us: 0.05, kr: 0.05 },
+    ...over,
+});
+
+describe('verdictOf', () => {
+    it('is insufficient below the sample floor, whatever the numbers say', () => {
+        expect(verdictOf(verdictInputs({ n: BASE_RATE_MIN_N - 1 }))).toBe(
+            'insufficient_sample'
+        );
+        expect(verdictOf(verdictInputs({ n: BASE_RATE_MIN_N }))).toBe(
+            'beats_placebo'
+        );
+    });
+
+    it('beats the placebo only with a significant positive difference that holds in every split', () => {
+        expect(verdictOf(verdictInputs())).toBe('beats_placebo');
+        expect(verdictOf(verdictInputs({ significant: false }))).toBe(
+            'no_edge'
+        );
+        expect(verdictOf(verdictInputs({ significant: null }))).toBe('no_edge');
+        expect(verdictOf(verdictInputs({ mean: -0.05 }))).toBe('no_edge');
+        expect(verdictOf(verdictInputs({ low: -0.001 }))).toBe('no_edge');
+        expect(verdictOf(verdictInputs({ low: 0 }))).toBe('no_edge');
+    });
+
+    it('fails closed on a split that flips sign or is not covered', () => {
+        expect(
+            verdictOf(
+                verdictInputs({
+                    splits: { early: 0.04, late: -0.01, us: 0.05, kr: 0.05 },
+                })
+            )
+        ).toBe('no_edge');
+        expect(
+            verdictOf(
+                verdictInputs({
+                    splits: { early: 0.04, late: 0.06, us: 0.05, kr: null },
+                })
+            )
+        ).toBe('no_edge');
+        expect(
+            verdictOf(
+                verdictInputs({
+                    splits: { early: 0.04, late: 0.06, us: 0, kr: 0.05 },
+                })
+            )
+        ).toBe('no_edge');
+    });
+});
+
+describe('patternTable', () => {
+    const events = [
+        ...patterns('always_hits', 120, () => true),
+        ...patterns('coin_flip', 120, i => i % 4 === 0, 0.25),
+        ...patterns('one_market', 120, i => i % 2 === 0, 0.25),
+        ...patterns('rare', 40, () => true),
+    ];
+    const table = patternTable(events, WEEKS, scope);
+    const byKey = (key: string) => table.rows.find(r => r.family === key);
+
+    it('beats the placebo when the target always comes first and the placebo says 25%', () => {
+        const row = byKey('always_hits');
+        expect(row?.row).toMatchObject({
+            subject: 'chart_pattern',
+            key: 'always_hits',
+            n: 120,
+            eventShare: 1,
+            placeboShare: 0.25,
+            verdict: 'beats_placebo',
+            scope,
+        });
+        expect(row?.row.difference.mean).toBeCloseTo(0.75);
+        expect(row?.holmP).toBeLessThan(0.05);
+    });
+
+    it('is no edge when the event hits as often as its placebo', () => {
+        expect(byKey('coin_flip')?.row.verdict).toBe('no_edge');
+    });
+
+    it('is no edge when the gain holds in one market only', () => {
+        // US events hit, Korean events never do: the pool is positive, the Korean split is not.
+        expect(byKey('one_market')?.inputs.splits.kr).toBeLessThan(0);
+        expect(byKey('one_market')?.row.verdict).toBe('no_edge');
+    });
+
+    it('gives a family below the floor the pooled figures under the key pooled', () => {
+        const rare = byKey('rare');
+        expect(rare?.row.key).toBe('pooled');
+        expect(rare?.row.verdict).toBe('insufficient_sample');
+        expect(rare?.row.n).toBe(table.pooled.row.n);
+        expect(table.pooled.row.n).toBe(events.length);
+    });
+
+    it('lists families in key order and the pooled row with the same rule', () => {
+        expect(table.rows.map(r => r.family)).toEqual([
+            'always_hits',
+            'coin_flip',
+            'one_market',
+            'rare',
+        ]);
+        expect(table.pooled.row.key).toBe('pooled');
+        expect(table.pooled.row.eventShare).toBeCloseTo(
+            events.filter(e => e.target60 === 'hit').length / events.length
+        );
+    });
+
+    it('refuses a row it cannot compute instead of writing a 0', () => {
+        expect(() => patternTable([], WEEKS, scope)).toThrow(
+            'is not computable'
+        );
+    });
+});
+
+describe('candleTable', () => {
+    const events = [
+        ...candles('hammer', 120, () => true),
+        ...candles('shooting_star', 120, i => i % 2 === 0),
+        ...candles('rare_one', 30, () => true),
+        ...Array.from({ length: 10 }, (_, i) => ({
+            ...candleEvent(slotOf(i)),
+            status: 'neutral' as const,
+            y: null,
+            pct: null,
+            matched: null,
+            unmatched: null,
+        })),
+    ];
+    const table = candleTable(events, WEEKS, scope);
+    const byKey = (key: string) => table.rows.find(r => r.family === key);
+
+    it('reads the hit share of the next five bars against the matched placebo, and keeps the ATR edge', () => {
+        const hammer = byKey('hammer');
+        expect(hammer?.row).toMatchObject({
+            subject: 'candle_pattern',
+            n: 120,
+            eventShare: 1,
+            placeboShare: 0.5,
+            verdict: 'beats_placebo',
+        });
+        expect(hammer?.row.difference.mean).toBeCloseTo(0.5);
+        expect(hammer?.atrEdge?.mean).toBeCloseTo(1);
+    });
+
+    it('is no edge for half hits, insufficient below the floor, and ignores untested events', () => {
+        expect(byKey('shooting_star')?.row.verdict).toBe('no_edge');
+        expect(byKey('rare_one')?.row.key).toBe('pooled');
+        expect(byKey('rare_one')?.row.verdict).toBe('insufficient_sample');
+        expect(table.pooled.row.n).toBe(270);
+    });
+});
+
+describe('priceLevelRow', () => {
+    const group = (
+        share: number,
+        n: number,
+        mean: number | null,
+        low: number | null
+    ) => ({
+        held: { n, share },
+        transplant: { n: n * 3, share: share - (mean ?? 0) },
+        difference: { mean, low, high: low === null ? null : low + 0.02 },
+    });
+    const summary = (
+        over: Partial<LevelSummaryInput> = {}
+    ): LevelSummaryInput => ({
+        overall: group(0.4965, 550171, -0.0005, -0.007),
+        tables: {
+            market: {
+                us: group(0.5, 1000, -0.001, -0.01),
+                kr: group(0.5, 1000, 0.002, -0.01),
+            },
+            half: {
+                'pre-2022': group(0.5, 1000, 0.003, -0.01),
+                '2022+': group(0.5, 1000, -0.003, -0.01),
+            },
+        },
+        ...over,
+    });
+
+    it('records the held rate against the placebo and says no edge today', () => {
+        const row = priceLevelRow(summary(), scope);
+        expect(row.row).toMatchObject({
+            subject: 'price_level',
+            key: 'pooled',
+            n: 550171,
+            eventShare: 0.4965,
+            verdict: 'no_edge',
+        });
+        expect(row.row.placeboShare).toBeCloseTo(0.497);
+    });
+
+    it('would beat the placebo with a positive interval that holds in every market and half', () => {
+        const positive = group(0.55, 550171, 0.03, 0.01);
+        const row = priceLevelRow(
+            summary({
+                overall: positive,
+                tables: {
+                    market: { us: positive, kr: positive },
+                    half: { 'pre-2022': positive, '2022+': positive },
+                },
+            }),
+            scope
+        );
+        expect(row.row.verdict).toBe('beats_placebo');
+    });
+
+    it('refuses a level run without a computable held rate', () => {
+        expect(() =>
+            priceLevelRow(
+                summary({ overall: group(0.5, 0, null, null) }),
+                scope
+            )
+        ).toThrow('is not computable');
+    });
+});
+
+describe('renderBaseRateTable', () => {
+    it('writes the header, the types and one record entry per row', () => {
+        const pattern = patternTable(
+            [
+                ...patterns('a', 120, () => true),
+                ...patterns('b', 20, () => true),
+            ],
+            WEEKS,
+            scope
+        );
+        const candle = candleTable(
+            candles('hammer', 120, () => true),
+            WEEKS,
+            scope
+        );
+        const source = renderBaseRateTable({
+            header: {
+                setId: 'replay-v1',
+                fingerprint: 'f'.repeat(64),
+                coreSha: 'a'.repeat(40),
+                definitions: 'labels v1',
+                date: '2026-11-22',
+                command: 'cmd',
+            },
+            patterns: pattern,
+            candles: candle,
+            priceLevel: priceLevelRow(
+                {
+                    overall: {
+                        held: { n: 1000, share: 0.5 },
+                        transplant: { n: 3000, share: 0.5 },
+                        difference: { mean: 0, low: -0.01, high: 0.01 },
+                    },
+                    tables: { market: {}, half: {} },
+                },
+                scope
+            ).row,
+        });
+        expect(source).toContain(
+            'GENERATED by scripts/replay/baseRateTable.ts'
+        );
+        expect(source).toContain(
+            `export const BASE_RATE_MIN_N = ${BASE_RATE_MIN_N};`
+        );
+        expect(source).toContain("'a': {");
+        expect(source).toContain("'b': {");
+        expect(source).toContain("verdict: 'insufficient_sample'");
+        expect(source).toContain('export function measuredBaseRateFor(');
+        expect(source).toContain("if (timeframe !== '1Day') return null;");
+    });
+});
+
+// ─── The runs it reads ────────────────────────────────────────────────────────
+
+const FINGERPRINT = 'b'.repeat(64);
+const SHA = 'c'.repeat(40);
+
+function writeEngineRun(
+    dir: string,
+    options: {
+        gate: 'geometry' | 'c9';
+        events: readonly EvalEvent[];
+        sha?: string;
+        diff?: string | null;
+        fingerprint?: string;
+        only?: string | null;
+        summaryEvents?: number;
+        symbols?: readonly string[];
+    }
+): void {
+    mkdirSync(dir, { recursive: true });
+    const patternEvents = options.events.filter(e => e.kind === 'pattern');
+    const candleEvents = options.events.filter(e => e.kind === 'candle');
+    const summary = summarizeArm({
+        arm: options.gate,
+        weeks: WEEKS,
+        gate: options.gate,
+        candleEvents: options.gate === 'c9' ? candleEvents : null,
+        patternEvents: options.gate === 'geometry' ? patternEvents : null,
+        patternCounters: options.gate === 'geometry' ? { days: 10 } : null,
+        caseLines: null,
+    });
+    const fixed =
+        options.summaryEvents === undefined
+            ? summary
+            : {
+                  ...summary,
+                  patterns: summary.patterns && {
+                      ...summary.patterns,
+                      events: options.summaryEvents,
+                  },
+              };
+    writeFileSync(
+        join(dir, 'run.json'),
+        JSON.stringify({
+            tool: 'engineEval',
+            arm: options.gate,
+            coreGitSha: options.sha ?? SHA,
+            dirtyDiffSha256: options.diff ?? null,
+            source: {
+                kind: 'set',
+                fingerprint: options.fingerprint ?? FINGERPRINT,
+                symbols: options.symbols ?? ['NVDA', '005930.KS'],
+            },
+            only: options.only ?? null,
+            gate: options.gate,
+            constants: { seed: 1 },
+        })
+    );
+    writeFileSync(join(dir, 'summary.json'), JSON.stringify(fixed));
+    writeFileSync(
+        join(dir, 'events.jsonl'),
+        options.events.map(e => `${JSON.stringify(e)}\n`).join('')
+    );
+}
+
+function writeLevelRun(
+    dir: string,
+    options: {
+        sha?: string;
+        reference?: boolean;
+        fingerprint?: string;
+        l0?: boolean | null;
+        disagreements?: number;
+        symbols?: readonly string[];
+    } = {}
+): void {
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+        join(dir, 'run.json'),
+        JSON.stringify({
+            tool: 'levelEval',
+            coreGitSha: options.sha ?? SHA,
+            dirtyDiffSha256: null,
+            source: {
+                fingerprint: options.fingerprint ?? FINGERPRINT,
+                symbols: options.symbols ?? ['NVDA', '005930.KS'],
+            },
+            referencePopulation: options.reference ?? true,
+            constants: { seed: 2 },
+        })
+    );
+    const group = {
+        held: { n: 1000, share: 0.5 },
+        transplant: { n: 3000, share: 0.5 },
+        difference: { mean: 0, low: -0.01, high: 0.01 },
+    };
+    writeFileSync(
+        join(dir, 'summary.json'),
+        JSON.stringify({
+            scope,
+            labelAgreement: { disagreements: options.disagreements ?? 0 },
+            gates: [
+                {
+                    id: 'L0',
+                    pass: options.l0 === undefined ? true : options.l0,
+                },
+            ],
+            overall: group,
+            tables: {
+                market: { us: group, kr: group },
+                half: { 'pre-2022': group, '2022+': group },
+            },
+        })
+    );
+}
+
+interface World {
+    dir: string;
+    args: BaseRateTableArgs;
+}
+
+function makeWorld(
+    over: {
+        engine?: Partial<Parameters<typeof writeEngineRun>[1]>;
+        candles?: Partial<Parameters<typeof writeEngineRun>[1]>;
+        levels?: Parameters<typeof writeLevelRun>[1];
+    } = {}
+): World {
+    const { dir, remove } = makeTempDir();
+    temps.add(remove);
+    const patternEvents = [
+        ...patterns('always_hits', 120, () => true),
+        ...patterns('rare', 30, () => false),
+    ];
+    const candleEvents = candles('hammer', 120, () => true);
+    writeEngineRun(join(dir, 'runs', 'geometry'), {
+        gate: 'geometry',
+        events: patternEvents,
+        ...over.engine,
+    });
+    writeEngineRun(join(dir, 'runs', 'c9'), {
+        gate: 'c9',
+        events: candleEvents,
+        ...over.candles,
+    });
+    writeLevelRun(join(dir, 'runs', 'levels'), over.levels);
+    return {
+        dir,
+        args: {
+            engine: join(dir, 'runs', 'geometry'),
+            candles: join(dir, 'runs', 'c9'),
+            levels: join(dir, 'runs', 'levels'),
+            out: join(dir, 'out', 'measuredBaseRates.ts'),
+            json: join(dir, 'out', 'rates.json'),
+            date: '2026-11-22',
+            allowDirty: false,
+        },
+    };
+}
+
+const readInputs = (args: BaseRateTableArgs) => ({
+    engine: readEngineInput(args.engine),
+    candles: readEngineInput(args.candles),
+    levels: readLevelInput(args.levels),
+});
+
+describe('parseBaseRateTableArgs', () => {
+    it('needs every input and a well-formed date, and accepts a summary.json path', () => {
+        expect(() => parseBaseRateTableArgs(['--engine', 'e'])).toThrow(
+            'missing --candles, --levels, --out, --date'
+        );
+        const base = [
+            '--engine',
+            'e/summary.json',
+            '--candles',
+            'c',
+            '--levels',
+            'l',
+            '--out',
+            'o',
+        ];
+        expect(() =>
+            parseBaseRateTableArgs([...base, '--date', 'today'])
+        ).toThrow('--date must be YYYY-MM-DD');
+        const parsed = parseBaseRateTableArgs([
+            ...base,
+            '--date',
+            '2026-11-22',
+            '--json',
+            'j',
+            '--allow-dirty',
+        ]);
+        expect(parsed.engine).toMatch(/\/e$/);
+        expect(parsed.json).toMatch(/\/j$/);
+        expect(parsed.allowDirty).toBe(true);
+    });
+});
+
+describe('inputProblems', () => {
+    const problems = (world: World, allowDirty = false) => {
+        const { engine, candles: c, levels } = readInputs(world.args);
+        return inputProblems(engine, c, levels, allowDirty);
+    };
+
+    it('finds nothing wrong with clean runs of one set and one commit', () => {
+        expect(problems(makeWorld())).toEqual([]);
+    });
+
+    it('refuses a dirty checkout unless told to look anyway', () => {
+        const world = makeWorld({
+            engine: { sha: `${SHA}+dirty`, diff: 'd'.repeat(64) },
+        });
+        expect(problems(world).join('\n')).toContain(
+            '--engine was made on a dirty checkout'
+        );
+        expect(problems(world, true).join('\n')).not.toContain(
+            'dirty checkout'
+        );
+    });
+
+    it('refuses runs of different bars or commits', () => {
+        expect(
+            problems(
+                makeWorld({ levels: { fingerprint: 'e'.repeat(64) } })
+            ).join('\n')
+        ).toContain('different bars');
+        expect(
+            problems(makeWorld({ levels: { sha: 'd'.repeat(40) } })).join('\n')
+        ).toContain('different core commits');
+    });
+
+    it('refuses a run of the wrong gate, a missing half and a level run that is not the reference population', () => {
+        const wrongGate = makeWorld({
+            candles: { gate: 'geometry', events: patterns('x', 5, () => true) },
+        });
+        expect(problems(wrongGate).join('\n')).toContain(
+            '--candles must be a run with --gate c9'
+        );
+        const noPatterns = makeWorld({ engine: { only: 'candles' } });
+        expect(problems(noPatterns).join('\n')).toContain(
+            'did not measure the chart patterns'
+        );
+        expect(
+            problems(makeWorld({ levels: { reference: false } })).join('\n')
+        ).toContain('not the reference population');
+    });
+
+    it('refuses runs of a subset of the symbols, whichever run it is', () => {
+        const subset = ['NVDA'];
+        expect(
+            problems(makeWorld({ engine: { symbols: subset } })).join('\n')
+        ).toContain('different symbols');
+        expect(
+            problems(makeWorld({ candles: { symbols: subset } })).join('\n')
+        ).toContain('different symbols');
+        expect(
+            problems(makeWorld({ levels: { symbols: subset } })).join('\n')
+        ).toContain('different symbols');
+    });
+
+    it('refuses a level run that did not reproduce section 1 or whose evaluator drifted', () => {
+        expect(
+            problems(makeWorld({ levels: { l0: false } })).join('\n')
+        ).toContain('did not pass its L0 gate');
+        expect(
+            problems(makeWorld({ levels: { l0: null } })).join('\n')
+        ).toContain('did not pass its L0 gate');
+        expect(
+            problems(makeWorld({ levels: { disagreements: 4 } })).join('\n')
+        ).toContain('counts 4 real levels');
+    });
+
+    it('refuses events that do not match their summary', () => {
+        const world = makeWorld({ engine: { summaryEvents: 7 } });
+        expect(problems(world).join('\n')).toContain('counts 7 pattern events');
+    });
+});
+
+describe('generateTable and runBaseRateTable', () => {
+    it('writes the table and its JSON companion, formatted and byte-identical on a rerun', async () => {
+        const world = makeWorld();
+        const code = await runBaseRateTable(world.args, () => undefined);
+        expect(code).toBe(0);
+        const first = readFileSync(world.args.out, 'utf-8');
+        const companion = JSON.parse(
+            readFileSync(world.args.json ?? '', 'utf-8')
+        );
+        expect(companion.chartPatterns.rows).toHaveLength(2);
+        expect(companion.priceLevel.row.verdict).toBe('no_edge');
+        await runBaseRateTable(world.args, () => undefined);
+        expect(readFileSync(world.args.out, 'utf-8')).toBe(first);
+        const config = (await resolveConfig(TABLE_PATH)) ?? {};
+        expect(await format(first, { ...config, parser: 'typescript' })).toBe(
+            first
+        );
+        expect(first).toContain(`Core: ${SHA} (clean checkout)`);
+        expect(first).toContain('--date 2026-11-22');
+    });
+
+    it('writes a measuredBaseRateFor that returns the row, the pooled row or null', async () => {
+        const world = makeWorld();
+        await runBaseRateTable(world.args, () => undefined);
+        const { outputText } = transpileModule(
+            readFileSync(world.args.out, 'utf-8'),
+            { compilerOptions: { module: ModuleKind.CommonJS } }
+        );
+        const exported: Record<string, unknown> = {};
+        new Function('exports', outputText)(exported);
+        const lookup = (
+            subject: string,
+            key: string,
+            timeframe: string
+        ): { key: string; n: number; subject: string } | null =>
+            Reflect.apply(
+                exported.measuredBaseRateFor as () => never,
+                undefined,
+                [subject, key, timeframe]
+            );
+        expect(lookup('chart_pattern', 'always_hits', '1Day')).toMatchObject({
+            key: 'always_hits',
+            n: 120,
+        });
+        // A family under the floor, a key nobody measured: the pooled row.
+        expect(lookup('chart_pattern', 'rare', '1Day')?.key).toBe('pooled');
+        expect(lookup('chart_pattern', 'unknown_id', '1Day')).toMatchObject({
+            key: 'pooled',
+            n: 150,
+            subject: 'chart_pattern',
+        });
+        expect(lookup('candle_pattern', 'hammer', '1Day')?.key).toBe('hammer');
+        expect(lookup('candle_pattern', 'nothing', '1Day')?.subject).toBe(
+            'candle_pattern'
+        );
+        // Nothing was measured off daily bars.
+        expect(lookup('chart_pattern', 'always_hits', '1Hour')).toBeNull();
+        expect(lookup('candle_pattern', 'hammer', '5Min')).toBeNull();
+    });
+
+    it('does not put the machine paths of the runs into the file', async () => {
+        const world = makeWorld();
+        await runBaseRateTable(world.args, () => undefined);
+        expect(readFileSync(world.args.out, 'utf-8')).not.toContain(world.dir);
+    });
+
+    it('refuses untrustworthy inputs with every reason', async () => {
+        const world = makeWorld({
+            engine: { sha: `${SHA}+dirty` },
+            levels: { reference: false },
+        });
+        await expect(
+            runBaseRateTable(world.args, () => undefined)
+        ).rejects.toThrow(
+            /cannot be trusted[\s\S]*dirty checkout[\s\S]*reference population|cannot be trusted[\s\S]*reference population[\s\S]*dirty/
+        );
+    });
+
+    it('writes outside the repository only, except the committed path, and never a dirty table there', async () => {
+        const world = makeWorld();
+        await expect(
+            runBaseRateTable({
+                ...world.args,
+                out: join(process.cwd(), 'x.ts'),
+            })
+        ).rejects.toThrow('is inside the repository');
+        await expect(
+            runBaseRateTable({
+                ...world.args,
+                out: TABLE_PATH,
+                allowDirty: true,
+            })
+        ).rejects.toThrow('--allow-dirty cannot write the committed table');
+        await expect(
+            runBaseRateTable({
+                ...world.args,
+                json: join(process.cwd(), 'j.json'),
+            })
+        ).rejects.toThrow('is inside the repository');
+    });
+
+    it('rejects an events file that holds a line which is not an event', () => {
+        const world = makeWorld();
+        writeFileSync(
+            join(world.args.engine, 'events.jsonl'),
+            '{"kind":"other"}\n'
+        );
+        expect(() => readEngineInput(world.args.engine)).toThrow(
+            'line 1 is not an event'
+        );
+    });
+
+    it('rejects an event that lacks a field the table reads', () => {
+        const events = [
+            candleEvent({ pattern: 'hammer' }),
+            patternEvent({ id: 'a' }),
+        ];
+        expect(events.every(isEvalEvent)).toBe(true);
+        const without = (event: object, field: string): unknown =>
+            Object.fromEntries(
+                Object.entries(event).filter(([key]) => key !== field)
+            );
+        expect(isEvalEvent(without(events[1], 'target60'))).toBe(false);
+        expect(isEvalEvent(without(events[1], 'week'))).toBe(false);
+        expect(isEvalEvent({ ...events[1], market: 'jp' })).toBe(false);
+        expect(isEvalEvent({ ...events[1], placeboTargetHit: 'x' })).toBe(
+            false
+        );
+        expect(isEvalEvent(without(events[0], 'pattern'))).toBe(false);
+        expect(isEvalEvent({ ...events[0], matched: null })).toBe(false);
+        expect(
+            isEvalEvent({ ...events[0], y: { h1: 1, h5: Number.NaN, h10: 1 } })
+        ).toBe(false);
+        // A neutral candle needs no outcome.
+        expect(
+            isEvalEvent({
+                ...events[0],
+                status: 'neutral',
+                y: null,
+                matched: null,
+            })
+        ).toBe(true);
+        expect(isEvalEvent(null)).toBe(false);
+        expect(isEvalEvent({ kind: 'other' })).toBe(false);
+    });
+
+    it('lets a dirty run through for inspection and keeps the sha in the header', async () => {
+        const world = makeWorld({
+            engine: { sha: `${SHA}+dirty` },
+            candles: { sha: `${SHA}+dirty` },
+            levels: { sha: `${SHA}+dirty` },
+        });
+        const generated = await generateTable(
+            { ...world.args, allowDirty: true },
+            readInputs(world.args)
+        );
+        expect(generated.source).toContain(
+            `Core: ${SHA}+dirty (DIRTY checkout: do not commit)`
+        );
+    });
+});

@@ -30,6 +30,8 @@ export const EVAL_MODES = [
     'plan',
     'gating',
     'output',
+    'claims',
+    'zone',
 ] as const;
 export type EvalMode = (typeof EVAL_MODES)[number];
 
@@ -108,6 +110,8 @@ export const FIELDS_EVAL_CONSTANTS = {
         candidateCoverageMargin: 0.02,
         detectedCandidateMargin: -0.03,
         panelItemsMargin: 0.1,
+        /** WP-18 §8.3 O1: the change removes text, so the median output-token ratio may not grow. */
+        claimsOutputMaxRatio: 1.05,
     },
     /** WP-16 card rules the instrument recomputes from the printed lines (WP-16 §3.3, §4). */
     cards: {

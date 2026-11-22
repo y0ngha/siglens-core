@@ -253,6 +253,8 @@ const baseArgs = (overrides: Partial<FieldsEvalArgs>): FieldsEvalArgs => ({
     tier: null,
     baseline: null,
     repeat: null,
+    lang: 'ko',
+    restate: false,
     ...overrides,
 });
 
@@ -295,6 +297,26 @@ interface SummaryOut {
     paired?: unknown;
     p7Sample?: Record<string, string[]>;
     skills?: { cases: number };
+    claims?: {
+        paired: number;
+        unpaired: number;
+        reliability: {
+            before: { count: number };
+            after: { count: number };
+            diff: { high: number | null };
+        };
+    };
+    zone?: {
+        n: number;
+        n3: { basis: string };
+        positions: {
+            tolerance: Record<string, { count: number }>;
+            exact: Record<string, { count: number }>;
+        };
+        toleranceInZoneGeometry: Record<string, { count: number }>;
+        n1Sample: Record<string, string[]>;
+    };
+    targetRoom?: { paired: number } | null;
 }
 
 interface Summary {
@@ -1743,7 +1765,7 @@ describe('the arguments of gating and output', () => {
                 '--repeat',
                 'p',
             ])
-        ).toThrow('skills: --repeat applies to output only');
+        ).toThrow('skills: --repeat applies to output and claims only');
     });
 });
 
@@ -2166,6 +2188,321 @@ describe('runFieldsEval: output', () => {
                 makeDeps()
             )
         ).rejects.toThrow('no skill file found');
+    });
+});
+
+describe('runFieldsEval: claims', () => {
+    const body =
+        (summary: string, cards: readonly string[]) =>
+        (c: { close: number }): ResultBody => ({
+            ...asBody(defaultBody(c)),
+            summary,
+            indicatorResults: [],
+            strategyResults: [],
+            patternSummaries: cards.map(text => ({
+                detected: true,
+                summary: text,
+            })),
+            candlePatterns: [],
+        });
+    const skills = (world: World): string => {
+        const dir = join(world.dir, 'skills');
+        mkdirSync(join(dir, 'patterns'), { recursive: true });
+        writeFileSync(
+            join(dir, 'patterns', 'double-top.md'),
+            '---\nname: 이중천장\ntype: pattern\ngating:\n  tier: gated\n  triggers: [double_top]\n---\nbody'
+        );
+        return dir;
+    };
+    const claimsArgs = (world: World, over: Partial<FieldsEvalArgs>) =>
+        baseArgs({
+            mode: 'claims',
+            set: world.setDir,
+            skills: skills(world),
+            out: join(world.dir, 'out'),
+            ...over,
+        });
+    const claiming = body('강한 지지가 있습니다', ['신뢰도가 높은 편입니다']);
+    const quiet = body('조용한 장입니다', ['모양이 보입니다']);
+
+    it('compares the claim rates of an after and a before run and writes the claim gates beside the WP-18 form of the shared ones', async () => {
+        const world = makeWorld();
+        const after = writeRun(world, {
+            name: 'after',
+            body: quiet,
+            usage: { inputTokens: 1000, outputTokens: 180, cachedTokens: 400 },
+        });
+        const before = writeRun(world, { name: 'before', body: claiming });
+        const out = join(world.dir, 'out');
+        const code = await runFieldsEval(
+            claimsArgs(world, { run: after, before, gate: ['C1', 'C2', 'O1'] }),
+            makeDeps()
+        );
+        expect(code).toBe(0);
+        const { summary, gates } = readSummary(out);
+        expect(gates.map(g => g.id)).toEqual([
+            'C1',
+            'C2',
+            'F1',
+            'F2',
+            'L1',
+            'O1',
+            'V1',
+        ]);
+        const claims = need(summary.claims, 'claims');
+        expect(claims.paired).toBe(world.manifest.cases.length);
+        expect(claims.reliability.before.count).toBe(
+            world.manifest.cases.length
+        );
+        expect(claims.reliability.after.count).toBe(0);
+        expect(need(claims.reliability.diff.high, 'high')).toBeLessThan(0);
+        expect(gates.find(g => g.id === 'O1')?.pass).toBe(true);
+        expect(readRun(out).inputs.language).toBe('ko');
+        expect(
+            readFileSync(join(out, 'rows.jsonl'), 'utf-8').trim().split('\n')
+        ).toHaveLength(world.manifest.cases.length);
+    });
+
+    it('fails C1 and C2 when the claims stay and O1 when the output grows', async () => {
+        const world = makeWorld();
+        const after = writeRun(world, {
+            name: 'after',
+            body: claiming,
+            usage: { inputTokens: 1000, outputTokens: 400, cachedTokens: 400 },
+        });
+        const before = writeRun(world, { name: 'before', body: claiming });
+        const code = await runFieldsEval(
+            claimsArgs(world, { run: after, before, gate: ['C1', 'C2', 'O1'] }),
+            makeDeps()
+        );
+        expect(code).toBe(2);
+        const { gates } = readSummary(join(world.dir, 'out'));
+        expect(gates.filter(g => g.pass === false).map(g => g.id)).toEqual([
+            'C1',
+            'C2',
+            'O1',
+        ]);
+    });
+
+    it('reads an English run with the English wording', async () => {
+        const world = makeWorld();
+        const english = (text: string) => body(text, [text]);
+        const after = writeRun(world, {
+            name: 'after',
+            body: english('quiet market'),
+        });
+        const before = writeRun(world, {
+            name: 'before',
+            body: english('strong support, highly reliable'),
+        });
+        const code = await runFieldsEval(
+            claimsArgs(world, {
+                run: after,
+                before,
+                lang: 'en',
+                gate: ['C1', 'C2'],
+            }),
+            makeDeps()
+        );
+        expect(code).toBe(0);
+        expect(readRun(join(world.dir, 'out')).inputs.language).toBe('en');
+    });
+
+    it('refuses a run that does not cover its cases instead of pairing what is there', async () => {
+        const world = makeWorld();
+        const after = writeRun(world, { name: 'after', body: quiet, take: 2 });
+        const before = writeRun(world, { name: 'before', body: claiming });
+        await expect(
+            runFieldsEval(
+                claimsArgs(world, { run: after, before, gate: ['C1'] }),
+                makeDeps()
+            )
+        ).rejects.toThrow('is incomplete');
+    });
+});
+
+describe('runFieldsEval: zone', () => {
+    /** A plan whose zone ends 0.5% under the close: the 1% rule calls it in_zone, exact edges above_zone. */
+    const bandBody = (c: { close: number }): ResultBody => ({
+        trend: 'neutral',
+        riskLevel: 'medium',
+        summary: '조용한 장입니다.',
+        keyLevels: { support: [], resistance: [] },
+        actionRecommendation: {
+            entryRecommendation: 'enter',
+            entryPrices: [c.close * 0.985, c.close * 0.995],
+            stopLoss: c.close * 0.9,
+            takeProfitPrices: [c.close * 1.5],
+            entry: '눌림을 기다립니다',
+            positionAnalysis: '현재 가격은 구간 위입니다',
+            riskReward: '',
+            planState: {
+                position: 'in_zone',
+                distanceAtr: 0,
+                atr: 1,
+                stopDistanceAtr: 1,
+                stopBasis: 'model',
+            },
+        },
+    });
+    const zoneArgs = (world: World, over: Partial<FieldsEvalArgs>) =>
+        baseArgs({
+            mode: 'zone',
+            set: world.setDir,
+            out: join(world.dir, 'out'),
+            ...over,
+        });
+
+    it('reads where the close sits and the plan state under both rules', async () => {
+        const world = makeWorld();
+        const out = join(world.dir, 'out');
+        const run = writeRun(world, {
+            name: 'run',
+            body: bandBody,
+            labels: labelsOf,
+        });
+        const code = await runFieldsEval(
+            zoneArgs(world, { run, gate: ['Z1'] }),
+            makeDeps()
+        );
+        const { summary, gates } = readSummary(out);
+        const zone = need(summary.zone, 'zone');
+        expect(zone.n).toBe(world.manifest.cases.length);
+        expect(zone.n3.basis).toBe('stored');
+        expect(zone.positions.tolerance.in_zone.count).toBe(zone.n);
+        expect(zone.positions.exact.above_zone.count).toBe(zone.n);
+        expect(zone.toleranceInZoneGeometry.band_above.count).toBe(zone.n);
+        expect(gates.map(g => g.id)).toEqual(['Z1', 'Z2', 'N2', 'N3']);
+        // The stored state says in_zone for plans that sit above their zone: Z1 fails by design.
+        expect(gates.find(g => g.id === 'Z1')?.pass).toBe(false);
+        expect(code).toBe(2);
+        expect(
+            readFileSync(join(out, 'rows.jsonl'), 'utf-8').trim().split('\n')
+        ).toHaveLength(zone.n);
+    });
+
+    it('restates the positions with exact edges without a model call', async () => {
+        const world = makeWorld();
+        const run = writeRun(world, { name: 'run', body: bandBody });
+        const code = await runFieldsEval(
+            zoneArgs(world, { run, restate: true, gate: ['N3', 'Z2'] }),
+            makeDeps()
+        );
+        const { summary, gates } = readSummary(join(world.dir, 'out'));
+        expect(need(summary.zone, 'zone').n3.basis).toBe('exact');
+        // Every plan is above its zone: more than 85% in one position fails N3.
+        expect(gates.find(g => g.id === 'N3')?.pass).toBe(false);
+        // No plan is in_zone under the exact rule, so the cue rate among them is not computable.
+        expect(gates.find(g => g.id === 'Z2')?.pass).toBeNull();
+        expect(code).toBe(2);
+        expect(readRun(join(world.dir, 'out')).inputs.restate).toBe(true);
+    });
+
+    it('pairs with a before run for N2', async () => {
+        const world = makeWorld();
+        const after = writeRun(world, { name: 'after', body: bandBody });
+        const before = writeRun(world, { name: 'before', body: bandBody });
+        await runFieldsEval(
+            zoneArgs(world, { run: after, before, gate: ['N2'] }),
+            makeDeps()
+        );
+        const { summary, gates } = readSummary(join(world.dir, 'out'));
+        expect(need(summary.targetRoom, 'targetRoom').paired).toBe(
+            world.manifest.cases.length
+        );
+        expect(gates.find(g => g.id === 'N2')?.pass).toBe(true);
+    });
+
+    it('fails on a run with no plan', async () => {
+        const world = makeWorld();
+        const run = writeRun(world, {
+            name: 'run',
+            body: () => ({ trend: 'neutral' }),
+        });
+        await expect(
+            runFieldsEval(zoneArgs(world, { run }), makeDeps())
+        ).rejects.toThrow('the run has no plan');
+    });
+});
+
+describe('the arguments of claims and zone', () => {
+    const claims = [
+        '--mode',
+        'claims',
+        '--set',
+        's',
+        '--skills',
+        'k',
+        '--run',
+        'r',
+        '--before',
+        'b',
+        '--out',
+        'o',
+    ];
+    const zone = ['--mode', 'zone', '--set', 's', '--run', 'r', '--out', 'o'];
+
+    it('accepts the documented forms and reads --lang and --restate', () => {
+        expect(
+            parseFieldsEvalArgs([...claims, '--repeat', 'x', '--lang', 'en'])
+        ).toMatchObject({
+            mode: 'claims',
+            lang: 'en',
+            restate: false,
+        });
+        expect(
+            parseFieldsEvalArgs([
+                ...zone,
+                '--restate',
+                'exact',
+                '--before',
+                'b',
+            ])
+        ).toMatchObject({
+            mode: 'zone',
+            restate: true,
+            lang: 'ko',
+        });
+        expect(
+            parseFieldsEvalArgs([...claims, '--gate', 'C1,O1']).gate
+        ).toEqual(['C1', 'O1']);
+    });
+
+    it('refuses what does not apply', () => {
+        expect(() =>
+            parseFieldsEvalArgs([
+                '--mode',
+                'claims',
+                '--set',
+                's',
+                '--out',
+                'o',
+            ])
+        ).toThrow('claims: --run, --before and --skills are required');
+        expect(() =>
+            parseFieldsEvalArgs(['--mode', 'zone', '--set', 's', '--out', 'o'])
+        ).toThrow('zone: --run is required');
+        expect(() => parseFieldsEvalArgs([...zone, '--skills', 'k'])).toThrow(
+            'zone: --member-run, --skills and --limit do not apply'
+        );
+        expect(() => parseFieldsEvalArgs([...zone, '--repeat', 'x'])).toThrow(
+            'zone: --repeat applies to output and claims only'
+        );
+        expect(() =>
+            parseFieldsEvalArgs([...claims, '--restate', 'exact'])
+        ).toThrow('claims: --restate applies to zone only');
+        expect(() => parseFieldsEvalArgs([...zone, '--restate', 'x'])).toThrow(
+            '--restate must be "exact"'
+        );
+        expect(() => parseFieldsEvalArgs([...zone, '--lang', 'fr'])).toThrow(
+            '--lang must be ko or en'
+        );
+        expect(() => parseFieldsEvalArgs([...zone, '--gate', 'C1'])).toThrow(
+            '--gate ids not in mode zone'
+        );
+        expect(() => parseFieldsEvalArgs([...claims, '--limit', '3'])).toThrow(
+            'claims: --member-run and --limit do not apply'
+        );
     });
 });
 
