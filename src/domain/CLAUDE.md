@@ -664,7 +664,8 @@ A calculation whose result can be undefined (warm-up, division by zero) returns 
 `NaN` in a cached result or prompt corrupts parsing, sorting and rendering downstream.
 
 - Financial inputs get range guards, not just `Number.isFinite`: prices `> 0`, a take-profit
-  that equals the entry yields no ratio, `tp <= entry` on a long cannot produce a reward.
+  that equals the entry yields no ratio, `tp <= entry` on a long cannot produce a reward;
+  a percent change over a base price checks the base `> 0` first (a zero base prints `Infinity`).
 - Public numeric options that index arrays or define windows (horizons, periods) are
   filtered to valid integers (`Number.isInteger(n) && n > 0`) before use; derived values
   pass `Number.isFinite` before aggregation.

@@ -443,6 +443,21 @@ describe('computeMarketBackdrop', () => {
         expect(reading.relative[0].benchmarkPct).toBe(7.2);
     });
 
+    it('leaves a window null when its base close is not positive, instead of printing Infinity', () => {
+        // index 79 is the base of the 20-session window ending on the last bar (index 99)
+        const corrupt = symbolDaily.map((bar, i) =>
+            i === 79 ? { ...bar, close: 0 } : bar
+        );
+        const reading = computeMarketBackdrop({
+            label,
+            symbolDaily: corrupt,
+            benchmark: benchmarkOf(benchmarkBars),
+        });
+        expect(reading.relative[0].symbolPct).toBeNull();
+        expect(reading.relative[0].benchmarkPct).toBe(7.2);
+        expect(reading.relative[1].symbolPct).toBe(43.2);
+    });
+
     it('leaves a window null when a series has too little history for it', () => {
         const reading = computeMarketBackdrop({
             label,

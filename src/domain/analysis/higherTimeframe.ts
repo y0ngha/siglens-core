@@ -275,7 +275,9 @@ function changeToEnd(
     const endIndex = bars.findIndex(bar => bar.time === end);
     const last = bars[endIndex];
     const before = bars[endIndex - sessions];
-    if (last === undefined || before === undefined) return null;
+    // A non-positive base close is corrupt data; a ratio on it would print Infinity or a sign flip.
+    if (last === undefined || before === undefined || !(before.close > 0))
+        return null;
     return toPrinted((last.close / before.close - 1) * 100);
 }
 

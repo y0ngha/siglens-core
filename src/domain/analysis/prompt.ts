@@ -2918,20 +2918,22 @@ export function buildAnalysisPrompt(
     const trendReading = computeAnalysisTrend(bars, indicators);
     // The same one-computation rule for the two context blocks: the printed lines and the
     // readings handed back to the caller come from these values.
+    const higherSeries = higherContext?.higher ?? null;
     const higher =
-        higherContext?.higher == null
+        higherSeries === null
             ? null
             : computeHigherTimeframe({
-                  series: higherContext.higher,
+                  series: higherSeries,
                   analysisTrend: trendReading?.trend ?? null,
                   clock: marketClock,
               });
+    const backdropInput = higherContext?.backdrop ?? null;
     const backdrop =
-        higherContext?.backdrop == null
+        backdropInput === null
             ? null
             : {
-                  label: higherContext.backdrop.label,
-                  reading: computeMarketBackdrop(higherContext.backdrop),
+                  label: backdropInput.label,
+                  reading: computeMarketBackdrop(backdropInput),
               };
     const smcConceptNote = formatSmcConceptNote(indicators, bars);
     const overlayCandidatesSection =

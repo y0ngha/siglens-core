@@ -1183,6 +1183,11 @@ export interface MarketBackdropReading {
 /**
  * The market a symbol is read against, chosen by the consumer's market profile (core never
  * derives it from the symbol): a name to fetch daily bars under and a label to print.
+ *
+ * Only `symbol` enters the cache keys, so a consumer must pass one fixed `label` and
+ * `fmpSymbol` per benchmark `symbol`; two calls that share a `symbol` but differ in either
+ * would be served each other's cached entry. A benchmark equal to the analysed symbol
+ * still adds its key suffix, though no backdrop is fetched for it.
  */
 export interface MarketBenchmark {
     /** Symbol the provider is asked for (the benchmark's own code, e.g. `SPY`). */
