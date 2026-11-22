@@ -39,6 +39,11 @@ import {
     normalizeTrendline,
 } from '@/domain/analysis/normalize';
 import { normalizeCycleReading } from '@/domain/analysis/normalizeCards';
+import {
+    candleCardBaseRate,
+    normalizeCachedBaseRate,
+    patternCardBaseRate,
+} from '@/domain/analysis/baseRateCards';
 import { extractJsonFromLlmResponse } from '@/domain/analysis/promptFormat';
 import {
     OVERLAY_ID_PREFIX,
@@ -299,7 +304,8 @@ function buildUniqueIds(names: readonly string[]): string[] {
  *   prompt allows entries for the listed patterns only); omitted keeps every
  *   card.
  * @param options - `withoutModelCards` drops what the model wrote for the cards
- *   core computes (see {@link EnrichOptions}); omitted keeps every entry.
+ *   core computes (see {@link EnrichOptions}); omitted keeps every entry. `timeframe`
+ *   attaches each pattern and candle card's measured `baseRate`.
  * @returns A fully-validated, weight-enriched {@link AnalysisResponse}.
  *
  * @see buildAnalysisPrompt
@@ -389,6 +395,14 @@ export function enrichAnalysisWithConfidence(
                     skill?.confidenceWeight ??
                     UNMATCHED_SKILL_CONFIDENCE_WEIGHT,
                 renderConfig: skill?.display?.chart,
+                ...(options.timeframe === undefined
+                    ? {}
+                    : {
+                          baseRate: patternCardBaseRate(
+                              skill?.pattern,
+                              options.timeframe
+                          ),
+                      }),
             };
         }
     );
@@ -418,6 +432,14 @@ export function enrichAnalysisWithConfidence(
             ): CandlePatternSummary => ({
                 ...p,
                 id: candlePatternIds[index],
+                ...(options.timeframe === undefined
+                    ? {}
+                    : {
+                          baseRate: candleCardBaseRate(
+                              p.patternName,
+                              options.timeframe
+                          ),
+                      }),
             })
         ),
     };
@@ -513,9 +535,11 @@ function normalizeCachedPatternResult(
 
     const raw = asObject(item);
     const renderConfig = normalizePatternRenderConfig(raw?.renderConfig);
+    const baseRate = normalizeCachedBaseRate(raw?.baseRate);
 
     return {
         ...base,
+        ...(baseRate === undefined ? {} : { baseRate }),
         id: asString(raw?.id, fallbackId),
         confidenceWeight:
             asNumber(raw?.confidenceWeight) ??
@@ -553,9 +577,11 @@ function normalizeCachedCandlePattern(
     if (!base) return null;
 
     const raw = asObject(item);
+    const baseRate = normalizeCachedBaseRate(raw?.baseRate);
 
     return {
         ...base,
+        ...(baseRate === undefined ? {} : { baseRate }),
         id: asString(raw?.id, fallbackId),
     };
 }

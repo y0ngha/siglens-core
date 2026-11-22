@@ -79,6 +79,15 @@ import {
     type IndicatorTrend,
 } from '@/domain/analysis/indicatorTrendTag';
 import { confidenceLabel, roleLabel } from '@/domain/analysis/confidenceLevel';
+import {
+    baseRateVerdictLabel,
+    patternCardBaseRate,
+} from '@/domain/analysis/baseRateCards';
+import {
+    CANDLE_POOLED_BASE_RATE,
+    PATTERN_POOLED_BASE_RATE,
+    type MeasuredBaseRate,
+} from '@/domain/analysis/measuredBaseRates';
 import { detectSignals } from '@/domain/signals';
 import {
     CONFLUENCE_MIN_BARS,
@@ -1703,10 +1712,51 @@ const formatIndicatorSection = (
     ].join('\n');
 };
 
-const buildSkillBlock = (skill: Skill): string => {
+/**
+ * The verdict a pooled-figures row speaks for. A family below the sample floor is stored with
+ * `insufficient_sample` and the pooled numbers; the header then describes those numbers, whose
+ * n is large, so it reads the verdict of the subject's pooled row instead of "small sample".
+ */
+const pooledVerdictOf = (
+    skill: Skill,
+    row: MeasuredBaseRate
+): MeasuredBaseRate['verdict'] =>
+    row.verdict === 'insufficient_sample'
+        ? (skill.type === 'pattern'
+              ? PATTERN_POOLED_BASE_RATE
+              : CANDLE_POOLED_BASE_RATE
+          ).verdict
+        : row.verdict;
+
+/**
+ * The header label of a skill block. A pattern or candlestick skill carries what this engine
+ * measured for it (`[Measured: no edge over placebo, n=612]`, from the generated table, the
+ * same row the card and the candidate block print) instead of the catalog's literature
+ * weight, which measured nothing about this engine (WP-18 C4). A candlestick skill covers
+ * several candles, so it carries the pooled candle row. Every other skill type keeps its
+ * confidence label.
+ */
+const skillHeaderLabel = (skill: Skill, timeframe: Timeframe): string => {
+    if (skill.type !== 'pattern' && skill.type !== 'candlestick') {
+        return confidenceLabel(skill.confidenceWeight);
+    }
+    const row =
+        skill.type === 'pattern'
+            ? patternCardBaseRate(skill.pattern, timeframe)
+            : timeframe === '1Day'
+              ? CANDLE_POOLED_BASE_RATE
+              : null;
+    return row === null
+        ? '[Not measured on intraday bars]'
+        : row.key === 'pooled'
+          ? `[Measured over every ${skill.type === 'pattern' ? 'chart pattern' : 'candle'}: ${baseRateVerdictLabel(pooledVerdictOf(skill, row))}, n=${row.n.toLocaleString('en-US')}]`
+          : `[Measured: ${baseRateVerdictLabel(row.verdict)}, n=${row.n.toLocaleString('en-US')}]`;
+};
+
+const buildSkillBlock = (skill: Skill, timeframe: Timeframe): string => {
     const roles =
         skill.type === 'indicator_guide' ? roleLabel(skill.usageRoles) : '';
-    return `### ${skill.name} ${confidenceLabel(skill.confidenceWeight)}${roles}\n${skill.content}`;
+    return `### ${skill.name} ${skillHeaderLabel(skill, timeframe)}${roles}\n${skill.content}`;
 };
 
 /**
@@ -2038,6 +2088,28 @@ const withoutCycleStrategies = (
 });
 
 /**
+ * The reliability rule of the pattern and candle writing blocks (WP-18 C4, DOM-9): the guides
+ * still carry textbook reliability figures, while the engine measured no edge for what it
+ * detects, so a reliability claim must cite what the prompt prints, which names its own basis.
+ * Each variant names only what its block prints: the pattern block has the Measured label on
+ * its guide and the Measured line of each candidate; a candle has the label on its guide and
+ * no candidate block. Off daily bars nothing was measured, so the rule says that instead of
+ * pointing at numbers that are not there (DOM-12).
+ */
+const baseRateWritingRule = (
+    subject: 'pattern' | 'candle',
+    timeframe: Timeframe
+): string => {
+    const forbidden = `- Do not call a ${subject} reliable, high-confidence or likely to ${subject === 'pattern' ? 'reach its target' : 'play out'}`;
+    if (timeframe !== '1Day') {
+        return `${forbidden}; reliability was not measured on intraday bars, so do not state any.`;
+    }
+    return subject === 'pattern'
+        ? `${forbidden}; when you mention reliability, cite the Measured label on its guide or the Measured line of its candidate instead.`
+        : `${forbidden}; when you mention reliability, cite the Measured label on its guide instead.`;
+};
+
+/**
  * Full "## Analysis Request" section — the request header, the
  * critical-response rules, the generic ask sentence, the (fully static,
  * catalog-only) field content guidance, AND the per-type writing-rule
@@ -2072,6 +2144,7 @@ const buildAnalysisRequest = (
     supportResistanceSkills: Skill[],
     regularSkills: Skill[],
     computed: ComputedCardsInPrompt,
+    timeframe: Timeframe,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string => {
     const patternListInstruction =
@@ -2086,6 +2159,7 @@ const buildAnalysisRequest = (
                   `- In summary and every other text field, write about patterns as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says — the reader sees the chart, not this prompt.`,
                   '- **Do not include candle patterns (single/multi candle) in patternSummaries** — e.g. tweezers top/bottom, engulfing, doji, hammer, shooting star, harami, morning/evening star are candle patterns, never chart patterns, even when you describe other shapes. Candle patterns belong only in candlePatterns.',
                   '- skillName: follow the Name Field Matching rule in ## Analysis Guidelines. It MUST exactly match its pattern skill name from the list below.',
+                  baseRateWritingRule('pattern', timeframe),
                   // Schema-restatement dedup: the response schema's `required`
                   // list only API-enforces this for the forced-tool providers
                   // (Gemini/OpenAI/haiku). The thinking-Claude path (sonnet/opus,
@@ -2158,7 +2232,8 @@ const buildAnalysisRequest = (
                   '',
                   '### candlePatterns Writing Rules for Candlestick Skills',
                   '- Use the Candlestick Pattern Guides above to interpret the candle patterns detected in ## Detected Candle Patterns.',
-                  '- For each detected candle pattern, evaluate the trend context, confirmation signals, and statistical reliability as described in the matching guide.',
+                  '- For each detected candle pattern, evaluate the trend context and confirmation signals as described in the matching guide.',
+                  baseRateWritingRule('candle', timeframe),
                   '- When a pattern matches a guide, enrich the candlePatterns entry with the guide insights: trend context validity, volume confirmation, and recommended indicator cross-checks.',
                   '- The summary field of each candlePatterns entry must include the guide-informed interpretation, not just pattern name repetition.',
                   '- The trend field MUST use the value provided in the [trend: ...] label of ## Detected Candle Patterns. Do not re-judge or override it.',
@@ -2469,13 +2544,14 @@ const SKILL_CONTENT_SECTION_ORDER: readonly SkillGroupKey[] = [
  * {@link buildAnalysisRequest}, not here).
  */
 const buildSkillContentSections = (
-    groups: Record<SkillGroupKey, Skill[]>
+    groups: Record<SkillGroupKey, Skill[]>,
+    timeframe: Timeframe
 ): string[] =>
     SKILL_CONTENT_SECTION_ORDER.flatMap(key => {
         const skills = groups[key];
         if (skills.length === 0) return [];
         return [
-            `${SKILL_CONTENT_SECTION_HEADER[key]}\n${skills.map(buildSkillBlock).join('\n\n')}`,
+            `${SKILL_CONTENT_SECTION_HEADER[key]}\n${skills.map(skill => buildSkillBlock(skill, timeframe)).join('\n\n')}`,
         ];
     });
 
@@ -2806,6 +2882,7 @@ export function buildAnalysisPrompt(
                 card.cycle === undefined ? [] : [card.cycle.kind]
             ),
         },
+        timeframe,
         locale
     );
 
@@ -2822,7 +2899,7 @@ export function buildAnalysisPrompt(
     // Only the position of these two blocks moved — their text is unchanged,
     // and the Analysis Request stays at the tail of `dynamic` (moving the
     // output rules forward degraded actionability; see buildAnalysisRequest).
-    const coreSkillSections = buildSkillContentSections(coreGroups);
+    const coreSkillSections = buildSkillContentSections(coreGroups, timeframe);
     const stableSections = [
         ANALYSIS_INTENT_BLOCK,
         analysisGuidelines(locale),
@@ -2951,7 +3028,7 @@ export function buildAnalysisPrompt(
             signalFreshness ?? undefined
         ),
         ...(coreSkillSections.length > 0 ? [CORE_SKILL_REFERENCE_POINTER] : []),
-        ...buildSkillContentSections(selectedGroups),
+        ...buildSkillContentSections(selectedGroups, timeframe),
         ...(selectionContext.atrPercent >= atrExtremeThreshold(timeframe)
             ? [ATR_EXTREME_VOLATILITY_NOTE]
             : []),

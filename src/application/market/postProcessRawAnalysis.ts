@@ -22,6 +22,7 @@ import type {
     RawStrategyResult,
     ResolvedChartOverlays,
     Skill,
+    Timeframe,
 } from '@/domain/types';
 
 /**
@@ -72,6 +73,11 @@ export interface PostProcessRawAnalysisInput {
     readonly currency?: CurrencyCode;
     readonly locale?: AnalysisLocale;
     readonly krxTickTable?: KrxTickTable;
+    /**
+     * The analysis timeframe: pattern and candle cards carry their measured `baseRate` for
+     * it (`null` off daily bars). Omitted leaves the field off the cards.
+     */
+    readonly timeframe?: Timeframe;
 }
 
 /**
@@ -130,12 +136,13 @@ export function postProcessRawAnalysis(
         currency,
         locale = DEFAULT_ANALYSIS_LOCALE,
         krxTickTable,
+        timeframe,
     } = input;
     const enriched = enrichAnalysisWithConfidence(
         rawResult,
         skills,
         allowedPatternSkills,
-        { withoutModelCards: true }
+        { withoutModelCards: true, timeframe }
     );
     const resolvedOverlays = resolveChartOverlays(
         overlayCandidates,

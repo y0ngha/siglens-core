@@ -77,8 +77,10 @@ import type { ChartPatternId, Timeframe } from '@/domain/types';
 /** The sample floor of a family row and of the verdict rule (CP-11). */
 export const BASE_RATE_MIN_N = ${BASE_RATE_MIN_N};
 
-/** Tier 4, both entrypoints (API-3). */
+/** What a base-rate row measures. Tier 4, both entrypoints (API-3). */
 export type BaseRateSubject = 'chart_pattern' | 'candle_pattern' | 'price_level';
+
+/** Whether a row beats its placebo (the WP-17 G3 rule), has no edge, or has too few events. */
 export type BaseRateVerdict = 'beats_placebo' | 'no_edge' | 'insufficient_sample';
 
 export interface MeasuredBaseRate {

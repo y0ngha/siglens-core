@@ -153,7 +153,7 @@ sentences and the Step 1 bullet. Measured on the 65-symbol daily replay set (41,
 both anchors sat a median 0.53 ATR from the close, inside one bar's range; the ratio's rank
 correlation with the next 10 sessions' return was 0.001; and the printed levels held no more
 often than a price at the same distance on another date (49.6% against 49.7% of 550,171
-touches, `PRICE_LEVEL_HOLD_RATE`). A verdict sentence on a number that carries no information is
+touches, `PRICE_LEVEL_BASE_RATE` in the generated `measuredBaseRates.ts`). A verdict sentence on a number that carries no information is
 a claim the data contradict (DOM-9, DOM-12). No level score exists either: a fitted score of
 kinds, touches, volume and recency did not beat its own placebo out of sample
 (`scripts/replay/levelEval.ts`, gate L-gate). The measured statement is in the market reference

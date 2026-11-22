@@ -88,6 +88,33 @@ import * as coreApi from '@/index';
 import { describe, expect, it } from 'vitest';
 
 describe('public API exports', () => {
+    it('exports the measured base rates and their lookup (WP-18 C4, API-1: both entrypoints)', () => {
+        expect(typeof coreApi.measuredBaseRateFor).toBe('function');
+        expect(coreApi.BASE_RATE_MIN_N).toBe(100);
+        expect(coreApi.PRICE_LEVEL_BASE_RATE.subject).toBe('price_level');
+        expect(Object.keys(coreApi.PATTERN_BASE_RATES)).toContain(
+            'double_bottom'
+        );
+        expect(Object.keys(coreApi.CANDLE_BASE_RATES)).toContain('hammer');
+        expect(
+            coreApi.measuredBaseRateFor(
+                'chart_pattern',
+                'double_bottom',
+                '1Day'
+            )
+        ).toBe(coreApi.PATTERN_BASE_RATES.double_bottom);
+        expect(
+            coreApi.measuredBaseRateFor('candle_pattern', 'hammer', '1Day')
+        ).toBe(coreApi.CANDLE_BASE_RATES.hammer);
+        expect(
+            coreApi.measuredBaseRateFor(
+                'chart_pattern',
+                'double_bottom',
+                '1Hour'
+            )
+        ).toBeNull();
+    });
+
     it('exports indicator constants from package entrypoint', () => {
         expect(RSI_DEFAULT_PERIOD).toBe(14);
         expect(EMA_DEFAULT_PERIODS).toEqual([9, 20, 21, 60]);

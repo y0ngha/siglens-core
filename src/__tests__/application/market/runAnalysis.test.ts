@@ -2187,7 +2187,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
                 expect.anything(),
                 expect.anything(),
                 ['Cup Guide'],
-                { withoutModelCards: true }
+                { withoutModelCards: true, timeframe: mockTimeframe }
             );
         });
 

@@ -370,6 +370,21 @@ export {
     validateActionPrices,
 } from './domain/analysis/actionRecommendation';
 export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
+// The measured base rates of the engines' claims on the daily replay set (WP-18 C4): the
+// rows a pattern or candle card carries as `baseRate`, the price-level row, and the lookup
+// the client uses for a result stored before `baseRate` existed. Pure, so both entrypoints.
+export {
+    BASE_RATE_MIN_N,
+    CANDLE_BASE_RATES,
+    PATTERN_BASE_RATES,
+    PRICE_LEVEL_BASE_RATE,
+    measuredBaseRateFor,
+} from './domain/analysis/measuredBaseRates';
+export type {
+    BaseRateSubject,
+    BaseRateVerdict,
+    MeasuredBaseRate,
+} from './domain/analysis/measuredBaseRates';
 
 // Dashboard helpers
 export {

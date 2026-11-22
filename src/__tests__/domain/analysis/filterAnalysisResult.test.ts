@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { filterAnalysisResult } from '@/domain/analysis/filterAnalysisResult';
+import { PATTERN_BASE_RATES } from '@/domain/analysis/measuredBaseRates';
 import { TIER_CONFIG } from '@/domain/tier';
 import type {
     AnalysisResponse,
@@ -323,6 +324,30 @@ describe('filterAnalysisResult', () => {
             },
         });
         expect(filtered.lockedInfoDepth).toEqual(['confidence']);
+    });
+
+    it('keeps a pattern card baseRate at the card depth: it survives the confidence mask and goes with the card', () => {
+        const baseRate = PATTERN_BASE_RATES.double_bottom;
+        const analysis = makeAnalysisResponse({
+            patternSummaries: [
+                {
+                    ...makeAnalysisResponse().patternSummaries[0],
+                    baseRate,
+                },
+            ],
+        });
+        // skill_detection granted, confidence not: the weight is masked, the caveat of the
+        // target the card shows is not.
+        const masked = expectFilteredResult(
+            filterAnalysisResult(analysis, 'member', customRestrictedConfig)
+        );
+        expect(masked.patternSummaries?.[0].confidenceWeight).toBe(0);
+        expect(masked.patternSummaries?.[0].baseRate).toBe(baseRate);
+        // skill_detection denied: the whole card, baseRate included, is gone.
+        const denied = expectFilteredResult(
+            filterAnalysisResult(analysis, 'member', denySkillDetectionConfig)
+        );
+        expect(denied.patternSummaries).toBeNull();
     });
 
     it('masks patternSummaries and strategyResults to null when skill_detection is not allowed', () => {

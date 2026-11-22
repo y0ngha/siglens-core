@@ -639,6 +639,7 @@ async function runAnalysisImpl(
             currency: options.currency,
             locale,
             krxTickTable: options.krxTickTable,
+            timeframe,
         });
     // Once per generation: `dedupeGeneration` hands the winner's reply to every concurrent
     // caller, and each one post-processes it, so only the caller whose factory actually ran
