@@ -145,7 +145,7 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | `classifyTrend` | `domain/signals/index.ts` |
 | `CROSS_LOOKBACK_BARS`(3) / `GOLDEN_CROSS_FAST_PERIOD`(50) / `GOLDEN_CROSS_SLOW_PERIOD`(200) / `SHORT_MA_CROSS_FAST_PERIOD`(20) / `SHORT_MA_CROSS_SLOW_PERIOD`(50) — `detectSignals`의 교차 신호 상수. `golden_cross`/`death_cross`는 SMA50이 SMA200을 최근 `CROSS_LOOKBACK_BARS`봉 안에 교차(201봉 필요), `short_ma_bullish_cross`/`short_ma_bearish_cross`는 SMA20/SMA50 교차(51봉 필요, 컨플루언스 계열 `ma`)다. 컨플루언스 집계는 변하지 않는다(50/200은 제외, `short_ma_*`가 20/50 표를 이어받는다). **소비자 조치(semver minor)**: `SignalType`을 키로 하는 전수 `Record<SignalType, …>` 맵에는 `short_ma_bullish_cross`/`short_ma_bearish_cross`를 추가해야 하고, `golden_cross`/`death_cross`는 이제 50/200을 뜻하므로 20/50을 가정한 라벨·설명·집계를 고친다. 두 entrypoint 모두 export. | `domain/signals/constants.ts` |
 
-**개별 지표 단독 export (2)** — 통합 계산기와 별개로 소비자가 직접 쓰도록 노출한 순수 함수. `calculateMA`는 서버 entry 전용, `calculateIchimokuFutureCloud`는 양 entrypoint.
+**개별 지표 단독 export (2)** — 통합 계산기와 별개로 소비자가 직접 쓰도록 노출한 순수 함수. 둘 다 양 entrypoint(`calculateMA`는 브라우저 차트가 core 기본 기간에 없는 기간을 봉으로 계산하도록 클라이언트 entry에도 둔다).
 | Symbol | Source |
 |---|---|
 | `calculateMA(bars, period)` — 종가 단순 이동평균. 봉이 없거나 `period <= 0`이면 `[]`, 봉이 `period`보다 적으면 전부 `null`인 배열(봉과 같은 길이)을 돌려준다. 소비자가 이동평균을 재구현하지 않도록 노출한다. | `domain/indicators/ma.ts` |

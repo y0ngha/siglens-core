@@ -799,7 +799,9 @@ extracted to a `const` at the top of the test.
 
 A `describe`/`it` title must not claim more than its assertions verify. A guard test that
 names a class of inputs covers every instance of that class (scan all quoted strings, not
-only the ones labelled "example").
+only the ones labelled "example"): its matcher gets a fixture for every form the real
+document or code uses (separators, letter case, multi-symbol rows) plus one innocent look-alike
+it must not flag.
 
 <a id="TE-9"></a>
 #### TE-9 — No vacuous tests

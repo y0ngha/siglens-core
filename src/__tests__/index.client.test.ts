@@ -362,6 +362,7 @@ describe('client entrypoint export presence (API-1)', () => {
         'calculateIchimokuFutureCloud',
         'canonicalJson',
         'calculateIndicators',
+        'calculateMA',
         'computeCryptoFearGreedHistory',
         'computeCryptoFearGreedIndex',
         'computeFearGreedHistory',
