@@ -21,7 +21,10 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FUNDAMENTAL_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { fingerprintSkillCatalog } from '@/infrastructure/skills/sampling';
-import { FREE_TIER_GATED_SKILLS_PER_GROUP } from '@/domain/analysis/skillTierCap';
+import {
+    FREE_TIER_GATED_SKILLS_PER_GROUP,
+    gatedSkillCapForTier,
+} from '@/domain/analysis/skillTierCap';
 import { FUNDAMENTAL_SYSTEM_PROMPT } from '@/domain/analysis/systemPrompt';
 import { analysisSeed } from '@/infrastructure/hash/analysisInput';
 import type { FundamentalDataProvider } from '@/domain/ports/fundamentalDataProvider';
@@ -157,6 +160,18 @@ describe('runFundamentalAnalysis', () => {
             );
             expect(memberKey).toContain(`member:${fingerprint}`);
             expect(freeKey).not.toBe(memberKey);
+        });
+
+        it('프롬프트 빌더에 티어의 gated 스킬 상한을 넘긴다', async () => {
+            await keyFor('free');
+            expect(mockBuildFundamentalAnalysisPrompt.mock.lastCall?.[6]).toBe(
+                gatedSkillCapForTier('free')
+            );
+
+            await keyFor('member');
+            expect(
+                mockBuildFundamentalAnalysisPrompt.mock.lastCall?.[6]
+            ).toBeNull();
         });
     });
 

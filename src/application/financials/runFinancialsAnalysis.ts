@@ -28,6 +28,7 @@ import {
 import { FINANCIALS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { financialsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import {
     buildFinancialsCacheKey,
@@ -237,7 +238,8 @@ export async function runFinancialsAnalysis(
         snapshot,
         scorecard,
         skillsResult.skills,
-        locale
+        locale,
+        gatedSkillCapForTier(tier)
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

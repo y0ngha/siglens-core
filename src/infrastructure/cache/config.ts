@@ -1133,12 +1133,15 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * gone). A free technical prompt carries every always-on skill and, per injection group,
  * at most `FREE_TIER_GATED_SKILLS_PER_GROUP` of the gated skills that fired, taken in
  * relevance order; member and pro prompts are unchanged. Free bytes change for every
- * technical prompt. Every free cache key (technical, fundamental, financials, news,
- * congress, market-news digest) now carries `free-c<cap>` (the cap value) and the
+ * technical prompt. The prompts of the other analysis kinds (fundamental, financials, news,
+ * congress, market-news digest) apply the same per-group cap to their gated skills, and
+ * never cap always-on skills: free gets every always-on skill on every path. Their
+ * catalog today is all always-on with at most 3 skills per group, and a chartless prompt
+ * can fire no gated skill, so their bytes are unchanged. Every free cache key (technical,
+ * fundamental, financials, news, congress, market-news digest) now carries `free-c<cap>` (the cap value) and the
  * fingerprint of the whole catalog instead of that of a per-symbol sample, so each free
  * entry is regenerated once and a later change of the cap moves the free keys again, as
- * does the technical peek key; the fundamental, financials, news, congress and digest
- * prompts render the same bytes as before. After the model answers, a capped tier (free)
+ * does the technical peek key. After the model answers, a capped tier (free)
  * enriches the result with only the skills its prompt carried; member and pro keep
  * enriching with the full catalog, as before.
  *

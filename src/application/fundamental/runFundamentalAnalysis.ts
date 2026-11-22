@@ -27,6 +27,7 @@ import {
 import { FUNDAMENTAL_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { fundamentalSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import { ISO_DATE_PREFIX_LENGTH } from '@/domain/constants/format';
 import {
@@ -304,7 +305,8 @@ export async function runFundamentalAnalysis(
         skillsResult.skills,
         locale,
         options.currency,
-        occurredAt
+        occurredAt,
+        gatedSkillCapForTier(tier)
     );
     // Design C: the always-on skill digest (`stable`) folds into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

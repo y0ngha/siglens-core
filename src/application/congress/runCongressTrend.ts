@@ -21,6 +21,7 @@ import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt'
 import { CONGRESS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { congressSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type {
     ActiveModelId,
@@ -166,7 +167,8 @@ export async function runCongressTrend(
         trades,
         stats,
         skillsResult.skills,
-        locale
+        locale,
+        gatedSkillCapForTier(tier)
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

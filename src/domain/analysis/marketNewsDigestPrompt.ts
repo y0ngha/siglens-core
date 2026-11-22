@@ -25,11 +25,15 @@ import type { AssembledPrompt, EnrichedNewsItem, Skill } from '@/domain/types';
  * chart, so only `always_on` skills can qualify. Confidence is a display
  * weight, not an inclusion gate.
  */
-function selectNewsSkills(skills: readonly Skill[]): Skill[] {
+function selectNewsSkills(
+    skills: readonly Skill[],
+    gatedSkillCap: number | null | undefined
+): Skill[] {
     const { core, selected } = selectSkills(
         skills,
         NO_CHART_SELECTION_CONTEXT,
-        'news'
+        'news',
+        { gatedPerGroupCap: gatedSkillCap }
     );
     return [...core, ...selected];
 }
@@ -75,6 +79,8 @@ function formatNewsItem(
  * @param categoryLabel - Human Korean label for the feed category shown to the model.
  * @param news          - Enriched news items with per-card analysis.
  * @param skills        - All loaded skills; non-news entries are filtered out.
+ * @param gatedSkillCap - The most gated skills one injection group may keep, by relevance
+ *   (see {@link selectSkills}); omitted or `null` keeps all. Always-on skills are never capped.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
 export function buildMarketNewsDigestPrompt(
@@ -87,9 +93,10 @@ export function buildMarketNewsDigestPrompt(
      * Optional without a wall-clock default: the domain never reads the clock
      * itself (production callers pass it); omitted → no age suffix.
      */
-    now?: Date
+    now?: Date,
+    gatedSkillCap?: number | null
 ): AssembledPrompt {
-    const qualifiedSkills = selectNewsSkills(skills);
+    const qualifiedSkills = selectNewsSkills(skills, gatedSkillCap);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

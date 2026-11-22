@@ -19,7 +19,10 @@ import { createCacheProvider } from '@/infrastructure/cache/redis';
 import { FINANCIALS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
 import { loadSkillsCached } from '@/infrastructure/skills/loader';
 import { fingerprintSkillCatalog } from '@/infrastructure/skills/sampling';
-import { FREE_TIER_GATED_SKILLS_PER_GROUP } from '@/domain/analysis/skillTierCap';
+import {
+    FREE_TIER_GATED_SKILLS_PER_GROUP,
+    gatedSkillCapForTier,
+} from '@/domain/analysis/skillTierCap';
 import { buildFinancialsAnalysisPrompt } from '@/domain/analysis/financialsPrompt';
 import { financialsSystemPrompt } from '@/domain/analysis/systemPrompt';
 
@@ -113,6 +116,18 @@ describe('runFinancialsAnalysis', () => {
             );
             expect(memberKey).toContain(`member:${fingerprint}`);
             expect(freeKey).not.toBe(memberKey);
+        });
+
+        it('프롬프트 빌더에 티어의 gated 스킬 상한을 넘긴다', async () => {
+            await keyFor('free');
+            expect(mockBuildFinancialsAnalysisPrompt.mock.lastCall?.[5]).toBe(
+                gatedSkillCapForTier('free')
+            );
+
+            await keyFor('member');
+            expect(
+                mockBuildFinancialsAnalysisPrompt.mock.lastCall?.[5]
+            ).toBeNull();
         });
     });
 

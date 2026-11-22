@@ -19,6 +19,7 @@ import {
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER } from '@/domain/tier';
 import type { ActiveModelId, NewsAnalysisResponse } from '@/domain/types';
 import { NEWS_CACHE_TTL_SECONDS } from '@/infrastructure/cache/config';
@@ -100,7 +101,8 @@ export async function runMarketNewsDigest(
         news,
         digestSkills,
         locale,
-        new Date()
+        new Date(),
+        gatedSkillCapForTier(tier)
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.

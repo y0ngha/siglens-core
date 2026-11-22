@@ -1,5 +1,5 @@
 import { isStateNotable } from '@/domain/analysis/skillGatingPredicates';
-import { skillGroupKey } from '@/domain/analysis/skillTierCap';
+import { capGatedPerGroup } from '@/domain/analysis/skillTierCap';
 import {
     isSkillAllowedInContext,
     type PromptSkillContext,
@@ -106,20 +106,6 @@ const byNameEn = (a: Skill, b: Skill): number =>
 export interface SelectSkillsOptions {
     gatedPerGroupCap?: number | null;
 }
-
-/**
- * Keeps the first `cap` skills of every injection group, preserving the input
- * (relevance) order. Local Map accumulator: the input is never mutated.
- */
-const capGatedPerGroup = (skills: readonly Skill[], cap: number): Skill[] => {
-    const kept = new Map<string, number>();
-    return skills.filter(skill => {
-        const key = skillGroupKey(skill);
-        const count = kept.get(key) ?? 0;
-        kept.set(key, count + 1);
-        return count < cap;
-    });
-};
 
 /**
  * @internal

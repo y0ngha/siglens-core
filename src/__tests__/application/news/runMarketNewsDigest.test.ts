@@ -3,7 +3,19 @@ import type { Mock } from 'vitest';
 
 vi.mock('@/application/analysis/callAnalysisAi');
 vi.mock('@/infrastructure/cache/redis');
+vi.mock('@/domain/analysis/marketNewsDigestPrompt', async importOriginal => {
+    const actual =
+        await importOriginal<
+            typeof import('@/domain/analysis/marketNewsDigestPrompt')
+        >();
+    return {
+        ...actual,
+        buildMarketNewsDigestPrompt: vi.fn(actual.buildMarketNewsDigestPrompt),
+    };
+});
 
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
+import { buildMarketNewsDigestPrompt } from '@/domain/analysis/marketNewsDigestPrompt';
 import { runMarketNewsDigest } from '@/application/news/runMarketNewsDigest';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -63,6 +75,22 @@ describe('runMarketNewsDigest', () => {
         mockCacheGet.mockResolvedValue(null);
         mockCacheSet.mockResolvedValue(undefined);
         mockCallAnalysisAi.mockResolvedValue(JSON.stringify(mockRawResult));
+    });
+
+    describe('프롬프트 빌더에 넘기는 gated 스킬 상한', () => {
+        const capFor = async (tier: 'free' | 'member'): Promise<unknown> => {
+            vi.mocked(buildMarketNewsDigestPrompt).mockClear();
+            await runMarketNewsDigest({ ...baseArgs(), tier });
+            const call = vi
+                .mocked(buildMarketNewsDigestPrompt)
+                .mock.calls.find(c => c[0] === baseArgs().categoryLabel);
+            return call?.[5];
+        };
+
+        it('free는 상한을, member는 null을 넘긴다', async () => {
+            expect(await capFor('free')).toBe(gatedSkillCapForTier('free'));
+            expect(await capFor('member')).toBeNull();
+        });
     });
 
     describe('no_news 가드', () => {

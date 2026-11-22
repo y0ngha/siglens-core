@@ -1,7 +1,20 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { buildMarketNewsDigestPrompt as buildMarketNewsDigestPromptRaw } from '@/domain/analysis/marketNewsDigestPrompt';
 import { DRIVER_READER_FACING_RULE } from '@/domain/analysis/newsPrompt';
 import type { EnrichedNewsItem, Skill } from '@/domain/types';
+
+import { selectSkills } from '@/domain/analysis/selectSkills';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
+import {
+    ALWAYS_ON_COUNT,
+    tierCapCatalog,
+} from '@/__tests__/helpers/tierCapSkills';
+
+vi.mock('@/domain/analysis/selectSkills', async importOriginal => {
+    const actual =
+        await importOriginal<typeof import('@/domain/analysis/selectSkills')>();
+    return { ...actual, selectSkills: vi.fn(actual.selectSkills) };
+});
 
 // `buildMarketNewsDigestPrompt` now returns `{ stable, dynamic }` (assembly
 // split) — this file's call sites predate the split and assert
@@ -190,4 +203,41 @@ describe('buildMarketNewsDigestPrompt — 독자용 문구 규칙', () => {
         expect(dynamic).not.toMatch(/No price\/volume data/);
         expect(dynamic).toContain('Do not attribute price moves to the news.');
     });
+});
+
+describe('buildMarketNewsDigestPrompt — 티어 상한', () => {
+    const { catalog, alwaysOnNames, gatedNames } = tierCapCatalog(
+        'news',
+        'Dig'
+    );
+    const tiers = ['free', 'member', 'pro'] as const;
+
+    it.each(tiers)(
+        '%s: always-on 스킬은 모두 프롬프트에 들어가고 상한이 selectSkills에 전달된다',
+        tier => {
+            vi.mocked(selectSkills).mockClear();
+            const { stable, dynamic } = buildMarketNewsDigestPromptRaw(
+                '미국 암호화폐',
+                [ITEM],
+                catalog,
+                'ko',
+                undefined,
+                gatedSkillCapForTier(tier)
+            );
+            const text = `${stable}\n${dynamic}`;
+
+            expect(alwaysOnNames).toHaveLength(ALWAYS_ON_COUNT);
+            alwaysOnNames.forEach(name => expect(text).toContain(name));
+            // A chartless context fires no gated skill (see
+            // NO_CHART_SELECTION_CONTEXT), so none can reach the prompt on any
+            // tier; the cap is still handed to the selection step.
+            gatedNames.forEach(name => expect(text).not.toContain(name));
+            expect(selectSkills).toHaveBeenLastCalledWith(
+                expect.anything(),
+                expect.anything(),
+                'news',
+                { gatedPerGroupCap: gatedSkillCapForTier(tier) }
+            );
+        }
+    );
 });

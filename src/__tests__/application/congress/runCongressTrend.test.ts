@@ -4,7 +4,19 @@ import type { Mock } from 'vitest';
 vi.mock('@/application/analysis/callAnalysisAi');
 vi.mock('@/infrastructure/cache/redis');
 vi.mock('@/infrastructure/skills/loader');
+vi.mock('@/domain/analysis/congressTrendPrompt', async importOriginal => {
+    const actual =
+        await importOriginal<
+            typeof import('@/domain/analysis/congressTrendPrompt')
+        >();
+    return {
+        ...actual,
+        buildCongressTrendPrompt: vi.fn(actual.buildCongressTrendPrompt),
+    };
+});
 
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
+import { buildCongressTrendPrompt } from '@/domain/analysis/congressTrendPrompt';
 import { runCongressTrend } from '@/application/congress/runCongressTrend';
 import { callAnalysisAi } from '@/application/analysis/callAnalysisAi';
 import { createCacheProvider } from '@/infrastructure/cache/redis';
@@ -98,6 +110,22 @@ describe('runCongressTrend', () => {
         mockGetTrades.mockImplementation((_symbol: string, chamber: string) =>
             Promise.resolve(chamber === 'senate' ? [senateRow] : [])
         );
+    });
+
+    describe('프롬프트 빌더에 넘기는 gated 스킬 상한', () => {
+        const capFor = async (tier: 'free' | 'member'): Promise<unknown> => {
+            vi.mocked(buildCongressTrendPrompt).mockClear();
+            await runCongressTrend({ ...BASE_OPTIONS, tier });
+            const call = vi
+                .mocked(buildCongressTrendPrompt)
+                .mock.calls.find(c => c[0] === BASE_OPTIONS.symbol);
+            return call?.[5];
+        };
+
+        it('free는 상한을, member는 null을 넘긴다', async () => {
+            expect(await capFor('free')).toBe(gatedSkillCapForTier('free'));
+            expect(await capFor('member')).toBeNull();
+        });
     });
 
     describe('캐시 키의 스킬 지문', () => {

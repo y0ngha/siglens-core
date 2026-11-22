@@ -12,7 +12,9 @@ export function reasoningSeedPart(reasoning?: boolean): string {
  * Fingerprint of the whole loaded catalog (names, gating, token cost) for
  * cache-key derivation. It carries no tier and no cap: those are added by
  * {@link tierCapKeyPart}, so two symbols of one tier share the fingerprint
- * because they share the catalog.
+ * because they share the catalog. It stays a named wrapper (one caller,
+ * {@link skillCatalogKeyPart}) so the cache-key role is in the name, independent of
+ * what `hashSkillCatalog` hashes.
  */
 export function fingerprintSkillCatalog(skills: readonly Skill[]): string {
     return hashSkillCatalog(skills);

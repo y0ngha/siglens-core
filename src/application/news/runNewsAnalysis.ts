@@ -28,6 +28,7 @@ import {
 } from '@/domain/analysis/outputLocale';
 import { NEWS_RESPONSE_SCHEMA } from '@/domain/analysis/responseSchemas';
 import { newsSystemPrompt } from '@/domain/analysis/systemPrompt';
+import { gatedSkillCapForTier } from '@/domain/analysis/skillTierCap';
 import { DEFAULT_TIER, TIER_CONFIG } from '@/domain/tier';
 import type {
     ActiveModelId,
@@ -258,7 +259,8 @@ export async function runNewsAnalysis(
         options.currency,
         occurredAt,
         macroCalendar,
-        instrumentKind
+        instrumentKind,
+        gatedSkillCapForTier(tier)
     );
     // Design C: fold the always-on skill digest (`stable`) into SYSTEM so
     // providers with a stable-system cache hit amortise the cost.
