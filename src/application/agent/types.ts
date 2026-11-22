@@ -5,6 +5,7 @@ import type {
     AgentStreamEvent,
     CallAgentProvider,
 } from '@/domain/ports/agentProvider';
+import type { AgentToolSet } from '@/domain/agent/toolSet';
 import type { CounterStore } from '@/domain/ports/counterStore';
 import type { UsageLogRepository } from '@/domain/ports/usageLogRepository';
 import type {
@@ -47,6 +48,13 @@ export interface RunAgentTurnParams {
     userImages?: readonly AgentImage[];
     /** Tool names the consumer can execute right now. */
     availableTools: ReadonlySet<string>;
+    /**
+     * The consumer's tool set: the catalog the model may call, the prompt text
+     * for it and each tool's per-turn cap. Omitted: `BUILT_IN_AGENT_TOOL_SET`,
+     * which behaves exactly as the loop did before the set became injectable.
+     * `availableTools` still decides which of its tools are offered this turn.
+     */
+    toolSet?: AgentToolSet;
     /** Symbols the user holds, for the system prompt. */
     portfolioSymbols?: readonly string[];
     /**

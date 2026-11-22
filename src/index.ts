@@ -523,6 +523,8 @@ export {
     findToolSpec,
     selectTools,
 } from './domain/agent/tools';
+export { BUILT_IN_AGENT_TOOL_SET } from './domain/agent/builtInToolSet';
+export { selectToolSetSpecs } from './domain/agent/toolSet';
 export {
     AGENT_IMAGES_PER_MESSAGE_MAX,
     formatAttachedImagesMarker,
@@ -1388,6 +1390,14 @@ export type {
     AgentProviderResult,
     CallAgentProvider,
 } from './domain/ports/agentProvider';
+export type {
+    AgentRoutingRow,
+    AgentToolArgs,
+    AgentToolDefinition,
+    AgentToolPerTurnCap,
+    AgentToolSet,
+    AgentToolSetFragments,
+} from './domain/agent/toolSet';
 export type {
     AgentBarsTimeframe,
     AgentChartKind,

@@ -16,6 +16,11 @@
  * checks import these instead of retyping the wording.
  */
 
+/**
+ * Result-note texts the consumer attaches to a `get_bars_indicators` result.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const BARS_RESULT_NOTES = {
     /**
      * Any timeframe other than 1Day. `timeframe` is the requested one.
@@ -33,6 +38,11 @@ export const BARS_RESULT_NOTES = {
         "fearGreed is null in this result: SIGLENS could not compute this symbol's fear & greed reading from the loaded data. If the question asks about it, say it is not available; never estimate one and never substitute the market-wide index.",
 } as const;
 
+/**
+ * Result-note texts the consumer attaches to a `get_fundamentals` result.
+ *
+ * @deprecated The consumer owns its tool set: pass it as `toolSet` (see `AgentToolSet`). Removed in the next major.
+ */
 export const FUNDAMENTALS_RESULT_NOTES = {
     /** A next earnings date is present, earningsSession is null or absent, there is no earningsDateAlt and earningsDateConfirmed is not false. */
     earningsSessionUnknown:

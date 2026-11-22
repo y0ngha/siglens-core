@@ -28,6 +28,9 @@ import {
     composeAgentUserMessage,
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_IMAGES_PER_MESSAGE_MAX } from '@/domain/agent/attachedImages';
+import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
+import type { AgentToolDefinition, AgentToolSet } from '@/domain/agent/toolSet';
+import { AGENT_TOOL_NAMES } from '@/domain/agent/tools';
 
 const USAGE = {
     promptTokens: 10,
@@ -2131,4 +2134,347 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
         }));
         expect(new Set(requests.map(r => r.system)).size).toBe(1);
     });
+});
+
+function required<T>(value: T | undefined): T {
+    if (value === undefined) throw new Error('expected a value');
+    return value;
+}
+
+describe('runAgentTurn toolSet', () => {
+    const schemaWith = (property: string) =>
+        ({
+            type: 'object',
+            properties: { [property]: { type: 'string' } },
+            required: [property],
+            additionalProperties: false,
+        }) as const;
+    const lookup: AgentToolDefinition = {
+        name: 'lookup_thing',
+        description: 'Look a thing up.',
+        costClass: 'free',
+        inputSchema: schemaWith('id'),
+        // Only ids other than "free" use the cap, like a read next to a listing.
+        perTurn: { max: 2, counts: args => args.id !== 'free' },
+    };
+    const scan: AgentToolDefinition = {
+        name: 'scan_web',
+        description: 'Scan the web.',
+        costClass: 'external',
+        inputSchema: schemaWith('q'),
+        meter: 'webSearch',
+    };
+    const slow: AgentToolDefinition = {
+        name: 'slow_job',
+        description: 'A slow job.',
+        costClass: 'expensive',
+        inputSchema: schemaWith('mode'),
+        estimatedSeconds: args => (args.mode === 'long' ? 99 : undefined),
+    };
+    const customSet: AgentToolSet = {
+        ...BUILT_IN_AGENT_TOOL_SET,
+        version: 'custom.1',
+        tools: [lookup, scan, slow],
+        routingRows: [
+            { requires: ['lookup_thing'], text: 'Things → lookup_thing.' },
+        ],
+    };
+    const customParams = (overrides: Partial<RunAgentTurnParams> = {}) =>
+        params({
+            toolSet: customSet,
+            availableTools: new Set(['lookup_thing', 'scan_web', 'slow_job']),
+            ...overrides,
+        });
+    const oneStep = (
+        ...toolCalls: Array<{
+            id: string;
+            name: string;
+            args: Record<string, unknown>;
+        }>
+    ) =>
+        scriptedProvider([
+            { text: '', toolCalls, stopReason: 'tool_use', usage: USAGE },
+            { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+
+    it('제공자에는 묶음의 도구만, 부가 필드 없이 정의한 키 순서대로 간다', async () => {
+        const p = scriptedProvider([
+            { text: 'hi', toolCalls: [], stopReason: 'end', usage: USAGE },
+        ]);
+        await runAgentTurn(
+            customParams({
+                availableTools: new Set([
+                    'lookup_thing',
+                    'slow_job',
+                    'search_ticker',
+                ]),
+            }),
+            deps(p)
+        );
+        const first = required(p.calls.find(() => true));
+        expect(first.tools.map(t => t.name)).toEqual([
+            'lookup_thing',
+            'slow_job',
+        ]);
+        expect(first.tools.map(t => Object.keys(t))).toEqual([
+            ['name', 'description', 'costClass', 'inputSchema'],
+            ['name', 'description', 'costClass', 'inputSchema'],
+        ]);
+        expect(first.system).toContain('- Things → lookup_thing.');
+        expect(first.system).not.toContain('search_ticker');
+    });
+
+    it('묶음에 없는 도구는 availableTools에 있어도 unknown_tool이다', async () => {
+        const p = oneStep({
+            id: 'c1',
+            name: 'get_quote',
+            args: { symbols: ['AAPL'] },
+        });
+        const d = deps(p);
+        await runAgentTurn(
+            customParams({
+                availableTools: new Set(['lookup_thing', 'get_quote']),
+            }),
+            d
+        );
+        expect(d.executeTool).not.toHaveBeenCalled();
+        expect(toolResults(required(p.calls[1]))).toEqual([
+            { error: 'unknown_tool' },
+        ]);
+    });
+
+    it('perTurn.max는 counts가 받아들인 호출만 세고, 초과분은 per_turn quota다', async () => {
+        const call = (id: string, thing: string) => ({
+            id,
+            name: 'lookup_thing',
+            args: { id: thing },
+        });
+        const p = oneStep(
+            call('a', 'free'),
+            call('b', 'x'),
+            call('c', 'free'),
+            call('d', 'y'),
+            call('e', 'z'),
+            call('f', 'free')
+        );
+        const d = deps(p);
+        await runAgentTurn(customParams(), d);
+        expect(
+            toolResults(required(p.calls[1])).map(
+                r => (r as { error?: string }).error
+            )
+        ).toEqual([
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            'quota',
+            undefined,
+        ]);
+        expect(d.executeTool).toHaveBeenCalledTimes(5);
+    });
+
+    it("meter 'webSearch'인 도구는 이름과 무관하게 웹 검색 카운터를 쓴다", async () => {
+        const p = oneStep(
+            { id: 's', name: 'scan_web', args: { q: 'x' } },
+            { id: 'l', name: 'lookup_thing', args: { id: 'x' } }
+        );
+        const d = deps(p);
+        await runAgentTurn(customParams(), d);
+        expect(d.executeTool).toHaveBeenCalledTimes(2);
+        expect(d.counters.webSearchGlobalDay.count).toBe(1);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(1);
+    });
+
+    it('이름이 web_search여도 meter가 없으면 웹 검색 카운터를 쓰지 않는다', async () => {
+        const noMeterSet: AgentToolSet = {
+            ...customSet,
+            tools: [{ ...scan, name: 'web_search', meter: undefined }],
+        };
+        const p = oneStep({
+            id: 'w',
+            name: 'web_search',
+            args: { q: 'y' },
+        });
+        const d = deps(p);
+        await runAgentTurn(
+            customParams({
+                toolSet: noMeterSet,
+                availableTools: new Set(['web_search']),
+            }),
+            d
+        );
+        expect(d.executeTool).toHaveBeenCalledTimes(1);
+        expect(d.counters.webSearchGlobalDay.count).toBe(0);
+        expect(d.counters.webSearchGlobalMonth.count).toBe(0);
+    });
+
+    it('executor 계량에서는 meter 도구에만 claim 클로저를 준다', async () => {
+        const p = oneStep(
+            { id: 's', name: 'scan_web', args: { q: 'x' } },
+            { id: 'l', name: 'lookup_thing', args: { id: 'x' } }
+        );
+        const seen = new Map<string, boolean>();
+        const d = deps(p, {
+            webSearchMetering: 'executor',
+            executeTool: vi.fn(
+                async (
+                    name: string,
+                    _a: unknown,
+                    ctx: ToolExecutionContext
+                ) => {
+                    seen.set(name, ctx.claimWebSearchUnit !== undefined);
+                    return { ok: true };
+                }
+            ),
+        });
+        await runAgentTurn(customParams(), d);
+        expect(Object.fromEntries(seen)).toEqual({
+            scan_web: true,
+            lookup_thing: false,
+        });
+        expect(d.counters.webSearchGlobalDay.count).toBe(0);
+    });
+
+    it('estimatedSeconds는 tool_start에 실리고, undefined면 키가 없다', async () => {
+        const p = oneStep(
+            { id: 'l', name: 'slow_job', args: { mode: 'long' } },
+            { id: 'q', name: 'slow_job', args: { mode: 'quick' } },
+            { id: 'n', name: 'lookup_thing', args: { id: 'x' } }
+        );
+        const d = deps(p);
+        await runAgentTurn(customParams(), d);
+        const starts = d.events.flatMap(e =>
+            e.type === 'tool_start'
+                ? [[e.id, e.estimatedSeconds, 'estimatedSeconds' in e]]
+                : []
+        );
+        expect(starts).toEqual([
+            ['l', 99, true],
+            ['q', undefined, false],
+            ['n', undefined, false],
+        ]);
+    });
+});
+
+describe('runAgentTurn built-in tool caps (reference table)', () => {
+    // Expected outcomes are written out by hand from AGENT_TURN_CAPS (web 4,
+    // fresh 3, filing reads 2, X 3, charts 3, tool calls 30), not read back from
+    // the definitions, so a changed cap or a lost `counts` fails here.
+    const RUN = [
+        ...Array.from({ length: 6 }, (_, i) => ({
+            id: `w${i}`,
+            name: 'web_search',
+            args: { query: `q${i}` },
+        })),
+        ...['technical', 'overall', 'news', 'options', 'technical'].map(
+            (kind, i) => ({
+                id: `f${i}`,
+                name: 'run_fresh_analysis',
+                args: { symbol: 'AAPL', kind },
+            })
+        ),
+        {
+            id: 'r0',
+            name: 'get_company_filings',
+            args: { symbol: 'AAPL', accession: 'a0' },
+        },
+        { id: 'r1', name: 'get_company_filings', args: { symbol: 'AAPL' } },
+        {
+            id: 'r2',
+            name: 'get_company_filings',
+            args: { symbol: 'AAPL', accession: 'a2' },
+        },
+        {
+            id: 'r3',
+            name: 'get_company_filings',
+            args: { symbol: 'AAPL', accession: 'a3' },
+        },
+        {
+            id: 'r4',
+            name: 'get_company_filings',
+            args: { symbol: 'AAPL', accession: '  ' },
+        },
+        ...Array.from({ length: 5 }, (_, i) => ({
+            id: `x${i}`,
+            name: 'get_x_posts',
+            args: { symbol: 'AAPL' },
+        })),
+        ...Array.from({ length: 5 }, (_, i) => ({
+            id: `c${i}`,
+            name: 'show_chart',
+            args: { kind: 'portfolio' },
+        })),
+        { id: 'u', name: 'nope', args: {} },
+        ...Array.from({ length: 14 }, (_, i) => ({
+            id: `q${i}`,
+            name: 'get_quote',
+            args: { symbols: ['AAPL'] },
+        })),
+    ];
+    const refused = (scope: string) => ({ error: 'quota', scope });
+    const EXPECTED: Record<string, unknown> = {
+        w4: refused('per_turn'),
+        w5: refused('per_turn'),
+        f3: refused('per_turn'),
+        f4: refused('per_turn'),
+        r3: refused('per_turn'),
+        x3: refused('per_turn'),
+        x4: refused('per_turn'),
+        c3: refused('per_turn'),
+        c4: refused('per_turn'),
+        u: { error: 'unknown_tool' },
+        q13: refused('per_turn_tools'),
+    };
+
+    it.each(['gate', 'executor'] as const)(
+        '한 스텝의 혼합 호출은 정해진 호출만 거절한다 (%s 계량)',
+        async metering => {
+            const p = scriptedProvider([
+                {
+                    text: '',
+                    toolCalls: RUN,
+                    stopReason: 'tool_use',
+                    usage: USAGE,
+                },
+                { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
+            ]);
+            const d = deps(p, {
+                webSearchMetering: metering,
+                executeTool: vi.fn(
+                    async (
+                        name: string,
+                        _a: unknown,
+                        ctx: ToolExecutionContext
+                    ) => {
+                        await ctx.claimWebSearchUnit?.();
+                        return { ok: name };
+                    }
+                ),
+            });
+            await runAgentTurn(
+                params({ availableTools: new Set(AGENT_TOOL_NAMES) }),
+                d
+            );
+            const byId = Object.fromEntries(
+                required(p.calls[1])
+                    .messages.filter(m => m.role === 'tool')
+                    .map(m => [m.toolCallId, JSON.parse(m.content)])
+            );
+            const actual = Object.fromEntries(
+                RUN.flatMap(c => {
+                    const r = byId[c.id];
+                    return r && typeof r === 'object' && 'error' in r
+                        ? [[c.id, r]]
+                        : [];
+                })
+            );
+            expect(actual).toEqual(EXPECTED);
+            // 4 web + 3 fresh + 4 filing (2 reads, 2 listings) + 3 X + 3 charts = 17,
+            // then 13 quotes reach the 30-call cap and the 14th is refused.
+            expect(d.executeTool).toHaveBeenCalledTimes(30);
+            expect(d.counters.webSearchGlobalDay.count).toBe(4);
+            expect(d.counters.webSearchGlobalMonth.count).toBe(4);
+        }
+    );
 });

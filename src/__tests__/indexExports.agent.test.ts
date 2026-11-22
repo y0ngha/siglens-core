@@ -5,6 +5,7 @@ import {
     BARS_RESULT_NOTES,
     FUNDAMENTALS_RESULT_NOTES,
     AGENT_TOOL_SPECS,
+    BUILT_IN_AGENT_TOOL_SET,
     CounterStoreUnavailableError,
     findUngroundedNumbers,
     peekMacroBriefingCacheEntry,
@@ -32,6 +33,7 @@ import {
     priceStatsEarliestDate,
     readPutCallRatio,
     scanLongTermMaCrosses,
+    selectToolSetSpecs,
     tallyEarningsReactions,
 } from '@/index';
 
@@ -40,6 +42,21 @@ describe('index — agent exports', () => {
         expect(typeof runAgentTurn).toBe('function');
         expect(AGENT_TOOL_SPECS.length).toBe(24);
         expect(new CounterStoreUnavailableError('p')).toBeInstanceOf(Error);
+    });
+
+    // 서버 진입점 전용이다: 프롬프트·루프 조립은 서버만 하고 브라우저 번들은 도구 묶음을 쓰지 않는다.
+    it('도구 묶음(내장 묶음·선택 함수)을 서버 진입점으로만 내보낸다', () => {
+        expect(BUILT_IN_AGENT_TOOL_SET.tools).toHaveLength(
+            AGENT_TOOL_SPECS.length
+        );
+        expect(
+            selectToolSetSpecs(
+                BUILT_IN_AGENT_TOOL_SET,
+                new Set(['get_quote'])
+            ).map(t => t.name)
+        ).toEqual(['get_quote']);
+        expect('BUILT_IN_AGENT_TOOL_SET' in clientApi).toBe(false);
+        expect('selectToolSetSpecs' in clientApi).toBe(false);
     });
 
     // 서버 진입점 전용이다: 스윙 통계는 도구 실행기(서버)만 계산하고 브라우저 번들은 쓰지 않는다.
