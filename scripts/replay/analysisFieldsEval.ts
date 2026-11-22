@@ -418,13 +418,13 @@ function validateCombination(args: FieldsEvalArgs): void {
     const tierAllowed =
         mode === 'gating' || mode === 'htf' || mode === 'weekly-hygiene';
     const baselineAllowed = mode === 'gating' || mode === 'htf';
-    if (
-        (args.tier !== null && !tierAllowed) ||
-        (args.baseline !== null && !baselineAllowed)
-    ) {
+    if (args.tier !== null && !tierAllowed) {
         throw new Error(
-            `${mode}: --tier and --baseline apply to gating only (--tier also to htf and weekly-hygiene, --baseline also to htf)`
+            `${mode}: --tier applies to gating, htf and weekly-hygiene only`
         );
+    }
+    if (args.baseline !== null && !baselineAllowed) {
+        throw new Error(`${mode}: --baseline applies to gating and htf only`);
     }
     if (args.selfCheck && mode !== 'htf') {
         throw new Error(`${mode}: --self-check applies to htf only`);
@@ -465,7 +465,7 @@ function validateCombination(args: FieldsEvalArgs): void {
         }
         if ((args.run === null) !== (args.before === null)) {
             throw new Error(
-                'weekly-hygiene: --run (weekly) and --before (daily) are given together'
+                'weekly-hygiene: --run (weekly) and --before (daily) must be given together'
             );
         }
         return;
@@ -553,7 +553,7 @@ function validateCombination(args: FieldsEvalArgs): void {
     }
     if (args.skills === null) throw new Error('skills: --skills is required');
     if ((args.run === null) !== (args.before === null)) {
-        throw new Error('skills: --run and --before are given together');
+        throw new Error('skills: --run and --before must be given together');
     }
     if (args.memberRun !== null && args.run === null) {
         throw new Error('skills: --member-run needs --run and --before');
@@ -594,7 +594,7 @@ export function loadSetData(setDir: string): SetData {
     };
 }
 
-interface RunData {
+export interface RunData {
     dir: string;
     meta: RunMeta;
     results: readonly CaseResultFile[];
@@ -1815,14 +1815,73 @@ function zoneMode(args: FieldsEvalArgs, deps: FieldsEvalDeps): ModeOutput {
 
 // ─── WP-19: weekly bars and the higher-timeframe block ───────────────────────
 
+/** The first repeat's `riskLevel` of every case of a run, by case id. */
+const riskLevelsOf = (run: RunData): Map<string, unknown> =>
+    new Map(
+        run.results
+            .filter(r => r.repeat === 1)
+            .map(r => [r.caseId, asRec(r.unfilteredResult)?.riskLevel])
+    );
+
+/**
+ * K2 pairs: the weekly run's `riskLevel` per case next to the daily run's. The daily map is
+ * built once, not once per case.
+ */
+export function riskLevelPairs(
+    weeklyRun: RunData,
+    dailyRun: RunData
+): { caseId: string; weekly: unknown; daily: unknown }[] {
+    const daily = riskLevelsOf(dailyRun);
+    return [...riskLevelsOf(weeklyRun)].map(([caseId, weekly]) => ({
+        caseId,
+        weekly,
+        daily: daily.get(caseId),
+    }));
+}
+
+const BAR_FIELDS = [
+    'time',
+    'open',
+    'high',
+    'low',
+    'close',
+    'volume',
+] as const satisfies readonly (keyof Bar)[];
+
+/**
+ * Throws unless every entry is a bar (finite numeric `time`, `open`, `high`, `low`, `close`,
+ * `volume`) and `time` strictly increases: the benchmark readers walk the bars oldest first and
+ * would silently mis-read a file that is not in that order.
+ */
+function assertBenchmarkBars(source: string, bars: readonly unknown[]): void {
+    const rows = bars.map(asRec);
+    rows.forEach((row, i) => {
+        const bad = BAR_FIELDS.find(field => !Number.isFinite(row?.[field]));
+        if (row === null || bad !== undefined) {
+            throw new Error(
+                `${source}: bar ${i} is not a bar with finite numeric time, open, high, low, close and volume${bad === undefined ? '' : ` ("${bad}")`}`
+            );
+        }
+    });
+    const unordered = rows.findIndex(
+        (row, i) => i > 0 && Number(row?.time) <= Number(rows[i - 1]?.time)
+    );
+    if (unordered >= 0) {
+        throw new Error(
+            `${source}: bar times must be strictly ascending (bar ${unordered} does not follow bar ${unordered - 1})`
+        );
+    }
+}
+
 /** Stored bars of every symbol of the set and of every `<SYMBOL>.json` in `dir`. */
 export function benchmarkBarsOf(
     set: SetData,
     dir: string | null
 ): ReadonlyMap<string, readonly Bar[]> {
-    const own = [...set.storedOf].map(
-        ([symbol, stored]) => [symbol, stored.bars] as const
-    );
+    const own = [...set.storedOf].map(([symbol, stored]) => {
+        assertBenchmarkBars(`set bars of ${symbol}`, stored.bars);
+        return [symbol, stored.bars] as const;
+    });
     const extra =
         dir === null
             ? []
@@ -1843,6 +1902,7 @@ export function benchmarkBarsOf(
                               `${join(dir, name)}: ${symbol} is already a symbol of the set; remove the file so the benchmark has one source`
                           );
                       }
+                      assertBenchmarkBars(join(dir, name), stored.bars);
                       return [symbol, stored.bars] as const;
                   });
     return new Map([...own, ...extra]);
@@ -2353,20 +2413,10 @@ async function weeklyHygieneMode(
             );
         }
     }
-    const riskOf = (run: RunData): Map<string, unknown> =>
-        new Map(
-            run.results
-                .filter(r => r.repeat === 1)
-                .map(r => [r.caseId, asRec(r.unfilteredResult)?.riskLevel])
-        );
     const k2Pairs =
         weeklyRun === null || dailyRun === null
             ? null
-            : [...riskOf(weeklyRun)].map(([caseId, weekly]) => ({
-                  caseId,
-                  weekly,
-                  daily: riskOf(dailyRun).get(caseId),
-              }));
+            : riskLevelPairs(weeklyRun, dailyRun);
     const k1Summary = summarizeChecks(k1);
     return {
         inputs: {

@@ -480,7 +480,7 @@ describe('parseFieldsEvalArgs', () => {
         );
         const ready = [...skills, '--skills', 'k'];
         expect(() => parseFieldsEvalArgs([...ready, '--run', 'r'])).toThrow(
-            '--run and --before are given together'
+            'skills: --run and --before must be given together'
         );
         expect(() =>
             parseFieldsEvalArgs([...ready, '--member-run', 'm'])
@@ -1800,7 +1800,9 @@ describe('the arguments of gating and output', () => {
         );
         expect(() =>
             parseFieldsEvalArgs([...output, '--tier', 'free'])
-        ).toThrow('output: --tier and --baseline apply to gating only');
+        ).toThrow(
+            'output: --tier applies to gating, htf and weekly-hygiene only'
+        );
         expect(() =>
             parseFieldsEvalArgs([
                 '--mode',

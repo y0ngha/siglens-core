@@ -25,6 +25,8 @@ import {
     labelDay,
     levelFeaturesAt,
     levelHash,
+    meanRanks,
+    meanRanksWithCost,
     nonPositiveSummary,
     partnerDays,
     quantileEdges,
@@ -523,6 +525,42 @@ describe('numerics', () => {
         expect(spearman([1, 2, 3, 4], [4, 3, 2, 1])).toBeCloseTo(-1);
         expect(spearman([1, 1, 1, 1], [1, 2, 3, 4])).toBeNull();
         expect(spearman([1, 2], [1, 2])).toBeNull();
+    });
+
+    it('meanRanks gives ties the mean of the ranks they span, in input order', () => {
+        expect(meanRanks([30, 10, 20, 10, 30, 30])).toEqual([
+            5, 1.5, 3, 1.5, 5, 5,
+        ]);
+        expect(meanRanks([])).toEqual([]);
+    });
+
+    it('meanRanks refuses a non-finite value, and auc and spearman then are not computable', () => {
+        [Number.NaN, Infinity, -Infinity].forEach(bad => {
+            expect(() => meanRanks([1, bad, 3])).toThrow(/finite/);
+            expect(auc([0.1, bad, 0.9], [false, true, true])).toBeNull();
+            expect(spearman([1, 2, bad], [1, 2, 3])).toBeNull();
+            expect(spearman([1, 2, 3], [1, bad, 3])).toBeNull();
+        });
+    });
+
+    it('meanRanks scans each tie group once: at most 2n comparisons, whatever the ties', () => {
+        // The group search used to restart from 0 for every group: about n^2 / 2 comparisons
+        // for distinct values. The bound is a count, not a clock.
+        const n = 5000;
+        const inputs = {
+            distinct: Array.from({ length: n }, (_, i) => (i * 7919) % n),
+            allTies: Array.from({ length: n }, () => 3),
+            mixed: Array.from({ length: n }, (_, i) => Math.floor(i / 7) % 40),
+        };
+        Object.values(inputs).forEach(values => {
+            expect(meanRanksWithCost(values).comparisons).toBeLessThanOrEqual(
+                2 * n
+            );
+        });
+        const { ranks } = meanRanksWithCost(inputs.distinct);
+        expect(ranks[inputs.distinct.indexOf(0)]).toBe(1);
+        expect(ranks[inputs.distinct.indexOf(n - 1)]).toBe(n);
+        expect(meanRanks(inputs.allTies)[0]).toBe((n + 1) / 2);
     });
 
     it('fits a logistic model that recovers the sign of a planted effect', () => {

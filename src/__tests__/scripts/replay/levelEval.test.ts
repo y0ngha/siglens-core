@@ -312,6 +312,53 @@ describe('runLevelEval', () => {
         ).toBe(0);
     });
 
+    it('exits 2 for every selected gate set that holds a gate which is not computable, whatever passes beside it', () => {
+        const { dir, setDir } = makeSet();
+        // G42 passes on this set; L0 is not computable (step 60 is not the reference population).
+        expect(
+            runLevelEval(
+                argsOf({
+                    set: setDir,
+                    out: join(dir, 'mixed'),
+                    gate: ['G42', 'L0'],
+                }),
+                deps()
+            )
+        ).toBe(2);
+        expect(
+            runLevelEval(
+                argsOf({
+                    set: setDir,
+                    out: join(dir, 'all'),
+                    gate: ['L0', 'L-gate', 'G42'],
+                }),
+                deps()
+            )
+        ).toBe(2);
+        // Not selected: the same not-computable L0 no longer decides the exit code.
+        expect(
+            runLevelEval(
+                argsOf({ set: setDir, out: join(dir, 'g42'), gate: ['G42'] }),
+                deps()
+            )
+        ).toBe(0);
+    });
+
+    it('exits 2 on the L0 gate when the labeller and the evaluator disagree, even with G42 selected beside it', () => {
+        const { dir, setDir } = makeSet();
+        force.on = true;
+        expect(
+            runLevelEval(
+                argsOf({
+                    set: setDir,
+                    out: join(dir, 'disagree'),
+                    gate: ['G42', 'L0'],
+                }),
+                deps()
+            )
+        ).toBe(2);
+    });
+
     it('narrows to the symbols asked for, and refuses an unknown or empty list', () => {
         const { dir, setDir } = makeSet();
         runLevelEval(

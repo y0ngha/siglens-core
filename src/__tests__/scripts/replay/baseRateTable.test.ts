@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { format, resolveConfig } from 'prettier';
 import { ModuleKind, transpileModule } from 'typescript';
@@ -764,12 +764,41 @@ describe('generateTable and runBaseRateTable', () => {
             engine: { sha: `${SHA}+dirty` },
             levels: { reference: false },
         });
+        const lines: string[] = [];
         await expect(
-            runBaseRateTable(world.args, () => undefined)
-        ).rejects.toThrow(
-            /cannot be trusted[\s\S]*dirty checkout[\s\S]*reference population|cannot be trusted[\s\S]*reference population[\s\S]*dirty/
+            runBaseRateTable(world.args, line => lines.push(line))
+        ).resolves.toBe(2);
+        expect(lines.join('\n')).toMatch(
+            /^FAIL: the inputs cannot be trusted[\s\S]*dirty checkout[\s\S]*reference population|^FAIL: the inputs cannot be trusted[\s\S]*reference population[\s\S]*dirty/
         );
     });
+
+    it.each([
+        ['L0 did not pass', { l0: false }, /did not pass its L0 gate/],
+        ['L0 was not computable', { l0: null }, /did not pass its L0 gate/],
+        ['labels disagree', { disagreements: 4 }, /counts 4 real levels/],
+        [
+            'runs are of different bars',
+            { fingerprint: 'e'.repeat(64) },
+            /different bars/,
+        ],
+        [
+            'runs are of different commits',
+            { sha: 'd'.repeat(40) },
+            /different core commits/,
+        ],
+    ] as const)(
+        'exits 2 and writes nothing when the levels run is not comparable: %s',
+        async (_name, levels, message) => {
+            const world = makeWorld({ levels });
+            const lines: string[] = [];
+            await expect(
+                runBaseRateTable(world.args, line => lines.push(line))
+            ).resolves.toBe(2);
+            expect(lines.join('\n')).toMatch(message);
+            expect(existsSync(world.args.out)).toBe(false);
+        }
+    );
 
     it('writes outside the repository only, except the committed path, and never a dirty table there', async () => {
         const world = makeWorld();
