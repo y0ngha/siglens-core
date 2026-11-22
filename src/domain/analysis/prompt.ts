@@ -1097,7 +1097,8 @@ const cryptoHorizonSpan = (barCount: number, timeframe: Timeframe): string => {
  * One price in a `Fib table:` / `Fib ABC table:` / `Pivot table:` line. A level
  * at or below zero (a deep down-leg's far extensions, a wide-range S3) is not a
  * price — it renders `N/A` instead of a quotable "target", matching the capped
- * nearest-level lists, which drop such levels via referenceLevels' own guard.
+ * nearest-level lists, which never list such levels (`computeMarketReference` filters
+ * non-positive prices before the per-side cap).
  */
 export const formatTablePrice = (
     price: number,

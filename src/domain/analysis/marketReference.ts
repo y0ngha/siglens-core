@@ -289,6 +289,16 @@ function buildStructure(
     };
 }
 
+/**
+ * A reference level must be a quotable price. Fibonacci and ABC extensions
+ * (`high − ratio·range`) go negative on a deep down-leg, and any other family
+ * can in principle emit 0; such a value is not a level, so it never reaches
+ * `splitBySide` (and from there the prompt lists, stop candidates and agent
+ * tools). `toLevel` applies the same rule to indicator levels.
+ */
+const isPositiveLevel = (level: ReferenceLevel): boolean =>
+    Number.isFinite(level.price) && level.price > 0;
+
 function buildHorizon(
     bars: Bar[],
     indicators: IndicatorResult,
@@ -463,7 +473,11 @@ function buildHorizon(
         },
         levels:
             currentPrice > 0
-                ? splitBySide(levels, currentPrice, atPriceBandPercent)
+                ? splitBySide(
+                      levels.filter(isPositiveLevel),
+                      currentPrice,
+                      atPriceBandPercent
+                  )
                 : { support: [], resistance: [] },
         structure: buildStructure(
             barWindow,

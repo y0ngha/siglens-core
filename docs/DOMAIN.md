@@ -1159,6 +1159,7 @@ function buildAnalysisPrompt(
   2. 널리 주시되는 지표 레벨 (widely-watched) — Supertrend, Ichimoku, Donchian, Bollinger, Keltner, VWAP, 표준 피벗, Camarilla 피벗, Anchored VWAP. Anchored VWAP(`kind: 'avwap'`)는 호라이즌 윈도우의 극단 스윙(최고가 스윙 고·최저가 스윙 저)을 앵커로 잡아 그 bar부터 마지막 bar까지 typical price(`(high+low+close)/3`)를 거래량 가중 평균한 레벨로, 호라이즌별 최대 2개(swing high·swing low 앵커)를 산출한다. 앵커 계산 헬퍼는 `anchoredVwap`(`domain/analysis/anchoredVwap.ts`, `@internal`).
   3. 서술적 추세 구조 (descriptive) — 가격 vs MA60/MA200, EMA 정렬, 스윙 구조(HH_HL/LH_LL/mixed), ADX, 효율비, 레짐(trending/ranging). **방향 예측이 아니라 사실 기술이다.**
 - **side 분리.** 레벨은 현재가 기준 support(아래)/resistance(위)로 나눠 nearest-first로 노출하며, AI는 정확한 레퍼런스 가격을 keyLevels에 **재사용**(arithmetic hallucination 제거)하거나 패턴·SMC·볼륨에서 직접 도출한다 — 둘 다 강제가 아니다.
+- **0 이하 가격은 레벨이 아니다.** 깊은 하락 레그의 fib/ABC 확장(`high − ratio·range`)처럼 0 이하로 떨어진 값은 `buildHorizon`이 `splitBySide` 전에 걸러낸다. 호라이즌 레벨 목록·`printedLevelsOnSide`(손절 후보 포함)·fib 오버레이 선 어디에도 나오지 않고, `Fib table:`은 같은 값을 `N/A`로 계속 출력한다.
 - **`classifyTrend`는 별개.** 시그널/대시보드용 `classifyTrend`(`domain/signals/`)는 이 레이어와 무관한 독립 관심사로 변경 없이 유지된다.
 
 ### 응답 형식 (JSON)
