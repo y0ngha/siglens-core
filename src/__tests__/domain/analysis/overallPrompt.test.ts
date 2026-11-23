@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import { buildOverallAnalysisPrompt as buildOverallAnalysisPromptRaw } from '@/domain/analysis/overallPrompt';
 import { evaluateInvestorFlows } from '@/domain/investorFlows/evaluateInvestorFlows';
 import {
@@ -117,6 +118,26 @@ const MOCK_NEWS: NewsAnalysisResponse = {
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
 describe('buildOverallAnalysisPrompt', () => {
+    it('no timeframe context claims reliability or relative weight of a signal (DOM-12)', () => {
+        for (const timeframe of TIMEFRAMES) {
+            const prompt = buildOverallAnalysisPrompt(
+                TEST_SYMBOL,
+                TEST_COMPANY_NAME,
+                MOCK_TECHNICAL,
+                MOCK_FUNDAMENTAL,
+                MOCK_NEWS,
+                timeframe
+            );
+            const context = prompt
+                .split('## Timeframe Context\n')[1]
+                .split('\n\n## ')[0];
+            expect(context.length, timeframe).toBeGreaterThan(0);
+            expect(context, timeframe).not.toMatch(
+                /reliab|actionable|significant|meaningful weight|equal(?:ly)? weight|roughly equal|dominate/i
+            );
+        }
+    });
+
     it('produces prompt with intraday timeframe context for 5Min', () => {
         const prompt = buildOverallAnalysisPrompt(
             TEST_SYMBOL,

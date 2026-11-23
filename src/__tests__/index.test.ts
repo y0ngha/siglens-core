@@ -765,6 +765,7 @@ describe('package entrypoint export presence (API-1)', () => {
         'parseSuggestions',
         'computeBarsEffectiveTtl',
         'analysisHistoryQuery',
+        'analysisCacheWindowStart',
         'createCacheProvider',
         'hashClientIp',
         'readFmpConfig',

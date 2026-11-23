@@ -423,6 +423,42 @@ export function priorAnalysisWindowStartMs(
 }
 
 /**
+ * Start of the analysis cache window `now` falls in for `timeframe` — the
+ * instant the current cache entry's lifetime began. Everything the analysis
+ * cache key folds in by time (prior-analysis history, market events) is cut at
+ * exactly this boundary, so a consumer that sizes its own time-dependent input
+ * to it (e.g. the news lookback it hands to `runAnalysis`) keeps that input —
+ * and with it the key — stable for the whole window.
+ *
+ * It is the very value the key computation cuts at
+ * (`priorAnalysisWindowStartMs(ANALYSIS_CACHE_TTL[timeframe], …)`), not a
+ * second implementation: `5Min`–`4Hour` start at the clock-anchored bucket
+ * (aligned to KST 05:00); `1Day` and `1Week` (both a one-day TTL) start at the
+ * last session boundary when `session` is given — the latest regular close plus
+ * the settle buffer (30 minutes) on a scheduled market, the latest 00:00 UTC on
+ * an always-open one — and at the KST 05:00 anchor without it.
+ *
+ * Callers must pass the same `session` the analysis call gets
+ * (`SubmitAnalysisOptions.session`); without it `1Day`/`1Week` fall back to the
+ * KST 05:00 anchor, and a different spec yields a different window than the
+ * key uses. Server-only (not exported from `index.client`).
+ *
+ * @param timeframe - Analysis timeframe.
+ * @param now - Reference time; reuse the instance the analysis call uses.
+ * @param session - Market session of the analysed instrument.
+ * @returns The window start as a new `Date`.
+ */
+export function analysisCacheWindowStart(
+    timeframe: Timeframe,
+    now: Date,
+    session?: MarketSessionSpec
+): Date {
+    return new Date(
+        priorAnalysisWindowStartMs(ANALYSIS_CACHE_TTL[timeframe], now, session)
+    );
+}
+
+/**
  * @internal
  *
  * Stage 1 of the two-stage prior-analysis narrowing that backs the
@@ -1240,6 +1276,13 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * Korean" instead of the 55/10 split). Stable bytes change for every technical prompt that
  * injects a pattern or candle guide (the guides and rule blocks), dynamic bytes for every
  * daily prompt with a qualified pattern and for every prompt whose framing numbers moved.
+ *
+ * `Timeframe interpretation:` lines reworded (still `p34`, unreleased): the unmeasured
+ * reliability and relative-weight sentences ("Indicator signals have high reliability",
+ * "Signals are reliable for multi-day trends", "carry more weight than 5/15-minute charts")
+ * became descriptions of the bars and of what a reading spans (DOM-12). One line in the
+ * dynamic block of every technical prompt, every timeframe except `1Week`; no bump is
+ * needed only because `p34` is unreleased (`v2.42.0` ships `p33`).
  *
  * `1Week` added (WP-19, still `p34`, unreleased); daily and intraday prompts unchanged. A
  * weekly analysis is a new key namespace (`analysis:<SYM>:1Week:…`, its peek and overall
@@ -2458,6 +2501,13 @@ export function buildNewsCacheKey(
  * **`p12`** — volatility grade (see {@link PROMPT_TEMPLATE_VERSION} `p34`). The
  * technical axis line `- Risk Level:` reads `- Volatility grade:` (the values are
  * unchanged); bytes change for every overall prompt.
+ *
+ * `## Timeframe Context` reworded for `30Min`, `1Hour` and `4Hour` (still `p12`, unreleased;
+ * `v2.42.0` ships `p11`): "moderate signal reliability", "carry roughly equal weight" (the printed
+ * `## Axis Weighting` says otherwise), "carry meaningful weight" and "Multi-day trends
+ * dominate" were unmeasured or contradicted claims (DOM-12) and became a description of the
+ * bars plus a pointer to the printed weights. One line of the dynamic block changes, only for
+ * those timeframes; no bump is needed only because `p12` is unreleased.
  *
  * @internal
  */

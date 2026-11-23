@@ -743,6 +743,11 @@ export { computeBarsEffectiveTtl } from './infrastructure/cache/config';
 // raw constants would just invite a second, potentially-diverging place to
 // compute the same limit.
 export { analysisHistoryQuery } from './infrastructure/cache/config';
+// Start of the analysis cache window for a timeframe/instant — the boundary the
+// cache key cuts prior analyses and market events at. Server-only (API-1
+// asymmetry): consumers size their own time-dependent inputs to it. The TTL and
+// expiry constants it derives from stay `@internal` (API-2).
+export { analysisCacheWindowStart } from './infrastructure/cache/config';
 export { createCacheProvider } from './infrastructure/cache/redis';
 
 // Chat token store

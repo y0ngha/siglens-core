@@ -264,17 +264,24 @@ const SMC_MAX_STRUCTURE_BREAKS = 3;
 const SMC_MAX_EQUAL_LEVELS = 3;
 const SMC_MAX_SWING_POINTS = 5;
 
+/**
+ * One line per timeframe, printed under `Timeframe interpretation:`. Each line says what the
+ * bars are and what a reading on them spans, and nothing about how reliable a signal is:
+ * no reliability or "weight" comparison between timeframes was measured, so none is
+ * stated (DOM-12). Reliability claims that were measured live in the generated
+ * base-rate labels, not here.
+ */
 const TIMEFRAME_CONTEXT: Record<Timeframe, string> = {
-    '5Min': 'Short-term chart. Combine indicator signals with volume confirmation before acting.',
-    '15Min': 'Intraday chart. Indicator signals have moderate reliability.',
+    '5Min': 'Intraday chart of 5-minute bars. Indicator readings change from bar to bar; read them together with volume.',
+    '15Min':
+        'Intraday chart of 15-minute bars. Indicator readings change faster than on the hourly and daily charts.',
     '30Min':
-        'Intraday chart. Good for identifying intraday trends and momentum shifts. Signals carry more weight than 5/15-minute charts.',
+        'Intraday chart of 30-minute bars. It shows intraday trends and momentum shifts; each bar covers more time than a 5- or 15-minute bar.',
     '1Hour':
-        'Medium-term chart. Divergences and pattern completions carry meaningful weight.',
+        'Hourly chart of 1-hour bars. A divergence or pattern completion here spans many hours of trading.',
     '4Hour':
-        'Swing trading chart. Signals are reliable for multi-day trends. Divergences and breakouts are actionable.',
-    '1Day': 'Daily chart. Indicator signals have high reliability. Overbought/oversold, divergences, and pattern completions are significant.',
-    // No reliability claim: nothing was measured on weekly bars (DOM-12).
+        'Swing chart of 4-hour bars. A trend on it spans multiple days; divergences and breakouts are read over several days.',
+    '1Day': 'Daily chart of daily bars: each bar is one full session, so intraday noise is already folded into the bar. Overbought/oversold readings, divergences, and pattern completions are read over days to weeks.',
     '1Week':
         'Weekly chart built by SIGLENS from daily bars: each bar is one ISO week (Monday start). Readings describe a multi-week to multi-month picture; the last bar may be the current, unfinished week (it is stated when the last row of ## Recent Bar Data carries a week-in-progress tag; no tag means its progress is unknown).',
 };

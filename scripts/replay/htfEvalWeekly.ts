@@ -62,7 +62,7 @@ export const DAILY_ONLY_PATTERNS: readonly { name: string; pattern: RegExp }[] =
         },
         {
             name: 'dailyIntervalLabel',
-            pattern: /Timeframe: Daily|Daily chart\. Indicator signals/,
+            pattern: /Timeframe: Daily|Daily chart of daily bars/,
         },
         // WP-18 core-3: measured base rates, measured on daily bars only.
         {

@@ -74,17 +74,17 @@ const TIMEFRAME_CONFIG: Record<Timeframe, { label: string; context: string }> =
         '30Min': {
             label: '30-Minute',
             context:
-                'Intraday chart with moderate signal reliability. Technical, fundamental, and news inputs carry roughly equal weight. Identify the dominant intraday trend.',
+                'Intraday chart of 30-minute bars. Combine the technical, fundamental, and news inputs using the axis weights below. Identify the dominant intraday trend.',
         },
         '1Hour': {
             label: '1-Hour',
             context:
-                'Medium-term chart. Divergences and cross-axis confirmations (technical + fundamental + news) carry meaningful weight. Good for swing entry/exit evaluation.',
+                'Hourly chart of 1-hour bars. Read divergences together with cross-axis confirmations (technical + fundamental + news). Use for swing entry/exit evaluation.',
         },
         '4Hour': {
             label: '4-Hour',
             context:
-                'Swing trading positional chart. All three axes (technical, fundamental, news) should converge before taking a strong directional stance. Multi-day trends dominate.',
+                'Swing trading positional chart of 4-hour bars. All three axes (technical, fundamental, news) should converge before taking a strong directional stance. A trend on it spans multiple days.',
         },
         '1Day': {
             label: 'Daily',
