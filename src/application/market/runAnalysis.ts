@@ -574,37 +574,38 @@ async function runAnalysisImpl(
         patternSkillNames,
         indicatorCards,
         cycleCards,
-    } = buildAnalysisPrompt(
+    } = buildAnalysisPrompt({
         symbol,
         companyName,
         bars,
         indicators,
         skills,
         timeframe,
-        fearGreed ?? undefined,
-        options.assetClass ?? 'equity',
-        options.positionBucket,
+        fearGreed: fearGreed ?? undefined,
+        assetClass: options.assetClass ?? 'equity',
+        positionBucket: options.positionBucket,
         locale,
-        priorAnalysisCandidates,
-        marketEventCandidates,
-        options.currency,
-        options.krxTickTable,
-        options.earningsDates,
+        priorAnalyses: priorAnalysisCandidates,
+        marketEvents: marketEventCandidates,
+        currency: options.currency,
+        krxTick: options.krxTickTable,
+        earningsDates: options.earningsDates,
         // The daily pivot block needs to know whether the last bar's session has closed.
         // `priorAnalysisNow` is the one instant this run already reads once; reusing it
         // keeps the prompt from depending on a second clock read.
-        options.session === undefined
-            ? undefined
-            : { session: options.session, now: priorAnalysisNow },
+        marketClock:
+            options.session === undefined
+                ? undefined
+                : { session: options.session, now: priorAnalysisNow },
         // Free carries every always-on skill plus its most relevant fired gated
         // skills per group; member and pro carry every fired skill. The tier and the
         // cap are in the cache key, so the two never share an entry.
         gatedSkillCap,
         // A weekly chart counts the sessions of its unfinished week from the daily
         // series it was built from.
-        timeframe === '1Week' ? barsData.fearGreedBars : undefined,
-        higherContext
-    );
+        dailyBars: timeframe === '1Week' ? barsData.fearGreedBars : undefined,
+        higherContext,
+    });
     // Logged here, before the model call, so a failure is reported even when
     // the generation itself fails: without it a throwing qualifier reads as
     // "this chart has no patterns".
@@ -699,11 +700,10 @@ async function runAnalysisImpl(
     const { reconciled, resolvedOverlays, modelOutput } =
         postProcessRawAnalysis({
             rawResult,
-            // A capped tier (free) enriches with exactly the skills its prompt carried:
-            // a gated skill the cap dropped must not weight the result. Uncapped tiers
-            // keep the full catalog as before; narrowing member and pro to their injected
-            // skills is a separate change that has not been measured.
-            skills: gatedSkillCap === null ? skills : injectedSkills,
+            // Enrich with exactly the skills the prompt carried, on every tier: a
+            // gated skill the gate or the cap left out must not weight the result,
+            // and an uninjected one must never supply a confidence weight.
+            skills: injectedSkills,
             overlayCandidates,
             patternGeometries,
             lastClose,

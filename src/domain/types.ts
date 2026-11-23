@@ -2712,7 +2712,7 @@ export interface TechnicalAssembledPrompt extends AssembledPrompt {
      * caller enriches the model's output with exactly these, so a skill the cap left out of
      * the prompt never supplies a confidence weight.
      */
-    injectedSkills: Skill[];
+    injectedSkills: readonly Skill[];
     /**
      * @internal
      * The indicator cards core builds for this prompt: one per injected `indicator_guide` skill

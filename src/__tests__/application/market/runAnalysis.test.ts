@@ -12,6 +12,7 @@ import type {
     Timeframe,
 } from '@/domain/types';
 import type { HigherContextInput } from '@/domain/analysis/higherTimeframe';
+import type { BuildAnalysisPromptOptions } from '@/domain/analysis/prompt';
 import {
     EMPTY_INDICATOR_RESULT,
     EMPTY_SMC_RESULT,
@@ -187,28 +188,13 @@ const restrictedTierConfig = {
 } as const;
 
 /**
- * Positions of `buildAnalysisPrompt`'s parameters, which the mocked builder
- * records as a plain array. Reading them by name keeps a test from silently
- * reading the wrong argument when the signature gains a parameter.
+ * Reads one member of the options object the mocked `buildAnalysisPrompt` was
+ * called with (its only argument).
  */
-const PROMPT_ARG = {
-    skills: 4,
-    fearGreed: 6,
-    priorAnalyses: 10,
-    marketEvents: 11,
-    currency: 12,
-    krxTick: 13,
-    earningsDates: 14,
-    marketClock: 15,
-    gatedSkillCap: 16,
-    dailyBars: 17,
-    higherContext: 18,
-} as const;
-
 const promptArg = (
     call: readonly unknown[] | undefined,
-    name: keyof typeof PROMPT_ARG
-): unknown => call?.[PROMPT_ARG[name]];
+    name: keyof BuildAnalysisPromptOptions
+): unknown => (call?.[0] as BuildAnalysisPromptOptions | undefined)?.[name];
 
 describe('runAnalysis', () => {
     beforeEach(() => {
@@ -1494,32 +1480,37 @@ describe('runAnalysis', () => {
             expect(enrichCall?.[1]).not.toEqual(catalog);
         });
 
-        it('member 후처리는 발화하지 않은 gated 스킬이 있어도 카탈로그 전체로 보강한다', async () => {
-            // The gated skill does not fire, so what the prompt carries
-            // (`injectedSkills`) is a strict subset of the catalog.
-            const injected = catalog.slice(0, 1);
-            mockBuildAnalysisPrompt.mockReturnValueOnce({
-                stable: 'mock-stable',
-                dynamic: 'mock-dynamic',
-                overlayCandidates: [],
-                overlayBuildFailures: [],
-                patternScreenFailure: null,
-                patternArbitration: { kept: [], dropped: [] },
-                patternGeometries: new Map(),
-                trend: null,
-                printedSupportPrices: [],
-                injectedSkills: injected,
-                indicatorCards: [],
-                cycleCards: [],
-            });
-            mockEnrichAnalysisWithConfidence.mockClear();
+        it.each(['member', 'pro'] as const)(
+            '%s 후처리도 발화하지 않은 gated 스킬은 신뢰도 보강에 쓰지 않는다 (프롬프트가 실은 스킬로만)',
+            async tier => {
+                // The gated skill does not fire, so what the prompt carries
+                // (`injectedSkills`) is a strict subset of the catalog; the
+                // uncapped tiers used to be enriched with the whole catalog.
+                const injected = catalog.slice(0, 1);
+                mockBuildAnalysisPrompt.mockReturnValueOnce({
+                    stable: 'mock-stable',
+                    dynamic: 'mock-dynamic',
+                    overlayCandidates: [],
+                    overlayBuildFailures: [],
+                    patternScreenFailure: null,
+                    patternArbitration: { kept: [], dropped: [] },
+                    patternGeometries: new Map(),
+                    trend: null,
+                    printedSupportPrices: [],
+                    injectedSkills: injected,
+                    indicatorCards: [],
+                    cycleCards: [],
+                });
+                mockEnrichAnalysisWithConfidence.mockClear();
 
-            await runAs('member', 'AAPL');
+                await runAs(tier, 'AAPL');
 
-            const enrichCall = mockEnrichAnalysisWithConfidence.mock.lastCall;
-            expect(enrichCall?.[1]).toEqual(catalog);
-            expect(enrichCall?.[1]).not.toEqual(injected);
-        });
+                const enrichCall =
+                    mockEnrichAnalysisWithConfidence.mock.lastCall;
+                expect(enrichCall?.[1]).toEqual(injected);
+                expect(enrichCall?.[1]).not.toEqual(catalog);
+            }
+        );
 
         it('peek 키는 free에만 상한이 들어가고 member·pro는 예전 키 그대로다', async () => {
             const peekKeyFor = async (tier: 'free' | 'member' | 'pro') => {
@@ -1825,7 +1816,7 @@ describe('runAnalysis', () => {
 
     /**
      * `options.priorAnalyses`가 `narrowPriorAnalysesForCacheKey`(캐시 키
-     * 단계)와 `buildAnalysisPrompt`의 11번째 인자(프롬프트 단계) 양쪽에
+     * 단계)와 `buildAnalysisPrompt`의 priorAnalyses 옵션(프롬프트 단계) 양쪽에
      * 올바르게 배선되는지, 그리고 생략했을 때 기존 캐시 키와 바이트가
      * 같은지 확인한다.
      */
@@ -1882,7 +1873,7 @@ describe('runAnalysis', () => {
             expect(withRecentHistoryKey).toBe(omittedKey);
         });
 
-        it('윈도우 밖의 priorAnalyses가 있으면 캐시 키에 :hist= 세그먼트가 붙고, buildAnalysisPrompt의 11번째 인자로 narrowed candidates가 전달된다', async () => {
+        it('윈도우 밖의 priorAnalyses가 있으면 캐시 키에 :hist= 세그먼트가 붙고, buildAnalysisPrompt의 priorAnalyses 옵션으로 narrowed candidates가 전달된다', async () => {
             const oldEntry = {
                 generatedAt: new Date('2020-01-01T00:00:00.000Z'),
                 trend: 'bullish' as const,
@@ -2024,7 +2015,7 @@ describe('marketEvents 주입', () => {
     const eventsArg = () =>
         promptArg(mockBuildAnalysisPrompt.mock.calls.at(-1), 'marketEvents');
 
-    it('이벤트가 프롬프트 빌더의 12번째 인자로 전달된다', async () => {
+    it('이벤트가 프롬프트 빌더의 marketEvents 옵션으로 전달된다', async () => {
         await runAnalysis(
             mockSymbol,
             mockCompanyName,
@@ -2551,7 +2542,7 @@ describe('runAnalysis — 게이트·장애 내성·내부 변형', () => {
 
             expect(result.status).toBe('done');
             expect(mockComputeFearGreedIndex).not.toHaveBeenCalled();
-            // 7번째 인자 = fearGreed 스냅샷
+            // fearGreed 스냅샷
             expect(
                 promptArg(
                     mockBuildAnalysisPrompt.mock.calls.at(-1),

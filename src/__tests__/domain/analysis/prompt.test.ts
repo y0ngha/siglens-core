@@ -122,9 +122,9 @@ const USD_QUOTING: PriceQuoting = { dp: 2, krxTick: null };
 // meaningful without rewriting each call site; the split itself is covered by
 // dedicated stable/dynamic invariant tests in `promptStability.test.ts`.
 const buildAnalysisPrompt = (
-    ...args: Parameters<typeof buildAnalysisPromptRaw>
+    options: Parameters<typeof buildAnalysisPromptRaw>[0]
 ): string => {
-    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    const { stable, dynamic } = buildAnalysisPromptRaw(options);
     return `${stable}\n\n${dynamic}`;
 };
 
@@ -246,13 +246,13 @@ const makeSkill = (overrides?: Partial<Skill>): Skill => ({
 describe('prompt', () => {
     describe('반환 타입', () => {
         it('문자열을 반환한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(typeof result).toBe('string');
         });
     });
@@ -264,13 +264,13 @@ describe('prompt', () => {
      */
     describe('액션 추천 서술 규칙', () => {
         it('명령형 조언을 금지하고 조건형 서술을 요구한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Descriptive, not prescriptive');
             expect(result).toContain('사는 편이 낫습니다');
             expect(result).toContain(
@@ -281,26 +281,26 @@ describe('prompt', () => {
 
     describe('종목명 섹션', () => {
         it('symbol이 프롬프트에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(TEST_SYMBOL);
         });
     });
 
     describe('현재 시장 상황 섹션 - bars가 비어있을 때', () => {
         it('현재가, 변화율, 거래량 모두 N/A를 표시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(
                 'Snapshot Price (price captured at analysis time; not a live quote): N/A'
             );
@@ -312,13 +312,13 @@ describe('prompt', () => {
     describe('현재 시장 상황 섹션 - bars가 있을 때', () => {
         it('현재가(마지막 봉의 종가)를 포함한다', () => {
             const bars = [makeBar(0, TEST_CLOSE_PRICE)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(TEST_CLOSE_PRICE.toFixed(2));
         });
 
@@ -327,37 +327,37 @@ describe('prompt', () => {
                 makeBar(0, TEST_PREV_CLOSE),
                 makeBar(1, TEST_NEXT_CLOSE),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(TEST_CHANGE_RATE_FORMATTED);
         });
 
         it('봉이 1개일 때 변화율은 N/A다', () => {
             const bars = [makeBar(0, TEST_CLOSE_PRICE)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Price Change %: N/A');
         });
 
         it('거래량을 포함한다', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Volume:');
         });
 
@@ -366,14 +366,14 @@ describe('prompt', () => {
                 makeBar(0, TEST_PREV_CLOSE),
                 makeBar(1, TEST_NEXT_CLOSE),
             ];
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(prompt).toContain('## Analysis Snapshot');
             expect(prompt).toContain(
                 '- Snapshot Price (price captured at analysis time; not a live quote):'
@@ -384,13 +384,13 @@ describe('prompt', () => {
 
         it('마지막 봉의 거래량이 NaN이면 N/A로 표시된다 (NaN이 아니다)', () => {
             const bars = [{ ...makeBar(0), volume: Number.NaN }];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Volume: N/A');
             expect(result).not.toContain('Volume: NaN');
         });
@@ -403,13 +403,13 @@ describe('prompt', () => {
                 { ...makeBar(1), high: Number.NaN },
                 { ...makeBar(2), low: Number.NaN },
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // bar1.high is NaN → excluded; finite highs are bar0/bar2.
             const expectedHigh = Math.max(bars[0].high, bars[2].high).toFixed(
                 2
@@ -425,13 +425,13 @@ describe('prompt', () => {
 
     describe('인디케이터 수치 섹션', () => {
         it('RSI 값이 없을 때 N/A를 표시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ rsi: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ rsi: [] }),
+                skills: [],
+            });
             expect(result).toContain(`RSI(${RSI_DEFAULT_PERIOD}): N/A`);
         });
 
@@ -439,36 +439,36 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 rsi: [null, null, TEST_RSI_VALUE],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_RSI_VALUE.toFixed(2));
         });
 
         it('전부 null인 RSI 배열일 때 N/A를 표시한다', () => {
             const indicators = makeIndicators({ rsi: [null, null, null] });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(`RSI(${RSI_DEFAULT_PERIOD}): N/A`);
         });
 
         it('MACD 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ macd: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ macd: [] }),
+                skills: [],
+            });
             expect(result).toContain('MACD: N/A');
         });
 
@@ -476,13 +476,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 macd: [{ macd: null, signal: null, histogram: null }],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('MACD: N/A');
         });
 
@@ -496,26 +496,26 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_MACD_VALUE.toFixed(2));
             expect(result).toContain(TEST_SIGNAL_VALUE.toFixed(2));
             expect(result).toContain(TEST_HISTOGRAM_VALUE.toFixed(2));
         });
 
         it('볼린저 밴드 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ bollinger: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ bollinger: [] }),
+                skills: [],
+            });
             expect(result).toContain('Bollinger Bands: Upper N/A');
         });
 
@@ -523,13 +523,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 bollinger: [{ upper: null, middle: null, lower: null }],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('Bollinger Bands: Upper N/A');
         });
 
@@ -543,26 +543,26 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_BOLLINGER_UPPER.toFixed(2));
             expect(result).toContain(TEST_BOLLINGER_MIDDLE.toFixed(2));
             expect(result).toContain(TEST_BOLLINGER_LOWER.toFixed(2));
         });
 
         it('DMI 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ dmi: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ dmi: [] }),
+                skills: [],
+            });
             expect(result).toContain('DMI: +DI N/A');
         });
 
@@ -570,13 +570,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 dmi: [{ diPlus: null, diMinus: null, adx: null }],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('DMI: +DI N/A');
         });
 
@@ -590,26 +590,26 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_DI_PLUS.toFixed(2));
             expect(result).toContain(TEST_DI_MINUS.toFixed(2));
             expect(result).toContain(TEST_ADX_VALUE.toFixed(2));
         });
 
         it('Stochastic 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ stochastic: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ stochastic: [] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `Stochastic(${STOCHASTIC_K_PERIOD},${STOCHASTIC_D_PERIOD},${STOCHASTIC_SMOOTHING}): %K N/A`
             );
@@ -619,13 +619,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 stochastic: [{ percentK: null, percentD: null }],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(
                 `Stochastic(${STOCHASTIC_K_PERIOD},${STOCHASTIC_D_PERIOD},${STOCHASTIC_SMOOTHING}): %K N/A`
             );
@@ -640,25 +640,25 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_STOCHASTIC_K.toFixed(2));
             expect(result).toContain(TEST_STOCHASTIC_D.toFixed(2));
         });
 
         it('StochRSI 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ stochRsi: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ stochRsi: [] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `StochRSI(${STOCH_RSI_RSI_PERIOD},${STOCH_RSI_STOCH_PERIOD},${STOCH_RSI_K_PERIOD},${STOCH_RSI_D_PERIOD}): K N/A`
             );
@@ -668,13 +668,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 stochRsi: [{ k: null, d: null }],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(
                 `StochRSI(${STOCH_RSI_RSI_PERIOD},${STOCH_RSI_STOCH_PERIOD},${STOCH_RSI_K_PERIOD},${STOCH_RSI_D_PERIOD}): K N/A`
             );
@@ -689,13 +689,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_STOCH_RSI_K.toFixed(2));
             expect(result).toContain(TEST_STOCH_RSI_D.toFixed(2));
         });
@@ -703,13 +703,13 @@ describe('prompt', () => {
 
     describe('지표 섹션 - CCI', () => {
         it('CCI 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ cci: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ cci: [] }),
+                skills: [],
+            });
             expect(result).toContain(`CCI(${CCI_DEFAULT_PERIOD}): N/A`);
         });
 
@@ -717,13 +717,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 cci: [null, null, null],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(`CCI(${CCI_DEFAULT_PERIOD}): N/A`);
         });
 
@@ -731,26 +731,26 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 cci: [null, TEST_CCI_VALUE],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_CCI_VALUE.toFixed(2));
         });
     });
 
     describe('지표 섹션 - Volume Profile', () => {
         it('volumeProfile이 null일 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ volumeProfile: null }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ volumeProfile: null }),
+                skills: [],
+            });
             expect(result).toContain(
                 'Volume Profile (all 0 bars): POC N/A / VAH N/A / VAL N/A'
             );
@@ -758,11 +758,11 @@ describe('prompt', () => {
 
         it('프로파일이 어느 구간 기준인지 봉 수로 밝히고, 호라이즌 블록은 자기 구간을 쓴다고 알린다', () => {
             const bars = Array.from({ length: 40 }, (_, i) => makeBar(i));
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({
+                indicators: makeIndicators({
                     volumeProfile: {
                         poc: 100,
                         vah: 110,
@@ -770,8 +770,8 @@ describe('prompt', () => {
                         profile: [],
                     },
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(
                 'Volume Profile (all 40 bars): POC 100.00 / VAH 110.00 / VAL 90.00'
             );
@@ -781,13 +781,13 @@ describe('prompt', () => {
         });
 
         it('POC를 유일한 최강 지지/저항으로 단정하지 않고, 프로파일마다 구간을 함께 인용하라고 한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('POC is the strongest');
             expect(result).not.toContain('high-probability reaction zone');
             expect(result).toContain('cite a profile together with its window');
@@ -802,13 +802,13 @@ describe('prompt', () => {
                     profile: [],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_VP_POC.toFixed(2));
             expect(result).toContain(TEST_VP_VAH.toFixed(2));
             expect(result).toContain(TEST_VP_VAL.toFixed(2));
@@ -817,13 +817,13 @@ describe('prompt', () => {
 
     describe('지표 섹션 - MA', () => {
         it('ma가 빈 객체일 때 모든 기간이 N/A로 표시된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ ma: {} }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ ma: {} }),
+                skills: [],
+            });
             MA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`MA(${p}): N/A`);
             });
@@ -839,13 +839,13 @@ describe('prompt', () => {
                     200: [null, null],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             MA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`MA(${p}): N/A`);
             });
@@ -861,13 +861,13 @@ describe('prompt', () => {
                     200: [null, TEST_MA_200_VALUE],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(`MA(5): ${TEST_MA_5_VALUE.toFixed(2)}`);
             expect(result).toContain(`MA(20): ${TEST_MA_20_VALUE.toFixed(2)}`);
             expect(result).toContain(`MA(60): ${TEST_MA_60_VALUE.toFixed(2)}`);
@@ -882,13 +882,13 @@ describe('prompt', () => {
 
     describe('지표 섹션 - EMA', () => {
         it('ema가 빈 객체일 때 모든 기간이 N/A로 표시된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ ema: {} }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ ema: {} }),
+                skills: [],
+            });
             EMA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`EMA(${p}): N/A`);
             });
@@ -903,13 +903,13 @@ describe('prompt', () => {
                     60: [null, null],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             EMA_DEFAULT_PERIODS.forEach(p => {
                 expect(result).toContain(`EMA(${p}): N/A`);
             });
@@ -924,13 +924,13 @@ describe('prompt', () => {
                     60: [null, TEST_EMA_60_VALUE],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(`EMA(9): ${TEST_EMA_9_VALUE.toFixed(2)}`);
             expect(result).toContain(
                 `EMA(20): ${TEST_EMA_20_VALUE.toFixed(2)}`
@@ -946,13 +946,13 @@ describe('prompt', () => {
 
     describe('지표 섹션 - Ichimoku', () => {
         it('ichimoku 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ ichimoku: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ ichimoku: [] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan N/A`
             );
@@ -970,13 +970,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(
                 `Ichimoku(${ICHIMOKU_CONVERSION_PERIOD},${ICHIMOKU_BASE_PERIOD},${ICHIMOKU_SPAN_B_PERIOD}): Tenkan N/A`
             );
@@ -994,13 +994,13 @@ describe('prompt', () => {
                     },
                 ],
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_ICHIMOKU_TENKAN.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_KIJUN.toFixed(2));
             expect(result).toContain(TEST_ICHIMOKU_SENKOU_A.toFixed(2));
@@ -1015,11 +1015,11 @@ describe('prompt', () => {
 
             it('마지막 봉의 chikou 시리즈는 항상 null이어도 N/A가 아니라 현재 종가와 26봉 전 종가의 비교를 찍는다', () => {
                 // calculateIchimoku's last entry is null by construction.
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
+                const result = buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
                     bars,
-                    makeIndicators({
+                    indicators: makeIndicators({
                         ichimoku: [
                             {
                                 tenkan: 1,
@@ -1030,8 +1030,8 @@ describe('prompt', () => {
                             },
                         ],
                     }),
-                    []
-                );
+                    skills: [],
+                });
                 // last close 139, 26 bars earlier (index 13) close 113
                 expect(result).toContain(
                     'Chikou 139.00 (close vs 113.00 26 bars ago: above)'
@@ -1045,25 +1045,25 @@ describe('prompt', () => {
                 }));
                 const flat = bars.map(b => ({ ...b, close: 150 }));
                 const render = (b: Bar[]): string =>
-                    buildAnalysisPrompt(
-                        TEST_SYMBOL,
-                        TEST_COMPANY_NAME,
-                        b,
-                        makeIndicators(),
-                        []
-                    );
+                    buildAnalysisPrompt({
+                        symbol: TEST_SYMBOL,
+                        companyName: TEST_COMPANY_NAME,
+                        bars: b,
+                        indicators: makeIndicators(),
+                        skills: [],
+                    });
                 expect(render(falling)).toContain('26 bars ago: below)');
                 expect(render(flat)).toContain('26 bars ago: equal)');
             });
 
             it('봉이 26개 이하면 N/A로 둔다', () => {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    bars.slice(0, 26),
-                    makeIndicators(),
-                    []
-                );
+                const result = buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: bars.slice(0, 26),
+                    indicators: makeIndicators(),
+                    skills: [],
+                });
                 expect(result).toContain('Chikou N/A');
             });
         });
@@ -1071,13 +1071,16 @@ describe('prompt', () => {
 
     describe('지표 섹션 - 움직임 없는 구간의 RSI/MFI', () => {
         it('마지막 값이 null이면 이전 값을 현재처럼 찍지 않고 N/A로 읽는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [makeBar(0, 150)],
-                makeIndicators({ rsi: [55, null], mfi: [60, null] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [makeBar(0, 150)],
+                indicators: makeIndicators({
+                    rsi: [55, null],
+                    mfi: [60, null],
+                }),
+                skills: [],
+            });
             expect(result).toContain(`RSI(${RSI_DEFAULT_PERIOD}): N/A`);
             expect(result).toContain(`MFI(${MFI_DEFAULT_PERIOD}): N/A`);
             expect(result).toContain('RSI zone: N/A');
@@ -1090,27 +1093,27 @@ describe('prompt', () => {
         const bars = [makeBar(0, 150)];
 
         it('일봉에서는 봉의 대표가격과 같아지는 VWAP 줄을 찍지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                vwapIndicators,
-                [],
-                '1Day'
-            );
+                indicators: vwapIndicators,
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(result).not.toContain('- VWAP:');
         });
 
         it('분봉·시간봉에서는 VWAP 줄을 그대로 찍는다', () => {
             for (const timeframe of ['15Min', '1Hour', '4Hour'] as const) {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
+                const result = buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
                     bars,
-                    vwapIndicators,
-                    [],
-                    timeframe
-                );
+                    indicators: vwapIndicators,
+                    skills: [],
+                    timeframe,
+                });
                 expect(result).toContain('- VWAP: 145.50');
             }
         });
@@ -1118,24 +1121,24 @@ describe('prompt', () => {
 
     describe('지표 섹션 - ATR', () => {
         it('atr 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ atr: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ atr: [] }),
+                skills: [],
+            });
             expect(result).toContain(`ATR(${ATR_DEFAULT_PERIOD}): N/A`);
         });
 
         it('atr 값을 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ atr: [null, TEST_ATR_VALUE] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ atr: [null, TEST_ATR_VALUE] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `ATR(${ATR_DEFAULT_PERIOD}): ${TEST_ATR_VALUE.toFixed(2)}`
             );
@@ -1144,50 +1147,50 @@ describe('prompt', () => {
 
     describe('지표 섹션 - OBV', () => {
         it('obv 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ obv: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ obv: [] }),
+                skills: [],
+            });
             expect(result).toContain('OBV: N/A');
         });
 
         it('obv 값을 comma 포매팅하여 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ obv: [TEST_OBV_VALUE] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ obv: [TEST_OBV_VALUE] }),
+                skills: [],
+            });
             expect(result).toContain('OBV: 1,234,567');
         });
     });
 
     describe('지표 섹션 - Parabolic SAR', () => {
         it('parabolicSar 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ parabolicSar: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ parabolicSar: [] }),
+                skills: [],
+            });
             expect(result).toContain('Parabolic SAR: N/A (N/A)');
         });
 
         it('parabolicSar 값과 trend를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({
                     parabolicSar: [{ sar: TEST_PSAR_VALUE, trend: 'up' }],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(
                 `Parabolic SAR: ${TEST_PSAR_VALUE.toFixed(2)} (up)`
             );
@@ -1196,26 +1199,28 @@ describe('prompt', () => {
 
     describe('지표 섹션 - Williams %R', () => {
         it('williamsR 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ williamsR: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ williamsR: [] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `Williams %R(${WILLIAMS_R_DEFAULT_PERIOD}): N/A`
             );
         });
 
         it('williamsR 값을 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ williamsR: [null, TEST_WILLIAMS_R_VALUE] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({
+                    williamsR: [null, TEST_WILLIAMS_R_VALUE],
+                }),
+                skills: [],
+            });
             expect(result).toContain(
                 `Williams %R(${WILLIAMS_R_DEFAULT_PERIOD}): ${TEST_WILLIAMS_R_VALUE.toFixed(2)}`
             );
@@ -1224,30 +1229,30 @@ describe('prompt', () => {
 
     describe('지표 섹션 - Supertrend', () => {
         it('supertrend 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ supertrend: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ supertrend: [] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `Supertrend(${SUPERTREND_ATR_PERIOD},${SUPERTREND_MULTIPLIER}): N/A (N/A)`
             );
         });
 
         it('supertrend 값과 trend를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({
                     supertrend: [
                         { supertrend: TEST_SUPERTREND_VALUE, trend: 'up' },
                     ],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(
                 `Supertrend(${SUPERTREND_ATR_PERIOD},${SUPERTREND_MULTIPLIER}): ${TEST_SUPERTREND_VALUE.toFixed(2)} (up)`
             );
@@ -1256,24 +1261,24 @@ describe('prompt', () => {
 
     describe('지표 섹션 - MFI', () => {
         it('mfi 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ mfi: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ mfi: [] }),
+                skills: [],
+            });
             expect(result).toContain(`MFI(${MFI_DEFAULT_PERIOD}): N/A`);
         });
 
         it('mfi 값을 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ mfi: [null, TEST_MFI_VALUE] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ mfi: [null, TEST_MFI_VALUE] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `MFI(${MFI_DEFAULT_PERIOD}): ${TEST_MFI_VALUE.toFixed(2)}`
             );
@@ -1282,24 +1287,24 @@ describe('prompt', () => {
 
     describe('지표 섹션 - Keltner Channel', () => {
         it('keltnerChannel 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ keltnerChannel: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ keltnerChannel: [] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `Keltner Channel(${KELTNER_EMA_PERIOD},${KELTNER_ATR_PERIOD},${KELTNER_MULTIPLIER}): Upper N/A`
             );
         });
 
         it('keltnerChannel 값을 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({
                     keltnerChannel: [
                         {
                             upper: TEST_KELTNER_UPPER,
@@ -1308,8 +1313,8 @@ describe('prompt', () => {
                         },
                     ],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_KELTNER_UPPER.toFixed(2));
             expect(result).toContain(TEST_KELTNER_MIDDLE.toFixed(2));
             expect(result).toContain(TEST_KELTNER_LOWER.toFixed(2));
@@ -1318,24 +1323,24 @@ describe('prompt', () => {
 
     describe('지표 섹션 - CMF', () => {
         it('cmf 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ cmf: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ cmf: [] }),
+                skills: [],
+            });
             expect(result).toContain(`CMF(${CMF_DEFAULT_PERIOD}): N/A`);
         });
 
         it('cmf 값을 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ cmf: [null, TEST_CMF_VALUE] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ cmf: [null, TEST_CMF_VALUE] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `CMF(${CMF_DEFAULT_PERIOD}): ${TEST_CMF_VALUE.toFixed(2)}`
             );
@@ -1344,24 +1349,24 @@ describe('prompt', () => {
 
     describe('지표 섹션 - Donchian Channel', () => {
         it('donchianChannel 배열이 비어있을 때 N/A를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({ donchianChannel: [] }),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({ donchianChannel: [] }),
+                skills: [],
+            });
             expect(result).toContain(
                 `Donchian Channel(${DONCHIAN_DEFAULT_PERIOD}): Upper N/A`
             );
         });
 
         it('donchianChannel 값을 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators({
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators({
                     donchianChannel: [
                         {
                             upper: TEST_DONCHIAN_UPPER,
@@ -1370,8 +1375,8 @@ describe('prompt', () => {
                         },
                     ],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain(TEST_DONCHIAN_UPPER.toFixed(2));
             expect(result).toContain(TEST_DONCHIAN_MIDDLE.toFixed(2));
             expect(result).toContain(TEST_DONCHIAN_LOWER.toFixed(2));
@@ -1380,24 +1385,24 @@ describe('prompt', () => {
 
     describe('Skills 섹션 - skills가 비어있을 때', () => {
         it('패턴 분석 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('## Pattern Analysis\n');
         });
 
         it('활성화된 Skills 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('## Active Skills\n');
         });
     });
@@ -1412,13 +1417,13 @@ describe('prompt', () => {
                 gating: undefined,
             });
             expect(() =>
-                buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    [skill]
-                )
+                buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: [],
+                    indicators: makeIndicators(),
+                    skills: [skill],
+                })
             ).toThrow(/gating/);
         });
 
@@ -1427,13 +1432,13 @@ describe('prompt', () => {
                 name: 'Tagged Low',
                 confidenceWeight: TEST_BELOW_MIN_CONFIDENCE,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Tagged Low');
         });
 
@@ -1442,13 +1447,13 @@ describe('prompt', () => {
                 name: 'Included Skill',
                 confidenceWeight: TEST_ABOVE_MIN_CONFIDENCE,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Included Skill');
         });
 
@@ -1462,13 +1467,13 @@ describe('prompt', () => {
                     triggers: ['rsi_oversold'],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('Excluded Skill');
         });
 
@@ -1493,13 +1498,13 @@ describe('prompt', () => {
                     },
                 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).not.toContain('## Active Skills\n');
             expect(result).not.toContain('## Pattern Analysis\n');
         });
@@ -1511,13 +1516,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Double Top',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Pattern Analysis');
             expect(result).toContain('Double Top');
         });
@@ -1527,13 +1532,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Double Top',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('## Active Skills\n');
         });
     });
@@ -1544,13 +1549,13 @@ describe('prompt', () => {
                 name: 'RSI Divergence',
                 type: undefined,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('## Active Skills\n');
             expect(result).toContain('RSI Divergence');
         });
@@ -1560,13 +1565,13 @@ describe('prompt', () => {
                 name: 'RSI Divergence',
                 type: undefined,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('## Pattern Analysis\n');
         });
 
@@ -1575,13 +1580,13 @@ describe('prompt', () => {
                 name: 'RSI Divergence',
                 type: undefined,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('### Regular Skills Usage');
             expect(result).toContain('summary only');
             expect(result).toContain('### Active Skills Writing Rules');
@@ -1596,13 +1601,13 @@ describe('prompt', () => {
             const skill = makeSkill({
                 confidenceWeight: TEST_ABOVE_HIGH_CONFIDENCE,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('[High Confidence]');
         });
 
@@ -1610,13 +1615,13 @@ describe('prompt', () => {
             const skill = makeSkill({
                 confidenceWeight: TEST_HIGH_CONFIDENCE,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('[High Confidence]');
         });
 
@@ -1624,13 +1629,13 @@ describe('prompt', () => {
             const skill = makeSkill({
                 confidenceWeight: TEST_MEDIUM_CONFIDENCE,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('[Medium Confidence]');
         });
 
@@ -1647,13 +1652,13 @@ describe('prompt', () => {
                     gating: { tier: 'always_on' as const },
                 },
             ];
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(prompt).toContain(
                 '### MACD-V Signal Guide [Low Confidence] [Roles: Confirmation]'
             );
@@ -1663,14 +1668,14 @@ describe('prompt', () => {
 
     describe('Skills 섹션 - 측정된 기준율 레이블 (WP-18 C4)', () => {
         const render = (skill: Skill, timeframe: '1Day' | '1Hour' = '1Day') =>
-            buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill],
-                timeframe
-            );
+            buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+                timeframe,
+            });
 
         it('labels a pattern skill with its own measured row instead of a confidence label', () => {
             const row = PATTERN_BASE_RATES.double_bottom;
@@ -1788,13 +1793,13 @@ describe('prompt', () => {
     describe('Skills 섹션 - skill 내용 포함', () => {
         it('skill의 name이 포함된다', () => {
             const skill = makeSkill({ name: 'Generic Theory Strategy' });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Generic Theory Strategy');
         });
 
@@ -1802,13 +1807,13 @@ describe('prompt', () => {
             const skill = makeSkill({
                 content: '## Special Analysis Criteria\n- Unique content',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Special Analysis Criteria');
             expect(result).toContain('Unique content');
         });
@@ -1821,13 +1826,13 @@ describe('prompt', () => {
                 name: 'Head and Shoulders',
             });
             const regularSkill = makeSkill({ name: 'RSI Divergence' });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [patternSkill, regularSkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [patternSkill, regularSkill],
+            });
             expect(result).toContain('Pattern Analysis');
             expect(result).toContain('Head and Shoulders');
             expect(result).toContain('## Active Skills\n');
@@ -1839,13 +1844,13 @@ describe('prompt', () => {
                 makeSkill({ type: 'pattern', name: 'Double Top' }),
                 makeSkill({ type: 'pattern', name: 'Double Bottom' }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain('Double Top');
             expect(result).toContain('Double Bottom');
         });
@@ -1866,13 +1871,13 @@ describe('prompt', () => {
                     },
                 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain('Included Skill');
             expect(result).not.toContain('Excluded Skill');
         });
@@ -1880,13 +1885,13 @@ describe('prompt', () => {
 
     describe('최근 봉 데이터 섹션 - bars가 비어있을 때', () => {
         it('데이터 없음을 표시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Recent Bar Data');
             expect(result).toContain('No data available');
         });
@@ -1895,13 +1900,13 @@ describe('prompt', () => {
     describe('최근 봉 데이터 섹션 - bars가 있을 때', () => {
         it('OHLCV 형식 레이블이 포함된다', () => {
             const bars = [makeBar(0, TEST_CLOSE_PRICE)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('O:');
             expect(result).toContain('H:');
             expect(result).toContain('L:');
@@ -1911,50 +1916,50 @@ describe('prompt', () => {
 
         it('캔들패턴이 대괄호 형식으로 포함된다', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toMatch(/\[.+]/);
         });
 
         it('30개를 초과하는 봉이 있을 때 최근 30봉만 포함한다', () => {
             const bars = Array.from({ length: 31 }, (_, i) => makeBar(i));
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Last 30 bars');
         });
 
         it('봉이 30개 이하일 때 실제 봉 수를 표시한다', () => {
             const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Last 5 bars');
         });
     });
 
     describe('거래량 분석 섹션 - bars가 비어있을 때', () => {
         it('데이터 없음을 표시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Volume Analysis');
             expect(result).toContain('No data available');
         });
@@ -1963,44 +1968,44 @@ describe('prompt', () => {
     describe('거래량 분석 섹션 - bars가 있을 때', () => {
         it('현재 봉 매수/매도 거래량과 비율이 포함된다', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({
+                indicators: makeIndicators({
                     buySellVolume: [{ buyVolume: 600, sellVolume: 400 }],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('Current bar:');
             expect(result).toContain('Buy ratio:');
         });
 
         it('누적 매수/매도 비율이 포함된다', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({
+                indicators: makeIndicators({
                     buySellVolume: [{ buyVolume: 600, sellVolume: 400 }],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('cumulative');
         });
 
         it('매수+매도 거래량 합이 0이면 비율은 N/A다 (0%가 아니다)', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({
+                indicators: makeIndicators({
                     buySellVolume: [{ buyVolume: 0, sellVolume: 0 }],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('Buy ratio: N/A');
             expect(result).not.toContain('N/A%');
             expect(result).not.toContain('NaN%');
@@ -2008,15 +2013,15 @@ describe('prompt', () => {
 
         it('매수 거래량이 NaN이면 비율은 N/A다 (NaN%가 아니다)', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({
+                indicators: makeIndicators({
                     buySellVolume: [{ buyVolume: Number.NaN, sellVolume: 0 }],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('Buy ratio: N/A');
             expect(result).not.toContain('N/A%');
             expect(result).not.toContain('NaN%');
@@ -2030,15 +2035,15 @@ describe('prompt', () => {
         // would otherwise print as a plausible (but meaningless) ratio.
         it('총 거래량이 음수(오염된 데이터)면 비율은 N/A다 (유한한 오답이 아니다)', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({
+                indicators: makeIndicators({
                     buySellVolume: [{ buyVolume: 100, sellVolume: -150 }],
                 }),
-                []
-            );
+                skills: [],
+            });
             expect(result).toContain('Buy ratio: N/A');
             expect(result).not.toContain('N/A%');
             expect(result).not.toContain('NaN%');
@@ -2047,24 +2052,24 @@ describe('prompt', () => {
 
     describe('분석 가이드라인 섹션', () => {
         it('지지/저항 판단 가이드라인이 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Support/Resistance Assessment');
         });
 
         it('가격 목표 산출 가이드라인이 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('### Price Target Selection');
             // Targets come from levels already in the prompt; the model must
             // not be told to project a pattern height itself (that contradicted
@@ -2080,13 +2085,13 @@ describe('prompt', () => {
         });
 
         it('가이드라인 섹션은 분석 요청 섹션보다 앞에 위치한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             const guidelineIndex = result.indexOf('Analysis Guidelines');
             const requestIndex = result.indexOf('Analysis Request');
             expect(guidelineIndex).toBeLessThan(requestIndex);
@@ -2097,14 +2102,14 @@ describe('prompt', () => {
                 makeBar(0, TEST_PREV_CLOSE),
                 makeBar(1, TEST_NEXT_CLOSE),
             ];
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(prompt).toContain('### Price Reference Naming');
             expect(prompt).toContain('분석 시점 가격');
             expect(prompt).toContain('NEVER call it "현재 가격"');
@@ -2113,104 +2118,104 @@ describe('prompt', () => {
 
     describe('분석 요청 섹션', () => {
         it('JSON 형식 응답을 요청한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('JSON');
         });
 
         it('trend 필드가 요청에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('trend');
         });
 
         it('signals 필드는 요청에 포함되지 않는다 (deprecated)', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // signals 필드가 스키마 top-level에 키로 존재하지 않아야 함
             // (indicatorResults 내부의 nested signals는 허용)
             expect(result).not.toMatch(/^\s*"signals":/m);
         });
 
         it('indicatorResults는 요청에 없다: 코드가 만들고 응답 스키마에도 없다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('indicatorResults');
         });
 
         it('keyLevels 필드가 요청에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('keyLevels');
         });
 
         it('patternSummaries 필드가 요청에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('patternSummaries');
         });
 
         it('strategyResults 필드가 요청에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('strategyResults');
         });
 
         it('riskLevel의 구조 스켈레톤은 제거되었다 (스키마가 enum을 강제)', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // riskLevel은 schema가 enum을 강제하므로 프롬프트의 placeholder 스켈레톤은 중복.
             expect(result).not.toContain('riskLevel');
         });
 
         it('patternSummaries 구조 스켈레톤(keyPrices/patternLines/timeRange)은 제거되었다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // patternSummaries는 ### patternSummaries Writing Rules가 별도로 다루므로
             // JSON 스켈레톤 예시는 중복 → 제거.
             expect(result).not.toContain('"keyPrices"');
@@ -2222,13 +2227,13 @@ describe('prompt', () => {
         });
 
         it('keyLevels 구조 스켈레톤(reason/poc 예시)은 제거되었다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // keyLevels는 ### keyLevels Writing Rules가 별도로 다루므로 JSON 스켈레톤 제거.
             expect(result).not.toContain(
                 '{ "support": [{ "price": 150.00, "reason": "..." }]'
@@ -2237,13 +2242,13 @@ describe('prompt', () => {
         });
 
         it('priceTargets 구조 스켈레톤(bullish/bearish 예시 객체)은 제거되었다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // priceTargets 구조는 스키마가 강제 → JSON 스켈레톤 예시 제거.
             expect(result).not.toContain(
                 '{ "bullish": { "targets": [{ "price": 165.00'
@@ -2254,13 +2259,13 @@ describe('prompt', () => {
         });
 
         it('indicatorResults 구조 스켈레톤(예시 배열)은 제거되었다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // indicatorResults는 ### indicatorResults Writing Rules가 별도로 다룸.
             expect(result).not.toContain(
                 '[{ "indicatorName": "RSI Signal Guide", "signals":'
@@ -2270,13 +2275,13 @@ describe('prompt', () => {
 
     describe('Field Content Guidance 섹션', () => {
         const buildEmpty = (): string =>
-            buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
 
         it('## Field Content Guidance 섹션이 포함된다', () => {
             expect(buildEmpty()).toContain('## Field Content Guidance');
@@ -2322,24 +2327,24 @@ describe('prompt', () => {
         // the schema-restatement dedup even though the field-by-field
         // enumeration prose around it was cut.
         it('ANALYSIS_INTENT_BLOCK에 단일 JSON 객체 응답 지시문이 남아있다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Respond with a single JSON object');
         });
 
         it('## Analysis Request의 최종 요청문에도 단일 JSON 객체 응답 지시문이 남아있다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(
                 'perform technical analysis and respond with a single JSON object'
             );
@@ -2348,24 +2353,24 @@ describe('prompt', () => {
 
     describe('candlePatterns 스키마', () => {
         it('candlePatterns 스키마 키가 프롬프트에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('candlePatterns');
         });
 
         it('가이드라인에 patternSummaries는 Skills 전용이라는 안내 문구가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(
                 'Only include chart patterns defined in skills/*.md'
             );
@@ -2374,26 +2379,26 @@ describe('prompt', () => {
 
     describe('trendlines 스키마', () => {
         it('trendlines JSON 스켈레톤 예시는 제거되었다 (스키마가 구조를 강제)', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // trendlines 구조는 스키마가 강제하고 ## Trendline Candidates 섹션이 안내하므로
             // JSON 스켈레톤 예시는 중복 → 제거.
             expect(result).not.toContain('"direction": "ascending"');
         });
 
         it('가이드라인에 trendlineIds 지침이 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('### trendlineIds');
             expect(result).not.toContain('Trendline Detection');
             expect(result).not.toContain('patternLines');
@@ -2404,13 +2409,13 @@ describe('prompt', () => {
         it('every non-pattern overlay id is printed in dynamic; every pattern id lands as a "Candidate id" line', () => {
             const bars = doubleTopFixture.bars as Bar[];
             const indicators = calculateIndicators(bars);
-            const { dynamic, overlayCandidates } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const { dynamic, overlayCandidates } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
                 indicators,
-                []
-            );
+                skills: [],
+            });
 
             expect(overlayCandidates.length).toBeGreaterThan(0);
             for (const candidate of overlayCandidates) {
@@ -2431,13 +2436,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('patternSummaries Writing Rules');
         });
 
@@ -2446,13 +2451,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Skills pattern list to analyze');
             expect(result).toContain('- Head and Shoulders');
         });
@@ -2462,25 +2467,25 @@ describe('prompt', () => {
                 makeSkill({ type: 'pattern', name: 'Double Top' }),
                 makeSkill({ type: 'pattern', name: 'Double Bottom' }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain('- Double Top');
             expect(result).toContain('- Double Bottom');
         });
 
         it('패턴 skill이 없을 때 patternSummaries 작성 규칙 안내가 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('patternSummaries Writing Rules');
         });
 
@@ -2489,13 +2494,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain(
                 'Do not include candle patterns (single/multi candle) in patternSummaries'
             );
@@ -2516,13 +2521,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('detected: false');
         });
 
@@ -2531,13 +2536,13 @@ describe('prompt', () => {
                 name: 'RSI Divergence',
                 type: undefined,
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('patternSummaries Writing Rules');
         });
 
@@ -2551,56 +2556,56 @@ describe('prompt', () => {
                     triggers: ['rsi_oversold'],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('- Excluded Pattern');
         });
     });
 
     describe('skills 기본값', () => {
         it('skills 파라미터를 생략하면 빈 배열과 동일하게 동작한다', () => {
-            const withEmpty = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            const withDefault = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators()
-            );
+            const withEmpty = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
+            const withDefault = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+            });
             expect(withDefault).toBe(withEmpty);
         });
     });
 
     describe('한국어 응답 지시', () => {
         it('분석 요청 섹션에 한국어 응답 지시가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('Korean');
         });
 
         it('한국어 응답 지시는 Field Content Guidance 본문보다 앞에 위치한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             const koreanInstructionIndex = result.indexOf('Respond in Korean.');
             // '- summary:'는 실제 Field Content Guidance 본문에만 존재(Intent 블록의
             // 섹션 참조 텍스트가 아님)하므로 본문 위치의 안정적 마커로 사용한다.
@@ -2610,13 +2615,13 @@ describe('prompt', () => {
         });
 
         it('순수 한글(no-한자) 출력 규칙이 기술적 분석 프롬프트에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // STRICT pure-Hangul rule forbidding 한자/Chinese-character leakage
             // (observed issue: e.g. "附近" instead of "부근").
             expect(result).toContain('pure Hangul');
@@ -2649,16 +2654,15 @@ describe('prompt', () => {
             timeframe: Timeframe = '1Day',
             assetClass: AssetClass = 'equity'
         ): string =>
-            buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                [],
+                indicators: makeIndicators(),
+                skills: [],
                 timeframe,
-                undefined,
-                assetClass
-            );
+                assetClass,
+            });
         /** `## Detected Candle Patterns` 섹션 본문(다음 `## ` 제목 전까지). */
         const patternSection = (prompt: string): string =>
             (prompt.split(CANDLE_PATTERNS_HEADER)[1] ?? '').split('\n## ')[0];
@@ -2677,13 +2681,13 @@ describe('prompt', () => {
 
         it('단봉 캔들 패턴 레이블이 대괄호 형식으로 bar row에 포함된다', () => {
             const bars = [makeBar(0)];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toMatch(/\[.+]/);
         });
 
@@ -2951,13 +2955,13 @@ describe('prompt', () => {
                 engulfingCurr,
                 ...neutralBars,
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('bullish_engulfing');
         });
     });
@@ -2968,13 +2972,13 @@ describe('prompt', () => {
                 type: 'indicator_guide',
                 name: 'RSI Signal Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Indicator Signal Guides');
             expect(result).toContain('RSI Signal Guide');
         });
@@ -2984,13 +2988,13 @@ describe('prompt', () => {
                 type: 'indicator_guide',
                 name: 'RSI Signal Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('## Pattern Analysis\n');
         });
 
@@ -2999,24 +3003,24 @@ describe('prompt', () => {
                 type: 'indicator_guide',
                 name: 'RSI Signal Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('## Active Skills\n');
         });
 
         it('indicator_guide skill이 없을 때 Indicator Signal Guides 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('## Indicator Signal Guides\n');
         });
 
@@ -3031,13 +3035,13 @@ describe('prompt', () => {
                     name: 'MACD Signal Guide',
                 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain('Indicator Signal Guides');
             expect(result).toContain('RSI Signal Guide');
             expect(result).toContain('MACD Signal Guide');
@@ -3056,13 +3060,13 @@ describe('prompt', () => {
                 type: undefined,
                 name: 'Generic Theory Strategy',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [indicatorGuideSkill, patternSkill, regularSkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [indicatorGuideSkill, patternSkill, regularSkill],
+            });
             expect(result).toContain('Indicator Signal Guides');
             expect(result).toContain('RSI Signal Guide');
             expect(result).toContain('Pattern Analysis');
@@ -3081,13 +3085,13 @@ describe('prompt', () => {
                     triggers: ['rsi_oversold'],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('Low Confidence Guide');
             expect(result).not.toContain('## Indicator Signal Guides\n');
         });
@@ -3106,13 +3110,13 @@ describe('prompt', () => {
             'name that combination of indicators in the description field',
         ];
         const build = (skills: Skill[]) =>
-            buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
 
         it('card 태그가 붙은 indicator_guide가 주입되면 모델이 쓰지 않는다는 한 줄만 남는다', () => {
             const result = build([
@@ -3193,13 +3197,13 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
         });
 
         it('공통 Name Field Matching 섹션이 포함된다', () => {
@@ -3251,13 +3255,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain(
                 `- List only the patterns in the Skills pattern list below; a shape you see that ${CHART_PATTERN_CANDIDATES_SECTION_HEADER} does not list may be described in summary, not as a patternSummaries entry.`
             );
@@ -3272,26 +3276,26 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain(
                 'Do not include any patterns not listed below in patternSummaries'
             );
         });
 
         it('Chart Pattern Candidates 섹션 인트로는 목록이 판정이 아니라고 말하되 다른 패턴 보고는 권하지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(
                 'The list is not a verdict: confirm or reject each by the actual shape.'
             );
@@ -3304,13 +3308,15 @@ describe('prompt', () => {
         });
 
         it('patternSummaries 규칙은 계산 섹션 서술의 일반 규칙을 가리킨다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [
+                    makeSkill({ type: 'pattern', name: 'Head and Shoulders' }),
+                ],
+            });
             expect(result).toContain(
                 `- In summary and every other text field, write about patterns as ${COMPUTED_SECTIONS_HEADING} in ## Analysis Guidelines says`
             );
@@ -3321,24 +3327,28 @@ describe('prompt', () => {
         });
 
         it('geometry 규칙에 형태 유사 목록이 더는 나오지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [
+                    makeSkill({ type: 'pattern', name: 'Head and Shoulders' }),
+                ],
+            });
             expect(result.toLowerCase()).not.toContain('resemblance');
         });
 
         describe('geometry는 Candidate id가 있는 패턴만 싣는다 (인트로와 Writing Rules 일치)', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [
+                    makeSkill({ type: 'pattern', name: 'Head and Shoulders' }),
+                ],
+            });
 
             it('Candidate id가 있는 패턴만 geometry를 싣는다고 말한다', () => {
                 expect(result).toContain(
@@ -3366,13 +3376,15 @@ describe('prompt', () => {
         });
 
         it('geometry 규칙은 목표가가 Candidate id가 있는 패턴에만 계산된다고 말한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [
+                    makeSkill({ type: 'pattern', name: 'Head and Shoulders' }),
+                ],
+            });
             expect(result).toContain(
                 `the app derives both from geometry, and only for a pattern listed with a Candidate id in ${CHART_PATTERN_CANDIDATES_SECTION_HEADER}.`
             );
@@ -3386,13 +3398,15 @@ describe('prompt', () => {
             'not drawable',
             'drawing checks',
         ])('프롬프트 어디에도 "%s"가 없다', phrase => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [makeSkill({ type: 'pattern', name: 'Head and Shoulders' })]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [
+                    makeSkill({ type: 'pattern', name: 'Head and Shoulders' }),
+                ],
+            });
             expect(result).not.toContain(phrase);
         });
     });
@@ -3403,13 +3417,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             // The schema's `required` list for patternSummaries[] is only
             // API-enforced for forced-tool providers (Gemini/OpenAI/haiku).
             // The thinking-Claude path (sonnet/opus, tool_choice: auto) is not
@@ -3430,13 +3444,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('head-and-shoulders → bearish');
             expect(result).toContain('inverse head-and-shoulders → bullish');
         });
@@ -3446,13 +3460,13 @@ describe('prompt', () => {
                 type: 'pattern',
                 name: 'Head and Shoulders',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             // The schema cannot express WHICH trend value to assign for a
             // not-detected pattern — that domain mapping is behavioral and
             // stays even though the surrounding "is REQUIRED" prose was cut.
@@ -3469,13 +3483,13 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
         });
 
         it('접근 가능한 언어 지시가 포함된다', () => {
@@ -3544,13 +3558,13 @@ describe('prompt', () => {
         let result: string;
 
         beforeEach(() => {
-            result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
         });
 
         it('Action Recommendation Decision Tree 섹션이 포함된다', () => {
@@ -3647,47 +3661,47 @@ describe('prompt', () => {
         });
 
         it('Strategy Analysis 섹션에 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [strategySkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [strategySkill],
+            });
             expect(result).toContain('Strategy Analysis');
             expect(result).toContain('엘리어트 파동');
         });
 
         it('Active Skills 섹션에는 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [strategySkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [strategySkill],
+            });
             expect(result).not.toContain('## Active Skills\n');
         });
 
         it('Pattern Analysis 섹션에는 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [strategySkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [strategySkill],
+            });
             expect(result).not.toContain('## Pattern Analysis\n');
         });
 
         it('strategy skill에 대한 strategyResults Writing Rules 지시사항이 생성된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [strategySkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [strategySkill],
+            });
             expect(result).toContain(
                 'strategyResults Writing Rules for Strategy Skills'
             );
@@ -3695,13 +3709,13 @@ describe('prompt', () => {
         });
 
         it('strategyResults summary를 한 줄 나열이 아닌 마크다운 줄 단위로 작성하도록 지시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [strategySkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [strategySkill],
+            });
             expect(result).toContain(
                 'Put each **label**: value item on its own line'
             );
@@ -3711,13 +3725,13 @@ describe('prompt', () => {
         });
 
         it('strategy skill이 없으면 strategyResults Writing Rules 지시사항이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain(
                 'strategyResults Writing Rules for Strategy Skills'
             );
@@ -3733,13 +3747,13 @@ describe('prompt', () => {
                     triggers: ['rsi_oversold'],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('낮은신뢰도전략');
             expect(result).not.toContain('Strategy Analysis');
         });
@@ -3757,13 +3771,13 @@ describe('prompt', () => {
                 type: undefined,
                 name: 'Generic Theory Strategy',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [patternSkill, strategySkill, regularSkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [patternSkill, strategySkill, regularSkill],
+            });
             expect(result).toContain('Pattern Analysis');
             expect(result).toContain('Head and Shoulders');
             expect(result).toContain('Strategy Analysis');
@@ -3773,13 +3787,13 @@ describe('prompt', () => {
         });
 
         it('strategyInstruction의 trend는 압축 enum shape guard + neutral fallback(behavioral)을 유지한다 (non-forced thinking-Claude 경로 보호)', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [strategySkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [strategySkill],
+            });
             // TREND_SCHEMA's enum/`required` is only API-enforced for
             // forced-tool providers. The thinking-Claude path (sonnet/opus,
             // tool_choice: auto) is not schema-enforced, and
@@ -3796,13 +3810,13 @@ describe('prompt', () => {
         });
 
         it('strategyInstruction의 REQUIRED FIELDS 헤더(schema-restatement)는 제거되었다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [strategySkill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [strategySkill],
+            });
             // strategyResults[] requires 5 fields (id, strategyName, trend,
             // summary, confidenceWeight) in TECHNICAL_RESPONSE_SCHEMA — the
             // "REQUIRED FIELDS (never omit any)" header only re-labelled 3 of
@@ -3822,13 +3836,13 @@ describe('prompt', () => {
                 type: 'candlestick',
                 name: 'Engulfing Pattern Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Candlestick Pattern Guides');
             expect(result).toContain('Engulfing Pattern Guide');
         });
@@ -3838,13 +3852,13 @@ describe('prompt', () => {
                 type: 'candlestick',
                 name: 'Engulfing Pattern Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('## Pattern Analysis\n');
         });
 
@@ -3853,26 +3867,26 @@ describe('prompt', () => {
                 type: 'candlestick',
                 name: 'Engulfing Pattern Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain(
                 'The trend field MUST use the value provided in the [trend: ...] label of ## Detected Candle Patterns. Do not re-judge or override it.'
             );
         });
 
         it('candlestick skill이 없어도 공통 가이드라인에 제공된 trend 사용 지시가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain(
                 'For each detected candle pattern, the candlePatterns[].trend field MUST copy the value from the [trend: ...] label in ## Detected Candle Patterns verbatim. Do not re-judge the trend yourself.'
             );
@@ -3883,24 +3897,24 @@ describe('prompt', () => {
                 type: 'candlestick',
                 name: 'Engulfing Pattern Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('## Active Skills\n');
         });
 
         it('candlestick skill이 없을 때 Candlestick Pattern Guides 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('## Candlestick Pattern Guides\n');
         });
 
@@ -3915,13 +3929,13 @@ describe('prompt', () => {
                     name: 'Doji Pattern Guide',
                 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain('Candlestick Pattern Guides');
             expect(result).toContain('Engulfing Pattern Guide');
             expect(result).toContain('Doji Pattern Guide');
@@ -3948,19 +3962,19 @@ describe('prompt', () => {
                 type: undefined,
                 name: 'Generic Theory Strategy',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [
                     candlestickSkill,
                     patternSkill,
                     indicatorGuideSkill,
                     strategySkill,
                     regularSkill,
-                ]
-            );
+                ],
+            });
             expect(result).toContain('Candlestick Pattern Guides');
             expect(result).toContain('Engulfing Pattern Guide');
             expect(result).toContain('Pattern Analysis');
@@ -3983,13 +3997,13 @@ describe('prompt', () => {
                     triggers: ['bullish_engulfing'],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('Low Confidence Guide');
             expect(result).not.toContain('## Candlestick Pattern Guides\n');
         });
@@ -4001,26 +4015,26 @@ describe('prompt', () => {
                 type: 'candlestick',
                 name: 'Engulfing Pattern Guide',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain(
                 'candlePatterns Writing Rules for Candlestick Skills'
             );
         });
 
         it('candlestick skill이 없을 때 candlePatterns Writing Rules 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain(
                 'candlePatterns Writing Rules for Candlestick Skills'
             );
@@ -4037,13 +4051,13 @@ describe('prompt', () => {
                     name: 'Doji Pattern Guide',
                 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain(
                 'Candlestick pattern guide list to apply:'
             );
@@ -4058,13 +4072,13 @@ describe('prompt', () => {
                 type: 'support_resistance',
                 name: '피봇 포인트',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain('Support/Resistance Tool Guides');
             expect(result).toContain('피봇 포인트');
         });
@@ -4074,24 +4088,24 @@ describe('prompt', () => {
                 type: 'support_resistance',
                 name: '피봇 포인트',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('## Active Skills\n');
         });
 
         it('support_resistance skill이 없을 때 Support/Resistance Tool Guides 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain('## Support/Resistance Tool Guides\n');
         });
 
@@ -4106,13 +4120,13 @@ describe('prompt', () => {
                     name: '피보나치 되돌림',
                 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain('Support/Resistance Tool Guides');
             expect(result).toContain('피봇 포인트');
             expect(result).toContain('피보나치 되돌림');
@@ -4128,13 +4142,13 @@ describe('prompt', () => {
                     triggers: ['rsi_oversold'],
                 },
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).not.toContain('Low Confidence SR');
             expect(result).not.toContain('## Support/Resistance Tool Guides\n');
         });
@@ -4146,32 +4160,32 @@ describe('prompt', () => {
                 type: 'support_resistance',
                 name: '피봇 포인트',
             });
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [skill]
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
             expect(result).toContain(
                 'keyLevels Writing Rules for Support/Resistance Tools'
             );
         });
 
         it('지지·저항·패턴 지시가 투자자 시사점·익절·손절선 예시로 summary를 끌지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [
                     makeSkill({
                         type: 'support_resistance',
                         name: '피봇 포인트',
                     }),
                     makeSkill({ type: 'pattern', name: '헤드앤숄더' }),
-                ]
-            );
+                ],
+            });
             expect(result).toContain(
                 'keyLevels Writing Rules for Support/Resistance Tools'
             );
@@ -4182,13 +4196,13 @@ describe('prompt', () => {
         });
 
         it('support_resistance skill이 없을 때 keyLevels Writing Rules 섹션이 포함되지 않는다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).not.toContain(
                 'keyLevels Writing Rules for Support/Resistance Tools'
             );
@@ -4205,13 +4219,13 @@ describe('prompt', () => {
                     name: '피보나치 확장',
                 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                skills
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills,
+            });
             expect(result).toContain('Support/Resistance tool list to apply:');
             expect(result).toContain('- 피봇 포인트');
             expect(result).toContain('- 피보나치 확장');
@@ -4220,24 +4234,24 @@ describe('prompt', () => {
 
     describe('Critical Response Rules', () => {
         it('분석 요청에 Critical Response Rules 섹션이 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(result).toContain('### Critical Response Rules');
         });
 
         it('스키마가 강제하는 타입/구조 재진술 규칙은 제거되었다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // responseSchema(필수/타입/items)가 강제하므로 프롬프트에서 제거됨.
             expect(result).not.toContain('return an empty array []');
             expect(result).not.toContain(
@@ -4249,13 +4263,13 @@ describe('prompt', () => {
         });
 
         it('의미적 안티-할루시네이션 규칙은 유지된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             // 타임스탬프 verbatim 복사(어떤 값을 쓸지) — 스키마가 강제하지 못함.
             expect(result).toContain(
                 'copied verbatim from the [ts:<number>] markers in the bar data'
@@ -4271,13 +4285,13 @@ describe('prompt', () => {
         let result: string;
 
         beforeAll(() => {
-            result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
         });
 
         describe('읽기 좋은 텍스트 포맷 규칙', () => {
@@ -4331,25 +4345,25 @@ describe('prompt', () => {
 
     describe('Analysis Intent 블록', () => {
         it('프롬프트에 Analysis Intent 블록이 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
 
             expect(result).toContain('## Analysis Intent');
         });
 
         it('Analysis Intent 블록이 데이터 분석 지시를 포함한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
 
             expect(result).toContain('Analyze the symbol below');
         });
@@ -4358,13 +4372,13 @@ describe('prompt', () => {
         // the head of `stable` (system message), so in the combined string it
         // now precedes the Timeframe framing that opens `dynamic`.
         it('Analysis Intent 블록이 Timeframe 섹션보다 앞에 위치한다 (stable head)', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
 
             const timeframeIndex = result.indexOf('Timeframe:');
             const intentIndex = result.indexOf('## Analysis Intent');
@@ -4375,13 +4389,13 @@ describe('prompt', () => {
         });
 
         it('Analysis Intent 블록이 Indicator Values 섹션보다 앞에 위치한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
 
             const intentIndex = result.indexOf('## Analysis Intent');
             const indicatorIndex = result.indexOf('## Indicator Values');
@@ -4391,13 +4405,13 @@ describe('prompt', () => {
         });
 
         it('제공된 숫자를 사용하되 Market Reference를 권고 맥락으로 다루라는 안내가 포함된다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
 
             expect(result).toContain(
                 'treat the Market Reference as advisory context'
@@ -4411,20 +4425,20 @@ describe('prompt', () => {
             const indicators = makeIndicators();
             const skills = [makeSkill({ name: 'Skill A' })];
 
-            const result1 = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result1 = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
                 indicators,
-                skills
-            );
-            const result2 = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+                skills,
+            });
+            const result2 = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
                 indicators,
-                skills
-            );
+                skills,
+            });
 
             expect(result1).toBe(result2);
         });
@@ -4441,20 +4455,20 @@ describe('prompt', () => {
                 content: '## Alpha\n- content',
             });
 
-            const result1 = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result1 = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
                 indicators,
-                [skillA, skillB]
-            );
-            const result2 = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+                skills: [skillA, skillB],
+            });
+            const result2 = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
                 indicators,
-                [skillB, skillA]
-            );
+                skills: [skillB, skillA],
+            });
 
             expect(result1).toBe(result2);
         });
@@ -4471,13 +4485,13 @@ describe('prompt', () => {
                 content: '## Apple\n- content',
             });
 
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
                 indicators,
-                [skillA, skillB]
-            );
+                skills: [skillA, skillB],
+            });
 
             const zebraIndex = result.indexOf('Zebra Skill');
             const appleIndex = result.indexOf('Apple Skill');
@@ -4490,12 +4504,12 @@ describe('prompt', () => {
         const bars = Array.from({ length: 100 }, (_, i) => makeBar(i));
 
         it('should show insufficient data message when SMC is empty', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             expect(result).toContain('Insufficient data for SMC analysis');
         });
 
@@ -4517,12 +4531,12 @@ describe('prompt', () => {
                     },
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain('[BOS] bullish at 155.00');
             expect(result).toContain('[CHOCH] bearish at 160.00');
             expect(result).toContain('Market Structure');
@@ -4555,12 +4569,12 @@ describe('prompt', () => {
                     },
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain('bullish OB: 149.00 ~ 152.00');
             expect(result).toContain('bullish OB: 142.00 ~ 145.00');
             expect(result).not.toContain('bearish OB: 158.00 ~ 162.00');
@@ -4594,12 +4608,12 @@ describe('prompt', () => {
                     }, // near edge 195 -> -4 below (only one, nearest below)
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc, atr: [TEST_ATR_VALUE] })
-            );
+                indicators: makeIndicators({ smc, atr: [TEST_ATR_VALUE] }),
+            });
             expect(result).toContain(
                 'bearish OB: 202.00 ~ 205.00 (89 bars ago) (+1.51% / +1.2 ATR from price) [nearest above]'
             );
@@ -4625,12 +4639,12 @@ describe('prompt', () => {
                     },
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain('No active order blocks');
         });
 
@@ -4654,12 +4668,12 @@ describe('prompt', () => {
                     },
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain('bullish FVG: 151.00 ~ 153.50');
             expect(result).not.toContain('bearish FVG: 158.50 ~ 160.00');
         });
@@ -4685,12 +4699,12 @@ describe('prompt', () => {
                     }, // near edge 196 -> -3 below (only one, nearest below)
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc, atr: [TEST_ATR_VALUE] })
-            );
+                indicators: makeIndicators({ smc, atr: [TEST_ATR_VALUE] }),
+            });
             expect(result).toContain(
                 'bullish FVG: 201.00 ~ 204.00 (84 bars ago) (+1.01% / +0.8 ATR from price) [nearest above]'
             );
@@ -4717,12 +4731,12 @@ describe('prompt', () => {
                     },
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain(
                 '- Equal Highs at 165.00 (buy-side liquidity) (-17.09% from price) (14 bars ago, span 15 bars)'
             );
@@ -4743,12 +4757,12 @@ describe('prompt', () => {
                 },
                 discountZone: { high: 150.0, low: 140.0, type: 'discount' },
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain('Premium Zone: 160.00 ~ 170.00');
             expect(result).toContain('Equilibrium Zone: 150.00 ~ 160.00');
             expect(result).toContain('Discount Zone: 140.00 ~ 150.00');
@@ -4770,12 +4784,12 @@ describe('prompt', () => {
                 ...EMPTY_SMC_RESULT,
                 discountZone: { high: 150.0, low: 140.0, type: 'discount' },
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                discountBars,
-                makeIndicators({ smc })
-            );
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: discountBars,
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain('is in discount zone');
             expect(result).not.toContain('is in premium zone');
         });
@@ -4791,14 +4805,14 @@ describe('prompt', () => {
                 },
                 discountZone: { high: 150.0, low: 140.0, type: 'discount' },
             };
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc }),
-                [],
-                '1Day'
-            );
+                indicators: makeIndicators({ smc }),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(prompt).toMatch(
                 /Snapshot Price \([\d.]+\) is in (premium|discount|equilibrium|neutral) zone/
             );
@@ -4811,12 +4825,12 @@ describe('prompt', () => {
                 swingHighs: [{ index: 95, price: 168.0, type: 'high' }],
                 swingLows: [{ index: 90, price: 142.0, type: 'low' }],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             expect(result).toContain('Swing High: 168.00 (4 bars ago)');
             expect(result).toContain('Swing Low: 142.00 (9 bars ago)');
         });
@@ -4832,12 +4846,12 @@ describe('prompt', () => {
                     isMitigated: false,
                 })),
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             const obMatches = result.match(/bullish OB:/g);
             expect(obMatches).toHaveLength(5);
         });
@@ -4854,12 +4868,12 @@ describe('prompt', () => {
                     },
                 ],
             };
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ smc })
-            );
+                indicators: makeIndicators({ smc }),
+            });
             const indicatorIdx = result.indexOf('## Indicator Values');
             // lastIndexOf: ANALYSIS_GUIDELINES의 'Price Reference Naming' 항목이
             // '## Smart Money Concepts (SMC)' 문자열을 참조하므로, 실제 SMC 섹션
@@ -4891,12 +4905,12 @@ describe('prompt', () => {
                 makeSqz({ momentum: 2.0, sqzOn: true }),
                 makeSqz({ momentum: 2.5, sqzOn: true }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).toContain('duration: 3 bars');
         });
 
@@ -4905,12 +4919,12 @@ describe('prompt', () => {
                 makeSqz({ momentum: 1.0, sqzOn: true }),
                 makeSqz({ momentum: 1.5, sqzOff: true }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).not.toMatch(/duration: \d+ bars/);
         });
 
@@ -4920,12 +4934,12 @@ describe('prompt', () => {
                 makeSqz({ momentum: -1.0, sqzOn: true }),
                 makeSqz({ momentum: 0.5, sqzOn: true }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).toContain('bullish zero-cross (0 bars ago)');
         });
 
@@ -4935,12 +4949,12 @@ describe('prompt', () => {
                 makeSqz({ momentum: 1.0, sqzOff: true }),
                 makeSqz({ momentum: -0.5, sqzOff: true }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).toContain('bearish zero-cross (0 bars ago)');
         });
 
@@ -4950,12 +4964,12 @@ describe('prompt', () => {
                 makeSqz({ momentum: 2.0, sqzOff: true }),
                 makeSqz({ momentum: 3.0, sqzOff: true }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).not.toContain('zero-cross');
         });
 
@@ -4965,22 +4979,22 @@ describe('prompt', () => {
                 makeSqz({ momentum: 1.5, sqzOn: true }),
                 makeSqz({ momentum: 2.0, sqzOn: true }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).toContain('duration: 2 bars');
         });
 
         it('should handle empty squeezeMomentum array', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: [] })
-            );
+                indicators: makeIndicators({ squeezeMomentum: [] }),
+            });
             expect(result).toContain('Squeeze Momentum');
             expect(result).toContain('N/A');
         });
@@ -4995,12 +5009,12 @@ describe('prompt', () => {
                         increasing: true,
                     })
             );
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).toMatch(/Squeeze Momentum.*\[rising]/);
         });
 
@@ -5012,12 +5026,12 @@ describe('prompt', () => {
                 makeSqz({ momentum: 1.0, sqzOff: true }),
                 makeSqz({ momentum: 1.5, sqzOff: true }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).toContain('squeeze OFF');
             expect(result).not.toContain('squeeze ON');
             expect(result).not.toContain('no squeeze');
@@ -5031,12 +5045,12 @@ describe('prompt', () => {
                 makeSqz({ momentum: 1.0 }),
                 makeSqz({ momentum: 1.5 }),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ squeezeMomentum: data })
-            );
+                indicators: makeIndicators({ squeezeMomentum: data }),
+            });
             expect(result).toContain('no squeeze');
             expect(result).not.toContain('squeeze ON');
             expect(result).not.toContain('squeeze OFF');
@@ -5049,12 +5063,12 @@ describe('prompt', () => {
         // UX audit: 모델이 "룰 엔진", "washout", "x / 100"을 사용자
         // 문장에 그대로 옮겨 적었다. 내부 라벨은 설명하되 이름으로 쓰지 못하게 한다.
         it('tells the model that engine labels are internal and must not appear in output', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             expect(result).toContain(
                 'are internal. In every output field describe what they measure in plain trading language; never write the words "rule engine", "confluence", or "washout", and never quote an "x / 100" score.'
             );
@@ -5074,12 +5088,14 @@ describe('prompt', () => {
         ])(
             'no line of the assembled prompt (%s) names confluence / washout / rule engine outside the internal-labels rule',
             (_label, barCount) => {
-                const result = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    Array.from({ length: barCount }, (_, i) => makeBar(i)),
-                    makeIndicators(),
-                    [
+                const result = buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: Array.from({ length: barCount }, (_, i) =>
+                        makeBar(i)
+                    ),
+                    indicators: makeIndicators(),
+                    skills: [
                         makeSkill({
                             name: 'Guide',
                             type: 'indicator_guide',
@@ -5090,8 +5106,8 @@ describe('prompt', () => {
                             name: 'SR',
                             type: 'support_resistance',
                         }),
-                    ]
-                );
+                    ],
+                });
                 // The skill-gated instruction blocks must actually be part of what is scanned.
                 expect(result).toContain(INDICATOR_CARDS_BUILT_BY_CODE_NOTE);
                 expect(result).toContain(
@@ -5118,12 +5134,12 @@ describe('prompt', () => {
         );
 
         it('no longer instructs the model to cite the rule engine or the washout label by name', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             expect(result).not.toContain('that the rule engine abstained');
             expect(result).not.toContain('say the confluence is corroborated');
             expect(result).toContain(
@@ -5135,12 +5151,12 @@ describe('prompt', () => {
         });
 
         it('defers the tally to the computation instead of asking the model to count', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             expect(result).toContain('### Indicator Agreement Assessment');
             expect(result).toContain('is computed, not judged by you');
             // The replaced instruction told the model to tally categories itself, which
@@ -5154,23 +5170,23 @@ describe('prompt', () => {
             // The instruction says "see ## Deterministic Metrics". If the section were
             // wired up wrong the prompt would reference a block that does not exist and
             // the model would fall back to guessing — the exact failure being removed.
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             expect(result).toContain('## Deterministic Metrics');
             expect(result).toContain('### Indicator Agreement');
         });
 
         it('still claims the non-indicator evidence for the model', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             // Handing the indicator tally to the engine must not read as "the engine
             // decides confluence" — patterns, SMC and S/R are still the model's call.
             expect(result).toContain(
@@ -5182,12 +5198,12 @@ describe('prompt', () => {
             // Re-measured 2026-09: the daily entry rule trailed the baseline in every period,
             // and on washout days the tally reads bearish about two thirds of the time. The
             // prompt must not let a bearish tally overrule a measured washout on its own.
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             expect(result).toContain(
                 'never as the reason for a verdict on its own'
             );
@@ -5203,12 +5219,12 @@ describe('prompt', () => {
     describe('entryRecommendation 판단 규칙 (컨플루언스 권위 철회, 2026-09-25)', () => {
         const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
         const result = () =>
-            buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
 
         it('Step 1은 진입 구간 배치이고, 코드가 계획 상태에서 판정을 정한다고 정확히 말한다', () => {
             const out = result();
@@ -5243,12 +5259,12 @@ describe('prompt', () => {
         });
 
         it('Step 1의 종가 문장은 고정 접두부에, 종가 숫자는 동적 블록에 있다', () => {
-            const { stable, dynamic } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const { stable, dynamic } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
             expect(stable + dynamic).toContain(
                 'To plan an entry at the price, make the zone contain the last close'
             );
@@ -5260,12 +5276,12 @@ describe('prompt', () => {
     describe('entryRecommendation washout 경로 (룰 엔진 판정, 2026-09-26)', () => {
         const bars = Array.from({ length: 5 }, (_, i) => makeBar(i));
         const result = () =>
-            buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators()
-            );
+                indicators: makeIndicators(),
+            });
 
         it('washout 경로는 구간을 종가 영역에 두게 하고, Step 1 바로 뒤에 온다', () => {
             const out = result();
@@ -5314,20 +5330,18 @@ describe('prompt', () => {
             }));
             const lastMs = daily.at(-1)!.time * 1000;
             const build = (events: MarketEvent[]) =>
-                buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    daily,
-                    makeIndicators(),
-                    [],
-                    '1Day',
-                    undefined,
-                    'equity',
-                    undefined,
-                    'ko',
-                    [],
-                    events
-                );
+                buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: daily,
+                    indicators: makeIndicators(),
+                    skills: [],
+                    timeframe: '1Day',
+                    assetClass: 'equity',
+                    locale: 'ko',
+                    priorAnalyses: [],
+                    marketEvents: events,
+                });
             expect(build([])).toContain(
                 'Entry verdict (computed): enter — sell-off path.'
             );
@@ -5369,12 +5383,12 @@ describe('prompt', () => {
             volume: 1000 + i,
         }));
         const built = () =>
-            buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                daily,
-                makeIndicators()
-            );
+            buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: daily,
+                indicators: makeIndicators(),
+            });
 
         it('Step 2의 손절 문장은 하한과 코드의 이동 규칙을 정확히 말한다', () => {
             const { stable, dynamic } = built();
@@ -5506,42 +5520,42 @@ describe('prompt', () => {
         );
 
         it('5Min 타임프레임에서는 해당 타임프레임의 recentBarsCount만큼 표시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                [],
-                '5Min'
-            );
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '5Min',
+            });
             expect(result).toContain(
                 `## Recent Bar Data (Last ${PROMPT_CONFIG_BY_TIMEFRAME['5Min'].recentBarsCount} bars)`
             );
         });
 
         it('1Day 타임프레임에서는 해당 타임프레임의 recentBarsCount만큼 표시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(result).toContain(
                 `## Recent Bar Data (Last ${PROMPT_CONFIG_BY_TIMEFRAME['1Day'].recentBarsCount} bars)`
             );
         });
 
         it('1Hour 타임프레임에서는 해당 타임프레임의 recentBarsCount만큼 표시한다', () => {
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                [],
-                '1Hour'
-            );
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Hour',
+            });
             expect(result).toContain(
                 `## Recent Bar Data (Last ${PROMPT_CONFIG_BY_TIMEFRAME['1Hour'].recentBarsCount} bars)`
             );
@@ -5552,22 +5566,22 @@ describe('prompt', () => {
                 buyVolume: 1000,
                 sellVolume: 500,
             }));
-            const result5Min = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result5Min = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ buySellVolume }),
-                [],
-                '5Min'
-            );
-            const result1Day = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+                indicators: makeIndicators({ buySellVolume }),
+                skills: [],
+                timeframe: '5Min',
+            });
+            const result1Day = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators({ buySellVolume }),
-                [],
-                '1Day'
-            );
+                indicators: makeIndicators({ buySellVolume }),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(result5Min).toContain(
                 `Last ${PROMPT_CONFIG_BY_TIMEFRAME['5Min'].recentBarsCount}-bar cumulative`
             );
@@ -5579,13 +5593,13 @@ describe('prompt', () => {
 
     describe('buildAnalysisPrompt — fearGreed integration', () => {
         it('omits fear-greed section when not provided', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(prompt).not.toContain('Fear & Greed Index');
         });
 
@@ -5601,15 +5615,15 @@ describe('prompt', () => {
                 sampleSize: 412,
                 warning: null,
             };
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [],
-                '1Day',
-                fg
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                fearGreed: fg,
+            });
             expect(prompt).toContain('Fear & Greed Index');
             expect(prompt).toContain('18');
             expect(prompt).toContain('EXTREME_FEAR');
@@ -5629,15 +5643,15 @@ describe('prompt', () => {
                 sampleSize: 412,
                 warning: 'CHRONIC_WEAKNESS',
             };
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [],
-                '1Day',
-                fg
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                fearGreed: fg,
+            });
             expect(prompt).toContain(
                 'This stock is in a long-term bearish cycle. The score represents its relative position within its own distribution.'
             );
@@ -5655,15 +5669,15 @@ describe('prompt', () => {
                 sampleSize: 412,
                 warning: 'CHRONIC_STRENGTH',
             };
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [],
-                '1Day',
-                fg
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                fearGreed: fg,
+            });
             expect(prompt).toContain(
                 'This stock is in a long-term bullish cycle. The score represents its relative position within its own distribution.'
             );
@@ -5672,13 +5686,13 @@ describe('prompt', () => {
 
     describe('buildAnalysisPrompt — position bucket hint', () => {
         it('omits the position hint section when positionBucket is not provided', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(prompt).not.toContain(
                 '이 사용자는 이 종목을 이미 보유 중이며'
             );
@@ -5693,17 +5707,16 @@ describe('prompt', () => {
         ] as const)(
             'includes the Korean hint for bucket %s (%s) when positionBucket is provided',
             (bucket, koreanLabel) => {
-                const prompt = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    [],
-                    '1Day',
-                    undefined,
-                    'equity',
-                    bucket
-                );
+                const prompt = buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: [],
+                    indicators: makeIndicators(),
+                    skills: [],
+                    timeframe: '1Day',
+                    assetClass: 'equity',
+                    positionBucket: bucket,
+                });
                 expect(prompt).toContain(
                     '이 사용자는 이 종목을 이미 보유 중이며'
                 );
@@ -5712,17 +5725,16 @@ describe('prompt', () => {
         );
 
         it('places the hint in `dynamic` only — `stable` never carries it', () => {
-            const { stable, dynamic } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                'profit'
-            );
+            const { stable, dynamic } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                positionBucket: 'profit',
+            });
             expect(dynamic).toContain('이 사용자는 이 종목을 이미 보유 중이며');
             expect(stable).not.toContain(
                 '이 사용자는 이 종목을 이미 보유 중이며'
@@ -5730,24 +5742,23 @@ describe('prompt', () => {
         });
 
         it('`stable` is byte-identical whether or not positionBucket is provided', () => {
-            const withoutBucket = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
-            const withBucket = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                'deep-loss'
-            );
+            const withoutBucket = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
+            const withBucket = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                positionBucket: 'deep-loss',
+            });
             expect(withBucket.stable).toBe(withoutBucket.stable);
         });
 
@@ -5758,24 +5769,23 @@ describe('prompt', () => {
             // empty string into `dynamicSections` (which would double up the
             // `\n\n` join separator).
             const invalidBucket = 'unknown-bucket' as unknown as PositionBucket;
-            const withInvalidBucket = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                invalidBucket
-            );
-            const withoutBucket = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
-                makeIndicators(),
-                []
-            );
+            const withInvalidBucket = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                positionBucket: invalidBucket,
+            });
+            const withoutBucket = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
+                indicators: makeIndicators(),
+                skills: [],
+            });
             expect(withInvalidBucket.dynamic).not.toContain(
                 '이 사용자는 이 종목을 이미 보유 중이며'
             );
@@ -5806,111 +5816,101 @@ describe('prompt', () => {
         });
 
         it('omitting priorAnalyses is byte-identical to explicitly passing an empty array', () => {
-            const omitted = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                []
-            );
-            const explicitEmpty = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                DEFAULT_ANALYSIS_LOCALE,
-                []
-            );
+            const omitted = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+            });
+            const explicitEmpty = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                locale: DEFAULT_ANALYSIS_LOCALE,
+                priorAnalyses: [],
+            });
             expect(explicitEmpty).toEqual(omitted);
         });
 
         it('an empty array renders nothing and leaves `dynamic` byte-identical to omitting the param', () => {
-            const withoutHistory = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                []
-            );
-            const withEmptyHistory = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                DEFAULT_ANALYSIS_LOCALE,
-                []
-            );
+            const withoutHistory = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+            });
+            const withEmptyHistory = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                locale: DEFAULT_ANALYSIS_LOCALE,
+                priorAnalyses: [],
+            });
             expect(withEmptyHistory.dynamic).toBe(withoutHistory.dynamic);
         });
 
         it('renders the "## Prior Analyses" section into `dynamic` when history is provided', () => {
-            const { dynamic } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                DEFAULT_ANALYSIS_LOCALE,
-                [priorEntry(3)]
-            );
+            const { dynamic } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                locale: DEFAULT_ANALYSIS_LOCALE,
+                priorAnalyses: [priorEntry(3)],
+            });
             expect(dynamic).toContain(
                 `## Prior Analyses (${TEST_SYMBOL} · Daily · reference only)`
             );
         });
 
         it('places the section in `dynamic` only — `stable` never carries it', () => {
-            const { stable, dynamic } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                DEFAULT_ANALYSIS_LOCALE,
-                [priorEntry(3)]
-            );
+            const { stable, dynamic } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                locale: DEFAULT_ANALYSIS_LOCALE,
+                priorAnalyses: [priorEntry(3)],
+            });
             expect(dynamic).toContain('## Prior Analyses');
             expect(stable).not.toContain('## Prior Analyses');
         });
 
         it('`stable` is byte-identical whether or not priorAnalyses is provided', () => {
-            const withoutHistory = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                []
-            );
-            const withHistory = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                DEFAULT_ANALYSIS_LOCALE,
-                [priorEntry(3)]
-            );
+            const withoutHistory = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+            });
+            const withHistory = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                locale: DEFAULT_ANALYSIS_LOCALE,
+                priorAnalyses: [priorEntry(3)],
+            });
             expect(withHistory.stable).toBe(withoutHistory.stable);
         });
 
@@ -5926,19 +5926,19 @@ describe('prompt', () => {
                 sampleSize: 100,
                 warning: null,
             };
-            const { dynamic } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [],
-                '1Day',
-                fg,
-                'equity',
-                'profit',
-                DEFAULT_ANALYSIS_LOCALE,
-                [priorEntry(3)]
-            );
+            const { dynamic } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                fearGreed: fg,
+                assetClass: 'equity',
+                positionBucket: 'profit',
+                locale: DEFAULT_ANALYSIS_LOCALE,
+                priorAnalyses: [priorEntry(3)],
+            });
             const fgIndex = dynamic.indexOf('Fear & Greed');
             const priorIndex = dynamic.indexOf('## Prior Analyses');
             const positionHintIndex = dynamic.indexOf(
@@ -5960,26 +5960,24 @@ describe('prompt', () => {
             const skill = makeSkill({ name: 'Unaffected Skill' });
             const history = [priorEntry(3)];
 
-            const withoutHistory = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [skill]
-            );
-            const withHistory = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                priorBars,
-                makeIndicators(),
-                [skill],
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                DEFAULT_ANALYSIS_LOCALE,
-                history
-            );
+            const withoutHistory = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [skill],
+            });
+            const withHistory = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: priorBars,
+                indicators: makeIndicators(),
+                skills: [skill],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                locale: DEFAULT_ANALYSIS_LOCALE,
+                priorAnalyses: history,
+            });
 
             const expectedSection = formatPriorAnalysisSection(
                 selectPriorAnalyses(history, priorBars),
@@ -6013,14 +6011,14 @@ describe('prompt', () => {
 
         it('prints the measured level statement with its numbers on 1Day and without them on an intraday chart', () => {
             const render = (timeframe: '1Day' | '1Hour') =>
-                buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    makeMarketReferenceBars(),
-                    makeIndicators(),
-                    [],
-                    timeframe
-                );
+                buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: makeMarketReferenceBars(),
+                    indicators: makeIndicators(),
+                    skills: [],
+                    timeframe,
+                });
             const daily = render('1Day');
             expect(daily).toContain(
                 `in ${(PRICE_LEVEL_BASE_RATE.eventShare * 100).toFixed(1)}% of ${PRICE_LEVEL_BASE_RATE.n.toLocaleString('en-US')} touches`
@@ -6038,14 +6036,14 @@ describe('prompt', () => {
         });
 
         it('renders the advisory market-reference section with honest framing', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(prompt).toContain(
                 '## Market Reference (deterministic · advisory)'
             );
@@ -6067,26 +6065,26 @@ describe('prompt', () => {
             // makeIndicators() defaults smc.swingHighs/swingLows to [] — fewer
             // than 2 swing points means computeFibonacciProjection returns
             // null, so formatHorizonBlock must render no Fib anchor line.
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(prompt).not.toContain('Fib anchor:');
         });
 
         it('omits the Fib and Fib ABC table lines when there is no projection (null rule)', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             // The guideline text names the lines in backticks, so match whole
             // rendered lines rather than substrings.
             const lines = prompt.split('\n');
@@ -6097,46 +6095,46 @@ describe('prompt', () => {
         });
 
         it('omits the Fib ABC anchor line when the window has fewer than 3 confirmed swing points (null rule)', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(prompt).not.toContain('Fib ABC anchor:');
         });
 
         it('no longer claims more-tested levels are higher conviction', () => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                '1Day'
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
             expect(prompt).not.toContain('higher-conviction');
         });
 
         it('labels each horizon with a timeframe-relative calendar span', () => {
-            const daily = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                '1Day'
-            );
-            const intraday = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                '5Min'
-            );
+            const daily = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+            });
+            const intraday = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '5Min',
+            });
             // Same "Long-term" horizon reads as months on a daily chart but only
             // a few sessions on a 5-minute chart, so the model calibrates vocabulary.
             expect(daily).toContain('Long-term — ~9-12 months');
@@ -6158,14 +6156,14 @@ describe('prompt', () => {
                 ['~2 trading hours', '~1 trading day', '~2-3 trading days'],
             ],
         ] as const)('renders all horizon spans for %s', (tf, spans) => {
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                makeMarketReferenceBars(),
-                makeIndicators(),
-                [],
-                tf
-            );
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: makeMarketReferenceBars(),
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: tf,
+            });
             for (const span of spans) expect(prompt).toContain(span);
         });
     });
@@ -6197,13 +6195,13 @@ describe('prompt', () => {
         const buildRealisticPrompt = (): string => {
             const bars = buildRealisticBars(PRO_ENOUGH_BARS);
             const indicators = calculateIndicators(bars);
-            return buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            return buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
                 indicators,
-                []
-            );
+                skills: [],
+            });
         };
 
         it('두 신규 섹션 헤더가 모두 존재한다', () => {
@@ -6295,13 +6293,13 @@ describe('prompt', () => {
                 { ...makeBar(2, 60), low: 50 },
                 makeBar(3, 100),
             ];
-            const result = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const result = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                makeIndicators(),
-                []
-            );
+                indicators: makeIndicators(),
+                skills: [],
+            });
             const rowDate = (i: number): string =>
                 result
                     .split('\n')
@@ -6513,13 +6511,13 @@ describe('prompt', () => {
                 hurst: [0.65],
                 varianceRatio: [0.75],
             });
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             const regimeSection = prompt.slice(
                 prompt.indexOf(REGIME_HEADER),
                 prompt.indexOf(INDICATOR_HEADER)
@@ -6543,13 +6541,13 @@ describe('prompt', () => {
                 hurst: [0.35],
                 varianceRatio: [0.75],
             });
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             const regimeSection = prompt.slice(
                 prompt.indexOf(REGIME_HEADER),
                 prompt.indexOf(INDICATOR_HEADER)
@@ -6571,13 +6569,13 @@ describe('prompt', () => {
                 varianceRatio: [null],
                 regression: [{ slope: 1.5, r2: 0.8 }],
             });
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             const regimeSection = prompt.slice(
                 prompt.indexOf(REGIME_HEADER),
                 prompt.indexOf(INDICATOR_HEADER)
@@ -6598,13 +6596,13 @@ describe('prompt', () => {
                 hurst: [0.65],
                 varianceRatio: [null],
             });
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             const regimeSection = prompt.slice(
                 prompt.indexOf(REGIME_HEADER),
                 prompt.indexOf(INDICATOR_HEADER)
@@ -6625,13 +6623,13 @@ describe('prompt', () => {
             const indicators = makeIndicators({
                 elderImpulse: ['green', null, 'red'],
             });
-            const prompt = buildAnalysisPrompt(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                [],
+            const prompt = buildAnalysisPrompt({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: [],
                 indicators,
-                []
-            );
+                skills: [],
+            });
             const impulseLine = prompt
                 .split('\n')
                 .find(l => l.startsWith('- Elder Impulse:'));
@@ -6642,13 +6640,13 @@ describe('prompt', () => {
         it('빈 bars에서도 throw 없이 insufficient data / N/A를 렌더한다', () => {
             let prompt = '';
             expect(() => {
-                prompt = buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    [],
-                    makeIndicators(),
-                    []
-                );
+                prompt = buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: [],
+                    indicators: makeIndicators(),
+                    skills: [],
+                });
             }).not.toThrow();
             expect(prompt).toContain(REGIME_HEADER);
             expect(prompt).toContain(PRO_HEADER);
@@ -6669,13 +6667,13 @@ describe('prompt', () => {
             const shortBars = buildRealisticBars(10);
             const indicators = calculateIndicators(shortBars);
             expect(() => {
-                buildAnalysisPrompt(
-                    TEST_SYMBOL,
-                    TEST_COMPANY_NAME,
-                    shortBars,
+                buildAnalysisPrompt({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY_NAME,
+                    bars: shortBars,
                     indicators,
-                    []
-                );
+                    skills: [],
+                });
             }).not.toThrow();
         });
     });
@@ -6684,18 +6682,16 @@ describe('prompt', () => {
 describe('buildAnalysisPrompt — 출력 로케일', () => {
     const bars = [makeBar(0), makeBar(1), makeBar(2)];
     const build = (locale?: AnalysisLocale) =>
-        buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
-            makeIndicators(),
-            [],
-            '1Day',
-            undefined,
-            'equity',
-            undefined,
-            locale
-        );
+            indicators: makeIndicators(),
+            skills: [],
+            timeframe: '1Day',
+            assetClass: 'equity',
+            locale,
+        });
 
     /**
      * **이 단언이 캐시를 지킨다.** 로케일 인자가 붙기 전과 ko 산출물이 한 글자라도
@@ -6769,20 +6765,18 @@ describe('marketEvents (buildAnalysisPrompt)', () => {
     });
 
     const build = (events?: readonly MarketEvent[]) =>
-        buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY_NAME,
-            eventBars,
-            makeIndicators(),
-            [],
-            '1Day',
-            undefined,
-            'equity',
-            undefined,
-            DEFAULT_ANALYSIS_LOCALE,
-            [],
-            events
-        );
+        buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY_NAME,
+            bars: eventBars,
+            indicators: makeIndicators(),
+            skills: [],
+            timeframe: '1Day',
+            assetClass: 'equity',
+            locale: DEFAULT_ANALYSIS_LOCALE,
+            priorAnalyses: [],
+            marketEvents: events,
+        });
 
     it('omitting marketEvents is byte-identical to explicitly passing an empty array', () => {
         expect(build([])).toEqual(build());
@@ -6815,26 +6809,24 @@ describe('marketEvents (buildAnalysisPrompt)', () => {
         // 이벤트는 봉에 대한 사실이라 봉 데이터의 연장이고, 이력은 그 위에서
         // 내린 판단이라 한 겹 위다. 리팩터링으로 순서가 뒤집히면 그 층위가
         // 무너지므로 여기서 고정한다.
-        const result = buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY_NAME,
-            eventBars,
-            makeIndicators(),
-            [],
-            '1Day',
-            undefined,
-            'equity',
-            undefined,
-            DEFAULT_ANALYSIS_LOCALE,
-            [
+        const result = buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY_NAME,
+            bars: eventBars,
+            indicators: makeIndicators(),
+            skills: [],
+            timeframe: '1Day',
+            assetClass: 'equity',
+            locale: DEFAULT_ANALYSIS_LOCALE,
+            priorAnalyses: [
                 {
                     generatedAt: new Date(eventBars[4].time * 1000),
                     trend: 'bullish',
                     riskLevel: 'medium',
                 },
             ],
-            [marketEvent(5)]
-        );
+            marketEvents: [marketEvent(5)],
+        });
 
         const eventsAt = result.dynamic.indexOf('## Market Events');
         const priorAt = result.dynamic.indexOf('## Prior Analyses');
@@ -7049,13 +7041,13 @@ describe('distanceFromExtreme', () => {
 // raw status code ("형성 중 (forming)"). One rule in ## Analysis Guidelines
 // covers every computed pattern and overlay section.
 describe('### Writing About Computed Sections', () => {
-    const result = buildAnalysisPrompt(
-        TEST_SYMBOL,
-        TEST_COMPANY_NAME,
-        [],
-        makeIndicators(),
-        []
-    );
+    const result = buildAnalysisPrompt({
+        symbol: TEST_SYMBOL,
+        companyName: TEST_COMPANY_NAME,
+        bars: [],
+        indicators: makeIndicators(),
+        skills: [],
+    });
     const [narration, codes] = COMPUTED_SECTIONS_RULES;
 
     it('renders under ## Analysis Guidelines whatever skills are active, every rule verbatim', () => {
@@ -7096,13 +7088,13 @@ describe('### Writing About Computed Sections', () => {
     // is missing (DOM-9: rules never contradict). The computed-sections rule
     // only forbids narrating the sections, and says how a gap is stated.
     it('coexists with the rules that require stating a missing level, trigger or price', () => {
-        const withPlan = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY_NAME,
-            [],
-            makeIndicators(),
-            []
-        );
+        const withPlan = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY_NAME,
+            bars: [],
+            indicators: makeIndicators(),
+            skills: [],
+        });
         for (const gapRule of [
             'if a level is not present, say so rather than fabricating one',
             'if none exists, say so instead of inventing one',
@@ -7159,13 +7151,13 @@ describe('buildAnalysisPrompt — horizon blocks', () => {
             swingHighs: [swingPoint(245, 360, 'high')],
             swingLows: [swingPoint(240, 330, 'low')],
         };
-        const result = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY_NAME,
-            bars250,
-            makeIndicators({ smc }),
-            []
-        );
+        const result = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY_NAME,
+            bars: bars250,
+            indicators: makeIndicators({ smc }),
+            skills: [],
+        });
 
         // Anchored at a line start: the guidance text also mentions the phrase.
         expect(countOf(result, '\nFib anchor: swing')).toBe(1);
@@ -7198,13 +7190,13 @@ describe('buildAnalysisPrompt — horizon blocks', () => {
                 swingPoint(235, 220, 'low'),
             ],
         };
-        const result = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY_NAME,
-            bars250,
-            makeIndicators({ smc }),
-            []
-        );
+        const result = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY_NAME,
+            bars: bars250,
+            indicators: makeIndicators({ smc }),
+            skills: [],
+        });
 
         expect(countOf(result, '\nFib anchor: swing')).toBe(3);
         expect(result).not.toContain('same leg as');
@@ -7224,24 +7216,18 @@ describe('buildAnalysisPrompt — horizon blocks', () => {
         });
         const dailyBars = [day(8, 111, 95, 105), day(9, 100, 98.5, 99)];
         const build = (now: Date): string => {
-            const { dynamic } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
-                dailyBars,
-                makeIndicators(),
-                [],
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                undefined,
-                undefined,
-                undefined,
-                'USD',
-                'share',
-                undefined,
-                { session: US_EQUITY_SESSION, now }
-            );
+            const { dynamic } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
+                bars: dailyBars,
+                indicators: makeIndicators(),
+                skills: [],
+                timeframe: '1Day',
+                assetClass: 'equity',
+                currency: 'USD',
+                krxTick: 'share',
+                marketClock: { session: US_EQUITY_SESSION, now },
+            });
             return dynamic;
         };
 
@@ -7287,26 +7273,19 @@ describe('buildAnalysisPrompt — 1Week', () => {
         marketClock?: { session: MarketSessionSpec; now: Date },
         dailyBars?: Bar[]
     ): string => {
-        const { stable, dynamic } = buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY_NAME,
+        const { stable, dynamic } = buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY_NAME,
             bars,
-            calculateIndicators(bars),
+            indicators: calculateIndicators(bars),
             skills,
             timeframe,
-            undefined,
-            'equity',
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            'USD',
-            'share',
-            undefined,
+            assetClass: 'equity',
+            currency: 'USD',
+            krxTick: 'share',
             marketClock,
-            undefined,
-            dailyBars
-        );
+            dailyBars,
+        });
         return `${stable}\n\n${dynamic}`;
     };
 
@@ -7383,17 +7362,17 @@ describe('buildAnalysisPrompt — 1Week', () => {
             close: 100,
         }));
         const withAtr = (atr: number) => {
-            const { dynamic } = buildAnalysisPromptRaw(
-                TEST_SYMBOL,
-                TEST_COMPANY_NAME,
+            const { dynamic } = buildAnalysisPromptRaw({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY_NAME,
                 bars,
-                {
+                indicators: {
                     ...calculateIndicators(bars),
                     atr: [...new Array(bars.length - 1).fill(null), atr],
                 },
-                [],
-                '1Week'
-            );
+                skills: [],
+                timeframe: '1Week',
+            });
             return dynamic;
         };
         expect(ATR_EXTREME_PERCENT_WEEKLY).toBe(13);

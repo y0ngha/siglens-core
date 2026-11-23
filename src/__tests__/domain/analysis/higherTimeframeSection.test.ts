@@ -481,27 +481,19 @@ describe('the blocks in a built prompt', () => {
         bars: Bar[],
         context?: HigherContextInput
     ) {
-        return buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        return buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
-            calculateIndicators(bars),
-            [],
+            indicators: calculateIndicators(bars),
+            skills: [],
             timeframe,
-            undefined,
-            'equity',
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            'USD',
-            'share',
-            undefined,
-            clock,
-            undefined,
-            undefined,
-            context
-        );
+            assetClass: 'equity',
+            currency: 'USD',
+            krxTick: 'share',
+            marketClock: clock,
+            higherContext: context,
+        });
     }
 
     const higher = higherTimeframeSeriesOf('1Day', dailyData);
@@ -578,27 +570,19 @@ describe('the blocks in a built prompt', () => {
     });
 
     it('a crypto chart never gets the measured claim, even for the weekly block', () => {
-        const crypto = buildAnalysisPrompt(
-            'BTC-USD',
-            'Bitcoin',
-            standard,
-            calculateIndicators(standard),
-            [],
-            '1Day',
-            undefined,
-            'crypto',
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            'USD',
-            'share',
-            undefined,
-            clock,
-            undefined,
-            undefined,
-            { higher, backdrop: null }
-        );
+        const crypto = buildAnalysisPrompt({
+            symbol: 'BTC-USD',
+            companyName: 'Bitcoin',
+            bars: standard,
+            indicators: calculateIndicators(standard),
+            skills: [],
+            timeframe: '1Day',
+            assetClass: 'crypto',
+            currency: 'USD',
+            krxTick: 'share',
+            marketClock: clock,
+            higherContext: { higher, backdrop: null },
+        });
         expect(crypto.dynamic).toContain('### Higher Timeframe');
         expect(crypto.dynamic).not.toContain('no measured edge');
         expect(build('1Day', standard, context).dynamic).toContain(

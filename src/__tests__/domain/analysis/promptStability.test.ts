@@ -116,22 +116,22 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
         const indA = calculateIndicators(barsA);
         const indB = calculateIndicators(barsB);
 
-        const a = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
-            barsA,
-            indA,
+        const a = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
+            bars: barsA,
+            indicators: indA,
             skills,
-            '1Day'
-        );
-        const b = buildAnalysisPrompt(
-            'TSLA',
-            'Tesla Inc.',
-            barsB,
-            indB,
+            timeframe: '1Day',
+        });
+        const b = buildAnalysisPrompt({
+            symbol: 'TSLA',
+            companyName: 'Tesla Inc.',
+            bars: barsB,
+            indicators: indB,
             skills,
-            '1Day'
-        );
+            timeframe: '1Day',
+        });
 
         expect(a.stable).toBe(b.stable);
         expect(a.stable).not.toContain('AAPL');
@@ -140,14 +140,14 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
     });
 
     it('stable contains no symbol or company name — only dynamic carries per-call framing', () => {
-        const { stable, dynamic } = buildAnalysisPrompt(
-            'MSFT',
-            'Microsoft Corporation',
-            makeBars(40, 300),
-            calculateIndicators(makeBars(40, 300)),
-            [],
-            '1Day'
-        );
+        const { stable, dynamic } = buildAnalysisPrompt({
+            symbol: 'MSFT',
+            companyName: 'Microsoft Corporation',
+            bars: makeBars(40, 300),
+            indicators: calculateIndicators(makeBars(40, 300)),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(stable).not.toContain('MSFT');
         expect(stable).not.toContain('Microsoft Corporation');
         // The symbol/company framing line lives in dynamic instead.
@@ -166,22 +166,22 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
             makeSkill({ name: 'A Pattern', type: 'pattern', gating: alwaysOn }),
         ];
 
-        const first = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const first = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
             indicators,
             skills,
-            '1Day'
-        );
-        const second = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+            timeframe: '1Day',
+        });
+        const second = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
             indicators,
             skills,
-            '1Day'
-        );
+            timeframe: '1Day',
+        });
 
         expect(first.stable).toBe(second.stable);
         expect(first.dynamic).toBe(second.dynamic);
@@ -217,14 +217,14 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
         });
         const indicators = calculateIndicators(bars);
 
-        const { stable, dynamic } = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const { stable, dynamic } = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
             indicators,
-            [coreSkill, gatedSkill],
-            '1Day'
-        );
+            skills: [coreSkill, gatedSkill],
+            timeframe: '1Day',
+        });
 
         // The digest CONTENT block (the `buildSkillBlock` "### <name> ..."
         // header immediately followed by the skill body) is what's actually
@@ -251,14 +251,14 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
                 gating: alwaysOn,
             }),
         ];
-        const { stable, dynamic } = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const { stable, dynamic } = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
             indicators,
             skills,
-            '1Day'
-        );
+            timeframe: '1Day',
+        });
         const combined = `${stable}\n\n${dynamic}`;
         // Both halves are non-empty and the join is the exact contract dispatch
         // relies on (`prompt: stable + '\n\n' + dynamic`, `seed: analysisSeed(combined)`).
@@ -273,34 +273,34 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
     it('stable is exactly Analysis Intent + Analysis Guidelines when the catalog has no always_on skills', () => {
         const bars = makeBars(30, 100);
         const indicators = emptyIndicators();
-        const { stable } = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const { stable } = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
             indicators,
-            [],
-            '1Day'
-        );
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(stable.startsWith('## Analysis Intent\n')).toBe(true);
         expect(stable).toContain('\n\n## Analysis Guidelines\n');
         expect(stable).not.toContain('## Analysis Request');
 
         // An always_on skill digest is appended AFTER that head — the head
         // itself is unchanged, so it stays the shared prefix.
-        const withSkill = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const withSkill = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
             indicators,
-            [
+            skills: [
                 makeSkill({
                     name: 'Always Pattern',
                     type: 'pattern',
                     gating: alwaysOn,
                 }),
             ],
-            '1Day'
-        ).stable;
+            timeframe: '1Day',
+        }).stable;
         expect(withSkill.startsWith(`${stable}\n\n`)).toBe(true);
         expect(withSkill.length).toBeGreaterThan(stable.length);
     });
@@ -326,14 +326,14 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
                 gating: alwaysOn,
             }),
         ];
-        const { stable, dynamic } = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const { stable, dynamic } = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
             indicators,
             skills,
-            '1Day'
-        );
+            timeframe: '1Day',
+        });
 
         // `dynamic` opens with the per-symbol framing and closes with the
         // output rules.
@@ -395,14 +395,14 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
     // ordering: Symbol → Timeframe → Intent → Guidelines → data → Request.
     it('stable + dynamic hold exactly the pre-p22 blocks — only their order changed', () => {
         const bars = makeBars(60, 150);
-        const { stable, dynamic } = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const { stable, dynamic } = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
-            calculateIndicators(bars),
-            [],
-            '1Day'
-        );
+            indicators: calculateIndicators(bars),
+            skills: [],
+            timeframe: '1Day',
+        });
 
         expect(stable.startsWith('## Analysis Intent\n')).toBe(true);
         expect(dynamic.startsWith('Symbol: AAPL\n')).toBe(true);
@@ -461,25 +461,19 @@ describe('buildAnalysisPrompt — stable/dynamic assembly-split invariants', () 
         const indicators = calculateIndicators(bars);
         const symbols = ['AAPL', 'MSFT', 'NVDA', 'TSLA', 'AMD'];
         const build = (symbol: string, tier: 'free' | 'member') =>
-            buildAnalysisPrompt(
+            buildAnalysisPrompt({
                 symbol,
-                `${symbol} Corp.`,
+                companyName: `${symbol} Corp.`,
                 bars,
                 indicators,
-                catalog,
-                '1Day',
-                undefined,
-                'equity',
-                undefined,
-                'ko',
-                undefined,
-                undefined,
-                'USD',
-                'share',
-                undefined,
-                undefined,
-                gatedSkillCapForTier(tier)
-            );
+                skills: catalog,
+                timeframe: '1Day',
+                assetClass: 'equity',
+                locale: 'ko',
+                currency: 'USD',
+                krxTick: 'share',
+                gatedSkillCap: gatedSkillCapForTier(tier),
+            });
         const systemOf = (symbol: string, tier: 'free' | 'member') =>
             `${aiSystemPrompt('ko')}\n\n${build(symbol, tier).stable}`;
 
@@ -534,25 +528,19 @@ describe('buildAnalysisPrompt — free-tier gated skill cap', () => {
         ),
     ];
     const build = (cap?: number | null) =>
-        buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
-            fallingBars,
+        buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
+            bars: fallingBars,
             indicators,
-            catalog,
-            '1Day',
-            undefined,
-            'equity',
-            undefined,
-            'ko',
-            undefined,
-            undefined,
-            'USD',
-            'share',
-            undefined,
-            undefined,
-            cap
-        );
+            skills: catalog,
+            timeframe: '1Day',
+            assetClass: 'equity',
+            locale: 'ko',
+            currency: 'USD',
+            krxTick: 'share',
+            gatedSkillCap: cap,
+        });
     const namesIn = (text: string): string[] =>
         gatedNames.filter(name => text.includes(name));
 

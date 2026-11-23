@@ -27,17 +27,17 @@ export interface SkillSelection {
 /**
  * @internal
  * Neutral selection context for prompt builders that have no chart in scope
- * (fundamental / financials / news). `always_on` skills still land in `core`;
+ * (fundamental / financials / news / congress). `always_on` skills still land in `core`;
  * gated skills can never fire against it (no signals, no candles, degenerate
  * price/indicators), which is the intended semantics — an event/state gate is
  * a *chart* condition, and a chartless prompt has no chart state to satisfy it.
  *
  * Public-API consequence: a `tier: 'gated'` skill tagged `category:
- * 'fundamental'` or `category: 'news'` is a contradiction in terms — it can
+ * 'fundamental'`, `'news'` or `'congress'` is a contradiction in terms — it can
  * never be selected into those prompts, because this context has no signals/
- * candles/state to satisfy any gate. Skills in these two categories must
- * therefore be `always_on`; the current catalog's 6 fundamental/news skills
- * all are.
+ * candles/state to satisfy any gate. Skills in these categories must
+ * therefore be `always_on`; the current catalog's fundamental/news skills
+ * all are, and it has no congress skills.
  */
 export const NO_CHART_SELECTION_CONTEXT: SkillSelectionContext = Object.freeze({
     indicators: EMPTY_INDICATOR_RESULT,
@@ -136,7 +136,7 @@ export interface SelectSkillsOptions {
  * @param ctx - Read-only chart selection context (signals, indicators, …).
  *   Chartless builders pass {@link NO_CHART_SELECTION_CONTEXT}.
  * @param promptContext - Which prompt family is selecting (technical /
- *   fundamental / news); drives the category/type whitelist.
+ *   fundamental / news / congress); drives the category/type whitelist.
  * @param options - Optional {@link SelectSkillsOptions} (the free-tier cap).
  * @returns `{ core, selected }` — see {@link SkillSelection}.
  * @throws {Error} when a whitelisted skill carries no `gating` metadata.

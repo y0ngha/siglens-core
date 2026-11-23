@@ -432,22 +432,18 @@ describe('checkPriceProvenance — KRW prompt built by buildAnalysisPrompt', () 
     });
     const lastClose = bars[bars.length - 1].close;
     const indicators = calculateIndicators(bars);
-    const { dynamic } = buildAnalysisPrompt(
-        '005930.KS',
-        '삼성전자',
+    const { dynamic } = buildAnalysisPrompt({
+        symbol: '005930.KS',
+        companyName: '삼성전자',
         bars,
         indicators,
-        [],
-        '1Day',
-        undefined,
-        'equity',
-        undefined,
-        'ko',
-        undefined,
-        undefined,
-        'KRW',
-        'share'
-    );
+        skills: [],
+        timeframe: '1Day',
+        assetClass: 'equity',
+        locale: 'ko',
+        currency: 'KRW',
+        krxTick: 'share',
+    });
     const priceDecimals = priceQuoting(lastClose, 'KRW').dp;
     const printedLevel = parsePromptReferenceLevels(dynamic)[0].price;
     /** Whether `value` shows up in the prompt text at all, however it is written. */

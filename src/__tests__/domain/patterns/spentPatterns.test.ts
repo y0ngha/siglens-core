@@ -252,14 +252,14 @@ describe('isSpentPattern', () => {
 
     it('the prompt leaves a fulfilled pattern out of its candidates and overlays', () => {
         const ids = (bars: Bar[]) =>
-            buildAnalysisPrompt(
-                'T',
-                'T',
+            buildAnalysisPrompt({
+                symbol: 'T',
+                companyName: 'T',
                 bars,
-                calculateIndicators(bars),
-                [],
-                '1Day'
-            ).overlayCandidates.map(c => c.id);
+                indicators: calculateIndicators(bars),
+                skills: [],
+                timeframe: '1Day',
+            }).overlayCandidates.map(c => c.id);
         const isDoubleTop = (id: string) =>
             id.startsWith('pattern:double_top:');
         // A slide from ~106: stopping short of the target keeps the pattern;

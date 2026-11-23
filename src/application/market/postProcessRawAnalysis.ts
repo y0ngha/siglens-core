@@ -33,7 +33,7 @@ import type {
 export interface PostProcessRawAnalysisInput {
     /** The parsed model JSON (`JSON.parse` of the normalized reply). */
     readonly rawResult: unknown;
-    readonly skills: Skill[];
+    readonly skills: readonly Skill[];
     /** `TechnicalAssembledPrompt.overlayCandidates`; `[]` resolves no overlay. */
     readonly overlayCandidates: readonly OverlayCandidate[];
     /** `TechnicalAssembledPrompt.patternGeometries`; empty strips every detected card's geometry. */

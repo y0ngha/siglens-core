@@ -19,9 +19,9 @@ import type {
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
 // return with a flattening wrapper.
 const buildAnalysisPrompt = (
-    ...args: Parameters<typeof buildAnalysisPromptRaw>
+    options: Parameters<typeof buildAnalysisPromptRaw>[0]
 ): string => {
-    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    const { stable, dynamic } = buildAnalysisPromptRaw(options);
     return `${stable}\n\n${dynamic}`;
 };
 
@@ -76,14 +76,14 @@ const smcGuideSkill = (gatingTier: 'always_on' | 'gated'): Skill => ({
 
 describe('SMC full-guide blocking', () => {
     it('never injects the SMC skill full guide, even when always_on', () => {
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            makeIndicators(EMPTY_SMC_RESULT),
-            [smcGuideSkill('always_on')],
-            '1Day'
-        );
+            indicators: makeIndicators(EMPTY_SMC_RESULT),
+            skills: [smcGuideSkill('always_on')],
+            timeframe: '1Day',
+        });
         expect(out).not.toContain('Full SMC Methodology');
         expect(out).not.toContain('$183.00–$184.20');
     });
@@ -99,14 +99,14 @@ describe('SMC full-guide blocking', () => {
             smcFullGuide: true,
             gating: { tier: 'always_on' },
         };
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            makeIndicators(EMPTY_SMC_RESULT),
-            [renamedGuide],
-            '1Day'
-        );
+            indicators: makeIndicators(EMPTY_SMC_RESULT),
+            skills: [renamedGuide],
+            timeframe: '1Day',
+        });
         // The flag, not the name, drives the block — body still never appears.
         expect(out).not.toContain('Full SMC Methodology');
         expect(out).not.toContain('$183.00–$184.20');
@@ -117,14 +117,14 @@ describe('SMC full-guide blocking', () => {
             ...EMPTY_SMC_RESULT,
             structureBreaks: [structureBreak(95, 'bos')],
         };
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            makeIndicators(smc),
-            [smcGuideSkill('always_on')],
-            '1Day'
-        );
+            indicators: makeIndicators(smc),
+            skills: [smcGuideSkill('always_on')],
+            timeframe: '1Day',
+        });
         // Computed data section (the anchor) still renders.
         expect(out).toContain('## Smart Money Concepts (SMC)');
         // The skill's prose body never appears.
@@ -141,14 +141,14 @@ describe('SMC compressed concept note (BOS/CHoCH recency gate)', () => {
             // 100 bars total → index 95 is 4 bars ago (within 10).
             structureBreaks: [structureBreak(95, 'choch')],
         };
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            makeIndicators(smc),
-            [],
-            '1Day'
-        );
+            indicators: makeIndicators(smc),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(out).toContain(SMC_GUIDE_BLOCKED_NOTICE);
         const noteLines = out
             .split('\n\n')
@@ -164,40 +164,40 @@ describe('SMC compressed concept note (BOS/CHoCH recency gate)', () => {
             // index 80 in a 100-bar series → 19 bars ago.
             structureBreaks: [structureBreak(80, 'bos')],
         };
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            makeIndicators(smc),
-            [],
-            '1Day'
-        );
+            indicators: makeIndicators(smc),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(out).not.toContain(SMC_GUIDE_BLOCKED_NOTICE);
     });
 
     it('omits the compressed note when there is no structure break', () => {
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            makeIndicators(EMPTY_SMC_RESULT),
-            [],
-            '1Day'
-        );
+            indicators: makeIndicators(EMPTY_SMC_RESULT),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(out).not.toContain(SMC_GUIDE_BLOCKED_NOTICE);
     });
 });
 
 describe('anti-fabrication guardrail on level-citing sections', () => {
     it('includes the guardrail in the chart prompt (level sections)', () => {
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            makeIndicators(EMPTY_SMC_RESULT),
-            [],
-            '1Day'
-        );
+            indicators: makeIndicators(EMPTY_SMC_RESULT),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(out).toContain(ANTI_FABRICATION_GUARDRAIL);
     });
 });

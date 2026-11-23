@@ -76,14 +76,14 @@ const staleBullishNewBearish = (total: number): void => {
 };
 
 const build = (bars: Bar[]) =>
-    buildAnalysisPrompt(
-        'AAPL',
-        'Apple Inc.',
+    buildAnalysisPrompt({
+        symbol: 'AAPL',
+        companyName: 'Apple Inc.',
         bars,
-        calculateIndicators(bars),
-        [MACD_GUIDE],
-        '1Day'
-    );
+        indicators: calculateIndicators(bars),
+        skills: [MACD_GUIDE],
+        timeframe: '1Day',
+    });
 
 const printedNewlyLit = (dynamic: string): string[] =>
     ['bullish', 'bearish'].flatMap(side => {

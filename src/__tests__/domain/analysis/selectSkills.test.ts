@@ -331,6 +331,7 @@ describe('selectSkills — category whitelist', () => {
     it.each([
         ['fundamental', 'value-investing'],
         ['news', 'event-driven'],
+        ['congress', 'congress-flow'],
     ] as const)(
         '%s context selects only its own category',
         (promptContext: PromptSkillContext, expected: string) => {
@@ -343,7 +344,7 @@ describe('selectSkills — category whitelist', () => {
         }
     );
 
-    it('no context selects a congress-category skill', () => {
+    it('only the congress context selects a congress-category skill', () => {
         const congress = alwaysOnSkill('congress-flow', {
             type: undefined,
             category: 'congress',
