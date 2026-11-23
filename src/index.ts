@@ -320,6 +320,25 @@ export { buildPlanCheck } from './domain/analysis/planCheck';
 // this a plan check built against a LIVE quote, so the state reads the same rule the stored
 // one did. Server entrypoint only (like `buildPlanCheck`).
 export { buildPlanState } from './domain/analysis/planState';
+// Price-level alerts: which plan levels an alert can watch and the first daily close that
+// meets a condition, with the plan state's own tie rules (inclusive edges, no tolerance) so an
+// alert and the analysis card never disagree. Pure/sync, so Tier 2. Server entrypoint only
+// (like `buildPlanState`): the proposal tool executor and the mail batch that evaluate alerts
+// both run on the server; the browser only receives a signed proposal. The types are on both.
+export {
+    alertablePlanLevels,
+    findPriceLevelTrigger,
+    isPriceLevelMet,
+    priceLevelStart,
+} from './domain/analysis/priceLevelAlert';
+export type {
+    AlertablePlanLevels,
+    PriceLevelCondition,
+    PriceLevelStart,
+    PriceLevelTarget,
+    PriceLevelTrigger,
+    PriceLevelZoneTrigger,
+} from './domain/analysis/priceLevelAlert';
 // The entry-price reference buildPlanCheck/postProcessAnalysisWithReconcile
 // use internally — exported so a consumer computing its OWN plan check
 // against a live price (siglens `sinceAnalysis.planNow`) uses the exact same
