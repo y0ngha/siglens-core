@@ -4,6 +4,7 @@
  * prettier config so the committed file is stable. The file holds aggregate statistics only
  * (no bars, no prices) and a header that says which runs it was measured on.
  */
+import { CANDLE_OUTCOME_BARS } from '@/domain/analysis/candleOutcomeBars';
 import {
     BASE_RATE_MIN_N,
     type BaseRateRow,
@@ -90,7 +91,7 @@ export interface MeasuredBaseRate {
     readonly key: string;
     readonly n: number;
     /**
-     * chart_pattern: target before invalidation within 60 bars; candle_pattern: next-5-bar
+     * chart_pattern: target before invalidation within 60 bars; candle_pattern: next-${CANDLE_OUTCOME_BARS}-bar
      * move in the label's direction; price_level: held after a touch (closed 0.5 ATR back on
      * the level's side before closing 0.5 ATR through it, within 10 bars).
      */

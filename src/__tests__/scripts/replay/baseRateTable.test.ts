@@ -32,6 +32,11 @@ import type {
     PatternEvent,
 } from '../../../../scripts/replay/engineEvalTypes';
 import { verdictOf } from '@/domain/analysis/baseRateVerdict';
+import { CANDLE_OUTCOME_BARS } from '@/domain/analysis/candleOutcomeBars';
+import {
+    HORIZONS,
+    PRIMARY_HORIZON,
+} from '../../../../scripts/replay/engineEvalTypes';
 import { makeTempDir } from './replayFixtures';
 import { candleEvent, patternEvent } from './engineEvalFixtures';
 
@@ -553,6 +558,20 @@ describe('renderBaseRateTable', () => {
             'export function priceLevelFamilyBaseRateFor('
         );
         expect(source).toContain('not the bootstrap p');
+        expect(source).toContain(
+            `candle_pattern: next-${CANDLE_OUTCOME_BARS}-bar`
+        );
+    });
+
+    it('emits the candle horizon from CANDLE_OUTCOME_BARS, matching the committed file', () => {
+        const committed = readFileSync(
+            join(__dirname, '../../../domain/analysis/measuredBaseRates.ts'),
+            'utf8'
+        );
+        expect(committed).toContain(
+            `candle_pattern: next-${CANDLE_OUTCOME_BARS}-bar`
+        );
+        expect(HORIZONS[PRIMARY_HORIZON]).toBe(CANDLE_OUTCOME_BARS);
     });
 
     it('gives every exported symbol its own doc, never a doc that belongs to the next one', () => {

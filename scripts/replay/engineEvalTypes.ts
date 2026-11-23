@@ -9,6 +9,7 @@
  * Everything the engine itself defines (the 500-bar production window, the detection window,
  * the pivot reversal multiple) is read from core, never copied.
  */
+import { CANDLE_OUTCOME_BARS } from '@/domain/analysis/candleOutcomeBars';
 import { CANDLE_PATTERN_DETECTION_BARS } from '@/domain/analysis/candle-detection';
 import { TIMEFRAME_BARS_LIMIT } from '@/domain/constants/market';
 import { OUTCOME_WINDOW_BARS } from '@/domain/outcomes/constants';
@@ -65,7 +66,12 @@ export const CORE_DERIVED = {
     labelWindowBars: OUTCOME_WINDOW_BARS,
 } as const;
 
-export const HORIZONS = { h1: 1, h5: 5, h10: 10 } as const;
+/**
+ * `h5` is the candle base-rate label horizon (`CANDLE_OUTCOME_BARS`). If that constant
+ * changes, rename the keys here (`HORIZON_KEYS`, `PRIMARY_HORIZON`) and the `'h5'` literals in
+ * baseRateTableCompute.ts and baseRateTable.ts with it.
+ */
+export const HORIZONS = { h1: 1, h5: CANDLE_OUTCOME_BARS, h10: 10 } as const;
 export type HorizonKey = keyof typeof HORIZONS;
 export const HORIZON_KEYS: readonly HorizonKey[] = ['h1', 'h5', 'h10'];
 export const PRIMARY_HORIZON: HorizonKey = 'h5';
