@@ -7,11 +7,10 @@ import type { Skill, SkillCategory, SkillType } from '@/domain/types';
  * unrelated prompt (invariant: e.g. a fundamental framework must not
  * be injected into the TECHNICAL chart prompt).
  *
- * OPTIONS / OVERALL / CONGRESS are intentionally absent: the options and
- * overall builders consume no skills, and the congress builder keeps its own
- * private category filter (no congress skill files exist yet).
+ * OPTIONS / OVERALL are intentionally absent: those builders consume no skills.
  */
-export type PromptSkillContext = 'technical' | 'fundamental' | 'news';
+export type PromptSkillContext =
+    'technical' | 'fundamental' | 'news' | 'congress';
 
 /**
  * Chart-prompt skill types. Every `SkillType` value is a chart type today, so
@@ -59,7 +58,7 @@ type WhitelistRule =
  *   all — so a category-axis filter would wrongly drop the entire indicator
  *   guide set. The chart direction categories (`reversal_*`, `continuation_*`,
  *   `neutral`) remain orthogonal metadata.
- * - `fundamental` / `news` filter on the **`category` axis**: their skills
+ * - `fundamental` / `news` / `congress` filter on the **`category` axis**: their skills
  *   declare no `type` (no `SkillType` value fits them) and are tagged solely
  *   by `category`, exactly as the existing prompt-builder filters did.
  */
@@ -69,6 +68,7 @@ export const SKILL_CONTEXT_WHITELIST: Readonly<
     technical: { axis: 'type', allow: TECHNICAL_SKILL_TYPES },
     fundamental: { axis: 'category', allow: ['fundamental'] },
     news: { axis: 'category', allow: ['news'] },
+    congress: { axis: 'category', allow: ['congress'] },
 };
 
 /**

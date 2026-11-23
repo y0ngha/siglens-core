@@ -13,8 +13,8 @@ import cupAndHandle from '@/__tests__/domain/patterns/fixtures/cup-and-handle.js
 const flat = ({ stable, dynamic }: AssembledPrompt): string =>
     `${stable}\n\n${dynamic}`;
 const buildAnalysisPrompt = (
-    ...args: Parameters<typeof buildAnalysisPromptRaw>
-): string => flat(buildAnalysisPromptRaw(...args));
+    options: Parameters<typeof buildAnalysisPromptRaw>[0]
+): string => flat(buildAnalysisPromptRaw(options));
 
 // ── pattern-screener candidates wired into skill selection ────────
 // Covers the third event-trigger source (`patternCandidates`) added to
@@ -84,14 +84,14 @@ describe('buildAnalysisPrompt — pattern-candidate gating (real screener)', () 
             gating: eventGated(['bull_flag']),
         });
 
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            fixture.bars,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: fixture.bars,
             indicators,
-            [matching, nonMatching],
-            '1Day'
-        );
+            skills: [matching, nonMatching],
+            timeframe: '1Day',
+        });
 
         expect(out).toContain('Double Top Guide');
         expect(out).not.toContain('Bull Flag Guide');
@@ -103,14 +103,14 @@ describe('buildAnalysisPrompt — pattern-candidate gating (real screener)', () 
             type: 'pattern',
             gating: eventGated(['double_top']),
         });
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            [],
-            calculateIndicators([]),
-            [skill],
-            '1Day'
-        );
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: [],
+            indicators: calculateIndicators([]),
+            skills: [skill],
+            timeframe: '1Day',
+        });
         expect(out).not.toContain('Double Top Guide');
     });
 });
@@ -138,14 +138,14 @@ describe('buildAnalysisPrompt — pattern-screener exception safety', () => {
         let out = '';
         expect(() => {
             out = flat(
-                buildWithThrowingScreener(
-                    TEST_SYMBOL,
-                    TEST_COMPANY,
-                    fixture.bars,
+                buildWithThrowingScreener({
+                    symbol: TEST_SYMBOL,
+                    companyName: TEST_COMPANY,
+                    bars: fixture.bars,
                     indicators,
-                    [skill],
-                    '1Day'
-                )
+                    skills: [skill],
+                    timeframe: '1Day',
+                })
             );
         }).not.toThrow();
         // patternCandidates degraded to [] — the gated pattern skill never fires.
@@ -176,14 +176,14 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         const { buildAnalysisPrompt: buildWithNoCandidates } =
             await import('@/domain/analysis/prompt');
         const withNoCandidates = flat(
-            buildWithNoCandidates(
-                TEST_SYMBOL,
-                TEST_COMPANY,
-                fixture.bars,
+            buildWithNoCandidates({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY,
+                bars: fixture.bars,
                 indicators,
                 skills,
-                '1Day'
-            )
+                timeframe: '1Day',
+            })
         );
 
         vi.resetModules();
@@ -198,14 +198,14 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
         const { buildAnalysisPrompt: buildWithCandidates } =
             await import('@/domain/analysis/prompt');
         const withCandidates = flat(
-            buildWithCandidates(
-                TEST_SYMBOL,
-                TEST_COMPANY,
-                fixture.bars,
+            buildWithCandidates({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY,
+                bars: fixture.bars,
                 indicators,
                 skills,
-                '1Day'
-            )
+                timeframe: '1Day',
+            })
         );
 
         // The active-skill catalog (and everything selection derives — the
@@ -234,20 +234,20 @@ describe('buildAnalysisPrompt — pattern-candidates never affect an all-always_
             await import('@/domain/analysis/prompt');
         const fixture = doubleTop as Fixture;
         const out = flat(
-            build(
-                TEST_SYMBOL,
-                TEST_COMPANY,
-                fixture.bars,
-                calculateIndicators(fixture.bars),
-                [
+            build({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY,
+                bars: fixture.bars,
+                indicators: calculateIndicators(fixture.bars),
+                skills: [
                     makeSkill({
                         name: 'Double Top Guide',
                         type: 'pattern',
                         gating: eventGated(['double_top']),
                     }),
                 ],
-                '1Day'
-            )
+                timeframe: '1Day',
+            })
         );
         expect(out).not.toContain('Double Top Guide');
         expect(out).not.toContain('double_top');
@@ -288,20 +288,20 @@ describe('buildAnalysisPrompt — skill selection sees qualified patterns the sc
             await import('@/domain/analysis/prompt');
         const fixture = doubleTop as Fixture;
         const out = flat(
-            build(
-                TEST_SYMBOL,
-                TEST_COMPANY,
-                fixture.bars,
-                calculateIndicators(fixture.bars),
-                [
+            build({
+                symbol: TEST_SYMBOL,
+                companyName: TEST_COMPANY,
+                bars: fixture.bars,
+                indicators: calculateIndicators(fixture.bars),
+                skills: [
                     makeSkill({
                         name: 'Bull Flag Guide',
                         type: 'pattern',
                         gating: eventGated(['bull_flag']),
                     }),
                 ],
-                '1Day'
-            )
+                timeframe: '1Day',
+            })
         );
         expect(out).toContain('Bull Flag Guide');
     });
@@ -350,25 +350,19 @@ describe('buildAnalysisPrompt — printed candidates, listed skills and allowed 
         const { buildAnalysisPrompt: build } =
             await import('@/domain/analysis/prompt');
         const fixture = doubleTop as Fixture;
-        return build(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            fixture.bars,
-            calculateIndicators(fixture.bars),
+        return build({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: fixture.bars,
+            indicators: calculateIndicators(fixture.bars),
             skills,
-            '1Day',
-            undefined,
-            'equity',
-            undefined,
-            'ko',
-            undefined,
-            undefined,
-            'USD',
-            'share',
-            undefined,
-            undefined,
-            cap
-        );
+            timeframe: '1Day',
+            assetClass: 'equity',
+            locale: 'ko',
+            currency: 'USD',
+            krxTick: 'share',
+            gatedSkillCap: cap,
+        });
     };
 
     const printedCandidateIds = (dynamic: string): string[] => {
@@ -426,14 +420,14 @@ describe('buildAnalysisPrompt — a throwing pattern qualifier', () => {
         const { buildAnalysisPrompt: build } =
             await import('@/domain/analysis/prompt');
         const fixture = doubleTop as Fixture;
-        const result = build(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            fixture.bars,
-            calculateIndicators(fixture.bars),
-            [],
-            '1Day'
-        );
+        const result = build({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: fixture.bars,
+            indicators: calculateIndicators(fixture.bars),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(result.patternScreenFailure).toContain(
             'Error: qualifier exploded'
         );
@@ -442,14 +436,14 @@ describe('buildAnalysisPrompt — a throwing pattern qualifier', () => {
 
     it('patternScreenFailure is null when screening succeeds', () => {
         const fixture = doubleTop as Fixture;
-        const result = buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            fixture.bars,
-            calculateIndicators(fixture.bars),
-            [],
-            '1Day'
-        );
+        const result = buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: fixture.bars,
+            indicators: calculateIndicators(fixture.bars),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(result.patternScreenFailure).toBeNull();
     });
 });
@@ -470,14 +464,14 @@ describe('buildAnalysisPrompt — pattern guides follow the printed candidates (
 
     it('injects the qualified pattern guide, not the one that lost the overlap arbitration', () => {
         const f = cupAndHandle as Fixture;
-        const result = buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            f.bars,
-            calculateIndicators(f.bars),
-            guides,
-            '1Day'
-        );
+        const result = buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: f.bars,
+            indicators: calculateIndicators(f.bars),
+            skills: guides,
+            timeframe: '1Day',
+        });
         expect(result.patternArbitration.dropped.map(d => d.id)).toEqual([
             'rounding_bottom',
         ]);
@@ -497,28 +491,28 @@ describe('buildAnalysisPrompt — pattern guides follow the printed candidates (
         const { buildAnalysisPrompt: build } =
             await import('@/domain/analysis/prompt');
         const f = cupAndHandle as Fixture;
-        const result = build(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            f.bars,
-            calculateIndicators(f.bars),
-            guides,
-            '1Day'
-        );
+        const result = build({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: f.bars,
+            indicators: calculateIndicators(f.bars),
+            skills: guides,
+            timeframe: '1Day',
+        });
         expect(result.patternScreenFailure).not.toBeNull();
         expect(result.injectedSkills).toEqual([]);
         expect(result.patternSkillNames).toEqual([]);
     });
 
     it('lists no pattern skill for a chart without bars', () => {
-        const result = buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            [],
-            calculateIndicators([]),
-            guides,
-            '1Day'
-        );
+        const result = buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: [],
+            indicators: calculateIndicators([]),
+            skills: guides,
+            timeframe: '1Day',
+        });
         expect(result.patternSkillNames).toEqual([]);
         expect(result.dynamic).not.toContain(
             '### patternSummaries Writing Rules'
@@ -529,14 +523,14 @@ describe('buildAnalysisPrompt — pattern guides follow the printed candidates (
 describe('buildAnalysisPrompt — patternArbitration', () => {
     it('reports the kept ids and each dropped pattern with its bar times and the id it lost to', () => {
         const f = cupAndHandle as Fixture;
-        const result = buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            f.bars,
-            calculateIndicators(f.bars),
-            [],
-            '1Day'
-        );
+        const result = buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: f.bars,
+            indicators: calculateIndicators(f.bars),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(result.patternArbitration.kept).toEqual(['cup_and_handle']);
         expect(result.patternArbitration.dropped).toHaveLength(1);
         const [drop] = result.patternArbitration.dropped;
@@ -549,14 +543,14 @@ describe('buildAnalysisPrompt — patternArbitration', () => {
     });
 
     it('is empty when no pattern was screened', () => {
-        const result = buildAnalysisPromptRaw(
-            TEST_SYMBOL,
-            TEST_COMPANY,
-            [],
-            calculateIndicators([]),
-            [],
-            '1Day'
-        );
+        const result = buildAnalysisPromptRaw({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
+            bars: [],
+            indicators: calculateIndicators([]),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(result.patternArbitration).toEqual({ kept: [], dropped: [] });
     });
 });

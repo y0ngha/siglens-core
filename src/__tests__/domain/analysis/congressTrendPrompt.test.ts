@@ -80,6 +80,7 @@ describe('buildCongressTrendPrompt', () => {
                 confidenceWeight: 1,
                 content: 'CONGRESS_SKILL_CONTENT',
                 category: 'congress',
+                gating: { tier: 'always_on' },
             },
             {
                 name: 'TechSkill',
@@ -88,12 +89,30 @@ describe('buildCongressTrendPrompt', () => {
                 confidenceWeight: 1,
                 content: 'TECH_SKILL_CONTENT',
                 category: 'reversal_bullish',
+                gating: { tier: 'always_on' },
             },
         ] as unknown as Skill[];
         const p = buildCongressTrendPrompt('AAPL', trades, stats, skills);
         expect(p).toContain('CongressInsiderGuide');
         expect(p).toContain('CONGRESS_SKILL_CONTENT');
         expect(p).not.toContain('TECH_SKILL_CONTENT');
+    });
+});
+
+describe('buildCongressTrendPrompt — 게이팅', () => {
+    it('gating이 없는 congress 스킬은 조용히 넣지 않고 throw한다 (fail-closed)', () => {
+        const untagged = {
+            name: 'UntaggedCongressSkill',
+            description: '',
+            indicators: [],
+            confidenceWeight: 1,
+            content: 'UNTAGGED_CONTENT',
+            category: 'congress',
+        } as unknown as Skill;
+
+        expect(() =>
+            buildCongressTrendPrompt('AAPL', trades, stats, [untagged])
+        ).toThrow(/no gating metadata/);
     });
 });
 
@@ -152,26 +171,19 @@ describe('buildCongressTrendPrompt — 티어 상한', () => {
     const present = (text: string, names: readonly string[]) =>
         names.filter(name => text.includes(name));
 
-    it('free는 always-on을 모두 남기고 gated는 이름순으로 상한까지만 남긴다', () => {
-        const text = render('free');
-
-        expect(alwaysOnNames).toHaveLength(ALWAYS_ON_COUNT);
-        expect(present(text, alwaysOnNames)).toEqual(alwaysOnNames);
-        expect(GATED_COUNT).toBeGreaterThan(FREE_TIER_GATED_SKILLS_PER_GROUP);
-        expect(present(text, gatedNames)).toEqual(
-            gatedNames
-                .toSorted((a, b) => a.localeCompare(b, 'en'))
-                .slice(0, FREE_TIER_GATED_SKILLS_PER_GROUP)
-        );
-    });
-
-    it.each(['member', 'pro'] as const)(
-        '%s는 always-on과 gated를 모두 남긴다',
+    it.each(['free', 'member', 'pro'] as const)(
+        '%s: always-on은 모두 남고, 게이트가 발화하지 않는 gated 스킬은 상한과 무관하게 들어가지 않는다',
         tier => {
             const text = render(tier);
 
+            expect(alwaysOnNames).toHaveLength(ALWAYS_ON_COUNT);
             expect(present(text, alwaysOnNames)).toEqual(alwaysOnNames);
-            expect(present(text, gatedNames)).toEqual(gatedNames);
+            expect(GATED_COUNT).toBeGreaterThan(
+                FREE_TIER_GATED_SKILLS_PER_GROUP
+            );
+            // The prompt has no chart, so no gate fires (the same selection
+            // the single technical analysis runs through `selectSkills`).
+            expect(present(text, gatedNames)).toEqual([]);
         }
     );
 

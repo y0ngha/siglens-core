@@ -135,21 +135,15 @@ export function buildTechnicalCase(
     // production dispatch builds as its `prompt` fallback field ('\n\n' join)
     // — or, under `--fold-stable-into-system`, folds `stable` into `system`
     // instead (see `composeCase`).
-    const { stable, dynamic } = buildAnalysisPrompt(
-        fixture.symbol,
-        fixture.companyName,
-        fixture.bars,
+    const { stable, dynamic } = buildAnalysisPrompt({
+        symbol: fixture.symbol,
+        companyName: fixture.companyName,
+        bars: fixture.bars,
         indicators,
-        // `buildAnalysisPrompt` requires mutable `Skill[]` but never mutates
-        // it: it only reads via `selectSkills` (which itself returns a new
-        // name-sorted copy, per its own doc comment) and `.filter`/loop-push
-        // into fresh `skillGroups` arrays. The caller's `readonly Skill[]` is
-        // never written through, so the widen to mutable is safe here.
-        skills as Skill[],
-        fixture.timeframe,
-        undefined,
-        'equity'
-    );
+        skills,
+        timeframe: fixture.timeframe,
+        assetClass: 'equity',
+    });
     const { system, prompt } = composeCase(
         AI_SYSTEM_PROMPT,
         stable,

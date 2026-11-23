@@ -6,6 +6,8 @@ import {
     type AnalysisLocale,
 } from './outputLocale';
 import type { KrxTickTable } from '@/domain/analysis/krxTick';
+import type { HigherContextInput } from '@/domain/analysis/higherTimeframe';
+import type { MarketReferenceClock } from '@/domain/analysis/marketReference';
 import { TIMEFRAME_MINUTES } from '@/domain/constants/market';
 import { DAYS_PER_WEEK, MS_PER_SECOND } from '@/domain/constants/time';
 import {
@@ -105,22 +107,17 @@ import type {
     CandlePatternEntry,
     CandlePriorMove,
     CandlePriorTrend,
-    CurrencyCode,
     CycleCardKind,
-    FearGreedSnapshot,
     HorizonKey,
     HorizonReference,
     ImpulseColor,
     IndicatorResult,
-    MarketEvent,
     MarketReference,
     ChartPatternId,
     PatternQualification,
     PivotTables,
     FibonacciProjection,
     AbcExtensionProjection,
-    PositionBucket,
-    PriorAnalysis,
     PromptConfig,
     ReferenceLevel,
     Skill,
@@ -136,13 +133,17 @@ import type {
     SqueezeMomentumResult,
     Timeframe,
     Trend,
+    CurrencyCode,
+    FearGreedSnapshot,
+    MarketEvent,
+    PositionBucket,
+    PriorAnalysis,
 } from '@/domain/types';
 import { computeAnalysisTrend } from '@/domain/analysis/analysisTrend';
 import { formatDeterministicMetricsSection } from '@/domain/analysis/confluenceSection';
 import {
     computeHigherTimeframe,
     computeMarketBackdrop,
-    type HigherContextInput,
 } from '@/domain/analysis/higherTimeframe';
 import {
     formatHigherTimeframeBlock,
@@ -175,7 +176,6 @@ import { buildOverlayCandidates } from '@/domain/overlays/buildOverlayCandidates
 import {
     computeMarketReference,
     formatFibRatio,
-    type MarketReferenceClock,
 } from '@/domain/analysis/marketReference';
 import { lastOf } from '@/domain/analysis/analysisUtils';
 import { formatFearGreedSection } from '@/domain/analysis/fearGreedSection';
@@ -2625,6 +2625,134 @@ export const CORE_SKILL_REFERENCE_POINTER =
     'Core skill reference: provided in the system prompt.';
 
 /**
+ * @internal Inputs of {@link buildAnalysisPrompt}. `symbol`, `companyName`, `bars` and
+ * `indicators` are required; every other member is optional and falls back to the default
+ * noted on it.
+ */
+export interface BuildAnalysisPromptOptions {
+    /**
+     * U.S. equity ticker (e.g. `"AAPL"`).
+     */
+    symbol: string;
+    /**
+     * Full English company name (e.g. `"Apple Inc."`).
+     */
+    companyName: string;
+    /**
+     * OHLCV bars sorted oldest-first.
+     */
+    bars: Bar[];
+    /**
+     * Indicator suite produced by {@link calculateIndicators}.
+     */
+    indicators: IndicatorResult;
+    /**
+     * Skill definitions to inject (defaults to none).
+     */
+    skills?: readonly Skill[];
+    /**
+     * Bar resolution; controls trend window sizing. Defaults to `"1Day"`.
+     */
+    timeframe?: Timeframe;
+    /**
+     * Optional Fear & Greed snapshot. When provided, a "Fear & Greed Index (Reference)"
+     * section is appended.
+     */
+    fearGreed?: FearGreedSnapshot;
+    /**
+     * Instrument asset class controlling prompt framing. `'crypto'` drops U.S. equity context
+     * (earnings, fundamentals, analyst ratings) and adds 24/7 market context. Defaults to
+     * `'equity'` for backward compatibility.
+     */
+    assetClass?: AssetClass;
+    /**
+     * Member position-bucket hint. When provided, a single neutral Korean reference line
+     * naming the member's coarse unrealized-P&L band is appended via {@link
+     * formatPositionHintSection} — into `dynamic` only, never `stable`, since a per-member
+     * value must not pollute the byte-cached stable system-prompt prefix shared across every
+     * caller. Omit for the base (no-bucket) analysis; see {@link buildAnalysisCacheKey}'s
+     * `positionBucket` param for the matching cache-key axis.
+     */
+    positionBucket?: PositionBucket;
+    /**
+     * Output language for the model-facing text. Defaults to {@link DEFAULT_ANALYSIS_LOCALE}
+     * (`ko`), which produces a byte-identical prompt to the one this builder emitted before
+     * the parameter existed — that byte identity is what keeps the existing Korean analysis
+     * cache valid.
+     */
+    locale?: AnalysisLocale;
+    /**
+     * Optional history of past analyses for this symbol + timeframe, supplied by the consumer
+     * (siglens or another consumer) from its own storage. When provided, narrowed via
+     * `selectPriorAnalyses` (bar anchor, per-bar dedup, newest-first, capped at
+     * `PRIOR_ANALYSIS_LIMIT`) and rendered via `formatPriorAnalysisSection` — into `dynamic`
+     * only, never `stable`, for the same reason as `positionBucket` above: a per-call value
+     * here would destroy the byte-cacheable stable prefix shared across every caller. It also
+     * never reaches skill selection — it is computed independently of {@link
+     * buildSkillSelectionContext} / {@link selectSkills} and cannot change which skills get
+     * injected into a prompt. Omitting it (or passing an empty array) produces a byte-
+     * identical prompt to the one this builder emitted before the parameter existed.
+     */
+    priorAnalyses?: readonly PriorAnalysis[];
+    /**
+     * Optional `YYYY-MM-DD` report dates of this company (past and upcoming). An `earnings`
+     * market event off every date is rendered as earnings-themed news and no longer suspends
+     * the washout verdict; omitted, no event is ever presented as the company's own report.
+     */
+    earningsDates?: readonly string[];
+    /**
+     * Optional market-moving news events for this symbol, supplied by the consumer from its
+     * own storage. When provided, narrowed via `selectMarketEvents` (bar-window cut, impact
+     * filter, capped at `MARKET_EVENT_LIMIT`) and rendered via `formatMarketEventsSection` —
+     * into `dynamic` only, never `stable`, for the same reason as `priorAnalyses` above. Only
+     * the classification travels (category / sentiment / impact); headlines and bodies never
+     * reach this prompt. Omitting it (or passing `[]`) renders no section, leaving `dynamic`
+     * byte-identical to what this builder produced before the parameter existed.
+     */
+    marketEvents?: readonly MarketEvent[];
+    /**
+     * Quote currency of the listing, supplied by the consumer's market profile (see {@link
+     * CurrencyCode} — core never derives it from the symbol). Drives the listing framing
+     * sentence and price precision (`KRW` → whole won). Defaults to `'USD'`.
+     */
+    currency?: CurrencyCode;
+    /**
+     * KRX tick table the listing's prices round to (`'etp'` for an ETF/ETN, `'share'`
+     * otherwise). Ignored unless `currency` is `KRW`.
+     */
+    krxTick?: KrxTickTable;
+    /**
+     * Optional session schedule and analysis instant. On a daily chart it lets the pivot block
+     * use the last bar once its session has closed (instead of always the bar before).
+     * Omitted, daily pivots use the bar before the last, as they did before the parameter
+     * existed.
+     */
+    marketClock?: MarketReferenceClock;
+    /**
+     * The most fired gated skills one injection group may keep, after relevance ordering (see
+     * {@link selectSkills}). The free tier passes `gatedSkillCapForTier('free')`; omitted or
+     * `null` keeps every fired skill. Always-on skills are never capped.
+     */
+    gatedSkillCap?: number | null;
+    /**
+     * The daily series a `1Week` chart was aggregated from (`BarsData.fearGreedBars`). With
+     * `marketClock` it lets the last weekly row say how far the current week is (observed
+     * daily bars against the calendar's sessions); ignored on every other timeframe, and with
+     * no clock the weekly bar is treated as still forming, with no tag.
+     */
+    dailyBars?: readonly Bar[];
+    /**
+     * The higher-timeframe series and the benchmark's daily bars (see {@link
+     * HigherContextInput}). Each present member prints one block after `### Trend (computed)`
+     * (`### Higher Timeframe (computed, ...)`, `### Market Backdrop (computed, ...)`) and
+     * comes back on the result as the reading it printed; a `null` member prints nothing.
+     * Omitted, the prompt is byte-identical to the one this builder emitted before the
+     * parameter existed.
+     */
+    higherContext?: HigherContextInput;
+}
+
+/**
  * @internal Builds the technical-analysis LLM prompt; used by submit use-cases.
  *
  * Build the AI analysis prompt for a single symbol from bars, indicators, and skills.
@@ -2685,103 +2813,33 @@ export const CORE_SKILL_REFERENCE_POINTER =
  * skill regardless of which half of the prompt (or which provider message)
  * its digest physically landed in.
  *
- * @param symbol - U.S. equity ticker (e.g. `"AAPL"`).
- * @param companyName - Full English company name (e.g. `"Apple Inc."`).
- * @param bars - OHLCV bars sorted oldest-first.
- * @param indicators - Indicator suite produced by {@link calculateIndicators}.
- * @param skills - Skill definitions to inject (defaults to none).
- * @param timeframe - Bar resolution; controls trend window sizing. Defaults to `"1Day"`.
- * @param fearGreed - Optional Fear & Greed snapshot. When provided, a "Fear & Greed Index (Reference)" section is appended.
- * @param assetClass - Instrument asset class controlling prompt framing. `'crypto'` drops
- *   U.S. equity context (earnings, fundamentals, analyst ratings) and adds 24/7 market
- *   context. Defaults to `'equity'` for backward compatibility.
- * @param positionBucket - Member position-bucket hint. When
- *   provided, a single neutral Korean reference line naming the member's
- *   coarse unrealized-P&L band is appended via
- *   {@link formatPositionHintSection} — into `dynamic` only, never `stable`,
- *   since a per-member value must not pollute the byte-cached stable
- *   system-prompt prefix shared across every caller. Omit for the base
- *   (no-bucket) analysis; see {@link buildAnalysisCacheKey}'s `positionBucket`
- *   param for the matching cache-key axis.
- * @param locale - Output language for the model-facing text. Defaults to
- *   {@link DEFAULT_ANALYSIS_LOCALE} (`ko`), which produces a byte-identical
- *   prompt to the one this builder emitted before the parameter existed —
- *   that byte identity is what keeps the existing Korean analysis cache valid.
- * @param priorAnalyses - Optional history of past analyses for this symbol +
- *   timeframe, supplied by the consumer (siglens or another consumer) from its
- *   own storage. When provided, narrowed via `selectPriorAnalyses` (bar
- *   anchor, per-bar dedup, newest-first, capped at
- *   `PRIOR_ANALYSIS_LIMIT`) and rendered via
- *   `formatPriorAnalysisSection` — into `dynamic` only, never `stable`,
- *   for the same reason as `positionBucket` above: a per-call value here
- *   would destroy the byte-cacheable stable prefix shared across every
- *   caller. It also never reaches skill selection — it is computed
- *   independently of {@link buildSkillSelectionContext} / {@link selectSkills}
- *   and cannot change which skills get injected into a prompt. Omitting it
- *   (or passing an empty array) produces a byte-identical prompt to the one
- *   this builder emitted before the parameter existed.
- * @param earningsDates - Optional `YYYY-MM-DD` report dates of this company (past and
- *   upcoming). An `earnings` market event off every date is rendered as earnings-themed
- *   news and no longer suspends the washout verdict; omitted, no event is ever presented
- *   as the company's own report.
- * @param marketEvents - Optional market-moving news events for this symbol,
- *   supplied by the consumer from its own storage. When provided, narrowed via
- *   `selectMarketEvents` (bar-window cut, impact filter, capped at
- *   `MARKET_EVENT_LIMIT`) and rendered via `formatMarketEventsSection` — into
- *   `dynamic` only, never `stable`, for the same reason as `priorAnalyses`
- *   above. Only the classification travels (category / sentiment / impact);
- *   headlines and bodies never reach this prompt. Omitting it (or passing
- *   `[]`) renders no section, leaving `dynamic` byte-identical to what this
- *   builder produced before the parameter existed.
- * @param currency - Quote currency of the listing, supplied by the consumer's
- *   market profile (see {@link CurrencyCode} — core never derives it from the
- *   symbol). Drives the listing framing sentence and price precision (`KRW` →
- *   whole won). Defaults to `'USD'`.
- * @param krxTick - KRX tick table the listing's prices round to (`'etp'` for an
- *   ETF/ETN, `'share'` otherwise). Ignored unless `currency` is `KRW`.
- * @param marketClock - Optional session schedule and analysis instant. On a daily chart
- *   it lets the pivot block use the last bar once its session has closed (instead of
- *   always the bar before). Omitted, daily pivots use the bar before the last, as they
- *   did before the parameter existed.
- * @param gatedSkillCap - The most fired gated skills one injection group may keep, after
- *   relevance ordering (see {@link selectSkills}). The free tier passes
- *   `gatedSkillCapForTier('free')`; omitted or `null` keeps every fired skill. Always-on
- *   skills are never capped.
- * @param dailyBars - The daily series a `1Week` chart was aggregated from (`BarsData.fearGreedBars`).
- *   With `marketClock` it lets the last weekly row say how far the current week is (observed
- *   daily bars against the calendar's sessions); ignored on every other timeframe, and with
- *   no clock the weekly bar is treated as still forming, with no tag.
- * @param higherContext - The higher-timeframe series and the benchmark's daily bars (see
- *   {@link HigherContextInput}). Each present member prints one block after `### Trend (computed)`
- *   (`### Higher Timeframe (computed, ...)`, `### Market Backdrop (computed, ...)`) and comes back on
- *   the result as the reading it printed; a `null` member prints nothing. Omitted, the prompt is
- *   byte-identical to the one this builder emitted before the parameter existed.
+ * @param options - See {@link BuildAnalysisPromptOptions}; each member's contract is documented there.
  * @returns `{ stable, dynamic, overlayCandidates, overlayBuildFailures, patternScreenFailure, patternArbitration, patternGeometries, trend, higherTimeframe, marketBackdrop }` — see {@link TechnicalAssembledPrompt}.
  *
  * @see calculateIndicators
  * @see enrichAnalysisWithConfidence
  */
-export function buildAnalysisPrompt(
-    symbol: string,
-    companyName: string,
-    bars: Bar[],
-    indicators: IndicatorResult,
-    skills: Skill[] = [],
-    timeframe: Timeframe = '1Day',
-    fearGreed?: FearGreedSnapshot,
-    assetClass: AssetClass = 'equity',
-    positionBucket?: PositionBucket,
-    locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
-    priorAnalyses?: readonly PriorAnalysis[],
-    marketEvents?: readonly MarketEvent[],
-    currency: CurrencyCode = 'USD',
-    krxTick: KrxTickTable = 'share',
-    earningsDates?: readonly string[],
-    marketClock?: MarketReferenceClock,
-    gatedSkillCap?: number | null,
-    dailyBars?: readonly Bar[],
-    higherContext?: HigherContextInput
-): TechnicalAssembledPrompt {
+export function buildAnalysisPrompt({
+    symbol,
+    companyName,
+    bars,
+    indicators,
+    skills = [],
+    timeframe = '1Day',
+    fearGreed,
+    assetClass = 'equity',
+    positionBucket,
+    locale = DEFAULT_ANALYSIS_LOCALE,
+    priorAnalyses,
+    marketEvents,
+    currency = 'USD',
+    krxTick = 'share',
+    earningsDates,
+    marketClock,
+    gatedSkillCap,
+    dailyBars,
+    higherContext,
+}: BuildAnalysisPromptOptions): TechnicalAssembledPrompt {
     // Detect candle patterns once and thread the result to every consumer
     // (skill-selection gating + the recent-bars section) so the expensive
     // detection pass runs a single time per prompt build.

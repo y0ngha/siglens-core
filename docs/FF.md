@@ -333,7 +333,7 @@ async function runFullAnalysis(symbol: string, timeframe: Timeframe) {
     const bars = await provider.fetchBars(symbol, timeframe);
     const indicators = calculateAllIndicators(bars);
     const skills = await skillsLoader.loadSkills();
-    const prompt = buildAnalysisPrompt(symbol, bars, indicators, skills);
+    const prompt = buildAnalysisPrompt({ symbol, companyName, bars, indicators, skills });
     const response = await aiProvider.send(prompt);
     await cache.set(cacheKey(symbol, timeframe), response, ttlFor(timeframe));
     return response;

@@ -1192,9 +1192,15 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * fundamental, financials, news, congress, market-news digest) now carries `free-c<cap>` (the cap value) and the
  * fingerprint of the whole catalog instead of that of a per-symbol sample, so each free
  * entry is regenerated once and a later change of the cap moves the free keys again, as
- * does the technical peek key. After the model answers, a capped tier (free)
- * enriches the result with only the skills its prompt carried; member and pro keep
- * enriching with the full catalog, as before.
+ * does the technical peek key. After the model answers, every tier
+ * post-processes the result with only the skills its prompt carried (member and pro used
+ * to use the full catalog). For member and pro this changes the output without changing
+ * the prompt: confidence weights, the strategy-name canonicalization (`findStrategySkill`),
+ * the overlay kind source (`resolveChartOverlays` strategyByName) and the computed-card
+ * drop (`withoutModelCards`) now read the injected skills, so a skill whose gate did not
+ * fire no longer contributes. The cache holds the post-processed result, so entries
+ * written before this change differ; no bump is needed only because `p34` is unreleased
+ * (v2.42.0 ships `p33`), so no stored entry carries it.
  *
  * A non-positive reference level (a Fibonacci or ABC extension below zero on a deep
  * down-leg) is no longer a level: it is not listed as support, not a stop candidate and

@@ -8,9 +8,9 @@ import type { AssetClass, Bar, CurrencyCode, Timeframe } from '@/domain/types';
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
 // return with a flattening wrapper.
 const buildAnalysisPrompt = (
-    ...args: Parameters<typeof buildAnalysisPromptRaw>
+    options: Parameters<typeof buildAnalysisPromptRaw>[0]
 ): string => {
-    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    const { stable, dynamic } = buildAnalysisPromptRaw(options);
     return `${stable}\n\n${dynamic}`;
 };
 
@@ -19,29 +19,28 @@ const indicators = EMPTY_INDICATOR_RESULT;
 
 describe('buildAnalysisPrompt assetClass framing', () => {
     it('crypto prompt avoids equity-only framing and adds 24/7 context', () => {
-        const p = buildAnalysisPrompt(
-            'BTCUSD',
-            'Bitcoin',
+        const p = buildAnalysisPrompt({
+            symbol: 'BTCUSD',
+            companyName: 'Bitcoin',
             bars,
             indicators,
-            [],
-            '1Day',
-            undefined,
-            'crypto'
-        );
+            skills: [],
+            timeframe: '1Day',
+            assetClass: 'crypto',
+        });
         expect(p).toMatch(/24\/7|no market open\/close/i);
         expect(p).not.toMatch(/earnings report|quarterly earnings|P\/E ratio/i);
     });
 
     it('equity prompt (default) is unchanged framing', () => {
-        const p = buildAnalysisPrompt(
-            'AAPL',
-            'Apple',
+        const p = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple',
             bars,
             indicators,
-            [],
-            '1Day'
-        );
+            skills: [],
+            timeframe: '1Day',
+        });
         // Must contain the equity framing literal emitted by buildAnalysisPrompt.
         expect(p).toContain('U.S. equity');
         // Must not bleed crypto-specific context into an equity prompt.
@@ -76,40 +75,30 @@ const renderDynamic = (
     currency: CurrencyCode = 'USD',
     krxTick: KrxTickTable = 'share'
 ): string =>
-    buildAnalysisPromptRaw(
+    buildAnalysisPromptRaw({
         symbol,
-        symbol,
-        series,
-        calculateIndicators(series),
-        [],
+        companyName: symbol,
+        bars: series,
+        indicators: calculateIndicators(series),
+        skills: [],
         timeframe,
-        undefined,
         assetClass,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
         currency,
-        krxTick
-    ).dynamic;
+        krxTick,
+    }).dynamic;
 
 describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
     it('frames a KRW listing as Korean, not a U.S. equity', () => {
-        const p = buildAnalysisPrompt(
-            '005930.KS',
-            '삼성전자',
+        const p = buildAnalysisPrompt({
+            symbol: '005930.KS',
+            companyName: '삼성전자',
             bars,
             indicators,
-            [],
-            '1Day',
-            undefined,
-            'equity',
-            undefined,
-            undefined,
-            undefined,
-            undefined,
-            'KRW'
-        );
+            skills: [],
+            timeframe: '1Day',
+            assetClass: 'equity',
+            currency: 'KRW',
+        });
         expect(p).toContain('Korean equity listed on the KRX');
         expect(p).not.toContain('U.S. equity');
     });
@@ -282,14 +271,14 @@ describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
         );
         // The stopLoss rule lives in the Analysis Guidelines, which sit at the
         // head of `stable` (system message) rather than in `dynamic`.
-        const { stable } = buildAnalysisPromptRaw(
-            'AAPL',
-            'AAPL',
-            series,
-            calculateIndicators(series),
-            [],
-            '1Day'
-        );
+        const { stable } = buildAnalysisPromptRaw({
+            symbol: 'AAPL',
+            companyName: 'AAPL',
+            bars: series,
+            indicators: calculateIndicators(series),
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(stable).toContain('never on a level tagged "at price"');
     });
 
@@ -350,14 +339,14 @@ describe('buildAnalysisPrompt listing framing and numeric rendering', () => {
                 volume: 1000,
             },
         ];
-        const p = buildAnalysisPrompt(
-            'AAPL',
-            'Apple',
-            zeroBase,
+        const p = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple',
+            bars: zeroBase,
             indicators,
-            [],
-            '1Hour'
-        );
+            skills: [],
+            timeframe: '1Hour',
+        });
         expect(p).toContain('- Price Change %: N/A');
         expect(p).toContain('- Period Return: N/A');
         expect(p).toContain('- Current vs Low: N/A');

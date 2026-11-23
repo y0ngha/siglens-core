@@ -109,7 +109,7 @@ interface SkillLookup {
     strategies: readonly Skill[];
 }
 
-function buildSkillLookup(skills: Skill[]): SkillLookup {
+function buildSkillLookup(skills: readonly Skill[]): SkillLookup {
     const strategies = skills.filter(s => s.type === 'strategy');
     return {
         byName: new Map(skills.map(s => [skillKey(s.name), s])),
@@ -316,7 +316,7 @@ function buildUniqueIds(names: readonly string[]): string[] {
  */
 export function enrichAnalysisWithConfidence(
     rawInput: unknown,
-    skills: Skill[],
+    skills: readonly Skill[],
     allowedPatternSkills?: readonly string[],
     options: EnrichOptions = {}
 ): AnalysisResponse {
@@ -463,7 +463,7 @@ export function enrichAnalysisWithConfidence(
 export function attachComputedCards(
     analysis: AnalysisResponse,
     computed: ComputedCards,
-    skills: Skill[]
+    skills: readonly Skill[]
 ): AnalysisResponse {
     const lookup = buildSkillLookup(skills);
     const taken = [

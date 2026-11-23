@@ -179,8 +179,9 @@ describe('isSkillAllowedInContext — news axis', () => {
 });
 
 describe('SKILL_CONTEXT_WHITELIST', () => {
-    it('defines exactly the 3 documented prompt contexts (options/overall/congress intentionally absent)', () => {
+    it('defines exactly the 4 documented prompt contexts (options/overall intentionally absent)', () => {
         expect(Object.keys(SKILL_CONTEXT_WHITELIST).sort()).toEqual([
+            'congress',
             'fundamental',
             'news',
             'technical',

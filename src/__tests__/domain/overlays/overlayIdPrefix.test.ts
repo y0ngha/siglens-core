@@ -26,14 +26,14 @@ describe('OVERLAY_ID_PREFIX', () => {
         .map(chartFixture)
         .flatMap(
             c =>
-                buildAnalysisPrompt(
-                    'T',
-                    'T',
-                    c.bars,
-                    calculateIndicators(c.bars),
-                    [],
-                    c.timeframe
-                ).overlayCandidates
+                buildAnalysisPrompt({
+                    symbol: 'T',
+                    companyName: 'T',
+                    bars: c.bars,
+                    indicators: calculateIndicators(c.bars),
+                    skills: [],
+                    timeframe: c.timeframe,
+                }).overlayCandidates
         );
     // The real charts carry no RSI divergence: one built from a textbook
     // bullish divergence (lows 105 → 103, RSI 25 → 32).

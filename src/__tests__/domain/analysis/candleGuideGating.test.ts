@@ -73,14 +73,14 @@ const buildWithEntries = async (
     const { buildAnalysisPrompt } = await import('@/domain/analysis/prompt');
     const { bars } = doubleTop as Fixture;
     return flat(
-        buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
-            calculateIndicators(bars),
-            GUIDES,
-            '1Day'
-        )
+            indicators: calculateIndicators(bars),
+            skills: GUIDES,
+            timeframe: '1Day',
+        })
     );
 };
 

@@ -7,7 +7,10 @@ import {
     type AnalysisLocale,
 } from './outputLocale';
 import { CORE_SKILL_REFERENCE_POINTER } from '@/domain/analysis/prompt';
-import { capGatedPerGroup } from '@/domain/analysis/skillTierCap';
+import {
+    NO_CHART_SELECTION_CONTEXT,
+    selectSkills,
+} from '@/domain/analysis/selectSkills';
 import type {
     AssembledPrompt,
     CongressTrade,
@@ -19,33 +22,23 @@ import type {
 const MAX_TRADES_IN_PROMPT = 50;
 
 /**
- * Filter skills to the congress category.
- *
- * Only skills with `category === 'congress'` are injected; all others are
- * filtered out — matching the same pattern used by `filterFundamentalSkills`
- * in `financialsPrompt.ts`.
+ * Select the congress-category skills via the shared selection engine
+ * (whitelist + fail-closed gating), like the news and fundamental builders.
+ * `NO_CHART_SELECTION_CONTEXT` — this prompt has no chart, so only `always_on`
+ * skills can qualify; a gated skill's gate never fires here, so it is never
+ * injected on any tier.
  */
-function filterCongressSkills(
+function selectCongressSkills(
     skills: readonly Skill[],
     gatedSkillCap: number | null | undefined
 ): Skill[] {
-    const inCategory = skills.filter(s => s.category === 'congress');
-    if (gatedSkillCap === null || gatedSkillCap === undefined) {
-        return inCategory;
-    }
-    // This prompt has no chart and no relevance score, so the gated skills it
-    // injects are capped in name order (the tie-break of `selectSkills`);
-    // always-on skills are never capped.
-    const isGated = (skill: Skill): boolean => skill.gating?.tier === 'gated';
-    const keptGated = new Set(
-        capGatedPerGroup(
-            inCategory
-                .filter(isGated)
-                .toSorted((a, b) => a.name.localeCompare(b.name, 'en')),
-            gatedSkillCap
-        )
+    const { core, selected } = selectSkills(
+        skills,
+        NO_CHART_SELECTION_CONTEXT,
+        'congress',
+        { gatedPerGroupCap: gatedSkillCap }
     );
-    return inCategory.filter(skill => !isGated(skill) || keptGated.has(skill));
+    return [...core, ...selected];
 }
 
 /** Format up to MAX_TRADES_IN_PROMPT trades as a bullet list for LLM consumption. */
@@ -66,8 +59,9 @@ function formatTrades(trades: readonly CongressTrade[]): string {
  * Build the congressional-trade trend LLM prompt, split into a
  * stable/dynamic pair ({@link AssembledPrompt}) — Design C
  * ("skills-to-system split"): `stable` is ONLY the Domain Skills (Active)
- * section — deterministic per catalog since {@link filterCongressSkills}
- * filters purely by category, never by chart/symbol state; `dynamic` is the
+ * section — deterministic per catalog since {@link selectCongressSkills}
+ * gates through {@link selectSkills} against a chartless context (no chart or symbol
+ * state, so only `always_on` skills qualify) and throws on a skill without `gating`; `dynamic` is the
  * ENTIRE rest of the prompt, in the ORIGINAL PRODUCTION ORDER (v0.31,
  * pre-split) — role framing + the specific "analyze this symbol" ask + Data
  * Boundary, the Deterministic Trade Statistics + Recent Trades sections, a
@@ -83,8 +77,9 @@ function formatTrades(trades: readonly CongressTrade[]): string {
  * (count-based) — the LLM only produces prose interpretation. The prompt
  * includes a disclosure-lag (~45 day) caveat to prevent overstatement.
  *
- * Only skills with `category === 'congress'` are injected; all others are
- * filtered out.
+ * Only `congress`-category skills whose gate passes are injected (always-on
+ * skills; this prompt has no chart, so a gated skill never fires), the same
+ * selection the technical analysis uses.
  *
  * The `Ko`/`KO` suffixes are schema field names, not a language claim —
  * their content follows the requested `locale`.
@@ -93,7 +88,7 @@ function formatTrades(trades: readonly CongressTrade[]): string {
  * @param trades - Normalized congress trades for the symbol (newest first).
  * @param stats  - Pre-computed count-based statistics from `summarizeCongressTrades`.
  * @param skills - All loaded skills; non-congress entries are filtered out.
- * @param gatedSkillCap - The most gated skills one injection group may keep (name order);
+ * @param gatedSkillCap - The most gated skills one injection group may keep, by relevance (see {@link selectSkills});
  *   omitted or `null` keeps all. Always-on skills are never capped.
  * @returns `{ stable, dynamic }` ready to be dispatched to the LLM worker.
  */
@@ -105,7 +100,7 @@ export function buildCongressTrendPrompt(
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     gatedSkillCap?: number | null
 ): AssembledPrompt {
-    const qualifiedSkills = filterCongressSkills(skills, gatedSkillCap);
+    const qualifiedSkills = selectCongressSkills(skills, gatedSkillCap);
     const skillsSection =
         qualifiedSkills.length > 0
             ? qualifiedSkills

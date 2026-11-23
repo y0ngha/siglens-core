@@ -7,10 +7,9 @@ import type { Skill, SkillCategory, SkillType, Tier } from '@/domain/types';
  * it, on every analysis kind. The cap is applied by {@link selectSkills} AFTER
  * relevance ordering, so the skills kept are the group's most relevant ones,
  * not a hash draw. The chartless prompts (fundamental, financials, news,
- * digest) pass it too, but their catalog is all always-on today and a
- * chartless context fires no gated skill, so it changes nothing there yet;
- * the congress prompt, which has no gate evaluation, caps its gated skills in
- * name order.
+ * digest) and the congress prompt pass it too, but their catalog is all
+ * always-on today and a chartless context fires no gated skill, so it changes
+ * nothing there yet.
  *
  * The cap is part of every free cache key (`tierCapKeyPart`,
  * `infrastructure/skills/sampling.ts`), so changing it moves the free keys by

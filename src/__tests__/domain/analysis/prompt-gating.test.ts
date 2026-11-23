@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import {
     buildAnalysisPrompt as buildAnalysisPromptRaw,
     ATR_EXTREME_PERCENT_DAILY,
@@ -19,14 +19,15 @@ import type {
     IndicatorResult,
     Skill,
     SkillGating,
+    TechnicalAssembledPrompt,
 } from '@/domain/types';
 
 // See prompt.test.ts for why this file shadows the raw `{ stable, dynamic }`
 // return with a flattening wrapper.
 const buildAnalysisPrompt = (
-    ...args: Parameters<typeof buildAnalysisPromptRaw>
+    options: Parameters<typeof buildAnalysisPromptRaw>[0]
 ): string => {
-    const { stable, dynamic } = buildAnalysisPromptRaw(...args);
+    const { stable, dynamic } = buildAnalysisPromptRaw(options);
     return `${stable}\n\n${dynamic}`;
 };
 
@@ -98,14 +99,14 @@ const eventGated = (triggers: string[]): SkillGating => ({
 });
 
 const build = (skills: Skill[], bars: Bar[], indicators: IndicatorResult) =>
-    buildAnalysisPrompt(
-        TEST_SYMBOL,
-        TEST_COMPANY,
+    buildAnalysisPrompt({
+        symbol: TEST_SYMBOL,
+        companyName: TEST_COMPANY,
         bars,
         indicators,
         skills,
-        '1Day'
-    );
+        timeframe: '1Day',
+    });
 
 describe('buildAnalysisPrompt gating (chart only)', () => {
     it('always_on skill is injected regardless of context', () => {
@@ -252,14 +253,14 @@ describe('ATR-extreme volatility note', () => {
             };
         });
         const indicators = calculateIndicators(bars);
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
             indicators,
-            [],
-            '1Day'
-        );
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(out).toMatch(/Volatility|position sizing/i);
         expect(sizingMatcher.test(out)).toBe(true);
     });
@@ -267,14 +268,14 @@ describe('ATR-extreme volatility note', () => {
     it('does not append the sizing note when ATR% is low', () => {
         const bars = makeBars(60, 1000); // tiny ATR relative to ~1000 price
         const indicators = calculateIndicators(bars);
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
             indicators,
-            [],
-            '1Day'
-        );
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(out).not.toMatch(/Extreme Volatility/i);
     });
     // Boundary-equality: ATR% exactly at the daily threshold must append the note
@@ -290,17 +291,17 @@ describe('ATR-extreme volatility note', () => {
             close: 100,
             volume: 1_000_000,
         }));
-        const out = buildAnalysisPrompt(
-            TEST_SYMBOL,
-            TEST_COMPANY,
+        const out = buildAnalysisPrompt({
+            symbol: TEST_SYMBOL,
+            companyName: TEST_COMPANY,
             bars,
-            {
+            indicators: {
                 ...emptyIndicators(),
                 atr: [...new Array(59).fill(null), ATR_EXTREME_PERCENT_DAILY],
             },
-            [],
-            '1Day'
-        );
+            skills: [],
+            timeframe: '1Day',
+        });
         expect(out).toMatch(/Extreme Volatility/i);
         // The note states a volatility condition; sizing and stop width stay in
         // actionRecommendation (PLAN_VOCABULARY_BOUNDARY).
@@ -495,5 +496,13 @@ describe('news / fundamental prompt builders route through selectSkills', () => 
         );
         expect(out).toContain('event-driven');
         expect(out).not.toContain('gated-news-frame');
+    });
+});
+
+describe('TechnicalAssembledPrompt.injectedSkills', () => {
+    it('is exposed as a readonly array, so a consumer cannot mutate the injected set', () => {
+        expectTypeOf<
+            TechnicalAssembledPrompt['injectedSkills']
+        >().toEqualTypeOf<readonly Skill[]>();
     });
 });

@@ -164,16 +164,15 @@ describe.each(TECHNICAL_FIXTURE_FILES)(
             readFileSync(join(FIXTURES_DIR, file), 'utf-8')
         ) as TechnicalFixture;
         const indicators = calculateIndicators(fixture.bars);
-        const { dynamic } = buildAnalysisPrompt(
-            fixture.symbol,
-            fixture.companyName,
-            fixture.bars,
+        const { dynamic } = buildAnalysisPrompt({
+            symbol: fixture.symbol,
+            companyName: fixture.companyName,
+            bars: fixture.bars,
             indicators,
-            [],
-            fixture.timeframe,
-            undefined,
-            'equity'
-        );
+            skills: [],
+            timeframe: fixture.timeframe,
+            assetClass: 'equity',
+        });
         const reference = computeMarketReference(
             fixture.bars,
             indicators,

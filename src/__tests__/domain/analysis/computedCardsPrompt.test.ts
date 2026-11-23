@@ -52,7 +52,14 @@ const FIB = skill('Fibonacci Strategy', 'strategy');
 const UNTAGGED_GUIDE = skill('Untagged Guide', 'indicator_guide');
 
 const build = (skills: Skill[]) =>
-    buildAnalysisPrompt('AAPL', 'Apple Inc.', bars, indicators, skills, '1Day');
+    buildAnalysisPrompt({
+        symbol: 'AAPL',
+        companyName: 'Apple Inc.',
+        bars,
+        indicators,
+        skills,
+        timeframe: '1Day',
+    });
 
 const TAGGED = [MA, EMA, ADX, ATR, OBV, VP];
 const text = (skills: Skill[]): string => {
@@ -165,14 +172,14 @@ describe('computed cards in the technical prompt', () => {
                 ),
             },
         };
-        const out = buildAnalysisPrompt(
-            'AAPL',
-            'Apple Inc.',
+        const out = buildAnalysisPrompt({
+            symbol: 'AAPL',
+            companyName: 'Apple Inc.',
             bars,
-            tied,
-            [MA_CYCLE, MACD_CYCLE, FIB],
-            '1Day'
-        );
+            indicators: tied,
+            skills: [MA_CYCLE, MACD_CYCLE, FIB],
+            timeframe: '1Day',
+        });
         const prompt = `${out.stable}\n\n${out.dynamic}`;
         expect(lineOf(prompt, '- MA cycle (')).toContain('N/A');
         expect(out.cycleCards.map(c => c.strategyName)).toEqual([

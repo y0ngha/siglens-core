@@ -58,14 +58,14 @@ function risingBars(count: number): Bar[] {
 }
 
 function promptFor(bars: readonly Bar[]) {
-    return buildAnalysisPrompt(
-        'AAPL',
-        'Apple Inc.',
-        [...bars],
-        calculateIndicators([...bars]),
-        [],
-        '1Day'
-    );
+    return buildAnalysisPrompt({
+        symbol: 'AAPL',
+        companyName: 'Apple Inc.',
+        bars: [...bars],
+        indicators: calculateIndicators([...bars]),
+        skills: [],
+        timeframe: '1Day',
+    });
 }
 
 const bearishReading: AnalysisTrendReading = {
