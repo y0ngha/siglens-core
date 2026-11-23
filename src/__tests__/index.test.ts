@@ -108,6 +108,14 @@ describe('public API exports', () => {
             'double_bottom'
         );
         expect(Object.keys(coreApi.CANDLE_BASE_RATES)).toContain('hammer');
+        expect(coreApi.PATTERN_POOLED_BASE_RATE).toMatchObject({
+            subject: 'chart_pattern',
+            key: 'pooled',
+        });
+        expect(coreApi.CANDLE_POOLED_BASE_RATE).toMatchObject({
+            subject: 'candle_pattern',
+            key: 'pooled',
+        });
         expect(
             coreApi.measuredBaseRateFor(
                 'chart_pattern',

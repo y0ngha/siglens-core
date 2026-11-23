@@ -61,6 +61,14 @@ describe('browser public API exports', () => {
             'double_bottom'
         );
         expect(Object.keys(clientApi.CANDLE_BASE_RATES)).toContain('hammer');
+        expect(clientApi.PATTERN_POOLED_BASE_RATE).toMatchObject({
+            subject: 'chart_pattern',
+            key: 'pooled',
+        });
+        expect(clientApi.CANDLE_POOLED_BASE_RATE).toMatchObject({
+            subject: 'candle_pattern',
+            key: 'pooled',
+        });
         expect(
             clientApi.measuredBaseRateFor(
                 'chart_pattern',

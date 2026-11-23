@@ -53,7 +53,14 @@ export interface MeasuredBaseRate {
     };
 }
 
-/** Chart patterns of the whole set; the row a family below BASE_RATE_MIN_N events carries. */
+/**
+ * The pooled measurement of all chart patterns across the whole replay set: its own sample, placebo
+ * comparison and verdict. Read this for a statement about chart patterns as a whole.
+ *
+ * The per-family 'pooled' rows inside PATTERN_BASE_RATES are copies of this row's numbers for a
+ * family below BASE_RATE_MIN_N events: they carry verdict 'insufficient_sample' (that
+ * family's own sample is too small), which is not this measurement's verdict.
+ */
 export const PATTERN_POOLED_BASE_RATE: MeasuredBaseRate = {
     subject: 'chart_pattern',
     key: 'pooled',
@@ -74,7 +81,14 @@ export const PATTERN_POOLED_BASE_RATE: MeasuredBaseRate = {
     },
 };
 
-/** Directional candles of the whole set; the row a candle below BASE_RATE_MIN_N events carries. */
+/**
+ * The pooled measurement of all directional candles across the whole replay set: its own sample, placebo
+ * comparison and verdict. Read this for a statement about directional candles as a whole.
+ *
+ * The per-family 'pooled' rows inside CANDLE_BASE_RATES are copies of this row's numbers for a
+ * family below BASE_RATE_MIN_N events: they carry verdict 'insufficient_sample' (that
+ * family's own sample is too small), which is not this measurement's verdict.
+ */
 export const CANDLE_POOLED_BASE_RATE: MeasuredBaseRate = {
     subject: 'candle_pattern',
     key: 'pooled',
