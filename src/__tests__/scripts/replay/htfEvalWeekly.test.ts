@@ -77,7 +77,7 @@ const weeklyText = (): string =>
     );
 const dailyText = (): string =>
     promptOf(
-        'Timeframe: Daily\nTimeframe interpretation: Daily chart. Indicator signals have high reliability.',
+        'Timeframe: Daily\nTimeframe interpretation: Daily chart of daily bars.',
         FEAR
     );
 
@@ -158,6 +158,14 @@ describe('K1: weekly hygiene', () => {
                 check(`${weeklyText()}\n${samples[name]}`).failures
             ).toContain(`dailyOnly:${name}`);
         });
+    });
+
+    it('flags the daily interpretation line even without the Timeframe: Daily label', () => {
+        expect(
+            check(
+                `${weeklyText()}\nTimeframe interpretation: Daily chart of daily bars: each bar is one full session.`
+            ).failures
+        ).toContain('dailyOnly:dailyIntervalLabel');
     });
 
     it('accepts the weekly wording of the unmeasured sentences', () => {

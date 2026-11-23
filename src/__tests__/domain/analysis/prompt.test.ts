@@ -2,6 +2,7 @@ import {
     DEFAULT_ANALYSIS_LOCALE,
     type AnalysisLocale,
 } from '@/domain/analysis/outputLocale';
+import { TIMEFRAMES } from '@/domain/constants/market';
 import { parsePromptSupportPrices } from '@/domain/analysis/promptNumbers';
 import { selectPriorAnalyses } from '@/domain/analysis/priorAnalysis';
 import { formatPriorAnalysisSection } from '@/domain/analysis/priorAnalysisSection';
@@ -7297,6 +7298,24 @@ describe('buildAnalysisPrompt — 1Week', () => {
         );
         expect(out).not.toContain('Indicator signals have high reliability');
         expect(out).not.toContain('Timeframe: Daily');
+    });
+
+    it('no timeframe interpretation claims reliability or relative weight (DOM-12)', () => {
+        for (const timeframe of TIMEFRAMES) {
+            const line = render(timeframe)
+                .split('\n')
+                .find(l => l.startsWith('Timeframe interpretation:'));
+            expect(line, timeframe).toBeDefined();
+            expect(line, timeframe).not.toMatch(
+                /reliab|actionable|significant|carry (?:more|meaningful) weight/i
+            );
+        }
+    });
+
+    it('says what the daily bar is and that it folds intraday noise', () => {
+        expect(render('1Day')).toContain(
+            'Timeframe interpretation: Daily chart of daily bars: each bar is one full session, so intraday noise is already folded into the bar.'
+        );
     });
 
     it('prints the weekly horizons: 20, 52 and 156 bars', () => {

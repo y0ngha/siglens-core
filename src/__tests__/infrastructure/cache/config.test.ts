@@ -11,6 +11,7 @@ import {
 import {
     ANALYSIS_CACHE_SETTLE_BUFFER_MINUTES,
     ANALYSIS_CACHE_TTL,
+    analysisCacheWindowStart,
     analysisHistoryQuery,
     BARS_OFFHOURS_TTL_CEILING_SECONDS,
     BARS_OPEN_TTL_SECONDS,
@@ -63,7 +64,12 @@ import {
     PRIOR_ANALYSIS_SLACK,
 } from '@/domain/analysis/priorAnalysis';
 import { CRYPTO_SESSION, US_EQUITY_SESSION } from '@/domain/session';
-import type { PositionBucket, PriorAnalysis } from '@/domain/types';
+import { TIMEFRAMES } from '@/domain/constants/market';
+import type {
+    MarketSessionSpec,
+    PositionBucket,
+    PriorAnalysis,
+} from '@/domain/types';
 import { describe, expect, it } from 'vitest';
 import { makeKrSession } from '../../helpers/krSession';
 
@@ -2127,5 +2133,150 @@ describe('marketEvents 시간 상한이 캐시 키에 반영될 때', () => {
         expect(narrowMarketEventsForCacheKey([friday]).fingerprint).toBe(
             'e3c3110e6da37bfe'
         );
+    });
+});
+
+describe('analysisCacheWindowStart', () => {
+    const iso = (
+        timeframe: Parameters<typeof analysisCacheWindowStart>[0],
+        now: string,
+        session?: MarketSessionSpec
+    ) =>
+        analysisCacheWindowStart(
+            timeframe,
+            new Date(now),
+            session
+        ).toISOString();
+
+    it('분 단위·시간 단위 봉은 KST 05:00에 정렬된 시계 버킷에서 시작한다', () => {
+        const now = '2026-09-29T13:47:30.000Z';
+        expect(iso('5Min', now)).toBe('2026-09-29T13:45:00.000Z');
+        expect(iso('15Min', now)).toBe('2026-09-29T13:45:00.000Z');
+        expect(iso('30Min', now)).toBe('2026-09-29T13:30:00.000Z');
+        expect(iso('1Hour', now)).toBe('2026-09-29T13:00:00.000Z');
+        // 4시간 버킷은 UTC 20:00에서 시작하므로 16:00·20:00·00:00·04:00...이 경계다.
+        expect(iso('4Hour', now)).toBe('2026-09-29T12:00:00.000Z');
+    });
+
+    it('분·시간 단위 봉은 세션을 줘도 같은 시계 버킷이다', () => {
+        const now = '2026-09-29T13:47:30.000Z';
+        for (const session of [US_EQUITY_SESSION, makeKrSession()]) {
+            expect(iso('15Min', now, session)).toBe(iso('15Min', now));
+            expect(iso('4Hour', now, session)).toBe(iso('4Hour', now));
+        }
+    });
+
+    it('세션 없는 1Day·1Week는 KST 05:00(UTC 20:00) 앵커에서 구른다', () => {
+        for (const timeframe of ['1Day', '1Week'] as const) {
+            expect(iso(timeframe, '2026-09-29T19:59:59.999Z')).toBe(
+                '2026-09-28T20:00:00.000Z'
+            );
+            expect(iso(timeframe, '2026-09-29T20:00:00.000Z')).toBe(
+                '2026-09-29T20:00:00.000Z'
+            );
+        }
+    });
+
+    it('US 1Day·1Week: 마감(20:00Z) + 정산 버퍼(30분)까지는 직전 세션 경계를 유지한다', () => {
+        for (const timeframe of ['1Day', '1Week'] as const) {
+            // 마감 직후지만 정산 버퍼 안 — 아직 어제 창이다.
+            expect(
+                iso(timeframe, '2026-09-29T20:10:00.000Z', US_EQUITY_SESSION)
+            ).toBe('2026-09-28T20:30:00.000Z');
+            expect(
+                iso(timeframe, '2026-09-29T20:29:59.999Z', US_EQUITY_SESSION)
+            ).toBe('2026-09-28T20:30:00.000Z');
+            // 버퍼가 끝나는 순간 새 창이 시작한다.
+            expect(
+                iso(timeframe, '2026-09-29T20:30:00.000Z', US_EQUITY_SESSION)
+            ).toBe('2026-09-29T20:30:00.000Z');
+        }
+    });
+
+    it('US 1Week: 주말에는 금요일 마감 + 30분이 창 시작이다', () => {
+        expect(
+            iso('1Week', '2026-09-27T12:00:00.000Z', US_EQUITY_SESSION)
+        ).toBe('2026-09-25T20:30:00.000Z');
+    });
+
+    it('KRX 1Day는 KST 05:00을 넘어도 같은 창이고, 마감 + 30분에 바뀐다', () => {
+        const kr = makeKrSession();
+        // KR 마감 15:30 KST(06:30Z) + 30분 = 07:00Z.
+        expect(iso('1Day', '2026-09-29T21:30:00.000Z', kr)).toBe(
+            '2026-09-29T07:00:00.000Z'
+        );
+        expect(iso('1Day', '2026-09-29T06:59:59.999Z', kr)).toBe(
+            '2026-09-28T07:00:00.000Z'
+        );
+    });
+
+    it('크립토(상시 개장) 1Day·1Week는 직전 00:00 UTC다', () => {
+        for (const timeframe of ['1Day', '1Week'] as const) {
+            expect(
+                iso(timeframe, '2026-09-29T21:00:00.000Z', CRYPTO_SESSION)
+            ).toBe('2026-09-29T00:00:00.000Z');
+        }
+    });
+
+    it('호출자의 now를 바꾸지 않고 새 Date를 돌려준다', () => {
+        const now = new Date('2026-09-29T13:47:30.000Z');
+        const before = now.getTime();
+        const start = analysisCacheWindowStart('15Min', now);
+        expect(now.getTime()).toBe(before);
+        expect(start).not.toBe(now);
+    });
+
+    describe('캐시 키 계산이 자르는 경계와 같다', () => {
+        const SESSIONS: ReadonlyArray<[string, MarketSessionSpec | undefined]> =
+            [
+                ['세션 없음', undefined],
+                ['US', US_EQUITY_SESSION],
+                ['KRX', makeKrSession()],
+                ['crypto', CRYPTO_SESSION],
+            ];
+        // KST 05:00(= UTC 20:00)·US 마감 + 정산 버퍼(20:30Z)·KRX 마감 + 버퍼(07:00Z)
+        // 양쪽 1ms, 그리고 임의의 장중 시각.
+        const INSTANTS = [
+            '2026-09-29T19:59:59.999Z',
+            '2026-09-29T20:00:00.000Z',
+            '2026-09-29T20:29:59.999Z',
+            '2026-09-29T20:30:00.000Z',
+            '2026-09-29T06:59:59.999Z',
+            '2026-09-29T07:00:00.000Z',
+            '2026-09-29T13:07:41.250Z',
+            '2026-09-27T12:00:00.000Z',
+        ];
+
+        for (const timeframe of TIMEFRAMES) {
+            it(`${timeframe}: 창 시작 직전 행은 키에 들어가고 창 시작 행은 빠진다`, () => {
+                for (const [label, session] of SESSIONS) {
+                    for (const nowIso of INSTANTS) {
+                        const now = new Date(nowIso);
+                        const startMs = analysisCacheWindowStart(
+                            timeframe,
+                            now,
+                            session
+                        ).getTime();
+                        const narrow = (generatedAtMs: number) =>
+                            narrowPriorAnalysesForCacheKey(
+                                [priorAnalysisAt(new Date(generatedAtMs))],
+                                ANALYSIS_CACHE_TTL[timeframe],
+                                now,
+                                session
+                            ).candidates.length;
+                        expect(
+                            narrow(startMs - 1),
+                            `${label} ${nowIso} 직전 행`
+                        ).toBe(1);
+                        expect(
+                            narrow(startMs),
+                            `${label} ${nowIso} 시작 행`
+                        ).toBe(0);
+                        // now가 속한 창이므로 시작은 now 이하이고 한 TTL 안이다.
+                        expect(startMs).toBeLessThanOrEqual(now.getTime());
+                    }
+                }
+            });
+        }
     });
 });
