@@ -232,20 +232,18 @@ export function findPriceLevelTrigger(
     bars: readonly Bar[],
     condition: PriceLevelCondition
 ): PriceLevelTrigger | PriceLevelZoneTrigger | null {
-    for (const [index, bar] of bars.entries()) {
-        if (isPriceLevelMet(bar.close, condition)) {
-            const trigger = { index, time: bar.time, close: bar.close };
-            return condition.kind === 'enter_zone'
-                ? {
-                      ...trigger,
-                      position: positionAgainstZone(
-                          bar.close,
-                          condition.low,
-                          condition.high
-                      ),
-                  }
-                : trigger;
-        }
-    }
-    return null;
+    const index = bars.findIndex(bar => isPriceLevelMet(bar.close, condition));
+    if (index === -1) return null;
+    const { time, close } = bars[index];
+    const trigger = { index, time, close };
+    return condition.kind === 'enter_zone'
+        ? {
+              ...trigger,
+              position: positionAgainstZone(
+                  close,
+                  condition.low,
+                  condition.high
+              ),
+          }
+        : trigger;
 }
