@@ -168,6 +168,12 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 | `evaluatePullback(bars)` — 마지막 봉의 short-term washout 판독(종가 vs MA200, Williams %R(14), RSI(2), MA5 청산 기준). 200봉 미만·비유한 종가면 `null`. 일봉 측정값이므로 호출자가 timeframe을 거른다. Returns `PullbackSnapshot \| null`. | `domain/signals/pullback.ts` |
 | `classifyPullback(aboveMa200, williamsR)` — 판독 분류만(경계: %R ≤ −90 washout, −90 < %R ≤ −80이고 MA200 위면 near). | `domain/signals/pullback.ts` |
 
+**타임프레임 분류 (2) — 양 entrypoint** — `Timeframe`이 일봉 이상인지 분·시간봉인지 가르는 술어. siglens의 stale 임계값·뉴스 룩백(브라우저 번들)과 에이전트 도구 실행기가 자기 사본 대신 쓴다. 둘 다 타입 가드이며 서로 정확한 여집합이다: `isDailyOrLonger(tf)`는 `tf is DailyOrLongerTimeframe`(`'1Day' | '1Week'`), `isIntraday(tf)`는 `tf is IntradayTimeframe`(`'5Min'`~`'4Hour'`)이고, false 분기는 반대쪽으로 좁혀진다(siglens `bucketWindowStart`가 이 좁힘에 기댄다). 두 타입은 내부 표에서 파생되어 표와 어긋나지 않으며 양 entrypoint에서 export한다(API-3). 내부 표가 `Record<Timeframe, boolean>`이라 `Timeframe`에 멤버가 늘면 컴파일이 막는다. 에이전트 전용 `'1Month'`는 `Timeframe`이 아니므로 분류하지 않는다 — 호출자가 따로 처리한다. **소비자 조치**: 없음(새 export). 자기 사본(`isDailyOrLongerTimeframe` 등)을 지우고 core에서 import한다.
+| Symbol | Source |
+|---|---|
+| `isDailyOrLonger(timeframe)` — 타입 가드(`DailyOrLongerTimeframe`). `'1Day'·`'1Week'`이면 `true`(봉이 시각이 아니라 날짜·주 단위), `5Min`~`4Hour`면 `false`. | `domain/constants/market.ts` |
+| `isIntraday(timeframe)` — 타입 가드(`IntradayTimeframe`). `5Min`~`4Hour`이면 `true`, `'1Day'`·`'1Week'`이면 `false`. `isDailyOrLonger`의 여집합. | `domain/constants/market.ts` |
+
 **Fear & Greed Index (per-stock) (7)**
 | Symbol | Source |
 |---|---|

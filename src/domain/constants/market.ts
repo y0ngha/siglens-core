@@ -20,17 +20,61 @@ export const TIMEFRAMES: readonly Timeframe[] = [
 ];
 
 /**
- * @internal `'1Day'` or `'1Week'`: bars are dated sessions or weeks rather than
- * clock times. Use this where `=== '1Day'` meant "not intraday"; keep
- * `=== '1Day'` only where the rule is measured on daily bars alone.
+ * Per-timeframe classification behind {@link isDailyOrLonger}. `satisfies`
+ * keeps it exhaustive (a new `Timeframe` member is a compile error here instead
+ * of silently falling into the intraday bucket) and `as const` keeps the literal
+ * values so {@link DailyOrLongerTimeframe} is derived from the table, not
+ * restated beside it.
  */
-export function isDailyOrLonger(timeframe: Timeframe): boolean {
-    return timeframe === '1Day' || timeframe === '1Week';
+const DAILY_OR_LONGER = {
+    '5Min': false,
+    '15Min': false,
+    '30Min': false,
+    '1Hour': false,
+    '4Hour': false,
+    '1Day': true,
+    '1Week': true,
+} as const satisfies Record<Timeframe, boolean>;
+
+/** Timeframes whose bars are dated sessions or weeks (`'1Day' | '1Week'`). */
+export type DailyOrLongerTimeframe = {
+    [K in Timeframe]: (typeof DAILY_OR_LONGER)[K] extends true ? K : never;
+}[Timeframe];
+
+/** Timeframes whose bars are clock times (`'5Min'` .. `'4Hour'`). */
+export type IntradayTimeframe = Exclude<Timeframe, DailyOrLongerTimeframe>;
+
+/**
+ * Whether bars of this timeframe are dated sessions or weeks (`'1Day'`,
+ * `'1Week'`) rather than clock times. Use it where `=== '1Day'` meant "not
+ * intraday"; keep `=== '1Day'` only where a rule is measured on daily bars
+ * alone. The agent-only `'1Month'` frame is not a `Timeframe`, so it is not
+ * classified here.
+ *
+ * @param timeframe - Analysis timeframe.
+ * @returns `true` (narrowing to {@link DailyOrLongerTimeframe}) for `'1Day'`
+ * and `'1Week'`; `false` (narrowing to {@link IntradayTimeframe}) for
+ * `5Min` .. `4Hour`.
+ */
+export function isDailyOrLonger(
+    timeframe: Timeframe
+): timeframe is DailyOrLongerTimeframe {
+    return DAILY_OR_LONGER[timeframe];
 }
 
-/** @internal Clock-time bars (`5Min` .. `4Hour`). */
-export function isIntraday(timeframe: Timeframe): boolean {
-    return !isDailyOrLonger(timeframe);
+/**
+ * Whether bars of this timeframe are clock-time bars (`5Min` .. `4Hour`): the
+ * exact complement of {@link isDailyOrLonger}.
+ *
+ * @param timeframe - Analysis timeframe.
+ * @returns `true` (narrowing to {@link IntradayTimeframe}) for `5Min` ..
+ * `4Hour`; `false` (narrowing to {@link DailyOrLongerTimeframe}) for `'1Day'`
+ * and `'1Week'`.
+ */
+export function isIntraday(
+    timeframe: Timeframe
+): timeframe is IntradayTimeframe {
+    return !DAILY_OR_LONGER[timeframe];
 }
 
 /** @internal */
