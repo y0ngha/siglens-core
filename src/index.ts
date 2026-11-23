@@ -341,6 +341,7 @@ export {
     measuredBaseRateFor,
     priceLevelFamilyBaseRateFor,
 } from './domain/analysis/measuredBaseRates';
+export { CANDLE_OUTCOME_BARS } from './domain/analysis/candleOutcomeBars';
 export type {
     BaseRateSubject,
     BaseRateVerdict,

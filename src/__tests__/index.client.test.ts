@@ -51,6 +51,7 @@ describe('browser public API exports', () => {
     it('exports the measured base rates and their lookup (WP-18 C4, API-1: both entrypoints)', () => {
         expect(typeof clientApi.measuredBaseRateFor).toBe('function');
         expect(clientApi.BASE_RATE_MIN_N).toBe(100);
+        expect(clientApi.CANDLE_OUTCOME_BARS).toBe(5);
         expect(clientApi.PRICE_LEVEL_BASE_RATE.subject).toBe('price_level');
         expect(Object.keys(clientApi.PRICE_LEVEL_FAMILY_BASE_RATES)).toContain(
             'fib'
