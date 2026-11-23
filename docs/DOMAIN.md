@@ -1380,6 +1380,15 @@ planState           종가가 플랜 진입 구간 어디에 있는가(`buildPla
                     모델이 보낸 `planState`·`reconciledLevels`는 버린다. 캐시 읽기는 유효한 값만 유지하고 멤버가
                     하나라도 잘못이면 통째로 버린다.
 
+가격대 알림 판정      `priceLevelAlert.ts`. 알림이 보는 레벨은 플랜 카드와 같은 규칙으로 읽는다(`alertablePlanLevels`): 구간은
+                    유한 양수 `entryPrices`의 최소·최대, 무효화 기준은 플랜이 읽는 유효 손절(`effectiveStopLoss`)이 구간
+                    하단 미만일 때만. 조건 판정은 `planState`·`planCheck`와 같은 경계 포함 비교(허용 오차 없음)다:
+                    구간 `from_above`는 `종가 ≤ 상단`, `from_below`는 `종가 ≥ 하단`(구간의 가까운 경계에 닿았거나 지나친 종가도 충족),
+                    `close_below`는 `종가 ≤ 레벨`, `close_above`는 `종가 ≥ 레벨`. `priceLevelStart`는 제안 시점
+                    종가로 조건을 정하고 이미 구간 안·레벨 통과면 알림을 만들지 않는다. `findPriceLevelTrigger`는 오래된
+                    봉부터 처음 채운 봉을 돌려준다(구간이면 종가의 구간 위치 `position`도). 유한하지 않거나 양수가 아닌 종가는
+                    건너뛴다. 시세·저장·날짜 창과 분할 감지는 호출자 몫이고 봉과 레벨은 같은 가격 기준이어야 한다.
+
 손절 하한            `reconciledLevels.stopLoss`: 모델 손절이 구간 하단−1 ATR 이하이고 구간 중앙−5 ATR 이상이면
                     유지(`model`), 아니면 그 구간의 가장 높은 인쇄된 지지선(`level`, 프롬프트가 찍은 가격
                     그대로), 없으면 하단−1.5 ATR(중앙−5 ATR보다 낮아지지 않게 제한, `atr`, KRX는 호가 단위 반올림이고

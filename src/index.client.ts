@@ -9,6 +9,16 @@
 // Tier 2 — Domain Building Blocks
 // =============================================================================
 
+// Price-level alert types only: the functions are server entrypoint only (see `src/index.ts`).
+export type {
+    AlertablePlanLevels,
+    PriceLevelCondition,
+    PriceLevelStart,
+    PriceLevelTarget,
+    PriceLevelTrigger,
+    PriceLevelZoneTrigger,
+} from './domain/analysis/priceLevelAlert';
+
 // Aggregate calculators / detectors
 export {
     calculateIchimokuFutureCloud,

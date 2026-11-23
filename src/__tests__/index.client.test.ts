@@ -502,4 +502,13 @@ describe('client entrypoint export presence (API-1)', () => {
     it.each(VALUE_EXPORTS)('exports %s as a defined value', name => {
         expect(exportsByName[name]).toBeDefined();
     });
+
+    it.each([
+        'alertablePlanLevels',
+        'priceLevelStart',
+        'isPriceLevelMet',
+        'findPriceLevelTrigger',
+    ])('does not export the server-only %s', name => {
+        expect(name in exportsByName).toBe(false);
+    });
 });
