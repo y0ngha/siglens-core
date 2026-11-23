@@ -333,7 +333,9 @@ export { filterAnalysisResult } from './domain/analysis/filterAnalysisResult';
 export {
     BASE_RATE_MIN_N,
     CANDLE_BASE_RATES,
+    CANDLE_POOLED_BASE_RATE,
     PATTERN_BASE_RATES,
+    PATTERN_POOLED_BASE_RATE,
     PRICE_LEVEL_BASE_RATE,
     PRICE_LEVEL_FAMILY_BASE_RATES,
     measuredBaseRateFor,
