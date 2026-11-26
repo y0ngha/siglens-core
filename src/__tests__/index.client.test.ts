@@ -368,6 +368,8 @@ describe('client entrypoint export presence (API-1)', () => {
     const exportsByName = clientApi as Record<string, unknown>;
 
     const FUNCTION_EXPORTS: readonly string[] = [
+        'isDailyOrLonger',
+        'isIntraday',
         'calculateIchimokuFutureCloud',
         'canonicalJson',
         'calculateIndicators',

@@ -47,6 +47,11 @@ export {
     summarizeExtremeZoneOutcomes,
 } from './domain/indicators';
 export { FEAR_GREED_LOOKBACK_DAYS } from './domain/constants/market';
+export { isDailyOrLonger, isIntraday } from './domain/constants/market';
+export type {
+    DailyOrLongerTimeframe,
+    IntradayTimeframe,
+} from './domain/constants/market';
 // Pure simple moving average, same implementation as the server entrypoint.
 export { calculateMA } from './domain/indicators/ma';
 export { classifyTrend, detectSignals } from './domain/signals';

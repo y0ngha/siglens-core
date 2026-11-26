@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, expectTypeOf } from 'vitest';
 import type { Timeframe } from '@/domain/types';
+import type {
+    DailyOrLongerTimeframe,
+    IntradayTimeframe,
+} from '@/domain/constants/market';
 import {
     DEFAULT_BARS_LIMIT,
     DEFAULT_TIMEFRAME,
@@ -124,6 +128,42 @@ describe('PROVIDER_TIMEFRAMES', () => {
 });
 
 describe('isDailyOrLonger / isIntraday', () => {
+    it('두 분기 모두 타입을 좁힌다', () => {
+        expectTypeOf<DailyOrLongerTimeframe>().toEqualTypeOf<
+            '1Day' | '1Week'
+        >();
+        expectTypeOf<IntradayTimeframe>().toEqualTypeOf<
+            '5Min' | '15Min' | '30Min' | '1Hour' | '4Hour'
+        >();
+        const tf = '1Day' as Timeframe;
+        if (isDailyOrLonger(tf)) {
+            expectTypeOf(tf).toEqualTypeOf<DailyOrLongerTimeframe>();
+        } else {
+            expectTypeOf(tf).toEqualTypeOf<IntradayTimeframe>();
+        }
+        if (isIntraday(tf)) {
+            expectTypeOf(tf).toEqualTypeOf<IntradayTimeframe>();
+        } else {
+            expectTypeOf(tf).toEqualTypeOf<DailyOrLongerTimeframe>();
+        }
+    });
+
+    it('모든 Timeframe 멤버를 정확히 하나로 분류한다 (서로 여집합)', () => {
+        const expected: Record<Timeframe, boolean> = {
+            '5Min': false,
+            '15Min': false,
+            '30Min': false,
+            '1Hour': false,
+            '4Hour': false,
+            '1Day': true,
+            '1Week': true,
+        };
+        for (const tf of TIMEFRAMES) {
+            expect(isDailyOrLonger(tf)).toBe(expected[tf]);
+            expect(isIntraday(tf)).toBe(!expected[tf]);
+        }
+    });
+
     it.each(['1Day', '1Week'] as const)("'%s'는 일봉 이상이다", tf => {
         expect(isDailyOrLonger(tf)).toBe(true);
         expect(isIntraday(tf)).toBe(false);

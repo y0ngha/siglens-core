@@ -150,6 +150,11 @@ export {
     summarizeExtremeZoneOutcomes,
 } from './domain/indicators';
 export { FEAR_GREED_LOOKBACK_DAYS } from './domain/constants/market';
+export { isDailyOrLonger, isIntraday } from './domain/constants/market';
+export type {
+    DailyOrLongerTimeframe,
+    IntradayTimeframe,
+} from './domain/constants/market';
 export { classifyTrend, detectSignals } from './domain/signals';
 export { detectNewConfirmedSignals } from './domain/signals/newSignals';
 export {

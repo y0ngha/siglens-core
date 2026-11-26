@@ -629,6 +629,8 @@ describe('package entrypoint export presence (API-1)', () => {
     const exportsByName = coreApi as Record<string, unknown>;
 
     const FUNCTION_EXPORTS: readonly string[] = [
+        'isDailyOrLonger',
+        'isIntraday',
         'alertablePlanLevels',
         'findPriceLevelTrigger',
         'isPriceLevelMet',
