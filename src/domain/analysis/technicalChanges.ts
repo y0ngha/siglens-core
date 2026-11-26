@@ -191,15 +191,14 @@ function planOf(raw: unknown): ActionRecommendation | null {
         levels === null
             ? undefined
             : asOptionalEnum(levels.stopBasis, STOP_BASES);
+    const stopLoss = asNumber(o.stopLoss);
     return {
         positionAnalysis: '',
         entry: '',
         exit: '',
         riskReward: '',
         entryPrices,
-        ...(asNumber(o.stopLoss) !== undefined
-            ? { stopLoss: asNumber(o.stopLoss) }
-            : {}),
+        ...(stopLoss !== undefined ? { stopLoss } : {}),
         takeProfitPrices,
         ...(levels !== null
             ? {
@@ -308,14 +307,11 @@ export function anchorBarIndexOf(
 
 function trendChange(
     bars: readonly Bar[],
-    fromIndex: number,
+    barsFrom: readonly Bar[],
     indicatorsFrom: IndicatorResult,
     indicatorsTo: IndicatorResult
 ): { readonly measured: boolean; readonly change: TechnicalChange | null } {
-    const from = computeAnalysisTrend(
-        bars.slice(0, fromIndex + 1),
-        indicatorsFrom
-    );
+    const from = computeAnalysisTrend(barsFrom, indicatorsFrom);
     const to = computeAnalysisTrend(bars, indicatorsTo);
     if (from === null || to === null) return { measured: false, change: null };
     if (from.trend === to.trend) return { measured: true, change: null };
@@ -525,7 +521,8 @@ export function technicalChangesBetween(
         return { ok: false, reason: 'invalid' };
     }
 
-    const indicatorsFrom = calculateIndicators(bars.slice(0, fromIndex + 1));
+    const barsFrom = bars.slice(0, fromIndex + 1);
+    const indicatorsFrom = calculateIndicators(barsFrom);
     const indicatorsTo = calculateIndicators(bars.slice());
     const plan =
         reference?.plan == null
@@ -537,7 +534,7 @@ export function technicalChangesBetween(
                   indicatorsFrom,
                   indicatorsTo
               );
-    const trend = trendChange(bars, fromIndex, indicatorsFrom, indicatorsTo);
+    const trend = trendChange(bars, barsFrom, indicatorsFrom, indicatorsTo);
     const signals = signalChanges(bars, fromIndex, signalTypes);
     const changes: TechnicalChange[] = [
         ...(plan === null ? [] : [plan]),

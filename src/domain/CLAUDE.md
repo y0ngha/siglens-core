@@ -417,8 +417,10 @@ date, say the data has no value yet and name the latest value; assert "no sessio
 "closed" only when the gap is provably so (a weekend directly after the last session, with
 no weekday in between). Input cleaning that drops rows (non-positive, NaN, duplicates)
 returns what it dropped, and downstream wording separates "row unusable" from "no row"
-instead of claiming the date had no trading; a "no events" result likewise carries what could not be evaluated, and measurement scripts do not count those cases as quiet. An attribution helper never assigns an input
-outside its window to an in-window bucket; it counts those separately.
+instead of claiming the date had no trading; a "no events" result likewise carries what
+could not be evaluated, and measurement scripts do not count those cases as quiet. An
+attribution helper never assigns an input outside its window to an in-window bucket; it
+counts those separately.
 
 <a id="DOM-13"></a>
 #### DOM-13 — A rendered comparison names its basis
