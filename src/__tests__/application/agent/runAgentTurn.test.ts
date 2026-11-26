@@ -2197,6 +2197,32 @@ describe('runAgentTurn toolSet', () => {
             { text: 'ok', toolCalls: [], stopReason: 'end', usage: USAGE },
         ]);
 
+    it('executor 계량: 쿼터 확인이 실패하면 경고 로그에 소비자가 정한 도구 이름이 찍힌다', async () => {
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const p = oneStep({ id: 's1', name: 'scan_web', args: { q: 'x' } });
+        const d = deps(p, {
+            webSearchMetering: 'executor',
+            executeTool: vi.fn(
+                async (
+                    _name: string,
+                    _args: Record<string, unknown>,
+                    ctx: ToolExecutionContext
+                ) => ({ claim: await ctx.claimWebSearchUnit?.() })
+            ),
+            globalLimits: { webSearchPerDay: 7, webSearchPerMonth: 70 },
+        });
+        // An outage (CounterStoreUnavailableError) is silent by design; any other
+        // failure is the one that logs.
+        d.counters.webSearchGlobalDay.consume = async () => {
+            throw new Error('boom');
+        };
+        await runAgentTurn(customParams(), d);
+        expect(warn).toHaveBeenCalledWith(
+            '[runAgentTurn] tool quota check failed',
+            expect.objectContaining({ name: 'scan_web' })
+        );
+    });
+
     it('제공자에는 묶음의 도구만, 부가 필드 없이 정의한 키 순서대로 간다', async () => {
         const p = scriptedProvider([
             { text: 'hi', toolCalls: [], stopReason: 'end', usage: USAGE },

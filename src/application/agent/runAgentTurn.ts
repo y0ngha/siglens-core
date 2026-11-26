@@ -566,7 +566,9 @@ export async function runAgentTurn(
      * request may already have been billed). The first call decides; later
      * calls replay its result so a retrying executor cannot charge twice.
      */
-    const createWebSearchClaim = (): (() => Promise<WebSearchClaim>) => {
+    const createWebSearchClaim = (
+        toolName: string
+    ): (() => Promise<WebSearchClaim>) => {
         let decided: Promise<WebSearchClaim> | undefined;
         const decide = async (): Promise<WebSearchClaim> => {
             if (turnSignal.aborted) {
@@ -617,9 +619,10 @@ export async function runAgentTurn(
                 return { ok: true };
             } catch (error) {
                 if (!(error instanceof CounterStoreUnavailableError)) {
-                    // Log-only label: this closure exists for metered (web search) calls.
+                    // The consumer's own name for its `meter: 'webSearch'` tool,
+                    // not a hard-coded 'web_search'.
                     console.warn('[runAgentTurn] tool quota check failed', {
-                        name: 'web_search',
+                        name: toolName,
                         error,
                     });
                 }
@@ -682,7 +685,11 @@ export async function runAgentTurn(
                         locale: params.locale,
                         signal: turnSignal,
                         ...(executorMetering && metered
-                            ? { claimWebSearchUnit: createWebSearchClaim() }
+                            ? {
+                                  claimWebSearchUnit: createWebSearchClaim(
+                                      call.name
+                                  ),
+                              }
                             : {}),
                     }),
                     turnSignal
