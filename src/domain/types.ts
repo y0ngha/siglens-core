@@ -99,6 +99,14 @@ export type MarketSessionSpec =
            * hours after the 13:00 bell.
            */
           closeMinuteFor?: (now: Date) => number;
+          /**
+           * Optional exchange calendar: per-day open override, for days the
+           * exchange opens late (KRX on the first trading day of the year and on
+           * the college-entrance-exam day open at 10:00). Returns the open minute
+           * for the local calendar day containing the instant. Omit it and every
+           * day opens at `openMinute`.
+           */
+          openMinuteFor?: (now: Date) => number;
       };
 
 /** Definition of a market index tracked by the dashboard. */
