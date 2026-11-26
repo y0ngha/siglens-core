@@ -34,6 +34,19 @@ export const US_EQUITY_SESSION: MarketSessionSpec = {
 export const CRYPTO_SESSION: MarketSessionSpec = { kind: 'always-open' };
 
 /**
+ * @internal The open minute that applies on the local day containing `now`:
+ * the spec's `openMinuteFor` override (delayed-open days) or its plain
+ * `openMinute`. Every open-boundary read goes through here so a delayed open
+ * cannot be honoured in one place and ignored in another.
+ */
+export function sessionOpenMinute(
+    spec: Extract<MarketSessionSpec, { kind: 'scheduled' }>,
+    now: Date
+): number {
+    return spec.openMinuteFor?.(now) ?? spec.openMinute;
+}
+
+/**
  * Field options shared by every zone's formatter — weekday, calendar date and
  * clock, all of which {@link localSessionParts} reads.
  */
@@ -159,7 +172,10 @@ export function getSessionStatus(
     // 거래소 캘린더가 있으면 그날의 실제 마감이 스펙의 기본 마감을 이긴다.
     // `0`은 휴장 — 어떤 시각도 개장 구간에 들지 않는다.
     const closeMinute = spec.closeMinuteFor?.(now) ?? spec.closeMinute;
-    if (spec.openMinute <= minutesOfDay && minutesOfDay < closeMinute) {
+    if (
+        sessionOpenMinute(spec, now) <= minutesOfDay &&
+        minutesOfDay < closeMinute
+    ) {
         return 'open';
     }
     return 'closed';
@@ -260,7 +276,7 @@ export function nextRegularSessionBoundaryMs(
         const closeMinute = spec.closeMinuteFor?.(probe) ?? spec.closeMinute;
         if (closeMinute <= 0) continue;
         const boundaryMinute =
-            boundary === 'open' ? spec.openMinute : closeMinute;
+            boundary === 'open' ? sessionOpenMinute(spec, probe) : closeMinute;
         const atMs = localWallClockToUtcMs(
             day.year,
             day.month,
@@ -307,7 +323,7 @@ export function previousRegularSessionBoundaryMs(
         const closeMinute = spec.closeMinuteFor?.(probe) ?? spec.closeMinute;
         if (closeMinute <= 0) continue;
         const boundaryMinute =
-            boundary === 'open' ? spec.openMinute : closeMinute;
+            boundary === 'open' ? sessionOpenMinute(spec, probe) : closeMinute;
         const atMs = localWallClockToUtcMs(
             day.year,
             day.month,

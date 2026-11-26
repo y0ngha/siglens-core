@@ -75,8 +75,8 @@ export interface AgentTurnContextInput {
     etSessionStatus?: EtSessionStatus;
     /**
      * The Korean exchange's session (KRX hours and holiday list). Core has no
-     * KRX spec — the holiday list is hand-kept by the consumer — so the
-     * consumer passes it; a `scheduled` spec adds the KRX line to the note.
+     * KRX calendar: the consumer composes the per-date open and close minutes
+     * (`openMinuteFor`, `closeMinuteFor`) into the spec and passes it; a `scheduled` spec adds the KRX line to the note.
      * Omitted or `always-open`: no KRX line.
      */
     krSession?: MarketSessionSpec;

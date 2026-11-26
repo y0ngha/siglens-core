@@ -59,8 +59,9 @@ export interface RunAgentTurnParams {
     portfolioSymbols?: readonly string[];
     /**
      * The Korean exchange's session spec (hours and holiday list), for the KRX
-     * line of the turn note. Core carries no KRX calendar, so the consumer
-     * passes it; omitted, the note has no KRX line.
+     * line of the turn note. Core carries no KRX calendar: the consumer composes
+     * the per-date open and close minutes into the spec (`openMinuteFor`,
+     * `closeMinuteFor`) and passes it; omitted, the note has no KRX line.
      */
     krSession?: MarketSessionSpec;
     /** Injectable clock for tests; defaults to `new Date()`. */

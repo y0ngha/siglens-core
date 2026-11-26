@@ -659,7 +659,7 @@ use-case option/result 타입 (모두 `src/index.ts`에서 export. `src/index.cl
 
 **`MarketSessionStatus` (Tier 4)** — `EtSessionStatus`의 의미 중립적 별칭(`type MarketSessionStatus = EtSessionStatus`). `getSessionStatus`의 반환 타입으로 사용되며, spec-driven generic 세션 함수의 소비자가 보다 중립적인 이름으로 타입을 참조할 수 있다. (`isRegularSessionOpen`은 `boolean`을 반환하므로 이 타입을 사용하지 않는다.) `EtSessionStatus`도 계속 export된다. `src/index.ts`, `src/index.client.ts` 양 진입점에서 export.
 
-**시장 세션 스펙/상수** — `MarketSessionSpec` (discriminated union: `{ kind: 'always-open' }` | `{ kind: 'scheduled'; timeZone; openMinute; closeMinute; weekendDays: readonly number[] }`), `US_EQUITY_SESSION` (NYSE 09:30–16:00 ET Mon–Fri 기본값), `CRYPTO_SESSION` (24/7 always-open 기본값). `MarketSessionSpec` 타입 정의는 `domain/types.ts`, 값 상수 `US_EQUITY_SESSION`/`CRYPTO_SESSION`은 `domain/session.ts`. `dst` 필드는 `Intl.DateTimeFormat` IANA zone이 DST를 자동 처리하므로 포함되지 않는다.
+**시장 세션 스펙/상수** — `MarketSessionSpec` (discriminated union: `{ kind: 'always-open' }` | `{ kind: 'scheduled'; timeZone; openMinute; closeMinute; weekendDays: readonly number[]; closeMinuteFor?: (now: Date) => number; openMinuteFor?: (now: Date) => number }`), `US_EQUITY_SESSION` (NYSE 09:30–16:00 ET Mon–Fri 기본값), `CRYPTO_SESSION` (24/7 always-open 기본값). `MarketSessionSpec` 타입 정의는 `domain/types.ts`, 값 상수 `US_EQUITY_SESSION`/`CRYPTO_SESSION`은 `domain/session.ts`. `dst` 필드는 `Intl.DateTimeFormat` IANA zone이 DST를 자동 처리하므로 포함되지 않는다.
 
 **자산 클래스** — `AssetClass` (`'equity' \| 'crypto'`) — `domain/types.ts`, `index.client.ts`에도 노출. `buildChatPrompt` 8번째 인자(`assetClass?: AssetClass`)와 `SubmitAnalysisOptions`(`runAnalysis`)·`OverallDependencyInputs`(`runOverallAnalysis`)·`SubmitNewsAnalysisOptions`(`runNewsAnalysis`)의 `assetClass?: AssetClass` 선택적 필드가 이 타입을 사용한다.
 

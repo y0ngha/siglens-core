@@ -8,6 +8,7 @@ import {
     getSessionStatus,
     localSessionParts,
     nextRegularSessionBoundaryMs,
+    sessionOpenMinute,
 } from '@/domain/session';
 import type { MarketSessionSpec } from '@/domain/types';
 import { timeZoneLabel } from './userTimeZone';
@@ -140,7 +141,7 @@ function closedState(
     if (!tradingDay) return 'closed';
     if (
         minutesOfDay >= US_PRE_MARKET_OPEN_MINUTE &&
-        minutesOfDay < spec.openMinute
+        minutesOfDay < sessionOpenMinute(spec, now)
     )
         return 'pre-market hours';
     if (
