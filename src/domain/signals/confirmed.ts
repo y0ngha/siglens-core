@@ -273,7 +273,14 @@ export function detectBollingerLowerBounce(
     };
 }
 
-/** @internal Detects a close above the upper Bollinger band (bearish confirmed signal). */
+/**
+ * @internal Detects a close above the upper Bollinger band (bearish confirmed signal).
+ *
+ * A state, not a crossing: it checks only the last bar (`close > upper`, no previous-bar test),
+ * so it fires on every bar the close stays above the band. The Keltner and Ichimoku breakouts
+ * fire only on the bar that crosses. The measured base rate (`measuredSignalBaseRates`) comes
+ * from this rule, so do not add a crossing test without re-measuring it.
+ */
 export function detectBollingerUpperBreakout(
     bars: Bar[],
     indicators: IndicatorResult

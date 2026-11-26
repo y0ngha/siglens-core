@@ -789,6 +789,39 @@ describe('detectBollingerUpperBreakout', () => {
         });
     });
 
+    describe('직전 봉도 이미 upper 위였을 때', () => {
+        it('교차가 아니어도 Signal을 반환한다(상태형)', () => {
+            const points: BollingerResult[] = [
+                { upper: 108, middle: 100, lower: 92 },
+                { upper: 110, middle: 101, lower: 92 },
+            ];
+            const bars: Bar[] = [
+                {
+                    time: 1,
+                    open: 107,
+                    high: 112,
+                    low: 106,
+                    close: 111,
+                    volume: 100,
+                },
+                {
+                    time: 2,
+                    open: 111,
+                    high: 114,
+                    low: 110,
+                    close: 113,
+                    volume: 100,
+                },
+            ];
+            const result = detectBollingerUpperBreakout(
+                bars,
+                withBollinger(points)
+            );
+            expect(result?.type).toBe('bollinger_upper_breakout');
+            expect(result?.detectedAt).toBe(1);
+        });
+    });
+
     describe('현봉 close가 upper 이하일 때', () => {
         it('null을 반환한다', () => {
             const points: BollingerResult[] = [
