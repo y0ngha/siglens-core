@@ -573,6 +573,7 @@ describe('public API exports', () => {
                 basis: 'same_length_drift',
                 n: 1,
                 meanPct: 0,
+                baselineMeanPct: 0,
                 ci95: { low: -1, high: 1 },
                 clusters: 'week',
             },

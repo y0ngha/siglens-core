@@ -923,6 +923,8 @@ export function computeBenchmarks(input: BenchmarkInput): BenchmarkResult {
             basis: 'same_length_drift',
             n: trades.length,
             meanPct: excess.mean,
+            baselineMeanPct:
+                mean(perTrade.map(r => r.sameLengthDriftPct)) ?? Number.NaN,
             ci95: { low: excess.low, high: excess.high },
             clusters: 'week',
         },
