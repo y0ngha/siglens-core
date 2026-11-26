@@ -84,20 +84,20 @@ function omitTurnToolResults(
     turn: readonly AgentMessage[],
     keep: HistoryWindowOptions['keepSmallToolResults']
 ): AgentMessage[] {
-    let keptChars = 0;
-    return turn.map(m => {
-        if (m.role !== 'tool') return m;
-        const size = m.content.length;
-        if (
-            keep &&
-            size <= keep.maxChars &&
-            keptChars + size <= keep.perTurnChars
-        ) {
-            keptChars += size;
-            return m;
-        }
-        return omitToolResult(m);
-    });
+    return turn.reduce<{ keptChars: number; rows: AgentMessage[] }>(
+        (acc, m) => {
+            if (m.role !== 'tool') return { ...acc, rows: [...acc.rows, m] };
+            const size = m.content.length;
+            const fits =
+                keep !== undefined &&
+                size <= keep.maxChars &&
+                acc.keptChars + size <= keep.perTurnChars;
+            return fits
+                ? { keptChars: acc.keptChars + size, rows: [...acc.rows, m] }
+                : { ...acc, rows: [...acc.rows, omitToolResult(m)] };
+        },
+        { keptChars: 0, rows: [] }
+    ).rows;
 }
 
 function omitToolResult(m: AgentMessage): AgentMessage {
