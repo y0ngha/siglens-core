@@ -4,6 +4,7 @@ import {
     MAX_TOKENS_CODE,
     callClaude,
 } from '@/infrastructure/ai/providers/anthropic';
+import { classifyError } from '@/infrastructure/ai/retry/withRetry';
 import { MODEL_SPECS } from '@/domain/analysis/modelSpecs';
 import type { ClaudeModelId } from '@/domain/analysis/modelSpecs';
 
@@ -411,6 +412,58 @@ describe('callClaude', () => {
 
         await expect(promise).rejects.toThrow(/refused/);
         await expect(promise).rejects.not.toMatchObject({ retryable: true });
+    });
+
+    it('classifies a refusal as non-retryable so withRetry never repeats it', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({ stop_reason: 'refusal', content: [] })
+        );
+
+        const error = await callClaude('prompt', {
+            model: MODEL_WITH_EFFORT,
+            apiKey: 'key',
+        }).catch((e: unknown) => e);
+
+        expect(classifyError(error)).toBe('none');
+        expect(error).not.toHaveProperty('code');
+        expect(mockStream).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses even when the refusal carries a text block', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'refusal',
+                content: [{ type: 'text', text: 'I cannot help with that.' }],
+            })
+        );
+
+        await expect(
+            callClaude('prompt', { model: MODEL_WITH_EFFORT, apiKey: 'key' })
+        ).rejects.toThrow(/refused/);
+    });
+
+    it('refuses instead of returning a tool_use input when stop_reason is refusal (structured output)', async () => {
+        mockStream.mockReturnValueOnce(
+            makeStream({
+                stop_reason: 'refusal',
+                content: [
+                    {
+                        type: 'tool_use',
+                        id: 'tu_refused',
+                        name: 'structured_analysis',
+                        input: { sentiment: 'bullish' },
+                    },
+                ],
+            })
+        );
+
+        await expect(
+            callClaude('prompt', {
+                model: MODEL_WITHOUT_THINKING,
+                apiKey: 'key',
+                responseSchema: { type: 'object' },
+            })
+        ).rejects.toThrow(/refused/);
     });
 
     it('throws retryable error for unexpected stop_reason', async () => {

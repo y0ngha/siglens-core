@@ -80,6 +80,9 @@ function valuesOf(
  * `reconciledLevels`, `planCheck`, and the pattern-target `keyPrices` the domain appends
  * come from arithmetic, not from the model reading the prompt. Non-finite and
  * non-positive values are skipped here — the plan invariants own those.
+ *
+ * A stored or hand-edited result can lack `priceTargets` (or one scenario, `keyLevels`,
+ * `patternSummaries`); the missing part simply contributes no values instead of throwing.
  */
 function collectCheckedValues(
     result: AnalysisResponse
@@ -93,25 +96,25 @@ function collectCheckedValues(
         ...valuesOf(
             'other',
             'keyLevels.support',
-            keyLevels.support.map(level => level.price)
+            (keyLevels?.support ?? []).map(level => level.price)
         ),
         ...valuesOf(
             'other',
             'keyLevels.resistance',
-            keyLevels.resistance.map(level => level.price)
+            (keyLevels?.resistance ?? []).map(level => level.price)
         ),
-        ...valuesOf('other', 'keyLevels.poc', [keyLevels.poc?.price]),
+        ...valuesOf('other', 'keyLevels.poc', [keyLevels?.poc?.price]),
         ...valuesOf(
             'other',
             'priceTargets',
-            [priceTargets.bullish, priceTargets.bearish].flatMap(
-                scenario => scenario?.targets.map(target => target.price) ?? []
+            [priceTargets?.bullish, priceTargets?.bearish].flatMap(
+                scenario => scenario?.targets?.map(target => target.price) ?? []
             )
         ),
         ...valuesOf(
             'other',
             'patternGeometry',
-            patternSummaries.flatMap(pattern => [
+            (patternSummaries ?? []).flatMap(pattern => [
                 pattern.geometry?.breakoutLevel,
                 pattern.geometry?.extremeLevel,
                 pattern.geometry?.invalidationLevel,
@@ -120,7 +123,7 @@ function collectCheckedValues(
         ...valuesOf(
             'keyPrices',
             'keyPrices',
-            patternSummaries.flatMap(pattern =>
+            (patternSummaries ?? []).flatMap(pattern =>
                 (pattern.keyPrices ?? [])
                     .filter(keyPrice => !isPatternTargetLabel(keyPrice.label))
                     .map(keyPrice => keyPrice.price)

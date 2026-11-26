@@ -57,9 +57,11 @@ export function periodBaselinePct(
 }
 
 /**
- * The provenance check of one result against one prompt. A result too malformed for the
- * check to read (a stored analysis always has the full shape, so this is a corrupt file)
- * has no provenance rather than failing the whole labelling run.
+ * The provenance check of one result against one prompt. A result missing `priceTargets`,
+ * one scenario, `keyLevels` or `patternSummaries` is still read (the missing part adds no
+ * values). A result whose fields have the wrong type (e.g. a non-array `keyLevels.support`)
+ * is a corrupt file the check cannot read: it has no provenance (`null`) rather than
+ * failing the whole labelling run.
  */
 function safeProvenance(
     promptDynamic: string,
@@ -194,9 +196,11 @@ export function buildLabelRow(input: LabelInput): LabelRow {
         profile.krxTickTable
     ).dp;
     // The stored result came from `runAnalysis` and has its full shape, but a corrupt or
-    // hand-edited file can be malformed: `checkPriceProvenance` and `checkPlanInvariants`
-    // then throw. `safeProvenance` and `safeInvariants` catch that and report nothing for
-    // such a result.
+    // hand-edited file can be malformed. Missing `priceTargets`/`keyLevels`/
+    // `patternSummaries` no longer throw in `checkPriceProvenance` (they just add no
+    // values), but wrong types (e.g. a non-array `keyLevels.support`) still do, as can
+    // `checkPlanInvariants`. `safeProvenance` and `safeInvariants` catch that and report
+    // nothing for such a result.
     const analysis = result.unfilteredResult as AnalysisResponse;
     const provenanceOf = (prompt: string | null): ProvenanceSummary | null =>
         prompt === null

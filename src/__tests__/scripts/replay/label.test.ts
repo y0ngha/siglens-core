@@ -412,21 +412,38 @@ describe('replay labelling', () => {
             );
         });
 
-        it('has no provenance for a result too malformed for the check, and still labels it', () => {
+        it('still reads the provenance of a result without priceTargets, and labels it', () => {
             const stored = usBars();
             const c = caseAt(stored, ANCHOR_INDEX);
-            const { priceTargets: _dropped, ...malformed } = analysis(
+            const targets = {
+                bullish: { targets: [{ price: 110, basis: '' }] },
+                bearish: { targets: [] },
+            };
+            const rowOf = (result: Record<string, unknown>) =>
+                buildLabelRow({
+                    case: c,
+                    result: resultFile(c, result),
+                    stored,
+                    controlPrompt: 'other',
+                });
+            const kept = rowOf(
+                analysis(stored, ANCHOR_INDEX, { priceTargets: targets })
+            );
+            const { priceTargets: _dropped, ...withoutTargets } = analysis(
                 stored,
                 ANCHOR_INDEX
             );
-            const row = buildLabelRow({
-                case: c,
-                result: resultFile(c, malformed),
-                stored,
-                controlPrompt: 'other',
-            });
-            expect(row.provenance).toBeNull();
-            expect(row.provenanceControl).toBeNull();
+            const row = rowOf(withoutTargets);
+            expect(row.provenance?.checked.plan).toBeGreaterThan(0);
+            expect(row.provenance?.checked.plan).toBe(
+                kept.provenance?.checked.plan
+            );
+            expect(row.provenanceControl?.checked).toEqual(
+                row.provenance?.checked
+            );
+            expect(row.provenance?.checked.other).toBe(
+                (kept.provenance?.checked.other ?? 0) - 1
+            );
             expect(row.status).toBe('labelled');
         });
 

@@ -303,6 +303,21 @@ export async function callClaude(
             });
         }
 
+        // A refusal can arrive with HTTP 200 and still carry content (a partial text or even
+        // a tool_use block). That content is not an analysis, so the refusal is decided
+        // before any extraction below: a plain Error (no `retryable`, no `code`) so
+        // `withRetry` classifies it as `none` — the same policy as Gemini SAFETY and
+        // OpenAI/DeepSeek content_filter. Retrying a policy refusal only repeats it.
+        if (stopReason === 'refusal') {
+            console.error('[Claude] Response refused by safety policy', {
+                model,
+                stopReason,
+            });
+            throw new Error(
+                `Claude refused response (stop_reason: ${stopReason})`
+            );
+        }
+
         // structuredOutput: tool을 호출한 응답은 stop_reason === 'tool_use'.
         // tool_use 블록의 input을 JSON 문자열로 직렬화해 반환한다 (downstream 계약은 JSON string).
         if (structuredOutput) {
@@ -335,7 +350,7 @@ export async function callClaude(
         }
 
         // structuredOutput 폴백: tool_use 블록이 없을 때만 도달 — text 추출을 시도한다.
-        // max_tokens/refusal 등은 아래 전용 분기에서 처리하도록 stop_reason으로 가드한다.
+        // refusal은 위에서 이미 먼저 던졌고, max_tokens는 아래 전용 분기에서 처리하므로 stop_reason으로 가드한다.
         if (
             stopReason === 'end_turn' ||
             (structuredOutput && stopReason === 'tool_use')
@@ -368,16 +383,6 @@ export async function callClaude(
             throw Object.assign(
                 new Error(`Claude hit output token limit (model: ${model})`),
                 { code: MAX_TOKENS_CODE }
-            );
-        }
-
-        if (stopReason === 'refusal') {
-            console.error('[Claude] Response refused by safety policy', {
-                model,
-                stopReason,
-            });
-            throw new Error(
-                `Claude refused response (stop_reason: ${stopReason})`
             );
         }
 
