@@ -538,3 +538,59 @@ describe('checkPriceProvenance — KRW prompt built by buildAnalysisPrompt', () 
         ]);
     });
 });
+
+describe('checkPriceProvenance — missing optional sub-objects', () => {
+    const scenario = (price: number) => ({
+        condition: '',
+        targets: [{ price, basis: '' }],
+    });
+    const withoutField = (field: keyof AnalysisResponse): AnalysisResponse => {
+        const { [field]: _omitted, ...rest } = analysis();
+        return rest as AnalysisResponse;
+    };
+
+    it('skips the target checks when priceTargets is absent', () => {
+        const report = check(withoutField('priceTargets'));
+        expect(report.checked).toEqual({ plan: 0, other: 0, keyPrices: 0 });
+        expect(report.other).toEqual([]);
+    });
+
+    it('checks only the bullish scenario when bearish is absent', () => {
+        const partial = {
+            ...analysis(),
+            priceTargets: { bullish: scenario(44.44) },
+        } as unknown as AnalysisResponse;
+        const report = check(partial);
+        expect(report.checked.other).toBe(1);
+        expect(report.other).toEqual([{ field: 'priceTargets', value: 44.44 }]);
+    });
+
+    it('checks only the bearish scenario when bullish is absent', () => {
+        const partial = {
+            ...analysis(),
+            priceTargets: { bearish: scenario(201.36) },
+        } as unknown as AnalysisResponse;
+        const report = check(partial);
+        expect(report.checked.other).toBe(1);
+        expect(report.other).toEqual([]);
+    });
+
+    it('skips a scenario without a targets list', () => {
+        const partial = {
+            ...analysis(),
+            priceTargets: { bullish: { condition: '' }, bearish: null },
+        } as unknown as AnalysisResponse;
+        expect(check(partial).checked.other).toBe(0);
+    });
+
+    it('still checks the other fields when keyLevels and patternSummaries are absent', () => {
+        const partial = {
+            ...withoutField('keyLevels'),
+            patternSummaries: undefined,
+            actionRecommendation: recommendation({ stopLoss: 190 }),
+        } as unknown as AnalysisResponse;
+        const report = check(partial);
+        expect(report.checked).toEqual({ plan: 1, other: 0, keyPrices: 0 });
+        expect(report.plan).toEqual([]);
+    });
+});
