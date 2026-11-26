@@ -44,6 +44,7 @@ function utcDayMs(value: Date | string): number {
  * @param earningsDates - `YYYY-MM-DD` report dates of this company, past and upcoming.
  *   An empty list means "calendar unknown" to the callers that gate on it (see
  *   {@link eventCategoryLabel}); this function itself returns `false` for it.
+ * @returns `true` when the event falls inside the window around one of the report dates.
  */
 export function isCompanyEarningsEvent(
     eventDate: Date | string,

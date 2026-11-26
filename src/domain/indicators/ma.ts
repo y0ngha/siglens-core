@@ -1,6 +1,12 @@
 import type { Bar } from '@/domain/types';
 
-/** Simple moving average of bar closes for a given period. */
+/**
+ * Simple moving average of bar closes for a given period.
+ *
+ * @param bars - Bars oldest-first.
+ * @param period - Number of closes averaged.
+ * @returns One value per bar, `null` until `period` closes exist; `[]` for no bars or `period <= 0`.
+ */
 export function calculateMA(bars: Bar[], period: number): (number | null)[] {
     if (bars.length === 0 || period <= 0) return [];
 

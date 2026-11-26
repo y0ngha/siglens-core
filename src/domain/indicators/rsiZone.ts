@@ -13,6 +13,9 @@ export type RsiZone = 'overbought' | 'neutral' | 'oversold';
  *
  * Expects a finite RSI (0–100): `NaN` fails both comparisons and reads as
  * `'neutral'`, so callers with a possibly-missing value check it first.
+ *
+ * @param rsi - A finite RSI value (0-100).
+ * @returns `'overbought'`, `'oversold'` or `'neutral'`.
  */
 export function rsiZone(rsi: number): RsiZone {
     if (rsi >= RSI_OVERBOUGHT_LEVEL) return 'overbought';

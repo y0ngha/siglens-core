@@ -1764,6 +1764,10 @@ export const MEASURED_SIGNAL_BASE_RATES: Readonly<
 /**
  * The measured record of a confirmed signal type; `null` off daily bars (nothing was
  * measured there) and for a type without an entry.
+ *
+ * @param type - Confirmed signal type name.
+ * @param timeframe - Bar timeframe of the detection.
+ * @returns The measured record, or `null`.
  */
 export function measuredSignalBaseRateFor(
     type: string,

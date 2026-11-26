@@ -60,7 +60,16 @@ export function calculateIchimoku(
     });
 }
 
-// Returns senkou A/B for displacement bars into the future per standard Ichimoku spec.
+/**
+ * Ichimoku cloud (senkou A/B) projected `displacement` bars into the future, per the standard Ichimoku spec. An empty `bars` gives `[]`.
+ *
+ * @param bars - Bars oldest-first.
+ * @param conversionPeriod - Tenkan-sen (conversion line) period.
+ * @param basePeriod - Kijun-sen (base line) period.
+ * @param spanBPeriod - Senkou span B period.
+ * @param displacement - How many bars ahead the cloud is projected.
+ * @returns The future cloud points, one per displaced bar.
+ */
 export function calculateIchimokuFutureCloud(
     bars: Bar[],
     conversionPeriod = ICHIMOKU_CONVERSION_PERIOD,

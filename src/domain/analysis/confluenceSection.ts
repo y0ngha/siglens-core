@@ -319,6 +319,9 @@ export function newsDrivenWashoutEvent(
  * company event landed within the last sessions, or `null` when none did. Uses the
  * same gate as the analysis prompt's suspended washout verdict, so the agent tool
  * and the analysis agree on when the sell-off base rate does not apply.
+ *
+ * @param input - Market events, the company's report dates and the daily bars.
+ * @returns The caveat text, or `null` when no event is within the gate.
  */
 export function pullbackEventCaveat(
     input: PullbackEventCaveatInput

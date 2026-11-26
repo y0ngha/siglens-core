@@ -323,6 +323,9 @@ function assertRowUsable(row: OutcomeRecordRow): void {
  *
  * Throws `RangeError` on a non-finite `seed`, `anchorBarTime` or `generatedAtMs`.
  *
+ * @param rows - Labelled analysis rows.
+ * @param opts - `seed` for the bootstrap; must be finite.
+ * @returns The live record summary.
  * @see OutcomeRecordSummary Shares only: no return figure exists on it.
  */
 export function summarizeOutcomeRecord(

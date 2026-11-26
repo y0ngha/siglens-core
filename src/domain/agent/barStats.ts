@@ -134,6 +134,7 @@ function extremeOf(
  * @param window - Bars oldest-first (any length).
  * @param lastClose - The close the distances are measured from; `null` or a
  *   non-finite value makes every `fromLastCloseRatio` `null`.
+ * @returns The window's high/low and close high/low with the bar each was set on and the last close's distance from each.
  */
 export function computeBarRangeStats(
     window: OrderedBars,
@@ -222,6 +223,8 @@ function directionOf(sign: number): CloseStreakDirection {
  * consecutive closes and does not look at bar spacing.
  *
  * @param bars - Bars oldest-first.
+ * @param options - Whether to drop the still-forming last bar before counting.
+ * @returns The streak ending at the last completed bar, or `null` when it cannot be measured.
  */
 export function computeCloseStreak(
     bars: OrderedBars,
@@ -269,6 +272,7 @@ export const LONG_TERM_MA_CROSS = {
  * window: an empty `crosses` then does NOT mean "no cross in a year".
  *
  * @param bars - Bars oldest-first.
+ * @returns The crossings and whether the history was long enough to check the whole window.
  */
 export function scanLongTermMaCrosses(bars: OrderedBars): MaCrossScan {
     return findMaCrosses(
@@ -350,6 +354,8 @@ function distancesFromLast(
  * @param bars - Bars oldest-first.
  * @param indicators - Indicator series aligned to `bars` (`IndicatorResult`
  *   fits).
+ * @param options - Bars back per change key and whether the last bar is a partial period.
+ * @returns The last bar's changes, volume ratio, ATR ratio and moving-average distances.
  */
 export function computeBarChangeStats<K extends string>(
     bars: OrderedBars,
@@ -452,7 +458,10 @@ export interface EarningsReactionOptions {
  * COMPLETED session on both sides of it (too old for the series, or no
  * finished session after it yet).
  *
+ * @param bars - Daily bars oldest-first, `time` at UTC midnight.
  * @param reportedDates - `YYYY-MM-DD` strings, any order.
+ * @param options - Whether to leave out the last bar, and how many of the newest report dates to return.
+ * @returns The reactions, newest report date first.
  */
 export function computeEarningsReactions(
     bars: OrderedBars,

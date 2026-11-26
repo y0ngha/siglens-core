@@ -19,6 +19,9 @@ const RATE_DECISION_PATTERN = /interest rate decision/i;
  * A central-bank policy-rate decision row. FMP names the US one
  * `'Fed Interest Rate Decision'` and the Bank of Korea one plain
  * `'Interest Rate Decision'`; both match.
+ *
+ * @param event - An economic-calendar event.
+ * @returns `true` for a central-bank policy-rate decision.
  */
 export function isRateDecisionEvent(event: EconomicCalendarEvent): boolean {
     return RATE_DECISION_PATTERN.test(event.event);
@@ -49,6 +52,10 @@ function byTime(a: EconomicCalendarEvent, b: EconomicCalendarEvent): number {
  * (rig count, CFTC positions) fill every slot on an ordinary week, so an FOMC
  * decision days away never reached the model. `omitted` lets the reader say a
  * date is incomplete rather than empty.
+ *
+ * @param events - Candidate calendar events.
+ * @param options - `max` events to keep and an optional `notBefore` cut-off.
+ * @returns The selected events and, per impact, how many eligible events were omitted.
  */
 export function selectCalendarEvents(
     events: readonly EconomicCalendarEvent[],

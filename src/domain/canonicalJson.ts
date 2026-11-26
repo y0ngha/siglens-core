@@ -17,6 +17,9 @@
  * - `-0` is written `0` (as stringify does), so two values equal under `===` share a text.
  * - An object property whose value is `undefined` is dropped; an `undefined` array element
  *   is written `null` (both as stringify does).
+ *
+ * @param value - Plain JSON data (objects, arrays, strings, finite numbers, booleans, `null`).
+ * @returns The canonical JSON text.
  */
 export function canonicalJson(value: unknown): string {
     return write(value, new Set());

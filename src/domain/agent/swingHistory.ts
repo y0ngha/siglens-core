@@ -725,6 +725,10 @@ function windowHigh(rows: readonly MarketDailyClose[]): WindowHigh {
  *
  * Server entry (`index.ts`) only, not `index.client.ts`: only the agent tool executor computes it,
  * and no browser bundle needs it.
+ *
+ * @param closes - Daily closes, ascending by date.
+ * @param options - The swing threshold and the optional lookback window.
+ * @returns The swing statistics, or `null` for options out of range or fewer than two closes.
  */
 export function computeSwingHistory(
     closes: readonly MarketDailyClose[],

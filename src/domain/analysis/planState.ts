@@ -120,6 +120,7 @@ function hasTargetRoom(
  * @param rec - The post-reconciliation recommendation.
  * @param planCheck - The plan check measured against the price to judge.
  * @param atr - ATR(14) of the last bar, `null` or non-positive when it is unusable.
+ * @returns The plan's position against the price, with the reason when there is no setup.
  */
 export function buildPlanState(
     rec: ActionRecommendation,
