@@ -157,7 +157,9 @@ export function selectPriorAnalyses(
         }
     }
 
+    // `Array.from` is a fresh array, so sorting it in place mutates nothing the caller can see
+    // (`.toSorted` is ES2023, and this module is now on the browser entrypoint's type graph).
     return Array.from(winnerByBar.values())
-        .toSorted((a, b) => b.generatedAt.getTime() - a.generatedAt.getTime())
+        .sort((a, b) => b.generatedAt.getTime() - a.generatedAt.getTime())
         .slice(0, PRIOR_ANALYSIS_LIMIT);
 }
