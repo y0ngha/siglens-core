@@ -83,6 +83,8 @@ function valuesOf(
  *
  * A stored or hand-edited result can lack `priceTargets` (or one scenario, `keyLevels`,
  * `patternSummaries`); the missing part simply contributes no values instead of throwing.
+ * The type says these fields are always present, but replay feeds results read back from
+ * stored files that the type never checked, hence the optional access below.
  */
 function collectCheckedValues(
     result: AnalysisResponse
