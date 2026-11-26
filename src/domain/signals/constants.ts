@@ -44,7 +44,15 @@ export const SR_APPROACH_LOOKBACK = 5;
 export const TREND_SLOPE_LOOKBACK = 20;
 /** @internal EMA slope threshold separating trending vs sideways. */
 export const TREND_SLOPE_THRESHOLD = 0.03;
-/** @internal EMA period used for trend slope evaluation. */
+/**
+ * EMA period (bars) shared by the trend rules (`computeAnalysisTrend`: the top-level
+ * `AnalysisResponse.trend`, also `technicalChangesBetween`'s `trend_changed`; and the
+ * dashboard's `classifyTrend`) and by the other EMA20 readers (anticipation signals, the
+ * confluence and higher-timeframe prompt sections): one constant, so copy never mirrors
+ * the number. It counts bars of the analyzed timeframe, so it is 20 days only on daily
+ * bars; for a stored analysis use its `trendBasis.emaPeriod`, not the live constant.
+ * Server entrypoint only (API-1: the consumer is a server-side mail).
+ */
 export const TREND_EMA_PERIOD = 20;
 /**
  * @internal Minimum EMA slope over `TREND_SLOPE_LOOKBACK` bars, in ATR(14) units, for the

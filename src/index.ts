@@ -171,6 +171,7 @@ export {
     GOLDEN_CROSS_SLOW_PERIOD,
     SHORT_MA_CROSS_FAST_PERIOD,
     SHORT_MA_CROSS_SLOW_PERIOD,
+    TREND_EMA_PERIOD,
 } from './domain/signals/constants';
 export {
     confluenceFamilyWeight,

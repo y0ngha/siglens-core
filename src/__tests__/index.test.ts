@@ -207,6 +207,10 @@ describe('public API exports', () => {
         expect(coreApi.SIGNAL_SCAN_DAILY_LOOKBACK_DAYS).toBe(400);
     });
 
+    it('exports the trend rule EMA period (server entrypoint only)', () => {
+        expect(coreApi.TREND_EMA_PERIOD).toBe(20);
+    });
+
     it('exports the MA-cross detector constants (golden/death 50/200, short-term 20/50)', () => {
         expect(coreApi.GOLDEN_CROSS_FAST_PERIOD).toBe(50);
         expect(coreApi.GOLDEN_CROSS_SLOW_PERIOD).toBe(200);

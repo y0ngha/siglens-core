@@ -1928,7 +1928,7 @@ display:
 - `DIVERGENCE_LOOKBACK_BARS = 20`, `DIVERGENCE_FRESHNESS_BARS = 5`, `PIVOT_WINDOW = 2`
 - `HISTOGRAM_CONVERGENCE_BARS = 5`
 - `SQUEEZE_LOOKBACK_BARS = 120`, `SQUEEZE_PERCENTILE = 0.1`, `SQUEEZE_PCT_B_THRESHOLD = 0.5`
-- `TREND_SLOPE_LOOKBACK = 20`, `TREND_SLOPE_THRESHOLD = 0.03`
+- `TREND_SLOPE_LOOKBACK = 20`, `TREND_SLOPE_THRESHOLD = 0.03`; `TREND_EMA_PERIOD = 20` — the EMA period shared by `computeAnalysisTrend`, `classifyTrend` and the other EMA20 readers (anticipation, confluence/higher-timeframe sections); bars of the analyzed timeframe (public, server entrypoint only)
 - `SR_PROXIMITY_PCT = 0.02`, `SR_APPROACH_LOOKBACK = 5`
 - `FIFTY_TWO_WEEK_LOOKBACK_DAYS = 365`, `FIFTY_TWO_WEEK_MIN_COVERAGE_DAYS = 358`, `GAP_MIN_ATR_MULT = 0.25`
 
