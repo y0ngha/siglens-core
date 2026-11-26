@@ -105,7 +105,12 @@ export const AGENT_THEME_IDS: readonly AgentThemeId[] = AGENT_THEMES.map(
     theme => theme.id
 );
 
-/** The theme with this id, or `undefined`. */
+/**
+ * The theme with this id, or `undefined`.
+ *
+ * @param id - Theme id.
+ * @returns The theme, or `undefined` when no theme has this id.
+ */
 export function findAgentTheme(id: string): AgentTheme | undefined {
     return AGENT_THEMES.find(theme => theme.id === id);
 }

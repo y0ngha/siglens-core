@@ -123,6 +123,10 @@ function summarizeWindow(
  * non-positive close cuts the series there). A member without a valid last close is listed in `missing` and left out of
  * every figure; a member with too few closes for a window is left out of that window only (`members` says how
  * many were counted). Pure — the consumer loads the closes.
+ *
+ * @param theme - The theme basket.
+ * @param members - Daily closes of each member.
+ * @returns The per-window snapshot of the basket.
  */
 export function summarizeTheme(
     theme: AgentTheme,

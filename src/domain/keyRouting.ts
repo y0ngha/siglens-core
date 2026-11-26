@@ -123,6 +123,8 @@ export function requiresUserApiKey(
  * `requiresByokKey`(3분류 접근 등급 기반, `enableTierRestrictions`와 무관)를 통해 별도로
  * 담당하며, 이 경로는 전혀 바뀌지 않는다.
  *
+ * @param model - The requested model id.
+ * @param tier - The caller's tier; `undefined` skips the check.
  * @returns `tier`가 undefined면 검사 생략(true). 그 외에는 `isModelAllowed`가 참조하는
  * roster(현재 정책 하에서는 `PRO_MODELS`)에 등록된 model이면 true, 그 roster 어디에도
  * 없는 model(오탈자·deprecated 등)이면 false.

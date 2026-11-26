@@ -18,7 +18,12 @@ function pad2(value: number): string {
     return String(value).padStart(2, '0');
 }
 
-/** `true` for a real `YYYY-MM-DD` calendar date: the shape matches and the date round-trips (no `2026-02-30`). */
+/**
+ * `true` for a real `YYYY-MM-DD` calendar date: the shape matches and the date round-trips (no `2026-02-30`).
+ *
+ * @param value - Candidate date string.
+ * @returns `true` for a real `YYYY-MM-DD` calendar date.
+ */
 export function isIsoDate(value: string): boolean {
     const match = ISO_DATE.exec(value);
     if (match === null) return false;
@@ -38,6 +43,10 @@ export function isIsoDate(value: string): boolean {
  * target month's length (03-31 minus 1 month is 02-28 or 02-29; a leap day
  * minus a year is 02-28). Pure UTC arithmetic, so no timezone can shift it.
  * The input must be a valid date (see {@link isIsoDate}).
+ *
+ * @param isoDate - A valid `YYYY-MM-DD` date.
+ * @param months - Calendar months to subtract.
+ * @returns The resulting `YYYY-MM-DD` date.
  */
 export function minusCalendarMonths(isoDate: string, months: number): string {
     const [year = 0, month = 1, day = 1] = isoDate.split('-').map(Number);
@@ -116,6 +125,10 @@ function searchOnOrBefore(
  * This is the one rule for where a period starts: the base of a window is the
  * close of the last session on or before the start date, so a weekend or
  * holiday start date resolves to the session before it.
+ *
+ * @param closes - Daily closes, ascending by date.
+ * @param date - `YYYY-MM-DD` date to look up.
+ * @returns The index into `closes`, or `-1` when the series starts after `date` or is empty.
  */
 export function closeOnOrBefore(
     closes: readonly MarketDailyClose[],

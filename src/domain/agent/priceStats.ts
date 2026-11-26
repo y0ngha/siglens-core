@@ -417,6 +417,11 @@ function localToday(today: string, lastDate: string): string {
  * market-local date (it fixes the year of `ytd`). `null` means the whole history
  * (`max`). Requested dates count too: a lookup before the window start needs
  * its own earlier close. With no window and no dates the anchor itself.
+ *
+ * @param request - The same request later passed to `computePriceStats`.
+ * @param lastCloseDate - `YYYY-MM-DD` date of the subject's last completed close.
+ * @param today - The subject's market-local `YYYY-MM-DD` date.
+ * @returns The earliest date needed, or `null` for the whole history.
  */
 export function priceStatsEarliestDate(
     request: PriceStatsRequest,
@@ -1252,6 +1257,7 @@ function windowEcho(
  *
  * @param subjects - Up to {@link AGENT_PRICE_STATS_MAX_SUBJECTS}; the caller enforces the cap.
  * @param request - The window, dates to look up and overridden arguments.
+ * @returns One view per subject plus pairwise return correlations and the `notes` the model must follow.
  */
 export function computePriceStats(
     subjects: readonly PriceStatsSubjectInput[],

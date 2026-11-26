@@ -1085,6 +1085,8 @@ The boundary between public (Tier 1–4) and internal symbols is defined in
 | Tier 4 (types) | type-level description, one-line per field | `@example` (composite types) | English |
 | Internal | `@internal` tag | (free) | (free) |
 
+`src/__tests__/guards/tier2JsdocTags.test.ts` enforces the Tier 2 row (`@param` per parameter, `@returns` unless `void`) for the `PUBLIC_API.md` Tier 2 inventory.
+
 Public-facing JSDoc is written in **English** because the npm package is published
 publicly and may be consumed by non-Korean developers. Internal-only JSDoc may be
 written in either language.

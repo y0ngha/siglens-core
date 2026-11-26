@@ -31,6 +31,9 @@ export const ANALYSIS_LOCALES: readonly AnalysisLocale[] = [
  * it, or a hand-edited URL. Without this guard the first
  * `OUTPUT_LANGUAGE[locale]` destructure throws a `TypeError` and takes the
  * whole analysis request down; mirrors `isValidTimeframe` for the same reason.
+ *
+ * @param value - The untrusted locale value.
+ * @returns `true` when `value` is an {@link AnalysisLocale}.
  */
 export function isValidAnalysisLocale(
     value: string | null | undefined

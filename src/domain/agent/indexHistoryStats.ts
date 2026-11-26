@@ -106,6 +106,10 @@ function previousMonth(month: string): string {
  * the 12 months after each midterm October. Months at or after `currentMonth` (still in progress) and malformed
  * or non-positive closes are dropped. A year counts only with its own December and the previous December; a
  * month's return needs the previous month. Pure.
+ *
+ * @param monthEnds - Month-end closes of the index, oldest-first.
+ * @param options - `usCycle` adds the US presidential-cycle tables; `currentMonth` (`YYYY-MM`) is the month still in progress.
+ * @returns The history tables, or `null` when no complete year can be formed.
  */
 export function computeIndexHistoryStats(
     monthEnds: readonly MonthEndClose[],

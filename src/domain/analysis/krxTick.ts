@@ -56,6 +56,10 @@ const KRX_TICK_BANDS_BY_TABLE: Record<
 /**
  * The KRX tick size for a listing priced at `price` won on `table` (see
  * {@link KRX_TICK_BANDS} and {@link KRX_ETP_TICK_BANDS}).
+ *
+ * @param price - Price in won.
+ * @param table - The KRX tick table: `'share'` or `'etp'`.
+ * @returns The tick size in won.
  */
 export function krxTickSize(
     price: number,
@@ -73,6 +77,10 @@ export function krxTickSize(
  * a Camarilla pivot at 205,325, a Keltner band at 224,565 — reads as a price
  * the market can actually quote (205,500 / 224,500). A non-finite or
  * non-positive value is returned unchanged: it is not a price to round.
+ *
+ * @param price - Price in won.
+ * @param table - The KRX tick table: `'share'` or `'etp'`.
+ * @returns The price rounded to the nearest tick.
  */
 export function roundToKrxTick(
     price: number,

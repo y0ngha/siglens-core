@@ -1621,6 +1621,9 @@ export const PRICE_LEVEL_FAMILY_BASE_RATES: Readonly<
  * The measured base rate of a price-level kind family, or `null` when the family has no
  * measurement of its own: it is not in the table, or its row is the pooled figures under
  * `insufficient_sample` (too few touches, or none).
+ *
+ * @param family - Price-level kind family name.
+ * @returns The family's own measured base rate, or `null`.
  */
 export function priceLevelFamilyBaseRateFor(
     family: string
@@ -1638,6 +1641,11 @@ export function priceLevelFamilyBaseRateFor(
 /**
  * The measured base rate of a detected pattern or candle; `null` off daily bars (nothing
  * was measured there). A key without an own row of enough events gets the pooled row.
+ *
+ * @param subject - Which measured table to read.
+ * @param key - Pattern or candle key.
+ * @param timeframe - Bar timeframe of the detection.
+ * @returns The measured base rate, or `null`.
  */
 export function measuredBaseRateFor(
     subject: 'chart_pattern' | 'candle_pattern',

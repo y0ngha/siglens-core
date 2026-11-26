@@ -17,6 +17,9 @@ export const isUsablePrice = (price: number): boolean =>
  * made `Period Low` 0 and printed `Current vs Low: Infinity%`, and dragged every
  * low-based indicator toward zero. A bar with a non-positive or non-finite price
  * is not a trade, so it is dropped rather than repaired.
+ *
+ * @param bar - The bar to check.
+ * @returns `true` when open, high, low and close are all usable prices.
  */
 export const hasUsablePrices = (bar: Bar): boolean =>
     isUsablePrice(bar.open) &&

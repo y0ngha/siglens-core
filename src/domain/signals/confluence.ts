@@ -366,12 +366,20 @@ export function readSignalFreshness(
  *
  * Exported so a renderer can label the half-weight members instead of presenting a
  * fractional family count with no visible explanation for the fraction.
+ *
+ * @param type - Signal type name.
+ * @returns `true` for an anticipated (`expected`) signal type.
  */
 export function isExpectedSignal(type: string): boolean {
     return EXPECTED_SIGNAL_TYPES.has(type);
 }
 
-/** The indicator family a signal belongs to; the type name itself when unmapped. */
+/**
+ * The indicator family a signal belongs to; the type name itself when unmapped.
+ *
+ * @param type - Signal type name.
+ * @returns The family name, or `type` itself when unmapped.
+ */
 export function signalFamily(type: string): string {
     return SIGNAL_FAMILY[type] ?? type;
 }
@@ -382,6 +390,10 @@ export function signalFamily(type: string): string {
  * Each family contributes its **highest** member weight once, so three Bollinger
  * signals still count as one indicator. The result may be fractional — two confirmed
  * families plus one expected family is 2.5.
+ *
+ * @param types - Signal type names.
+ * @param expectedWeight - Weight of a family whose strongest member is an expected (not yet completed) signal.
+ * @returns The weighted family count; may be fractional.
  */
 export function confluenceFamilyWeight(
     types: readonly string[],
@@ -413,6 +425,9 @@ export function confluenceFamilyWeight(
  *
  * `null` scores 50 so callers that average axes see a neutral value; callers that drop
  * absent axes from the denominator should check for `null` themselves.
+ *
+ * @param snapshot - The confluence snapshot, or `null` when there is none.
+ * @returns The score from 0 to 100; `50` for `null`.
  */
 export function scoreConfluence(snapshot: ConfluenceSnapshot | null): number {
     if (!snapshot) return 50;
@@ -453,6 +468,9 @@ export function scoreConfluence(snapshot: ConfluenceSnapshot | null): number {
  *
  * Only the trigger counts. Selling because a couple of bearish signals lit would exit
  * on every ordinary pullback.
+ *
+ * @param snapshot - The confluence snapshot, or `null` when there is none.
+ * @returns `true` when the bearish exit rule holds; `false` for `null`.
  */
 export function isConfluenceExit(snapshot: ConfluenceSnapshot | null): boolean {
     return snapshot?.exitTrigger === true;
