@@ -344,6 +344,23 @@ export type {
     PriceLevelTrigger,
     PriceLevelZoneTrigger,
 } from './domain/analysis/priceLevelAlert';
+// What changed in the technical reading between two daily closes (computed trend, new confirmed
+// signals, first close across a reference analysis's support/resistance, plan position), and the
+// tier-depth reader of a stored analysis that feeds it. Pure/sync, so Tier 2. Server entrypoint
+// only (like `buildPlanState`, which it runs): the morning mail batch and the agent tools that
+// call it run on the server. The types are on both.
+export {
+    anchorBarIndexOf,
+    changeReferenceOf,
+    technicalChangesBetween,
+} from './domain/analysis/technicalChanges';
+export type {
+    ChangeReference,
+    ChangeReferenceAccess,
+    TechnicalChange,
+    TechnicalChangesOptions,
+    TechnicalChangesResult,
+} from './domain/analysis/technicalChanges';
 // The entry-price reference buildPlanCheck/postProcessAnalysisWithReconcile
 // use internally — exported so a consumer computing its OWN plan check
 // against a live price (siglens `sinceAnalysis.planNow`) uses the exact same

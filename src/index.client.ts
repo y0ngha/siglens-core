@@ -19,6 +19,15 @@ export type {
     PriceLevelZoneTrigger,
 } from './domain/analysis/priceLevelAlert';
 
+// Technical-change types only: the functions are server entrypoint only (see `src/index.ts`).
+export type {
+    ChangeReference,
+    ChangeReferenceAccess,
+    TechnicalChange,
+    TechnicalChangesOptions,
+    TechnicalChangesResult,
+} from './domain/analysis/technicalChanges';
+
 // Aggregate calculators / detectors
 export {
     calculateIchimokuFutureCloud,

@@ -511,6 +511,9 @@ describe('client entrypoint export presence (API-1)', () => {
         'priceLevelStart',
         'isPriceLevelMet',
         'findPriceLevelTrigger',
+        'technicalChangesBetween',
+        'changeReferenceOf',
+        'anchorBarIndexOf',
     ])('does not export the server-only %s', name => {
         expect(name in exportsByName).toBe(false);
     });
