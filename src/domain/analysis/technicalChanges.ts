@@ -292,6 +292,13 @@ export function changeReferenceOf(
  * during the session it is the close that came after the analysis, and a crossing between the
  * analysis time and that close is not reported.
  *
+ * The match is by bar start time only; this function knows no market session. When daily bars
+ * are stamped at the start of their session date (UTC midnight, the usual input shape), an
+ * analysis made on that date before the market opens still picks that bar, although its session
+ * had not started (and the analysis saw only the previous close). A caller that needs "the
+ * last bar closed at analysis time" resolves the session date itself and passes bars that end
+ * at it.
+ *
  * @param bars - Daily bars, oldest first.
  * @param analyzedAt - ISO timestamp of the analysis.
  * @returns The bar index, or `null` for an unparsable timestamp or one before every bar.
