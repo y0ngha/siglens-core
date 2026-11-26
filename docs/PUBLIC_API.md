@@ -397,6 +397,8 @@ Tier 1 함수는 모두 `src/index.ts`(서버) 전용이다. `src/index.client.t
 
 `HistoryWindowOptions.toolResultStride?: number`(기본 `1`): 툴 결과가 `omitted`로 바뀌는 경계를 한 턴씩이 아니라 `toolResultStride`턴 단위로 옮긴다 — `toolResultTurns`…`toolResultTurns + toolResultStride − 1`개 최근 턴이 원문으로 남아, 경계가 움직이지 않는 턴 동안 요청 prefix가 바이트 단위로 유지된다. 예산을 넘기면 정확히 `toolResultTurns`턴으로 되돌아가고, 예산 초과 탈락은 `stride`가 1보다 크면 `stride` 블록 단위다. `runAgentTurn`은 `toolResultStride: 2`를 쓴다.
 
+`HistoryWindowOptions.keepSmallToolResults?: { maxChars: number; perTurnChars: number }`(기본 꺼짐): 최근 `toolResultTurns` 밖의 툴 결과 행 중 내용 길이가 `maxChars` 이하인 행을 `omitted` 마커 대신 원문으로 둔다. 한 턴에서 원문으로 남는 행의 합은 `perTurnChars` 이하이며, 행은 대화 순서대로 보고 상한을 넘기는 행은 마커로 바꾼다(뒤의 더 작은 행은 들어갈 수 있다). 판정은 그 턴의 행만 읽으므로 나중 턴이 앞 턴의 바이트를 바꾸지 않는다(캐시 분기점이 늘지 않는다). 예산을 넘으면 턴을 버리기 전에 이 원문 행들이 먼저 마커로 돌아간다. 소비자 조치 없음: 켜는 것은 `runAgentTurn`의 `HISTORY_WINDOW`(1,400자 / 턴당 3,000자)이고, 프롬프트가 `{"omitted": true}` 메시지의 뜻(다시 호출)을 설명한다.
+
 **지표 합류 (confluence) — 서버 entry 전용 (6 functions + 11 constants)**
 
 여러 지표 패밀리가 같은 방향을 가리키는지 점수화하는 순수 함수. 소비자가 봉(고차 타임프레임 봉 포함)을 직접 가져와 넘기며, 이 계층은 I/O를 하지 않는다. 타입은 Tier 4 색인(`ConfluenceSnapshot`, `ConfluenceParams`, `EvaluateConfluenceOptions`, `ConfluenceHtfMode`)을 본다.
