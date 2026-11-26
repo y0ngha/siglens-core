@@ -148,6 +148,15 @@ describe.skipIf(!enabled)(
             expect(
                 Math.abs(result.benchmarks.perTradeExcess.meanPct - audit)
             ).toBeLessThanOrEqual(0.005);
+            const baselineAudit = mean(
+                page.trades.map(t => drift(t.ticker, t.holdingDays))
+            );
+            expect(
+                Math.abs(
+                    result.benchmarks.perTradeExcess.baselineMeanPct -
+                        baselineAudit
+                )
+            ).toBeLessThanOrEqual(0.005);
             expect(result.benchmarks.perTradeExcess.n).toBe(page.trades.length);
         });
 

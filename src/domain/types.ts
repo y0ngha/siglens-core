@@ -3796,6 +3796,15 @@ export interface BacktestBenchmarks {
         readonly basis: 'same_length_drift';
         readonly n: number;
         readonly meanPct: number;
+        /**
+         * Mean, in percent, of the baseline each trade is measured against: the mean
+         * return of holding the same ticker for the same number of days (the trade's
+         * stored `holdingDays`) from every day of the period. Taken over all `n`
+         * trades, each counted once. A trade whose holding length does not fit the
+         * period has no baseline and the generator refuses to run, so no trade is
+         * left out. `meanPct` equals the mean trade return minus this value.
+         */
+        readonly baselineMeanPct: number;
         readonly ci95: {
             readonly low: number;
             readonly high: number;

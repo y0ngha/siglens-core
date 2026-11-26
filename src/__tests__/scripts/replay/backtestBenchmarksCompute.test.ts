@@ -145,6 +145,15 @@ describe('computeBenchmarks on the hand-made run (oracle: hand calculation)', ()
             clusters: 'week',
         });
         expect(benchmarks.perTradeExcess.meanPct).toBeCloseTo(mean(excess), 10);
+        const baselineMean = mean([driftT1, driftT2, driftT3]);
+        expect(benchmarks.perTradeExcess.baselineMeanPct).toBeCloseTo(
+            baselineMean,
+            10
+        );
+        expect(benchmarks.perTradeExcess.meanPct).toBeCloseTo(
+            mean([6, -4.35, 1.67]) - baselineMean,
+            10
+        );
         expect(benchmarks.perTradeExcess.ci95.low).toBeGreaterThanOrEqual(
             Math.min(...excess) - 1e-9
         );
