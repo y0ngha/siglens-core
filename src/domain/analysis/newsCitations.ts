@@ -55,15 +55,23 @@ export function citationMarker(n: number | 'N'): string {
  * `[기사 #1, 기사 #2]`, seen in production 2026-11-08), plus padding or
  * quotes around any member (`[ #5 ]`, `["#6"]`, `["#5", "#6"]`, 2026-11-12).
  *
- * The label ({@link MARKER_LABEL}) is letters, spaces and hyphens only, up to
- * 20 characters. No digits: the cited number is read with
+ * The label ({@link MARKER_LABEL}) comes in two shapes, up to 20 characters
+ * each and letters-led, never with digits: the cited number is read with
  * {@link MARKER_NUMBER}, so a digit in the label would be cited instead of the
- * article number. No punctuation, so `[No. #1]` stays text. A letters-only
- * bracket ending in `#number` (`[Top #1]`) is read as a marker on purpose:
- * in a news bullet that shape is far more often a leaked marker than prose,
- * and a leaked marker is what a reader must never see.
+ * article number.
+ * - Plain label: letters, spaces and hyphens, no punctuation, so `[No. #1]`
+ *   stays text. A letters-only bracket ending in `#number` (`[Top #1]`) is
+ *   read as a marker on purpose: in a news bullet that shape is far more often
+ *   a leaked marker than prose, and a leaked marker is what a reader must
+ *   never see.
+ * - Colon-terminated label (`[동향: #4]`, `[생산·품질: #10]`, `［実績：#3］`,
+ *   seen in production 2026-11-25 on STLA, all five bullets): the colon makes
+ *   the label a topic tag rather than prose, so only this shape may also carry
+ *   `·`, `・`, `ㆍ`, `/` or `&`. The same policy applies: `[Note: #1]` and
+ *   `[Source: #2]` are read as markers too, because in a news bullet a
+ *   `Label: #N` bracket is a leaked marker far more often than prose.
  */
-const MARKER_LABEL = String.raw`(?:\p{L}[\p{L} \-]{0,19})?`;
+const MARKER_LABEL = String.raw`(?:\p{L}[\p{L} \-]{0,19}|\p{L}[\p{L} \-·・ㆍ/&]{0,19}\s*[:：]\s*)?`;
 /** Spaces or quote marks the model puts just inside a marker's brackets. */
 const MARKER_PAD = String.raw`[\s"'“”‘’]*`;
 const MARKER_GROUP = new RegExp(

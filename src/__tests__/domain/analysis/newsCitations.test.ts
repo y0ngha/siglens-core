@@ -154,6 +154,69 @@ describe('resolveCitationMarkers — 모델이 실제로 쓰는 변형', () => {
         ).toBe('売上が増えた（10月15日・Reuters）。');
     });
 
+    // 2026-11-25 운영 STLA 스냅샷: 핵심 이벤트 5개 전부 `[동향: #4]`처럼 `라벨: #번호`로 끝나 표식이 그대로 남았다.
+    it.each([
+        ['콜론', '매수세가 유입됐다 [동향: #1].'],
+        ['콜론 앞 공백 없음·뒤 공백 없음', '매수세가 유입됐다 [동향:#1].'],
+        ['전각 콜론', '매수세가 유입됐다 [동향：#1].'],
+        ['가운뎃점이 든 라벨', '매수세가 유입됐다 [생산·품질: #1].'],
+        ['가운뎃점(ㆍ)이 든 라벨', '매수세가 유입됐다 [생산ㆍ품질: #1].'],
+        ['가운뎃점(・)이 든 라벨', '매수세가 유입됐다 [생산・품질: #1].'],
+        ['콜론 앞 공백', '매수세가 유입됐다 [동향 : #1].'],
+        ['슬래시·앰퍼샌드 라벨', '매수세가 유입됐다 [R&D/투자: #1].'],
+        ['영문 라벨', '매수세가 유입됐다 [Valuation: #1].'],
+        ['번호마다 라벨', '매수세가 유입됐다 [실적: #1, 구조조정: #1].'],
+    ])('콜론으로 끝나는 라벨 표식(%s)도 인용한다', (_label, text) => {
+        expect(resolveCitationMarkers(text, 'event', ctx())).toBe(
+            '매수세가 유입됐다 (10월 15일 · Reuters).'
+        );
+    });
+
+    it('운영 STLA 스냅샷의 불릿 5개(2026-11-25) — 라벨 형태별로 전부 인용으로 바뀐다', () => {
+        const articles = Array.from({ length: 12 }, (_v, i) => ({
+            source: `Outlet${i + 1}`,
+            publishedAt: `2026-11-${String(i + 1).padStart(2, '0')}T15:00:00Z`,
+        }));
+        const bullets = [
+            [
+                '2,000명 규모 근로자 보호를 위한 수단 동원 의사를 밝혔습니다. [동향: #4]',
+                '(11월 4일 · Outlet4)',
+            ],
+            ['핵심 변수로 남았습니다. [실적: #12]', '(11월 12일 · Outlet12)'],
+            ['실행 속도가 관건입니다. [구조조정: #1]', '(11월 1일 · Outlet1)'],
+            ['부담이 부각됐습니다. [생산·품질: #10]', '(11월 10일 · Outlet10)'],
+            [
+                '핵심 논점으로 제시됐습니다. [밸류에이션: #3]',
+                '(11월 3일 · Outlet3)',
+            ],
+        ] as const;
+        for (const [text, citation] of bullets) {
+            const out = resolveCitationMarkers(
+                text,
+                'event',
+                ctx({ articles })
+            );
+            expect(out).toContain(citation);
+            expect(out).not.toMatch(/#\d/);
+        }
+    });
+
+    it('콜론 라벨 표식: ja 전각 대괄호', () => {
+        expect(
+            resolveCitationMarkers(
+                '売上が増えた［実績：#1］。',
+                'event',
+                ctx({ locale: 'ja' })
+            )
+        ).toBe('売上が増えた（10月15日・Reuters）。');
+    });
+
+    it('콜론 라벨 표식도 stripCitationMarkers가 지운다', () => {
+        expect(stripCitationMarkers('수급이 개선됐다 [생산·품질: #10].')).toBe(
+            '수급이 개선됐다.'
+        );
+    });
+
     it('단어가 붙은 표식이 여럿이면 마지막 그룹을 인용한다', () => {
         expect(
             resolveCitationMarkers(
@@ -170,6 +233,14 @@ describe('resolveCitationMarkers — 모델이 실제로 쓰는 변형', () => {
         ['단어에 숫자(번호 오인 방지)', '실적 [Q3 #1] 발표'],
         ['단어에 구두점', '순위 [No. #1] 유지'],
         ['단어가 20자 초과', '실적 [an unusually long label text #1] 발표'],
+        ['콜론 라벨에 숫자', '실적 [Q3: #1] 발표'],
+        ['표식 뒤에 글이 이어지는 대괄호', '실적 [Note: #1 priority] 발표'],
+        ['콜론 라벨에 마침표', '순위 [No.: #1] 유지'],
+        ['콜론 없는 라벨에 가운뎃점', '실적 [생산·품질 #1] 발표'],
+        [
+            '콜론 라벨이 20자 초과',
+            '실적 [an unusually long label text: #1] 발표',
+        ],
     ])('표식으로 보지 않는다: %s', (_label, text) => {
         expect(resolveCitationMarkers(text, 'event', ctx())).toBe(text);
     });
