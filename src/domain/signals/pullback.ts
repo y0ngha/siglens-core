@@ -51,7 +51,7 @@ export const PULLBACK_WASHOUT_WILLIAMS_R = -90;
 export const PULLBACK_NEAR_WILLIAMS_R = -80;
 
 /**
- * What the measured 66-75% of the washout-in-uptrend reading is: the hit rate of a quick exit, never a win rate or a
+ * @internal What the measured 66-75% of the washout-in-uptrend reading is: the hit rate of a quick exit, never a win rate or a
  * holding-period result. Shared by the analysis prompt and the agent pullback rule so the two cannot drift apart.
  */
 export const PULLBACK_MEASURED_RATE_MEANING =
