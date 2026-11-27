@@ -184,7 +184,8 @@ const escapeRegExp = (text: string): string =>
  * positionAnalysis the same figure usually names the support level itself, which did not move.
  *
  * @param text - The prose field.
- * @param from - The model's stop (after KRX tick rounding).
+ * @param from - The model's raw stop. For KRW a figure matches when it equals `from` or
+ *   both round to the same KRX tick, so a prose figure written at the tick still matches.
  * @param to - The stop core replaced it with.
  */
 export function rewriteStopInProse(
@@ -201,7 +202,9 @@ export function rewriteStopInProse(
     const isStop = (value: number): boolean =>
         Math.abs(value - from) <= tolerance ||
         (currency === 'KRW' &&
-            Math.abs(roundToKrxTick(value, krxTick) - from) <= tolerance);
+            Math.abs(
+                roundToKrxTick(value, krxTick) - roundToKrxTick(from, krxTick)
+            ) <= tolerance);
     const plain = formatPrice(to, currency, krxTick);
 
     const parts: string[] = [];
