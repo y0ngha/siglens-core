@@ -302,8 +302,7 @@ export {
     getSinglePatternTrend,
     type PatternTrend,
 } from './domain/analysis/candle-trend';
-// ISO-week bar aggregator — consumer (siglens `get_bars_indicators` tool)
-// uses it to build the `higherTimeframe` rollup for `1Day` bars, since the
+// ISO-week bar aggregator — the consumer's bars tool uses it to build the `higherTimeframe` rollup for `1Day` bars, since the
 // domain has no daily→weekly aggregation of its own. Pure/sync, so Tier 2.
 export { aggregateBarsToWeekly } from './domain/analysis/aggregateBarsToWeekly';
 export { aggregateBarsToMonthly } from './domain/analysis/aggregateBarsToMonthly';
@@ -318,7 +317,7 @@ export {
 } from './domain/analysis/actionRecommendation';
 // Deterministic plan-vs-price arithmetic — `runAnalysis` already attaches
 // this to every technical-axis result via `planCheck`, but the agent tool
-// layer (siglens `get_cached_analysis`) needs to run it a second time
+// layer (the consumer's cached-analysis tool) needs to run it a second time
 // against a LIVE price (not the analysis-time close) to build
 // `sinceAnalysis.planNow`. Pure/sync, so Tier 2.
 export { buildPlanCheck } from './domain/analysis/planCheck';

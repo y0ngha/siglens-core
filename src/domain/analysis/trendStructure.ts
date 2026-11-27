@@ -75,8 +75,7 @@ export function classifyStackOrder(
  * exactly **two EMAs** (short, long) and returns `EmaStackState`
  * (`'aligned_up'` | `'aligned_down'` | `'mixed'`, never `null`). This function
  * looks at simple MAs only, excludes price, and spans every configured period.
- * It is the classifier behind the `get_bars_indicators` agent tool's
- * `derived.maStack` field.
+ * It is the classifier behind the consumer's bars tool `derived.maStack` field.
  *
  * @param indicators Output of `calculateIndicators`; only `indicators.ma` is read.
  * @param periods MA periods to compare, shortest first. Defaults to `MA_DEFAULT_PERIODS`.
