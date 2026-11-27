@@ -1,5 +1,13 @@
 # Changelog
 
+# [3.1.0](https://github.com/y0ngha/siglens-core/compare/v3.0.0...v3.1.0) (2026-11-27)
+
+* refactor!: 내장 에이전트 도구 묶음을 지우고 toolSet을 필수로 한다 (#425) ([3c402e2](https://github.com/y0ngha/siglens-core/commit/3c402e2eb5bdfb06238a387f9e1a7beadd7993f9)), closes [#425](https://github.com/y0ngha/siglens-core/issues/425)
+
+### BREAKING CHANGES
+
+* runAgentTurn·buildAgentSystemPrompt의 toolSet이 필수다. 내장 도구 묶음(BUILT_IN_AGENT_TOOL_SET), AGENT_TOOL_SPECS·AGENT_TOOL_NAMES·findToolSpec·selectTools, BARS/FUNDAMENTALS_RESULT_NOTES, AGENT_X_POSTS_*·AGENT_FILINGS_*·AGENT_MACRO_*·AGENT_CHART_*·AGENT_COMPARE_* 상수와 타입을 지웠다. 새 분석 일일 한도는 도구 정의의 dailyQuota로만 정해진다(이름 기반 폴백 삭제).
+
 # [3.0.0](https://github.com/y0ngha/siglens-core/compare/v2.42.0...v3.0.0) (2026-11-27)
 
 ### Bug Fixes
