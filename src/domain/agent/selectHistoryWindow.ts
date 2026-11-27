@@ -29,6 +29,19 @@ export interface HistoryWindowOptions {
      * Below 1 or non-integer is treated as 1.
      */
     toolResultStride?: number;
+    /**
+     * Keep small tool results verbatim instead of the `omitted` marker
+     * (default off). A tool row outside the verbatim turns whose content is at
+     * most `maxChars` characters stays as it is, as long as the kept rows of
+     * its own turn total at most `perTurnChars` characters. Rows are considered
+     * in transcript order; one that would push the turn past the cap (or that
+     * is over `maxChars`) becomes the marker, and a later, smaller row can
+     * still fit. The decision reads only that turn's own rows, so adding later
+     * turns never changes an earlier turn's bytes: no new cache break point.
+     * Under budget pressure these extras are dropped (back to markers) before
+     * any whole turn is.
+     */
+    keepSmallToolResults?: { maxChars: number; perTurnChars: number };
 }
 
 /**
@@ -60,6 +73,31 @@ function splitTurns(history: readonly AgentMessage[]): AgentMessage[][] {
         turns[turns.length - 1].push(m);
     }
     return turns;
+}
+
+/**
+ * Replace the tool rows of one old turn by markers, except small rows that fit
+ * the per-turn cap (see {@link HistoryWindowOptions.keepSmallToolResults}).
+ * Reads only `turn`, so the result never depends on other turns.
+ */
+function omitTurnToolResults(
+    turn: readonly AgentMessage[],
+    keep: HistoryWindowOptions['keepSmallToolResults']
+): AgentMessage[] {
+    return turn.reduce<{ keptChars: number; rows: AgentMessage[] }>(
+        (acc, m) => {
+            if (m.role !== 'tool') return { ...acc, rows: [...acc.rows, m] };
+            const size = m.content.length;
+            const fits =
+                keep !== undefined &&
+                size <= keep.maxChars &&
+                acc.keptChars + size <= keep.perTurnChars;
+            return fits
+                ? { keptChars: acc.keptChars + size, rows: [...acc.rows, m] }
+                : { ...acc, rows: [...acc.rows, omitToolResult(m)] };
+        },
+        { keptChars: 0, rows: [] }
+    ).rows;
 }
 
 function omitToolResult(m: AgentMessage): AgentMessage {
@@ -116,8 +154,8 @@ function turnTokens(turn: readonly AgentMessage[]): number {
  * when `stride > 1`, so the head only moves where it already moves.
  * Pure; does not mutate input.
  *
- * ponytail: fixed window — replace with summarisation (P3) once a
- * conversation-length histogram shows long threads matter.
+ * Small tool results can stay verbatim ({@link HistoryWindowOptions.keepSmallToolResults}).
+ * There is no summarisation: an omitted result is re-fetched by the model.
  *
  * @param history - The full transcript, oldest message first.
  * @param options - Window sizing: user turns kept, verbatim tool-result
@@ -139,11 +177,14 @@ export function selectHistoryWindow(
     const head = windowStart(count, options.turns, stride);
     const kept = allTurns.slice(head);
     /** Turns from absolute index `from` keep their tool results; older ones are omitted. */
-    const shape = (verbatimFrom: number): AgentMessage[][] =>
+    const shape = (
+        verbatimFrom: number,
+        keepSmall: HistoryWindowOptions['keepSmallToolResults']
+    ): AgentMessage[][] =>
         kept.map((turn, offset) =>
             head + offset >= verbatimFrom
                 ? turn
-                : turn.map(m => (m.role === 'tool' ? omitToolResult(m) : m))
+                : omitTurnToolResults(turn, keepSmall)
         );
     const sumTokens = (turns: readonly AgentMessage[][]): number =>
         turns.reduce((sum, turn) => sum + turnTokens(turn), 0);
@@ -152,12 +193,25 @@ export function selectHistoryWindow(
         head,
         quantize(Math.max(0, count - options.toolResultTurns), resultStride)
     );
-    const blockShaped = shape(blockFrom);
-    // Budget pressure: the extra verbatim turns the block boundary keeps are
-    // the first thing to go, back to exactly `toolResultTurns`.
-    const fallBack =
-        resultStride > 1 && sumTokens(blockShaped) > options.budgetTokens;
-    const shaped = fallBack ? shape(exactFrom) : blockShaped;
+    const build = (
+        keepSmall: HistoryWindowOptions['keepSmallToolResults']
+    ): AgentMessage[][] => {
+        const blockShaped = shape(blockFrom, keepSmall);
+        // Budget pressure: the extra verbatim turns the block boundary keeps are
+        // the first thing to go, back to exactly `toolResultTurns`.
+        const fallBack =
+            resultStride > 1 && sumTokens(blockShaped) > options.budgetTokens;
+        return fallBack ? shape(exactFrom, keepSmall) : blockShaped;
+    };
+    let shaped = build(options.keepSmallToolResults);
+    // Still over budget: the small results kept by `keepSmallToolResults` go
+    // back to markers before any whole turn is dropped.
+    if (
+        options.keepSmallToolResults &&
+        sumTokens(shaped) > options.budgetTokens
+    ) {
+        shaped = build(undefined);
+    }
     let total = sumTokens(shaped);
     let start = 0;
     while (total > options.budgetTokens && start < shaped.length - 1) {

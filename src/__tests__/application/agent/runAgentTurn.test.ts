@@ -1864,7 +1864,8 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
         turnCount: number,
         paramOverrides: (
             turn: number
-        ) => Partial<RunAgentTurnParams> = () => ({})
+        ) => Partial<RunAgentTurnParams> = () => ({}),
+        executeTool?: RunAgentTurnDependencies['executeTool']
     ): Promise<Simulated> {
         const turns = Array.from({ length: turnCount }, (_, i) => i + 1);
         return turns.reduce<Promise<Simulated>>(
@@ -1879,7 +1880,7 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
                         now: new Date(Date.UTC(2026, 8, 12, 14, 30 + turn * 7)),
                         ...paramOverrides(turn),
                     }),
-                    deps(p)
+                    deps(p, executeTool ? { executeTool } : {})
                 );
                 if (!r.ok || r.turnAt === undefined)
                     throw new Error('expected ok with a turn instant');
@@ -1922,8 +1923,15 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
         prefix.length <= whole.length &&
         prefix.every((m, i) => JSON.stringify(m) === JSON.stringify(whole[i]));
 
+    /** Over the 1,400-char keep limit, so it flips to a marker once old. */
+    const bigExecutor = async (name: string) => ({
+        tool: name,
+        symbol: 'AAPL',
+        text: 'x'.repeat(2_000),
+    });
+
     it("turn N+1 extends turn N's last request, except at the turns where a tool result flips to omitted", async () => {
-        const { requests } = await simulate(9);
+        const { requests } = await simulate(9, () => ({}), bigExecutor);
         const extendsPrevious = (turn: number): boolean =>
             startsWith(
                 firstOfTurn(requests, turn).messages,
@@ -1939,6 +1947,24 @@ describe('runAgentTurn — turn note persistence and prefix stability', () => {
             expect(firstOfTurn(requests, turn).system).toBe(first.system);
             expect(firstOfTurn(requests, turn).tools).toEqual(first.tools);
         });
+    });
+
+    it('small tool results stay verbatim, so no turn flips and every request extends the previous one', async () => {
+        const { requests } = await simulate(9);
+        Array.from({ length: 8 }, (_, i) => i + 2).forEach(turn =>
+            expect(
+                startsWith(
+                    firstOfTurn(requests, turn).messages,
+                    lastOfTurn(requests, turn - 1).messages
+                )
+            ).toBe(true)
+        );
+        const sent = lastOfTurn(requests, 9).messages;
+        expect(
+            sent.filter(
+                m => m.role === 'tool' && m.content.includes('"omitted"')
+            )
+        ).toHaveLength(0);
     });
 
     /** A mid-minute instant with milliseconds: the note's lead ("in 22m") reads them. */

@@ -398,3 +398,265 @@ describe('selectHistoryWindow — toolResultStride', () => {
         }
     );
 });
+
+describe('selectHistoryWindow — keepSmallToolResults', () => {
+    const BASE = { turns: 8, toolResultTurns: 2, budgetTokens: 32_000 };
+    const KEEP = { maxChars: 1_400, perTurnChars: 3_000 };
+
+    /** A turn with one tool row per entry of `sizes` (content length in chars). */
+    const sizedTurn = (i: number, sizes: readonly number[]): AgentMessage[] => [
+        { role: 'user', content: `q${i}` },
+        {
+            role: 'assistant',
+            content: '',
+            toolCalls: sizes.map((_, k) => ({
+                id: `c${i}_${k}`,
+                name: 'get_quote',
+                args: {},
+            })),
+        },
+        ...sizes.map((size, k): AgentMessage => ({
+            role: 'tool',
+            content: JSON.stringify({
+                symbol: 'AAPL',
+                pad: 'x'.repeat(size - 26),
+            }),
+            toolCallId: `c${i}_${k}`,
+            toolName: 'get_quote',
+        })),
+        { role: 'assistant', content: `a${i}` },
+    ];
+    const transcript = (
+        count: number,
+        sizes: (i: number) => readonly number[]
+    ): AgentMessage[] =>
+        Array.from({ length: count }, (_, i) => sizedTurn(i, sizes(i))).flat();
+    const isOmitted = (m: AgentMessage): boolean =>
+        (JSON.parse(m.content) as { omitted?: boolean }).omitted === true;
+    const toolRows = (out: readonly AgentMessage[]): AgentMessage[] =>
+        out.filter(m => m.role === 'tool');
+
+    it('small rows stay verbatim for every transcript length 1..16', () => {
+        for (let n = 1; n <= 16; n++) {
+            const history = transcript(n, () => [500]);
+            const out = selectHistoryWindow(history, {
+                ...BASE,
+                keepSmallToolResults: KEEP,
+            });
+            const rows = toolRows(out);
+            expect(rows.length).toBeGreaterThan(0);
+            expect(rows.some(isOmitted)).toBe(false);
+            // Verbatim means the very same message as in the transcript.
+            for (const row of rows) {
+                expect(history).toContainEqual(row);
+            }
+        }
+    });
+
+    it('without the option small old rows are still markers', () => {
+        const out = selectHistoryWindow(
+            transcript(6, () => [500]),
+            BASE
+        );
+        expect(toolRows(out).filter(isOmitted)).toHaveLength(4);
+    });
+
+    it('a row over maxChars becomes a marker, the exact limit stays', () => {
+        const out = selectHistoryWindow(
+            transcript(5, i => (i === 0 ? [1_400] : i === 1 ? [1_401] : [100])),
+            { ...BASE, keepSmallToolResults: KEEP }
+        );
+        const rows = toolRows(out);
+        expect(rows.map(isOmitted)).toEqual([false, true, false, false, false]);
+    });
+
+    it('the per-turn cap is applied in transcript order and a later smaller row can still fit', () => {
+        // 1400 + 1400 = 2800 fits; the third 1400 would make 4200 > 3000 -> marker;
+        // the trailing 200 still fits (3000 total exactly).
+        const out = selectHistoryWindow(
+            transcript(5, i => (i === 0 ? [1_400, 1_400, 1_400, 200] : [100])),
+            { ...BASE, keepSmallToolResults: KEEP }
+        );
+        const first = toolRows(out).slice(0, 4);
+        expect(first.map(isOmitted)).toEqual([false, false, true, false]);
+        // The kept rows total at most perTurnChars.
+        expect(
+            first
+                .filter(m => !isOmitted(m))
+                .reduce((s, m) => s + m.content.length, 0)
+        ).toBeLessThanOrEqual(KEEP.perTurnChars);
+    });
+
+    it('a turn decides from its own rows only: appending later turns never changes an earlier turn', () => {
+        // Deterministic pseudo-random sizes, so the property runs over many shapes.
+        let seed = 7;
+        const rand = (): number => {
+            seed = (seed * 1_103_515_245 + 12_345) % 2_147_483_648;
+            return seed / 2_147_483_648;
+        };
+        for (let trial = 0; trial < 25; trial++) {
+            const sizeTable = Array.from({ length: 16 }, () =>
+                Array.from({ length: 1 + Math.floor(rand() * 4) }, () =>
+                    Math.floor(100 + rand() * 1_500)
+                )
+            );
+            const history = transcript(16, i => sizeTable[i]);
+            for (let n = 1; n < 16; n++) {
+                // Wide window and a big budget: only the omit rule differs.
+                const opts = {
+                    turns: 16,
+                    toolResultTurns: 1,
+                    budgetTokens: 1_000_000,
+                    keepSmallToolResults: KEEP,
+                };
+                const shortOut = selectHistoryWindow(
+                    transcript(n, i => sizeTable[i]),
+                    opts
+                );
+                const longOut = selectHistoryWindow(history, opts);
+                // Turns 0..n-2 are old in both runs; their bytes must agree.
+                const cut = shortOut.findIndex(m => m.content === `q${n - 1}`);
+                expect(longOut.slice(0, cut)).toEqual(shortOut.slice(0, cut));
+            }
+        }
+    });
+
+    it('adds no cache break point: the prefix breaks only at turns where it already broke without the option', () => {
+        const opts = {
+            turns: 8,
+            toolResultTurns: 2,
+            budgetTokens: 1_000_000,
+            stride: 4,
+            toolResultStride: 2,
+        };
+        const sizes = (i: number): number[] => [300 + (i % 3) * 600, 900];
+        const breaks = (keep: boolean): number[] => {
+            const result: number[] = [];
+            for (let n = 1; n < 20; n++) {
+                const run = (count: number): AgentMessage[] =>
+                    selectHistoryWindow(transcript(count, sizes), {
+                        ...opts,
+                        ...(keep ? { keepSmallToolResults: KEEP } : {}),
+                    });
+                const prev = run(n);
+                const next = run(n + 1);
+                const preserved = prev.every(
+                    (m, k) => JSON.stringify(m) === JSON.stringify(next[k])
+                );
+                if (!preserved) result.push(n + 1);
+            }
+            return result;
+        };
+        const withKeep = breaks(true);
+        // The documented flip turns: the boundary moves at even turn counts only.
+        expect(withKeep.every(count => count % 2 === 0)).toBe(true);
+        // Kept rows never flip, so some flips become invisible; none is new.
+        const without = breaks(false);
+        expect(withKeep.every(count => without.includes(count))).toBe(true);
+    });
+
+    /** Token count by the function's own measure: content plus JSON toolCalls. */
+    const tokensOf = (out: readonly AgentMessage[]): number =>
+        out.reduce(
+            (sum, m) =>
+                sum +
+                estimateTokens(m.content) +
+                (m.toolCalls ? estimateTokens(JSON.stringify(m.toolCalls)) : 0),
+            0
+        );
+    const users = (out: readonly AgentMessage[]): number =>
+        out.filter(m => m.role === 'user').length;
+
+    it('under budget pressure the kept extras revert to markers before any turn is dropped', () => {
+        const history = transcript(6, () => [1_400, 1_400]);
+        const withExtras = tokensOf(
+            selectHistoryWindow(history, {
+                ...BASE,
+                keepSmallToolResults: KEEP,
+            })
+        );
+        const plain = selectHistoryWindow(history, BASE);
+        const plainTokens = tokensOf(plain);
+        expect(withExtras).toBeGreaterThan(plainTokens);
+        // A budget between the two: extras do not fit, but every turn does.
+        const budgetTokens = Math.floor((withExtras + plainTokens) / 2);
+        const out = selectHistoryWindow(history, {
+            ...BASE,
+            budgetTokens,
+            keepSmallToolResults: KEEP,
+        });
+        expect(tokensOf(out)).toBeLessThanOrEqual(budgetTokens);
+        expect(users(out)).toBe(6);
+        expect(toolRows(out).filter(isOmitted)).toHaveLength(8);
+        expect(out).toEqual(plain);
+    });
+
+    describe('budget pressure with stride 4 and toolResultStride 2', () => {
+        // 7 turns: head 0, block boundary turn 4, exact boundary turn 5.
+        // Each turn: one small row (kept when old) and one big row (verbatim
+        // only inside the verbatim turns).
+        const history = transcript(7, () => [1_000, 3_000]);
+        const WIDE = {
+            turns: 8,
+            toolResultTurns: 2,
+            stride: 4,
+            toolResultStride: 2,
+            budgetTokens: 1_000_000,
+        };
+        const exact = { ...WIDE, toolResultStride: 1 };
+        const keep = { keepSmallToolResults: KEEP };
+        const blockKeep = tokensOf(
+            selectHistoryWindow(history, { ...WIDE, ...keep })
+        );
+        const exactKeep = tokensOf(
+            selectHistoryWindow(history, { ...exact, ...keep })
+        );
+        const blockOff = tokensOf(selectHistoryWindow(history, WIDE));
+        const exactOff = tokensOf(selectHistoryWindow(history, exact));
+
+        it('the fixture orders the four shapes as the cases below assume', () => {
+            expect(blockKeep).toBeGreaterThan(exactKeep);
+            expect(exactKeep).toBeGreaterThan(blockOff);
+            expect(blockOff).toBeGreaterThan(exactOff);
+        });
+
+        it('block+keep over but exact+keep fits: falls back to exact+keep, extras kept', () => {
+            const out = selectHistoryWindow(history, {
+                ...WIDE,
+                budgetTokens: exactKeep,
+                ...keep,
+            });
+            expect(out).toEqual(
+                selectHistoryWindow(history, { ...exact, ...keep })
+            );
+            expect(tokensOf(out)).toBeLessThanOrEqual(exactKeep);
+        });
+
+        it('exact+keep over: extras revert and the block boundary is decided again, as with the option off', () => {
+            // blockOff fits here, exactKeep does not.
+            const budgetTokens = blockOff;
+            expect(exactKeep).toBeGreaterThan(budgetTokens);
+            const off = selectHistoryWindow(history, { ...WIDE, budgetTokens });
+            const out = selectHistoryWindow(history, {
+                ...WIDE,
+                budgetTokens,
+                ...keep,
+            });
+            expect(out).toEqual(off);
+            expect(tokensOf(out)).toBeLessThanOrEqual(budgetTokens);
+        });
+
+        it('so tight that the option off drops turns: the option on drops the same turns', () => {
+            const budgetTokens = exactOff - 100;
+            const off = selectHistoryWindow(history, { ...WIDE, budgetTokens });
+            const out = selectHistoryWindow(history, {
+                ...WIDE,
+                budgetTokens,
+                ...keep,
+            });
+            expect(users(off)).toBeLessThan(7);
+            expect(out).toEqual(off);
+            expect(users(out)).toBe(users(off));
+        });
+    });
+});

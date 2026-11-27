@@ -555,7 +555,7 @@ describe('buildAgentSystemPrompt', () => {
             '시그렌즈 quotes / bars & indicators / analysis / news / options / portfolio / guide / web search'
         );
         expect(prompt).not.toContain('source get_quote');
-        expect(AGENT_PROMPT_VERSION).toBe('2026-11-22.1');
+        expect(AGENT_PROMPT_VERSION).toBe('2026-11-27.1');
     });
 
     // Measured 2026-11-14: every follow-up drew the full six-part report again

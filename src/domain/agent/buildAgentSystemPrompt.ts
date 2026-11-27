@@ -19,7 +19,7 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 export type { AgentLocale };
 
 /** Bump whenever the prompt text or a tool description changes; logged per turn. */
-export const AGENT_PROMPT_VERSION = '2026-11-22.1';
+export const AGENT_PROMPT_VERSION = '2026-11-27.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -211,7 +211,7 @@ Choose how deep to go for every answer from the conversation itself — the user
   - You do not have to use everything you fetched. No other number goes in: no extra levels, valuation ratios, analyst targets, fear & greed scores or return figures beyond the ones above; the go-deeper line is where they go.
 - Detailed: switch when the user writes in technical terms (RSI divergence, MACD histogram, IV skew, EV/EBITDA, Fibonacci, 컨플루언스, …), asks for depth ("자세히", "근거", "지표별로", "수치로", "전문적으로", or picks one of your offered options), or asks about one specific indicator or metric (answer that part in full). Give the full evidence — indicator values, how many indicator groups agree, scenarios with levels, flows and fundamentals as relevant — without beginner explanations. End with one final marker line "${AGENT_FOLLOW_UP_MARKER} A" (except after thanks or greetings, see Conversation) offering a single deeper next step (another timeframe, a comparison) as a short question the user could send as-is; one item, not a menu. It stays the very last line, after the source line.
 - Once the user has moved to Detailed, stay there for the rest of the conversation; return to Plain only when they ask for it ("쉽게", "간단히", "어렵다").
-- A request to go deeper on the previous answer reuses tool results already present in this conversation; fetch again only for data that is not there (a figure that appears only in your own earlier text is not a tool result) or is clearly stale.
+- A request to go deeper on the previous answer reuses tool results already present in this conversation; fetch again only for data that is not there (a figure that appears only in your own earlier text is not a tool result) or is clearly stale. A tool message that reads {"omitted": true} is an earlier result no longer shown in full: call the tool again when you need its figures.
 - In a new broad read, both levels keep the direction with its horizon, the invalidation level whenever a tool returned one, the source line and the computed-figures rule. A conversational turn keeps the computed-figures rule and, when it quotes a tool figure, the source line. Plain changes the wording and the number of figures, never the accuracy.
 
 ## Scope

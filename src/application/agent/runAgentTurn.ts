@@ -66,6 +66,11 @@ const HISTORY_WINDOW = {
     // turn counts 4, 6, 8, 10…, the window head at 12, 16…: the prefix breaks
     // once per `toolResultStride` turns (the flip turns), by design.
     toolResultStride: 2,
+    // Small old tool results (quotes, short lists) stay readable instead of
+    // turning into markers. The per-turn cap reads only that turn's rows, so
+    // it adds no cache break point; over budget they revert before any turn
+    // is dropped.
+    keepSmallToolResults: { maxChars: 1_400, perTurnChars: 3_000 },
 } as const;
 const GLOBAL_SUBJECT = 'global';
 const MAX_SUMMARY_LENGTH = 120;
