@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.1.1](https://github.com/y0ngha/siglens-core/compare/v3.1.0...v3.1.1) (2026-11-27)
+
+### Bug Fixes
+
+* 진입 구간을 분석 자리에 두고 본문 손절가를 실제 손절가로 맞춘다 ([#426](https://github.com/y0ngha/siglens-core/issues/426)) ([941faf9](https://github.com/y0ngha/siglens-core/commit/941faf967ca42fb43c967d6654d5ec826b492173))
+
 # [3.1.0](https://github.com/y0ngha/siglens-core/compare/v3.0.0...v3.1.0) (2026-11-27)
 
 * refactor!: 내장 에이전트 도구 묶음을 지우고 toolSet을 필수로 한다 (#425) ([3c402e2](https://github.com/y0ngha/siglens-core/commit/3c402e2eb5bdfb06238a387f9e1a7beadd7993f9)), closes [#425](https://github.com/y0ngha/siglens-core/issues/425)
