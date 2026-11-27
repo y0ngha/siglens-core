@@ -13,6 +13,7 @@ import { isSmallTalkMessage } from '@/domain/agent/smallTalk';
 import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import {
     selectToolSetSpecs,
+    type AgentToolDefinition,
     type AgentToolPerTurnCap,
     type AgentToolSet,
 } from '@/domain/agent/toolSet';
@@ -247,6 +248,22 @@ function withTurnNote(
 }
 
 /**
+ * The per-user daily quota a tool's calls draw on: the definition's `dailyQuota`
+ * when it sets one, else the name-keyed rule the loop used before the field
+ * existed (`run_fresh_analysis` → `'freshAnalysis'`), so a consumer tool set
+ * written without the field is metered exactly as before. The name fallback goes
+ * away together with the built-in tool set.
+ */
+function dailyQuotaOf(
+    definition: AgentToolDefinition
+): AgentToolDefinition['dailyQuota'] {
+    return (
+        definition.dailyQuota ??
+        (definition.name === 'run_fresh_analysis' ? 'freshAnalysis' : undefined)
+    );
+}
+
+/**
  * Per-turn budget, pure and local to one turn: the global caps from
  * `AGENT_TURN_CAPS` (`maxToolCalls`, `maxDistinctSymbols`) and each tool's own
  * `perTurn` cap from its definition. Counted here rather than in the consumer
@@ -458,6 +475,7 @@ export async function runAgentTurn(
      */
     const consumeToolQuota = async (
         name: string,
+        dailyQuota: AgentToolDefinition['dailyQuota'],
         metered: boolean
     ): Promise<ToolQuotaResult> => {
         const claimed: Array<[CounterStore, string]> = [];
@@ -491,11 +509,7 @@ export async function runAgentTurn(
         // shared Brave budget (`deps.globalLimits`, default `AGENT_GLOBAL_LIMITS`)
         // is still enforced here.
         try {
-            // Deliberately keyed by tool name, not by definition metadata: the
-            // per-user fresh-analysis counter is a no-op while `freshAnalysisPerDay`
-            // is `Infinity`, and it moves into the tool definition in the major that
-            // removes the built-in tool set.
-            if (name === 'run_fresh_analysis') {
+            if (dailyQuota === 'freshAnalysis') {
                 if (
                     !(await claim(
                         counters.freshAnalysis,
@@ -660,7 +674,11 @@ export async function runAgentTurn(
         const scope = budget.reserve(call.name, spec.perTurn, validated.value);
         if (scope !== null) return serialize({ error: 'quota', scope });
         const metered = spec.meter === 'webSearch';
-        const quota = await consumeToolQuota(call.name, metered);
+        const quota = await consumeToolQuota(
+            call.name,
+            dailyQuotaOf(spec),
+            metered
+        );
         if ('refusal' in quota) return serialize(quota.refusal);
         // The turn may have stopped while the counters were being claimed:
         // give the daily units back and never start the executor.

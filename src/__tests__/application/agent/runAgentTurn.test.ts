@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
     AGENT_GLOBAL_LIMITS,
+    AGENT_LIMITS,
     AGENT_TURN_CAPS,
     TOOL_TIMEOUT_MS,
 } from '@/application/agent/limits';
@@ -31,6 +32,7 @@ import { AGENT_IMAGES_PER_MESSAGE_MAX } from '@/domain/agent/attachedImages';
 import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import type { AgentToolDefinition, AgentToolSet } from '@/domain/agent/toolSet';
 import { AGENT_TOOL_NAMES } from '@/domain/agent/tools';
+import type { Tier } from '@/domain/types';
 
 const USAGE = {
     promptTokens: 10,
@@ -2406,6 +2408,84 @@ describe('runAgentTurn toolSet', () => {
             ['q', undefined, false],
             ['n', undefined, false],
         ]);
+    });
+
+    describe('dailyQuota', () => {
+        // Every tier's `freshAnalysisPerDay` is `Infinity`, which never touches the
+        // counter, so the routing is only observable under a finite limit.
+        const limits = AGENT_LIMITS.freshAnalysisPerDay as Record<Tier, number>;
+        const original = limits.member;
+        afterEach(() => {
+            limits.member = original;
+        });
+
+        const twoCalls = (name: string) =>
+            oneStep(
+                { id: 'a', name, args: { mode: 'long' } },
+                { id: 'b', name, args: { mode: 'quick' } }
+            );
+        const runWith = async (tool: AgentToolDefinition) => {
+            limits.member = 1;
+            const p = twoCalls(tool.name);
+            const d = deps(p);
+            await runAgentTurn(
+                customParams({
+                    toolSet: { ...customSet, tools: [tool] },
+                    availableTools: new Set([tool.name]),
+                }),
+                d
+            );
+            return {
+                results: toolResults(required(p.calls[1])),
+                counted: d.counters.freshAnalysis.count,
+                executed: vi.mocked(d.executeTool).mock.calls.length,
+            };
+        };
+
+        it("dailyQuota 'freshAnalysis'인 도구는 이름과 무관하게 일일 분석 쿼터를 쓴다", async () => {
+            const r = await runWith({
+                ...slow,
+                name: 'deep_run',
+                dailyQuota: 'freshAnalysis',
+            });
+            expect(r.counted).toBe(1);
+            expect(r.executed).toBe(1);
+            expect(r.results[1]).toEqual({ error: 'quota', scope: 'daily' });
+        });
+
+        it('dailyQuota가 없어도 이름이 run_fresh_analysis면 예전처럼 일일 분석 쿼터를 쓴다', async () => {
+            const r = await runWith({ ...slow, name: 'run_fresh_analysis' });
+            expect(r.counted).toBe(1);
+            expect(r.executed).toBe(1);
+            expect(r.results[1]).toEqual({ error: 'quota', scope: 'daily' });
+        });
+
+        it('dailyQuota가 없고 다른 이름인 도구는 일일 분석 쿼터를 쓰지 않는다', async () => {
+            const r = await runWith(slow);
+            expect(r.counted).toBe(0);
+            expect(r.executed).toBe(2);
+            expect(r.results).not.toContainEqual({
+                error: 'quota',
+                scope: 'daily',
+            });
+        });
+
+        it('기본 묶음의 run_fresh_analysis는 정의의 dailyQuota로 쿼터를 쓴다', async () => {
+            limits.member = 1;
+            const fresh = (id: string) => ({
+                id,
+                name: 'run_fresh_analysis',
+                args: { symbol: 'AAPL', kind: 'technical' },
+            });
+            const p = oneStep(fresh('a'), fresh('b'));
+            const d = deps(p);
+            await runAgentTurn(params(), d);
+            expect(d.counters.freshAnalysis.count).toBe(1);
+            expect(toolResults(required(p.calls[1]))[1]).toEqual({
+                error: 'quota',
+                scope: 'daily',
+            });
+        });
     });
 });
 

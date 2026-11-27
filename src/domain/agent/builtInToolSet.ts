@@ -36,7 +36,7 @@ function isFilingRead(args: AgentToolArgs): boolean {
 
 type LoopMetadata = Pick<
     AgentToolDefinition,
-    'perTurn' | 'meter' | 'estimatedSeconds'
+    'perTurn' | 'meter' | 'dailyQuota' | 'estimatedSeconds'
 >;
 
 /**
@@ -50,6 +50,7 @@ const LOOP_METADATA: Readonly<Partial<Record<string, LoopMetadata>>> = {
     },
     run_fresh_analysis: {
         perTurn: { max: AGENT_TURN_CAPS.maxFreshAnalysis },
+        dailyQuota: 'freshAnalysis',
         estimatedSeconds: args =>
             isFreshAnalysisKind(args.kind)
                 ? FRESH_ANALYSIS_ESTIMATED_SECONDS[args.kind]
