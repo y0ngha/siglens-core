@@ -1255,7 +1255,7 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * close against the entry zone by exact edges (`zoneLow <= close <= zoneTop`, no 1% band
  * above the top), the same comparison the outcome labeller uses, so
  * `entryRecommendation = enter` falls (on the replay set's stored plans: `in_zone` from
- * 51.8% to 19.6%). Step 1 says "enter" when the close is inside the zone and tells the
+ * 51.8% to 19.6%). Step 1 says "enter" when the close is inside the zone and (until `p35`) told the
  * model to make the zone contain the last close to plan an entry at the price; the close
  * itself is printed in the new `### Entry Zone vs Last Close` block (Step 1 sits in the
  * byte-stable prefix and cannot carry it). Stable bytes change for every technical prompt
@@ -1312,9 +1312,29 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * byte is as before. When the siglens `multi-timeframe` skill is edited
  * to quote the block (a separate consumer change), the catalog fingerprint moves once.
  *
+ * `p35` (real-LLM A/B fixes after `p34` shipped in v3.0.0). Step 1 no longer ends "To plan an
+ * entry at the price, make the zone contain the last close": it put 78% of plans `in_zone`
+ * (zone top equal to the close in 320 of 588), so it now says to put the zone at the level the
+ * analysis names and to contain the close only when the close sits at that level or on the
+ * sell-off path, and `### Entry Zone vs Last Close` loses the same sentence (stable bytes of
+ * every technical prompt, dynamic bytes of every prompt with a close). The pattern and candle
+ * reliability rules forbid quoting the book rates a guide's text cites (Bulkowski,
+ * thepatternsite.com) in any field, and every skill line that cites one is prefixed
+ * `[Book figure, not measured by this engine]` with its "Measured (" label renamed "Reported ("
+ * (the rule blocks of every prompt that injects a pattern or candle guide, and the guide text of
+ * every skill with such a line, in the stable and the dynamic part). A weekly prompt whose last bar carries the in-progress tag gains
+ * `### Unfinished Week` in the Analysis Request. Reconciliation now replaces the model's stop
+ * figure in `exit` and `riskReward` when the stop floor moved it, so cached `p34` entries carry
+ * the old prose: the bump moves every technical key.
+ *
+ * Deploy impact: every technical-analysis entry (and its peek and overall keys) goes cold at once,
+ * on every symbol, tier and timeframe, so the first reads after the deploy regenerate. Deploy
+ * outside U.S. and Korean market hours and with the prewarm's model capacity in mind, as for any
+ * technical bump.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p34' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p35' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

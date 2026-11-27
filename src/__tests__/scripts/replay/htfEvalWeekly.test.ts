@@ -139,7 +139,7 @@ describe('K1: weekly hygiene', () => {
                 '### Doji [Not measured on intraday bars]',
             baseRateNotMeasuredLine: '- Not measured on intraday bars.',
             baseRateWritingRuleMeasured:
-                '; when you mention reliability, cite the Measured label on its guide instead.',
+                "; when you mention reliability, cite the Measured label in its guide's header instead.",
             baseRateWritingRuleNotMeasured:
                 '; reliability was not measured on intraday bars, so do not state any.',
             levelHoldMeasured:

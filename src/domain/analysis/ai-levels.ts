@@ -11,6 +11,7 @@ import {
     ENTRY_RECOMMENDATION_BY_POSITION,
 } from '@/domain/analysis/planState';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
+import { rewriteStopInProse } from '@/domain/analysis/stopProse';
 import {
     ceilToKrxTick,
     roundToKrxTick,
@@ -38,7 +39,7 @@ import type {
     ResolvedStop,
 } from '@/domain/types';
 
-/** AI SL/TP 검증 + ATR 기반 fallback resolver. AI 원본 필드를 수정하지 않고 reconciledLevels에 보정값을 병기한다. */
+/** AI SL/TP 검증 + ATR 기반 fallback resolver. AI 원본 숫자 필드를 수정하지 않고 reconciledLevels에 보정값을 병기한다(손절이 옮겨지면 exit·riskReward 본문의 손절 숫자만 고친다). */
 
 /**
  * @internal ATR 배수 상한 SL 가드.
@@ -553,7 +554,10 @@ function stopMoveWhy(
 
 /**
  * @internal Applies SL/TP reconciliation to a bullish recommendation.
- * bullish 추천에 SL/TP 보정을 적용한다. AI 원본 필드는 수정하지 않고 reconciledLevels에만 보정값을 병기한다.
+ * bullish 추천에 SL/TP 보정을 적용한다. AI 원본 숫자 필드(stopLoss, takeProfitPrices, entryPrices)는
+ * 수정하지 않고 reconciledLevels에만 보정값을 병기한다. 손절이 옮겨지면 exit·riskReward 본문에서
+ * 모델 손절 숫자만 보정된 손절로 바꾼다({@link rewriteStopInProse}): 본문이 카드가 쓰지 않는 손절을
+ * 말하지 않게 하기 위해서다.
  */
 export function reconcileBullishActionRecommendation(
     rec: ActionRecommendation,
@@ -718,10 +722,41 @@ export function reconcileBullishActionRecommendation(
             : []),
     ];
 
+    // The numeric AI fields stay as the model wrote them. The stop figure in the two prose
+    // fields whose subject is the stop is moved to the floored stop (`rewriteStopInProse`):
+    // otherwise the card text names a stop the plan no longer uses.
+    const movedFrom = slWasReconciled ? rec.stopLoss : undefined;
+    const proseStop = (text: string): string =>
+        movedFrom === undefined || reconciledSl === undefined
+            ? text
+            : rewriteStopInProse(
+                  text,
+                  movedFrom,
+                  reconciledSl,
+                  currency,
+                  krxTick
+              );
+    const exit = typeof rec.exit === 'string' ? proseStop(rec.exit) : rec.exit;
+    const riskReward =
+        typeof rec.riskReward === 'string'
+            ? proseStop(rec.riskReward)
+            : rec.riskReward;
+    const proseRewritten = exit !== rec.exit || riskReward !== rec.riskReward;
+
     return {
-        recommendation: { ...rec, reconciledLevels: reconciled }, // AI fields UNCHANGED
+        recommendation: {
+            ...rec,
+            exit,
+            riskReward,
+            reconciledLevels: reconciled,
+        },
         wasReconciled: true,
-        changes,
+        changes: proseRewritten
+            ? [
+                  ...changes,
+                  `exit/riskReward: stop figure ${movedFrom} → ${formatPrice(reconciledSl, currency, krxTick)} in prose`,
+              ]
+            : changes,
     };
 }
 

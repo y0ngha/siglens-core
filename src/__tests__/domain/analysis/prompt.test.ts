@@ -24,6 +24,8 @@ import {
     distanceFromExtreme,
     COMPUTED_SECTIONS_RULES,
     INDICATOR_CARDS_BUILT_BY_CODE_NOTE,
+    formatUnfinishedWeekRule,
+    BOOK_FIGURE_MARKER,
 } from '@/domain/analysis/prompt';
 import { INDICATOR_STATE_SECTION_HEADER } from '@/domain/analysis/indicatorState';
 import { CHART_PATTERN_CANDIDATES_SECTION_HEADER } from '@/domain/analysis/chartPatternCandidatesSection';
@@ -1746,12 +1748,12 @@ describe('prompt', () => {
             expect(prompt).not.toContain('[Measured:');
         });
 
-        const PATTERN_RULE =
-            '- Do not call a pattern reliable, high-confidence or likely to reach its target; when you mention reliability, cite the Measured label on its guide or the Measured line of its candidate instead.';
-        const CANDLE_RULE =
-            '- Do not call a candle reliable, high-confidence or likely to play out; when you mention reliability, cite the Measured label on its guide instead.';
+        const literatureRule = (subject: string) =>
+            `The rates on a guide line marked [Book figure, not measured by this engine] come from a book or website on other data: in no field state them as a probability, success rate or reliability of this ${subject}, and never call them measured.`;
+        const PATTERN_RULE = `- Do not call a pattern reliable, high-confidence or likely to reach its target; when you mention reliability, cite the Measured label in its guide's header or the Measured line of its candidate instead. ${literatureRule('pattern')}`;
+        const CANDLE_RULE = `- Do not call a candle reliable, high-confidence or likely to play out; when you mention reliability, cite the Measured label in its guide's header instead. ${literatureRule('candle')}`;
         const INTRADAY_SUFFIX =
-            '; reliability was not measured on intraday bars, so do not state any.';
+            '; reliability was not measured on intraday bars, so do not state any in any field, including the rates on a guide line marked [Book figure, not measured by this engine].';
 
         it('puts each variant of the reliability rule in its own writing block, naming only what that block prints', () => {
             const pattern = render(makeSkill({ type: 'pattern' }));
@@ -1782,6 +1784,80 @@ describe('prompt', () => {
                 );
                 expect(prompt).not.toContain('cite the Measured');
             }
+        });
+
+        it('marks every guide line that cites a book rate and renames its "Measured (" label, leaving other lines alone', () => {
+            const prompt = render(
+                makeSkill({
+                    type: 'candlestick',
+                    content: [
+                        'Marubozu Guide',
+                        '- Measured (Bulkowski, thepatternsite.com): White Marubozu continuation 56%.',
+                        'confidence_weight: 0.5 — Bulkowski (thepatternsite.com/x.html): rank 40/103.',
+                        '- Measured on this engine: none.',
+                    ].join('\n'),
+                })
+            );
+            expect(prompt).toContain(
+                `- ${BOOK_FIGURE_MARKER} Reported (Bulkowski, thepatternsite.com): White Marubozu continuation 56%.`
+            );
+            expect(prompt).toContain(
+                `${BOOK_FIGURE_MARKER} confidence_weight: 0.5 — Bulkowski (thepatternsite.com/x.html): rank 40/103.`
+            );
+            expect(prompt).toContain('\n- Measured on this engine: none.');
+            expect(prompt).not.toContain('Measured (Bulkowski');
+        });
+
+        it('marks only lines that carry a rate, not rule or identification lines that merely cite Bulkowski', () => {
+            const prompt = render(
+                makeSkill({
+                    type: 'pattern',
+                    content: [
+                        '- Breakout: a CLOSE outside either trendline; Bulkowski: it must hold for a day.',
+                        '- Bulkowski (channels.html): "Price should touch each trendline twice."',
+                        '삼중천장 — confidence_weight 0.6 (Bulkowski tt.html: rank 24/36)',
+                        '- Ranked by Bulkowski: rank 24 of 36.',
+                    ].join('\n'),
+                })
+            );
+            expect(prompt).toContain(
+                '\n- Breakout: a CLOSE outside either trendline; Bulkowski: it must hold for a day.'
+            );
+            expect(prompt).toContain(
+                '\n- Bulkowski (channels.html): "Price should touch each trendline twice."'
+            );
+            expect(prompt).toContain(
+                `\n${BOOK_FIGURE_MARKER} 삼중천장 — confidence_weight 0.6 (Bulkowski tt.html: rank 24/36)`
+            );
+            expect(prompt).toContain(
+                `\n- ${BOOK_FIGURE_MARKER} Ranked by Bulkowski: rank 24 of 36.`
+            );
+        });
+
+        it("marks the consumer's literature prefix line once, cleanly, and never twice", () => {
+            const line =
+                "- Bulkowski's study (literature, other data; not measured by SIGLENS): White Marubozu continuation.";
+            const prompt = render(
+                makeSkill({
+                    type: 'candlestick',
+                    content: [
+                        line,
+                        `- ${BOOK_FIGURE_MARKER} Reported (Bulkowski): 56%.`,
+                    ].join('\n'),
+                })
+            );
+            expect(prompt).toContain(
+                `\n- ${BOOK_FIGURE_MARKER} Bulkowski's study (literature, other data; not measured by SIGLENS): White Marubozu continuation.`
+            );
+            expect(prompt).toContain(
+                `\n- ${BOOK_FIGURE_MARKER} Reported (Bulkowski): 56%.`
+            );
+            expect(prompt.split(BOOK_FIGURE_MARKER).length - 1).toBe(
+                (prompt.match(/\[Book figure/g) ?? []).length
+            );
+            expect(prompt).not.toContain(
+                `${BOOK_FIGURE_MARKER} ${BOOK_FIGURE_MARKER}`
+            );
         });
 
         it('no longer asks the model to weigh a candle by "statistical reliability"', () => {
@@ -5230,7 +5306,7 @@ describe('prompt', () => {
         it('Step 1은 진입 구간 배치이고, 코드가 계획 상태에서 판정을 정한다고 정확히 말한다', () => {
             const out = result();
             expect(out).toContain(
-                `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the last close is inside the zone (its low <= close <= its high, edges included), "wait" when the zone lies wholly below the close (a pullback plan) or wholly above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value. To plan an entry at the price, make the zone contain the last close (printed in ## Deterministic Metrics → Entry Zone vs Last Close); a zone whose high is below it is a pullback plan and reads "wait".`
+                `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the last close is inside the zone (its low <= close <= its high, edges included), "wait" when the zone lies wholly below the close (a pullback plan) or wholly above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value. Put the zone at the level your analysis names for the entry (a support, a pullback level, a breakout level), not at the last close by default (printed in ## Deterministic Metrics → Entry Zone vs Last Close): let the zone contain the close only when the close itself sits at that level or the short-term sell-off path below applies, and never widen or shift a zone to reach the close. A zone whose high is below the close is a pullback plan and reads "wait".`
             );
         });
 
@@ -5266,8 +5342,12 @@ describe('prompt', () => {
                 bars,
                 indicators: makeIndicators(),
             });
-            expect(stable + dynamic).toContain(
-                'To plan an entry at the price, make the zone contain the last close'
+            expect(stable).toContain(
+                'not at the last close by default (printed in ## Deterministic Metrics → Entry Zone vs Last Close)'
+            );
+            // The A/B showed this sentence put 78% of plans at the close; it stays out of both parts.
+            expect(stable + dynamic).not.toContain(
+                'make the zone contain the last close'
             );
             expect(dynamic).toContain('### Entry Zone vs Last Close');
             expect(stable).not.toContain('Last close ');
@@ -7358,14 +7438,14 @@ describe('buildAnalysisPrompt — 1Week', () => {
                 '### Some Guide [Not measured on weekly bars]'
             );
             expect(weekly).toContain(
-                '; reliability was not measured on weekly bars, so do not state any.'
+                '; reliability was not measured on weekly bars, so do not state any in any field, including the rates on a guide line marked [Book figure, not measured by this engine].'
             );
             const hourly = render('1Hour', weeklyBars(), [skill]);
             expect(hourly).toContain(
                 '### Some Guide [Not measured on intraday bars]'
             );
             expect(hourly).toContain(
-                '; reliability was not measured on intraday bars, so do not state any.'
+                '; reliability was not measured on intraday bars, so do not state any in any field'
             );
         }
         expect(render('1Week')).toContain(formatLevelHoldFraming('1Week'));
@@ -7472,6 +7552,45 @@ describe('buildAnalysisPrompt — 1Week', () => {
             );
             // No daily series: unknown is not "0 observed", so nothing is printed.
             expect(noDaily).not.toContain('week in progress');
+        });
+
+        const RULE_HEADER = '### Unfinished Week';
+
+        it('tells the model in the Analysis Request to say the week is not finished, only when the tag prints', () => {
+            const out = render(
+                '1Week',
+                bars,
+                [],
+                { session: US_EQUITY_SESSION, now: wednesday },
+                dailyBars
+            );
+            const request = out.slice(out.indexOf('## Analysis Request'));
+            expect(request).toContain(
+                formatUnfinishedWeekRule({ sessionsSoFar: 3, sessionsTotal: 5 })
+            );
+            expect(request).toContain(
+                '- The last bar of ## Recent Bar Data is the current week, still in progress (3 of 5 sessions so far)'
+            );
+            expect(request).toContain(
+                'say that this week is not finished yet.'
+            );
+            const finished = render(
+                '1Week',
+                bars,
+                [],
+                { session: US_EQUITY_SESSION, now: saturday },
+                dailyBars
+            );
+            expect(finished).not.toContain(RULE_HEADER);
+        });
+
+        it('words the rule without a total when the tag has none', () => {
+            expect(
+                formatUnfinishedWeekRule({
+                    sessionsSoFar: 2,
+                    sessionsTotal: null,
+                })
+            ).toContain('(2 sessions so far)');
         });
 
         it('never tags a daily chart', () => {

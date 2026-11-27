@@ -602,11 +602,11 @@ describe('buildFinancialsCacheKey', () => {
 });
 
 describe('currency wording template versions (p32 bump set)', () => {
-    // p34 (technical) and p12 (overall) bumped again after the currency rule; p34 is the
-    // reference-level correctness change (2026-11-20), p12 relabels the volatility grade. The other six still sit at their
+    // p35 (technical) and p12 (overall) bumped again after the currency rule; p35 is the
+    // real-LLM A/B fix on top of the reference-level change (p34, 2026-11-20), p12 relabels the volatility grade. The other six still sit at their
     // currency-rule versions.
     it('pins every version whose non-Korean prompt bytes gained the currency rule', () => {
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p34');
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p35');
         expect(FUNDAMENTAL_PROMPT_TEMPLATE_VERSION).toBe('f7');
         expect(OVERALL_PROMPT_TEMPLATE_VERSION).toBe('p12');
         expect(NEWS_PROMPT_TEMPLATE_VERSION).toBe('p12');
@@ -1198,7 +1198,9 @@ describe('positionBucket이 캐시 키에 반영될 때', () => {
         // 직전 분석 회고에서 적중 평가를 뺀다(크롤러가 읽는 summary 산문).
         // p34 (2026-11-20): 일봉 VWAP 제거, 마감 뒤 일봉 피벗은 마지막 봉, 호라이즌별 피보 기준 스윙,
         // 거래량 프로파일 구간 명시, SMC 유동성 라벨·Chikou 판독 수정, 계획 목표가는 지어내지 않는다.
-        expect(PROMPT_TEMPLATE_VERSION).toBe('p34');
+        // p35 (2026-11-28): 진입 구간을 종가에 두라는 문장 제거, 문헌 확률 금지, 미완성 주봉 규칙,
+        // 옮겨진 손절을 exit·riskReward 본문에 반영.
+        expect(PROMPT_TEMPLATE_VERSION).toBe('p35');
     });
 });
 
