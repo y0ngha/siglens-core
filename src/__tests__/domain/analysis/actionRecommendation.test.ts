@@ -70,6 +70,73 @@ describe('validateActionPrices', () => {
 
         expect(validateActionPrices(rec)).toBeUndefined();
     });
+
+    describe('손절 거부 표식(reconciledLevels.stopLossRejected)', () => {
+        const rejected = {
+            exit: '',
+            riskReward: '',
+            reason: '',
+            stopLossRejected: true,
+        } as const;
+
+        it('표식이 true면 거부된 원본 손절을 빼고 진입·익절은 그대로 둔다', () => {
+            expect(
+                validateActionPrices({
+                    ...baseRec,
+                    stopLoss: 120,
+                    reconciledLevels: rejected,
+                })
+            ).toEqual({
+                entryPrices: [150],
+                stopLoss: undefined,
+                takeProfitPrices: [160, 170],
+            });
+        });
+
+        it('보정 레벨이 있어도 표식이 없으면 원본 손절을 그대로 둔다', () => {
+            expect(
+                validateActionPrices({
+                    ...baseRec,
+                    reconciledLevels: {
+                        exit: '',
+                        riskReward: '',
+                        reason: '',
+                        stopLoss: 140,
+                    },
+                })
+            ).toEqual({
+                entryPrices: [150],
+                stopLoss: 145,
+                takeProfitPrices: [160, 170],
+            });
+        });
+
+        it('표식이 false면 원본 손절을 그대로 둔다', () => {
+            // The type only admits `true`; a stored payload can still carry `false`.
+            const levels = {
+                exit: '',
+                riskReward: '',
+                reason: '',
+                stopLossRejected: false,
+            } as unknown as ActionRecommendation['reconciledLevels'];
+            expect(
+                validateActionPrices({ ...baseRec, reconciledLevels: levels })
+                    ?.stopLoss
+            ).toBe(145);
+        });
+
+        it('손절만 있던 계획이 거부되면 그릴 것이 없다', () => {
+            expect(
+                validateActionPrices({
+                    ...baseRec,
+                    entryPrices: [],
+                    takeProfitPrices: [],
+                    stopLoss: 120,
+                    reconciledLevels: rejected,
+                })
+            ).toBeUndefined();
+        });
+    });
 });
 
 describe('extractReconciledActionLines', () => {

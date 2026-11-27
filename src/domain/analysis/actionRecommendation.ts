@@ -4,6 +4,18 @@ import type {
     ValidatedActionPrices,
 } from '@/domain/types';
 
+/**
+ * The model's entry, stop and target prices with every non-positive value dropped, for
+ * drawing the plan's lines; `undefined` when no price is left.
+ *
+ * When core refused the model's stop (`reconciledLevels.stopLossRejected === true`) the plan
+ * has no stop, so `stopLoss` is `undefined` even though `rec.stopLoss` still holds the
+ * refused value: a chart must not draw it. A plan whose only price was that stop returns
+ * `undefined`. Entry and target prices are unaffected.
+ *
+ * @param rec - The analysis' action recommendation, if any.
+ * @returns The usable prices, or `undefined` when there is nothing to draw.
+ */
 export function validateActionPrices(
     rec: ActionRecommendation | undefined
 ): ValidatedActionPrices | undefined {
@@ -11,7 +23,9 @@ export function validateActionPrices(
 
     const entryPrices = (rec.entryPrices ?? []).filter(p => p > 0);
     const stopLoss =
-        rec.stopLoss !== undefined && rec.stopLoss > 0
+        rec.reconciledLevels?.stopLossRejected !== true &&
+        rec.stopLoss !== undefined &&
+        rec.stopLoss > 0
             ? rec.stopLoss
             : undefined;
     const takeProfitPrices = (rec.takeProfitPrices ?? []).filter(p => p > 0);
