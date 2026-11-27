@@ -1,5 +1,5 @@
 /**
- * Themes `get_theme_snapshot` summarises. SIGLENS curates the baskets: each holds the pure plays that a
+ * Themes the agent's theme-snapshot tool summarises. SIGLENS curates the baskets: each holds the pure plays that a
  * question about the theme means (3–8 names; the Korean baskets are smaller), not every company that touches it. A user never passes a
  * basket of their own. Symbols use SIGLENS form (Korean stocks carry `.KS` / `.KQ`).
  */

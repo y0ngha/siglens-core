@@ -213,12 +213,12 @@ A cap on how many times a tool may run in one agent turn (`AGENT_TURN_CAPS` in
 `src/domain/agent/turnCaps.ts`) is checked by `TurnBudget.reserve` in
 `src/application/agent/runAgentTurn.ts`, which refuses the call with a quota scope. The
 consumer executor has no turn identity and runs one step's calls in parallel, so a counter
-there is racy and resets per call. Add the field to `AGENT_TURN_CAPS` and a branch in
-`reserve`; never ask the consumer to count.
+there is racy and resets per call. Declare the cap on the tool's definition (`perTurn`, with
+`counts` for calls that should not use it); never ask the consumer to count.
 
 ```typescript
 // ❌ executor: if (++filingReads > 2) return { error: 'too_many' }   // no turn identity, parallel
-// ✅ AGENT_TURN_CAPS.maxFilingReads, refused in TurnBudget.reserve
+// ✅ perTurn: { max: AGENT_TURN_CAPS.maxFilingReads, counts: isFilingRead }, refused in TurnBudget.reserve
 ```
 
 ## Testing

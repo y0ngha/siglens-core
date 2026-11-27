@@ -3,26 +3,12 @@ import { MS_PER_DAY } from '@/domain/constants/time';
 import type { MarketDailyClose } from '@/domain/types';
 import { maxOf, minOf } from '@/domain/extent';
 
-/** `get_swing_history`'s `minSwingPct` bounds and default (percent, integer). */
+/** Bounds and default of {@link SwingHistoryOptions}' `minSwingPct` (percent, integer). */
 export const SWING_MIN_PCT = { min: 3, max: 50, default: 10 } as const;
-/** `get_swing_history`'s `lookbackYears` bounds (integer). */
+/** Bounds of {@link SwingHistoryOptions}' `lookbackYears` (integer). */
 export const SWING_LOOKBACK_YEARS = { min: 1, max: 60 } as const;
 /** Most recent declines (and, separately, rallies) listed in full; older ones still count. */
 export const SWING_EPISODES_LISTED_MAX = 20;
-/**
- * How the agent picks `minSwingPct` from the user's words. Shared by the tool description and
- * its routing row so the two never drift apart.
- */
-export const SWING_THRESHOLD_GUIDE =
-    'minSwingPct 10 for 조정 or an ordinary rally, 20 for 약세장 or 강세장 (a bear or bull market), 5 for 눌림목 or a short swing; for a coin or a volatile theme or small-cap stock a 10% swing is routine (it comes every few weeks), so use 20 when the user means a real correction of such a name';
-
-/**
- * Questions that route to `get_swing_history`. Shared by the tool description and its routing
- * row so the two trigger lists never drift apart.
- */
-export const SWING_TRIGGER_EXAMPLES =
-    '조정은 보통 며칠 가?, 월봉 조정 기간, 상승 구간은 보통 얼마나 가?, 평균 낙폭, 평균 상승폭, 고점 회복까지 얼마나 걸려, 역대 하락장·상승장, 지금 조정 깊은 편이야?, 이번 상승 오래된 편이야?, 조정 며칠째야?, 이번 하락은 보통 며칠 더 가?';
-
 /** Lower edges (percent) of the size bands above `minSwingPct`. */
 const DECLINE_BAND_EDGES: readonly number[] = [10, 20, 30, 50];
 const RALLY_BAND_EDGES: readonly number[] = [10, 20, 30, 50, 100];
@@ -705,7 +691,7 @@ function windowHigh(rows: readonly MarketDailyClose[]): WindowHigh {
 }
 
 /**
- * Swing statistics of one instrument from its daily closes, for `get_swing_history`: completed
+ * Swing statistics of one instrument from its daily closes, for the agent's swing-history tool: completed
  * declines and completed rallies with how long and how far each went, and the open leg compared
  * with them.
  *

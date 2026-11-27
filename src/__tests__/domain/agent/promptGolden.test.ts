@@ -6,34 +6,39 @@ import {
     buildAgentSystemPrompt,
     buildAgentTurnContext,
 } from '@/domain/agent/buildAgentSystemPrompt';
-import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import type { AgentLocale } from '@/domain/agent/promptShared';
-import { AGENT_TOOL_SPECS, selectTools } from '@/domain/agent/tools';
 import { selectToolSetSpecs } from '@/domain/agent/toolSet';
 import golden from '@/__tests__/fixtures/agentPromptGolden.json';
+import {
+    TEST_AGENT_TOOL_NAMES,
+    TEST_AGENT_TOOL_SET,
+} from '@/__tests__/fixtures/agentToolSet';
 
 /**
- * Prompt-byte gate for making the agent tool set injectable.
+ * Prompt-byte gate for the agent prompt frame.
  *
- * The hashes in `fixtures/agentPromptGolden.json` were taken from the prompt
- * builder BEFORE the tool text moved into `BUILT_IN_AGENT_TOOL_SET`: a render
- * that reads the same prompt back from the moved text cannot be a reference
- * for itself, so the reference is the frozen hash of the old bytes. Any edit
- * to the system prompt, a routing row, a tool rule, a tool description or the
- * order of the tools changes a hash here; that is a deliberate prompt change:
- * bump `AGENT_PROMPT_VERSION` and regenerate the file in the same commit with
+ * Core no longer ships tools: the consumer passes its own `toolSet` (tool
+ * catalog, routing rows, tool rules, fragments), and pins the bytes of its own
+ * prompt. What core owns is the frame those pieces are spliced into, so the
+ * hashes in `fixtures/agentPromptGolden.json` are renders of the frame with the
+ * fixed test tool set (`fixtures/agentToolSet.ts`). The fixture never changes
+ * with the frame, so a changed hash here is a frame change: bump
+ * `AGENT_PROMPT_VERSION` and regenerate the file in the same commit with
  *
  *   UPDATE_AGENT_PROMPT_GOLDEN=1 yarn test src/__tests__/domain/agent/promptGolden.test.ts
  *
  * which rewrites the fixture from the CURRENT builder (review the diff: it is
  * exactly the prompt change). With the variable unset the test never writes.
- * After core-3 removes the built-in set, the reference comes from the siglens
- * `toolSet` instead.
  *
- * Matrix: 4 locales x guest/member x portfolio symbols present/absent x 27
- * availability sets (all tools, each tool removed in turn, an E2E-like set and
- * the public-API set) = 432 renders, each hashed for the system prompt and
- * for the JSON of the selected tool specs.
+ * The prompt hashes were generated with this test tool set by the builder as it
+ * was before the built-in tool set was deleted, so the deletion is shown not to
+ * have moved a byte of the frame. The turn-context hashes are carried over
+ * unchanged from the earlier 432-cell file.
+ *
+ * Matrix: 4 locales x guest/member x portfolio symbols present/absent x 14
+ * availability sets (all test tools, each tool removed in turn, none) = 224
+ * renders, each hashed for the system prompt and for the JSON of the selected
+ * tool specs.
  */
 
 const LOCALES: readonly AgentLocale[] = ['ko', 'en', 'ja', 'zh'];
@@ -47,38 +52,16 @@ const TURN_CONTEXT_INSTANTS = [
     '2026-01-01T00:00:00Z',
 ];
 
-const ALL_NAMES: readonly string[] = AGENT_TOOL_SPECS.map(s => s.name);
 const AVAILABILITY_SETS: ReadonlyArray<readonly [string, readonly string[]]> = [
-    ['all', ALL_NAMES],
-    ...ALL_NAMES.map(
+    ['all', TEST_AGENT_TOOL_NAMES],
+    ...TEST_AGENT_TOOL_NAMES.map(
         n =>
-            [`minus:${n}`, ALL_NAMES.filter(x => x !== n)] as [string, string[]]
+            [`minus:${n}`, TEST_AGENT_TOOL_NAMES.filter(x => x !== n)] as [
+                string,
+                string[],
+            ]
     ),
-    [
-        'e2e',
-        [
-            'search_ticker',
-            'get_quote',
-            'get_bars_indicators',
-            'get_cached_analysis',
-            'get_news',
-            'get_options_summary',
-            'get_fundamentals',
-            'get_my_portfolio',
-            'show_chart',
-        ],
-    ],
-    [
-        'publicApi',
-        ALL_NAMES.filter(
-            n =>
-                ![
-                    'get_my_portfolio',
-                    'show_chart',
-                    'run_fresh_analysis',
-                ].includes(n)
-        ),
-    ],
+    ['none', []],
 ];
 
 const sha = (text: string): string =>
@@ -110,106 +93,22 @@ describe('agent prompt golden hashes', () => {
         )
     );
 
-    it.runIf(REGENERATE)(
-        'UPDATE_AGENT_PROMPT_GOLDEN=1: 현재 빌더로 고정 해시 파일을 다시 쓴다',
-        () => {
-            const prompts = Object.fromEntries(
-                cells.map(cell => {
-                    const tools = selectTools(cell.available);
-                    const prompt = buildAgentSystemPrompt({
-                        locale: cell.locale,
-                        tools,
-                        guest: cell.guest,
-                        portfolioSymbols: cell.portfolioSymbols,
-                    });
-                    return [
-                        cell.key,
-                        {
-                            prompt: sha(prompt),
-                            specs: sha(JSON.stringify(tools)),
-                        },
-                    ];
-                })
-            );
-            const turnContext = Object.fromEntries(
-                LOCALES.flatMap(locale =>
-                    TURN_CONTEXT_INSTANTS.map(at => [
-                        `${locale}|${at}`,
-                        sha(
-                            buildAgentTurnContext({
-                                locale,
-                                now: new Date(at),
-                            })
-                        ),
-                    ])
-                )
-            );
-            writeFileSync(
-                FIXTURE_PATH,
-                `${JSON.stringify({ prompts, turnContext }, null, 4)}\n`
-            );
-        }
-    );
-
-    it('매트릭스는 432칸이고 고정 해시 파일과 키가 정확히 일치한다', () => {
-        expect(cells).toHaveLength(432);
-        expect(Object.keys(golden.prompts).toSorted()).toEqual(
-            cells.map(c => c.key).toSorted()
-        );
-    });
-
-    it('기본 경로(toolSet 생략)의 프롬프트와 도구 스펙 JSON이 모든 칸에서 고정 해시와 같다', () => {
-        const mismatches = cells.flatMap(cell => {
-            const tools = selectTools(cell.available);
-            const prompt = buildAgentSystemPrompt({
+    const render = (cell: (typeof cells)[number]) => {
+        const tools = selectToolSetSpecs(TEST_AGENT_TOOL_SET, cell.available);
+        return {
+            prompt: buildAgentSystemPrompt({
                 locale: cell.locale,
                 tools,
+                toolSet: TEST_AGENT_TOOL_SET,
                 guest: cell.guest,
                 portfolioSymbols: cell.portfolioSymbols,
-            });
-            const expected =
-                golden.prompts[cell.key as keyof typeof golden.prompts];
-            return [
-                sha(prompt) === expected.prompt ? [] : [`${cell.key} prompt`],
-                sha(JSON.stringify(tools)) === expected.specs
-                    ? []
-                    : [`${cell.key} specs`],
-                sha(
-                    JSON.stringify(
-                        selectToolSetSpecs(
-                            BUILT_IN_AGENT_TOOL_SET,
-                            cell.available
-                        )
-                    )
-                ) === expected.specs
-                    ? []
-                    : [`${cell.key} toolSet specs`],
-            ].flat();
-        });
-        expect(mismatches).toEqual([]);
-    });
+            }),
+            specs: JSON.stringify(tools),
+        };
+    };
 
-    it('내장 도구 묶음을 명시해서 넘겨도 모든 칸에서 같은 바이트다', () => {
-        const mismatches = cells.filter(cell => {
-            const tools = selectTools(cell.available);
-            const input = {
-                locale: cell.locale,
-                tools,
-                guest: cell.guest,
-                portfolioSymbols: cell.portfolioSymbols,
-            };
-            return (
-                buildAgentSystemPrompt({
-                    ...input,
-                    toolSet: BUILT_IN_AGENT_TOOL_SET,
-                }) !== buildAgentSystemPrompt(input)
-            );
-        });
-        expect(mismatches.map(c => c.key)).toEqual([]);
-    });
-
-    it('턴 컨텍스트 노트도 도구 묶음 주입 전과 바이트가 같다', () => {
-        const actual = Object.fromEntries(
+    const turnContextHashes = () =>
+        Object.fromEntries(
             LOCALES.flatMap(locale =>
                 TURN_CONTEXT_INSTANTS.map(at => [
                     `${locale}|${at}`,
@@ -217,6 +116,47 @@ describe('agent prompt golden hashes', () => {
                 ])
             )
         );
-        expect(actual).toEqual(golden.turnContext);
+
+    it.runIf(REGENERATE)(
+        'UPDATE_AGENT_PROMPT_GOLDEN=1: 현재 빌더로 고정 해시 파일을 다시 쓴다',
+        () => {
+            const prompts = Object.fromEntries(
+                cells.map(cell => {
+                    const { prompt, specs } = render(cell);
+                    return [
+                        cell.key,
+                        { prompt: sha(prompt), specs: sha(specs) },
+                    ];
+                })
+            );
+            writeFileSync(
+                FIXTURE_PATH,
+                `${JSON.stringify({ prompts, turnContext: turnContextHashes() }, null, 4)}\n`
+            );
+        }
+    );
+
+    it('매트릭스는 224칸이고 고정 해시 파일과 키가 정확히 일치한다', () => {
+        expect(cells).toHaveLength(224);
+        expect(Object.keys(golden.prompts).toSorted()).toEqual(
+            cells.map(c => c.key).toSorted()
+        );
+    });
+
+    it('테스트 도구 묶음으로 만든 프롬프트와 도구 스펙 JSON이 모든 칸에서 고정 해시와 같다', () => {
+        const mismatches = cells.flatMap(cell => {
+            const { prompt, specs } = render(cell);
+            const expected =
+                golden.prompts[cell.key as keyof typeof golden.prompts];
+            return [
+                sha(prompt) === expected.prompt ? [] : [`${cell.key} prompt`],
+                sha(specs) === expected.specs ? [] : [`${cell.key} specs`],
+            ].flat();
+        });
+        expect(mismatches).toEqual([]);
+    });
+
+    it('턴 컨텍스트 노트는 도구 묶음과 무관하고 바이트가 고정 해시와 같다', () => {
+        expect(turnContextHashes()).toEqual(golden.turnContext);
     });
 });

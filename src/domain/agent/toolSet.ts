@@ -41,9 +41,7 @@ export interface AgentToolDefinition extends AgentToolSpec {
      * `AGENT_LIMITS.freshAnalysisPerDay` (uncapped today, so no counter is touched);
      * a refused call gets `{ error: 'quota', scope: 'daily' }`.
      *
-     * Omitted: a tool named `run_fresh_analysis` still draws on that quota (the
-     * loop's behaviour before this field existed, kept so a consumer set written
-     * without it is metered as before); any other tool has no per-user daily quota.
+     * Omitted: the tool has no per-user daily quota, whatever its name.
      */
     dailyQuota?: 'freshAnalysis';
     /**
@@ -103,8 +101,8 @@ export interface AgentToolSetFragments {
  * Everything in the agent prompt and the loop that belongs to the consumer's
  * tools: the tool definitions, the routing rows and tool rules the prompt
  * lists for them, and the loop's per-tool caps (carried by the definitions).
- * `runAgentTurn` and `buildAgentSystemPrompt` take one as an opt-in
- * `toolSet`; omitted, they use `BUILT_IN_AGENT_TOOL_SET`.
+ * `runAgentTurn` and `buildAgentSystemPrompt` require one as `toolSet`: core
+ * ships no tools of its own.
  */
 export interface AgentToolSet {
     /** Version of the tool text, for the consumer's own logs (core logs `AGENT_PROMPT_VERSION`). */
@@ -144,8 +142,8 @@ export function toAgentToolSpec(
 }
 
 /**
- * Filter a tool set to the tools the consumer can execute right now.
- * Mirrors `selectTools` for a caller-supplied set.
+ * Filter a tool set to the tools the consumer can execute right now. The
+ * consumer computes `available`; core never reads env.
  *
  * @param toolSet - The consumer's tool set.
  * @param available - Names of tools the consumer can currently execute.

@@ -253,7 +253,7 @@ consumer(DB 저장소, 시세·뉴스·재무 등 데이터 provider)가 소유�
 
 ### agent (ai.siglens.io)
 
-- `domain/agent/` — 툴 카탈로그·인자 검증(`validateArgs`)·시스템 프롬프트·이력 창 (순수)
+- `domain/agent/` — 도구 묶음 타입(`AgentToolSet`, 도구 자체는 소비자 소유)·인자 검증(`validateArgs`)·시스템 프롬프트 틀·이력 창·도구 결과 계산 (순수)
 - `domain/ports/agentProvider.ts` — 툴 콜링 스트리밍 프로바이더 포트 (어댑터는 siglens 소유)
 - `domain/ports/counterStore.ts` — 기간 카운터 포트와 `CounterStoreUnavailableError` (fail-closed 장애 신호)
 - `application/agent/` — `runAgentTurn` 루프(상한·마감·환불·중단)와 `AGENT_LIMITS` 정책

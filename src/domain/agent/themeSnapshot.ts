@@ -2,7 +2,7 @@ import { medianOfSorted, round2 } from '@/domain/agent/statsMath';
 import type { AgentTheme } from '@/domain/agent/themes';
 import { maxOf } from '@/domain/extent';
 
-/** Lookbacks `get_theme_snapshot` reports, in completed daily sessions. */
+/** Lookbacks a theme snapshot reports, in completed daily sessions. */
 export const THEME_CHANGE_WINDOWS = { '1d': 1, '5d': 5, '20d': 20 } as const;
 export type ThemeChangeWindow = keyof typeof THEME_CHANGE_WINDOWS;
 /** Sessions the 52-week high is read over. */
