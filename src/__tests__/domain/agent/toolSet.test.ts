@@ -143,6 +143,14 @@ describe('BUILT_IN_AGENT_TOOL_SET', () => {
         ]);
     });
 
+    it('일일 분석 쿼터는 run_fresh_analysis 정의에만 실려 있다', () => {
+        expect(
+            BUILT_IN_AGENT_TOOL_SET.tools
+                .filter(t => t.dailyQuota !== undefined)
+                .map(t => [t.name, t.dailyQuota])
+        ).toEqual([['run_fresh_analysis', 'freshAnalysis']]);
+    });
+
     it('get_company_filings는 accession이 있는 본문 읽기만 상한에 센다', () => {
         const counts = BUILT_IN_AGENT_TOOL_SET.tools.find(
             t => t.name === 'get_company_filings'
@@ -171,6 +179,7 @@ describe('toAgentToolSpec / selectToolSetSpecs', () => {
         const def = definition('t', {
             perTurn: { max: 1 },
             meter: 'webSearch',
+            dailyQuota: 'freshAnalysis',
             estimatedSeconds: () => 5,
         });
         const spec = toAgentToolSpec(def);
@@ -181,6 +190,7 @@ describe('toAgentToolSpec / selectToolSetSpecs', () => {
             'inputSchema',
         ]);
         expect(JSON.stringify(spec)).not.toContain('perTurn');
+        expect(JSON.stringify(spec)).not.toContain('dailyQuota');
     });
 
     it('가용한 도구만 묶음 순서대로 돌려주고 기본 묶음은 selectTools와 같다', () => {

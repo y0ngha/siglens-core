@@ -36,6 +36,17 @@ export interface AgentToolDefinition extends AgentToolSpec {
      */
     meter?: 'webSearch';
     /**
+     * Per-user daily quota every call of this tool draws on. `'freshAnalysis'`:
+     * `AgentCounters.freshAnalysis` under the caller tier's
+     * `AGENT_LIMITS.freshAnalysisPerDay` (uncapped today, so no counter is touched);
+     * a refused call gets `{ error: 'quota', scope: 'daily' }`.
+     *
+     * Omitted: a tool named `run_fresh_analysis` still draws on that quota (the
+     * loop's behaviour before this field existed, kept so a consumer set written
+     * without it is metered as before); any other tool has no per-user daily quota.
+     */
+    dailyQuota?: 'freshAnalysis';
+    /**
      * Seconds shown in `tool_start` while the call runs. Omitted, or
      * `undefined` for these arguments: the event carries no estimate.
      */
@@ -118,14 +129,16 @@ export interface AgentToolSet {
  * change the tool bytes a provider (and its prefix cache) sees.
  *
  * @param definition - A tool definition.
- * @returns A new object holding every field except `perTurn`, `meter` and `estimatedSeconds`.
+ * @returns A new object holding every field except `perTurn`, `meter`, `dailyQuota` and `estimatedSeconds`.
  */
 export function toAgentToolSpec(
     definition: AgentToolDefinition
 ): AgentToolSpec {
-    const { perTurn, meter, estimatedSeconds, ...spec } = definition;
+    const { perTurn, meter, dailyQuota, estimatedSeconds, ...spec } =
+        definition;
     void perTurn;
     void meter;
+    void dailyQuota;
     void estimatedSeconds;
     return spec;
 }
