@@ -1,6 +1,6 @@
 import { medianOfSorted, round2 } from '@/domain/agent/statsMath';
 
-/** Indices `get_index_history_stats` covers. */
+/** Indices the agent's index-history statistics cover. */
 export const AGENT_HISTORY_INDICES = [
     'sp500',
     'nasdaq',
@@ -101,7 +101,7 @@ function previousMonth(month: string): string {
 }
 
 /**
- * Turns month-end closes into the tables `get_index_history_stats` returns: full-year returns with the year's
+ * Turns month-end closes into the tables the agent's index-history statistics return: full-year returns with the year's
  * deepest month-end drawdown, month-of-year seasonality, and for US indices the presidential-cycle grouping and
  * the 12 months after each midterm October. Months at or after `currentMonth` (still in progress) and malformed
  * or non-positive closes are dropped. A year counts only with its own December and the previous December; a

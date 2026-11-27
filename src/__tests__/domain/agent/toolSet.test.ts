@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { buildAgentSystemPrompt } from '@/domain/agent/buildAgentSystemPrompt';
-import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import {
     selectToolSetSpecs,
     toAgentToolSpec,
     type AgentToolDefinition,
     type AgentToolSet,
 } from '@/domain/agent/toolSet';
-import { AGENT_TOOL_SPECS, selectTools } from '@/domain/agent/tools';
-import { AGENT_TURN_CAPS } from '@/domain/agent/turnCaps';
+import {
+    TEST_AGENT_TOOL_NAMES,
+    TEST_AGENT_TOOL_SET,
+} from '@/__tests__/fixtures/agentToolSet';
 
 const EMPTY_SCHEMA = {
     type: 'object',
@@ -29,7 +30,7 @@ function definition(
     };
 }
 
-/** A tool set that shares no text with the built-in one. */
+/** A tool set that shares no text with the test tool set. */
 const CUSTOM_SET: AgentToolSet = {
     version: 'custom.1',
     tools: [definition('lookup_thing'), definition('scan_web')],
@@ -74,106 +75,6 @@ function differingSections(a: string, b: string): string[] {
     return [...left.keys()].filter(k => left.get(k) !== right.get(k));
 }
 
-describe('BUILT_IN_AGENT_TOOL_SET', () => {
-    it('도구는 AGENT_TOOL_SPECS와 같은 순서·같은 내용이고, 제공자에게 가는 부분은 원본 스펙과 JSON까지 같다', () => {
-        expect(BUILT_IN_AGENT_TOOL_SET.tools.map(t => t.name)).toEqual(
-            AGENT_TOOL_SPECS.map(s => s.name)
-        );
-        expect(
-            JSON.stringify(BUILT_IN_AGENT_TOOL_SET.tools.map(toAgentToolSpec))
-        ).toBe(JSON.stringify(AGENT_TOOL_SPECS));
-    });
-
-    it('도구별 턴 상한·계량·예상 시간은 예전 루프에 박혀 있던 값 그대로다', () => {
-        const metaOf = (name: string) => {
-            const tool = BUILT_IN_AGENT_TOOL_SET.tools.find(
-                t => t.name === name
-            );
-            return {
-                max: tool?.perTurn?.max,
-                hasCounts: tool?.perTurn?.counts !== undefined,
-                meter: tool?.meter,
-                hasEstimate: tool?.estimatedSeconds !== undefined,
-            };
-        };
-        expect(metaOf('web_search')).toEqual({
-            max: AGENT_TURN_CAPS.maxWebSearch,
-            hasCounts: false,
-            meter: 'webSearch',
-            hasEstimate: false,
-        });
-        expect(metaOf('run_fresh_analysis')).toEqual({
-            max: AGENT_TURN_CAPS.maxFreshAnalysis,
-            hasCounts: false,
-            meter: undefined,
-            hasEstimate: true,
-        });
-        expect(metaOf('get_company_filings')).toEqual({
-            max: AGENT_TURN_CAPS.maxFilingReads,
-            hasCounts: true,
-            meter: undefined,
-            hasEstimate: false,
-        });
-        expect(metaOf('get_x_posts')).toEqual({
-            max: AGENT_TURN_CAPS.maxXPostCalls,
-            hasCounts: false,
-            meter: undefined,
-            hasEstimate: false,
-        });
-        expect(metaOf('show_chart')).toEqual({
-            max: AGENT_TURN_CAPS.maxCharts,
-            hasCounts: false,
-            meter: undefined,
-            hasEstimate: false,
-        });
-        const capped = BUILT_IN_AGENT_TOOL_SET.tools
-            .filter(
-                t =>
-                    t.perTurn !== undefined ||
-                    t.meter !== undefined ||
-                    t.estimatedSeconds !== undefined
-            )
-            .map(t => t.name);
-        expect(capped).toEqual([
-            'get_company_filings',
-            'run_fresh_analysis',
-            'get_x_posts',
-            'show_chart',
-            'web_search',
-        ]);
-    });
-
-    it('일일 분석 쿼터는 run_fresh_analysis 정의에만 실려 있다', () => {
-        expect(
-            BUILT_IN_AGENT_TOOL_SET.tools
-                .filter(t => t.dailyQuota !== undefined)
-                .map(t => [t.name, t.dailyQuota])
-        ).toEqual([['run_fresh_analysis', 'freshAnalysis']]);
-    });
-
-    it('get_company_filings는 accession이 있는 본문 읽기만 상한에 센다', () => {
-        const counts = BUILT_IN_AGENT_TOOL_SET.tools.find(
-            t => t.name === 'get_company_filings'
-        )?.perTurn?.counts;
-        expect(counts?.({ symbol: 'IONQ' })).toBe(false);
-        expect(counts?.({ symbol: 'IONQ', accession: '' })).toBe(false);
-        expect(counts?.({ symbol: 'IONQ', accession: '   ' })).toBe(false);
-        expect(counts?.({ symbol: 'IONQ', accession: 7 })).toBe(false);
-        expect(counts?.({ symbol: 'IONQ', accession: '0001-26-1' })).toBe(true);
-    });
-
-    it('run_fresh_analysis 예상 시간은 kind별 고정값이고 모르는 kind는 없다', () => {
-        const estimate = BUILT_IN_AGENT_TOOL_SET.tools.find(
-            t => t.name === 'run_fresh_analysis'
-        )?.estimatedSeconds;
-        expect(
-            ['technical', 'overall', 'news', 'options', 'other', undefined].map(
-                kind => estimate?.({ kind })
-            )
-        ).toEqual([40, 120, 90, 60, undefined, undefined]);
-    });
-});
-
 describe('toAgentToolSpec / selectToolSetSpecs', () => {
     it('부가 필드를 떼고 나머지 키 순서를 그대로 둔다', () => {
         const def = definition('t', {
@@ -193,47 +94,42 @@ describe('toAgentToolSpec / selectToolSetSpecs', () => {
         expect(JSON.stringify(spec)).not.toContain('dailyQuota');
     });
 
-    it('가용한 도구만 묶음 순서대로 돌려주고 기본 묶음은 selectTools와 같다', () => {
+    it('가용한 도구만 가용 집합 순서가 아니라 묶음 순서대로 돌려준다', () => {
         expect(
             selectToolSetSpecs(CUSTOM_SET, new Set(['scan_web', 'x'])).map(
                 s => s.name
             )
         ).toEqual(['scan_web']);
-        const available = new Set(['get_news', 'search_ticker', 'web_search']);
         expect(
-            JSON.stringify(
-                selectToolSetSpecs(BUILT_IN_AGENT_TOOL_SET, available)
-            )
-        ).toBe(JSON.stringify(selectTools(available)));
+            selectToolSetSpecs(
+                TEST_AGENT_TOOL_SET,
+                new Set(['web_search', 'get_news', 'search_ticker'])
+            ).map(s => s.name)
+        ).toEqual(['search_ticker', 'get_news', 'web_search']);
     });
 });
 
 describe('buildAgentSystemPrompt toolSet', () => {
-    const allTools = selectTools(new Set(AGENT_TOOL_SPECS.map(s => s.name)));
+    const allTools = selectToolSetSpecs(
+        TEST_AGENT_TOOL_SET,
+        new Set(TEST_AGENT_TOOL_NAMES)
+    );
     const base = {
         locale: 'en',
         tools: allTools,
+        toolSet: TEST_AGENT_TOOL_SET,
         portfolioSymbols: ['AAPL'],
     } as const;
 
-    it('내장 묶음을 명시한 것과 생략한 것은 바이트가 같다', () => {
-        expect(
-            buildAgentSystemPrompt({
-                ...base,
-                toolSet: BUILT_IN_AGENT_TOOL_SET,
-            })
-        ).toBe(buildAgentSystemPrompt(base));
-    });
-
     it('다른 묶음은 도구 관련 구역(Tools·Output의 한 줄·User)만 바꾼다', () => {
-        const builtIn = buildAgentSystemPrompt(base);
+        const testSet = buildAgentSystemPrompt(base);
         const custom = buildAgentSystemPrompt({ ...base, toolSet: CUSTOM_SET });
-        const differing = differingSections(builtIn, custom);
+        const differing = differingSections(testSet, custom);
         expect(differing).toEqual(['Tools', 'Output', 'User']);
 
         const outputLines = (prompt: string) =>
             sectionsOf(prompt).get('Output')?.split('\n') ?? [];
-        const a = outputLines(builtIn);
+        const a = outputLines(testSet);
         const b = outputLines(custom);
         expect(a).toHaveLength(b.length);
         const changed = a.flatMap((line, i) =>
@@ -269,6 +165,7 @@ describe('buildAgentSystemPrompt toolSet', () => {
         expect(prompt).toContain('custom_tool with a hint, a period');
         expect(prompt).not.toContain('search_ticker');
         expect(prompt).not.toContain('get_my_portfolio');
+        expect(prompt).not.toContain('Test rule');
     });
 
     it('게스트 문장은 묶음의 가능 목록을 쓴다', () => {

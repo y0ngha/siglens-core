@@ -75,7 +75,7 @@ A fear and greed index scores 0 to 100 in five stages (extreme fear, fear, neutr
 
 ### Agent building blocks
 
-For the conversational agent, the package supplies the tool catalog, argument validation, the system prompt, history windowing, and a turn loop with step limits, cancellation, and refunds.
+For the conversational agent, the package supplies the tool-set contract (the consumer brings its own tools), argument validation, the system prompt frame, history windowing, and a turn loop with step limits, cancellation, and refunds.
 
 ## Architecture
 

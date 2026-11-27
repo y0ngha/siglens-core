@@ -6,9 +6,10 @@
  * stays low because the global Brave budget (`AGENT_GLOBAL_LIMITS` by default) is shared
  * by every user.
  *
- * Lives in `domain/` (re-exported from `application/agent/limits.ts`) because
- * the tool descriptions the model reads (`tools.ts`) quote these numbers, and
- * `domain/` cannot import `application/` — one source keeps them in step.
+ * The per-tool fields are the values the consumer's tool definitions put in
+ * `perTurn` (`AgentToolPerTurnCap`); `TurnBudget` enforces whatever a
+ * definition declares. Lives in `domain/` and is re-exported from
+ * `application/agent/limits.ts`.
  */
 export const AGENT_TURN_CAPS = {
     maxSteps: 10,
@@ -16,14 +17,14 @@ export const AGENT_TURN_CAPS = {
     maxWebSearch: 4,
     maxFreshAnalysis: 3,
     /**
-     * Filing texts one turn may read through `get_company_filings` (a call
-     * with `accession`). A text is up to `AGENT_FILING_TEXT_MAX_CHARS`, so a
-     * third read would crowd the context the answer still needs. Listing
-     * filings (no `accession`) is not counted.
+     * Filing texts one turn may read (SIGLENS: a filings call with
+     * `accession`). A text is thousands of characters, so a third read would
+     * crowd the context the answer still needs. Listing filings is not
+     * counted.
      */
     maxFilingReads: 2,
     /**
-     * `get_x_posts` calls one turn may make. Each call reads up to two
+     * X posts calls one turn may make. Each call reads up to two
      * accounts' recent posts and X bills per post read, so a comparison across
      * many symbols must not fan out. Every call counts, including one that
      * finds no account (the budget cannot know the outcome when it reserves),
@@ -32,7 +33,7 @@ export const AGENT_TURN_CAPS = {
      */
     maxXPostCalls: 3,
     /**
-     * `show_chart` calls one turn may make. The chat shows at most three charts under one answer, so a fourth would be
+     * Chart calls one turn may make. The chat shows at most three charts under one answer, so a fourth would be
      * drawn for nobody; the prompt asks for two at most, this is the hard stop.
      */
     maxCharts: 3,

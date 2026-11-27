@@ -51,8 +51,9 @@ export const PULLBACK_WASHOUT_WILLIAMS_R = -90;
 export const PULLBACK_NEAR_WILLIAMS_R = -80;
 
 /**
- * @internal What the measured 66-75% of the washout-in-uptrend reading is: the hit rate of a quick exit, never a win rate or a
- * holding-period result. Shared by the analysis prompt and the agent pullback rule so the two cannot drift apart.
+ * What the measured 66-75% of the washout-in-uptrend reading is: the hit rate of a quick exit, never a win rate or a
+ * holding-period result. Shared by the analysis prompt and the consumer's agent pullback rule (exported for it) so the
+ * two cannot drift apart.
  */
 export const PULLBACK_MEASURED_RATE_MEANING =
     '66-75% is the share of short trades exited at the first close above MA5 (or after about 10 days) that ended in profit';
@@ -61,7 +62,7 @@ export const PULLBACK_MEASURED_RATE_MEANING =
  * What each reading has historically meant, in words a model can quote. `none` carries no
  * base rate.
  *
- * Keep in sync: the 66-75% wording below is restated by the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and the agent pullback rule (domain/agent/builtInToolSet.ts), which both build their sentence from {@link PULLBACK_MEASURED_RATE_MEANING}; if the meaning of the figure changes, change that constant and this text together.
+ * Keep in sync: the 66-75% wording below is restated by the analysis prompt Step 3 rule (domain/analysis/prompt.ts) and the consumer's agent pullback rule, which both build their sentence from {@link PULLBACK_MEASURED_RATE_MEANING}; if the meaning of the figure changes, change that constant and this text together.
  *
  * Measured on daily bars, entry at the signal day's close, 0.1% cost per side, over a
  * long multi-decade history split into five periods (the period labels appear in the

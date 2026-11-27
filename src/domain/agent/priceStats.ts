@@ -7,7 +7,7 @@ import {
 import { round2 } from '@/domain/agent/statsMath';
 import type { MarketDailyClose } from '@/domain/types';
 
-/** Named windows `get_price_stats` accepts, ending at the subject's last completed session. */
+/** Named windows {@link computePriceStats} accepts, ending at the subject's last completed session. */
 export const AGENT_PRICE_STATS_PERIODS = [
     'ytd',
     '1m',
@@ -38,11 +38,19 @@ export const PRICE_STATS_MIN_DAILY_OBSERVATIONS = 20;
 export const PRICE_STATS_MIN_WEEKLY_OBSERVATIONS = 12;
 
 /**
- * @internal An annual rate is printed only for a window longer than one year:
+ * An annual rate (`cagrPct`) is printed only for a window longer than one year:
  * more than this many calendar days (one leap year), and never for a named
- * period of a year or less or for a calendar year.
+ * period of a year or less or for a calendar year. Exported so a consumer's
+ * text about when the rate is given quotes the same number.
  */
 export const PRICE_STATS_CAGR_ABOVE_DAYS = 366;
+
+/**
+ * Calendar years a `year` window accepts: the earliest index history
+ * (1971) to a far upper bound. Exported so a consumer's argument schema
+ * bounds `year` with the same numbers.
+ */
+export const PRICE_STATS_YEAR = { min: 1971, max: 2100 } as const;
 
 /**
  * The window a caller asked for. `none`: only `dates` was passed, so the result

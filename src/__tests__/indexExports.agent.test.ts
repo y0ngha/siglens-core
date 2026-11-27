@@ -1,11 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import * as clientApi from '@/index.client';
+import * as serverApi from '@/index';
 import {
     AGENT_FOLLOW_UP_MARKER,
-    BARS_RESULT_NOTES,
-    FUNDAMENTALS_RESULT_NOTES,
-    AGENT_TOOL_SPECS,
-    BUILT_IN_AGENT_TOOL_SET,
     CounterStoreUnavailableError,
     findUngroundedNumbers,
     peekMacroBriefingCacheEntry,
@@ -17,7 +14,10 @@ import {
     AGENT_PRICE_STATS_MAX_DATES,
     AGENT_PRICE_STATS_MAX_SUBJECTS,
     AGENT_PRICE_STATS_PERIODS,
+    PRICE_STATS_CAGR_ABOVE_DAYS,
     PRICE_STATS_NOTE_TEMPLATES,
+    PRICE_STATS_YEAR,
+    PULLBACK_MEASURED_RATE_MEANING,
     alignNewsWithPriceMoves,
     buildLevelLadder,
     calendarPeriodChange,
@@ -38,25 +38,76 @@ import {
 } from '@/index';
 
 describe('index — agent exports', () => {
-    it('runAgentTurn·툴 카탈로그·CounterStoreUnavailableError를 값으로 내보낸다', () => {
+    it('runAgentTurn·CounterStoreUnavailableError를 값으로 내보낸다', () => {
         expect(typeof runAgentTurn).toBe('function');
-        expect(AGENT_TOOL_SPECS.length).toBe(24);
         expect(new CounterStoreUnavailableError('p')).toBeInstanceOf(Error);
     });
 
+    // core는 도구를 싣지 않는다: 도구 명세·묶음은 소비자 것이다.
+    it('내장 도구 묶음과 옛 도구 카탈로그·출력 계약 상수를 내보내지 않는다', () => {
+        const api: Record<string, unknown> = { ...serverApi };
+        for (const name of [
+            'BUILT_IN_AGENT_TOOL_SET',
+            'AGENT_TOOL_SPECS',
+            'AGENT_TOOL_NAMES',
+            'findToolSpec',
+            'selectTools',
+            'BARS_RESULT_NOTES',
+            'FUNDAMENTALS_RESULT_NOTES',
+            'AGENT_X_POSTS_MAX',
+            'AGENT_FILINGS_LIST_MAX',
+            'AGENT_MACRO_INSTRUMENTS',
+            'AGENT_CHART_KINDS',
+            'AGENT_COMPARE_SYMBOLS_MAX',
+        ]) {
+            expect(name in api).toBe(false);
+        }
+    });
+
     // 서버 진입점 전용이다: 프롬프트·루프 조립은 서버만 하고 브라우저 번들은 도구 묶음을 쓰지 않는다.
-    it('도구 묶음(내장 묶음·선택 함수)을 서버 진입점으로만 내보낸다', () => {
-        expect(BUILT_IN_AGENT_TOOL_SET.tools).toHaveLength(
-            AGENT_TOOL_SPECS.length
-        );
+    it('도구 묶음 선택 함수를 서버 진입점으로만 내보낸다', () => {
+        const toolSet = {
+            version: 't',
+            tools: [
+                {
+                    name: 'lookup_a',
+                    description: 'A.',
+                    costClass: 'free' as const,
+                    inputSchema: {
+                        type: 'object' as const,
+                        properties: {},
+                        additionalProperties: false as const,
+                    },
+                    perTurn: { max: 1 },
+                },
+            ],
+            routingRows: [],
+            ruleLines: () => [],
+            fragments: {
+                computedFigureExamples: '',
+                guestCapabilities: () => '',
+                portfolioTool: '',
+                recallExamples: () => '',
+                internalToolNameExamples: '',
+                toolDisplayNames: '',
+            },
+        };
         expect(
-            selectToolSetSpecs(
-                BUILT_IN_AGENT_TOOL_SET,
-                new Set(['get_quote'])
-            ).map(t => t.name)
-        ).toEqual(['get_quote']);
-        expect('BUILT_IN_AGENT_TOOL_SET' in clientApi).toBe(false);
+            selectToolSetSpecs(toolSet, new Set(['lookup_a'])).map(t =>
+                Object.keys(t)
+            )
+        ).toEqual([['name', 'description', 'costClass', 'inputSchema']]);
         expect('selectToolSetSpecs' in clientApi).toBe(false);
+    });
+
+    // 서버 진입점 전용이다: 소비자의 도구 문구가 core 계산과 같은 숫자·문장을 쓰도록 내보낸다.
+    it('계산과 묶인 상수·문장을 서버 진입점으로만 내보낸다', () => {
+        expect(PRICE_STATS_CAGR_ABOVE_DAYS).toBe(366);
+        expect(PRICE_STATS_YEAR).toEqual({ min: 1971, max: 2100 });
+        expect(PULLBACK_MEASURED_RATE_MEANING).toContain('66-75%');
+        expect('PRICE_STATS_CAGR_ABOVE_DAYS' in clientApi).toBe(false);
+        expect('PRICE_STATS_YEAR' in clientApi).toBe(false);
+        expect('PULLBACK_MEASURED_RATE_MEANING' in clientApi).toBe(false);
     });
 
     // 서버 진입점 전용이다: 스윙 통계는 도구 실행기(서버)만 계산하고 브라우저 번들은 쓰지 않는다.
@@ -118,15 +169,6 @@ describe('index — agent exports', () => {
         });
         expect(LONG_TERM_MA_CROSS.lookbackBars).toBe(252);
         expect('LONG_TERM_MA_CROSS' in clientApi).toBe(false);
-    });
-
-    // 서버 진입점 전용이다: 결과 notes는 도구 실행기(서버)만 붙이고 브라우저 번들은 쓰지 않는다.
-    it('결과 notes 문구를 서버 진입점으로만 내보낸다', () => {
-        expect(typeof BARS_RESULT_NOTES.dailyOnlyFields).toBe('function');
-        expect(typeof BARS_RESULT_NOTES.closeStreakUnavailable).toBe('string');
-        expect(typeof FUNDAMENTALS_RESULT_NOTES.peUntrusted).toBe('string');
-        expect('BARS_RESULT_NOTES' in clientApi).toBe(false);
-        expect('FUNDAMENTALS_RESULT_NOTES' in clientApi).toBe(false);
     });
 
     it('findUngroundedNumbers를 값으로 내보낸다', () => {

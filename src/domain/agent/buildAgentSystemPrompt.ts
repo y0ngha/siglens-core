@@ -1,4 +1,3 @@
-import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import type { AgentToolSet } from '@/domain/agent/toolSet';
 import type { AgentToolSpec } from '@/domain/ports/agentProvider';
 import { US_EQUITY_SESSION } from '@/domain/session';
@@ -18,20 +17,21 @@ import { formatAgentTimestamp, resolveAgentTimeZone } from './userTimeZone';
 
 export type { AgentLocale };
 
-/** Bump whenever the prompt text or a tool description changes; logged per turn. */
+/**
+ * Bump whenever the frame text changes (the consumer versions its own tool
+ * text, `AgentToolSet.version`); logged per turn.
+ */
 export const AGENT_PROMPT_VERSION = '2026-11-27.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
     tools: readonly AgentToolSpec[];
     /**
-     * The tool set whose routing rows, tool rules and fragments the prompt
-     * renders. Omitted: `BUILT_IN_AGENT_TOOL_SET`, and the bytes are exactly
-     * what the prompt was before the set became injectable. `tools` still
-     * decides which tools are available this turn; a set only supplies the
-     * text for them.
+     * The consumer's tool set, whose routing rows, tool rules and fragments
+     * the prompt renders; core ships no tools. `tools` still decides which
+     * tools are available this turn; a set only supplies the text for them.
      */
-    toolSet?: AgentToolSet;
+    toolSet: AgentToolSet;
     /**
      * @deprecated Ignored. The clock moved out of the system prompt into
      * {@link buildAgentTurnContext} (attached to the latest user message) so
@@ -44,7 +44,7 @@ export interface BuildAgentSystemPromptInput {
     etSessionStatus?: EtSessionStatus;
     /**
      * Symbols the signed-in user holds; quantities stay
-     * behind `get_my_portfolio`. Callers must pass only symbols that passed
+     * behind the tool set's `fragments.portfolioTool`. Callers must pass only symbols that passed
      * the consumer's symbol-shape validation; values are inserted verbatim
      * into the system prompt.
      */
@@ -147,8 +147,8 @@ function routingTable(
  * {@link buildAgentTurnContext}, attached to the latest user message only;
  * what remains varies only with locale, tool set and the user's holdings.
  *
- * @param input - Locale, selected tools, and the signed-in user's portfolio
- * symbols (if any).
+ * @param input - Locale, selected tools, the consumer's tool set, and the
+ * signed-in user's portfolio symbols (if any).
  * @returns The assembled system prompt string.
  */
 export function buildAgentSystemPrompt(
@@ -179,7 +179,7 @@ export function buildAgentSystemPrompt(
         input.locale === 'ko'
             ? `"${brand.service} 분석의 판정 기준"`
             : `"How ${brand.service}'s analysis spots it"`;
-    const toolSet = input.toolSet ?? BUILT_IN_AGENT_TOOL_SET;
+    const { toolSet } = input;
     const { fragments } = toolSet;
     const toolList = input.tools.map(t => `- ${t.name}`).join('\n');
     const available = new Set(input.tools.map(t => t.name));

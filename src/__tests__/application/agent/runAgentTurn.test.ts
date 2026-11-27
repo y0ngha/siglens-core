@@ -29,9 +29,11 @@ import {
     composeAgentUserMessage,
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { AGENT_IMAGES_PER_MESSAGE_MAX } from '@/domain/agent/attachedImages';
-import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import type { AgentToolDefinition, AgentToolSet } from '@/domain/agent/toolSet';
-import { AGENT_TOOL_NAMES } from '@/domain/agent/tools';
+import {
+    TEST_AGENT_TOOL_NAMES,
+    TEST_AGENT_TOOL_SET,
+} from '@/__tests__/fixtures/agentToolSet';
 import type { Tier } from '@/domain/types';
 
 const USAGE = {
@@ -124,6 +126,7 @@ function params(
             'run_fresh_analysis',
             'web_search',
         ]),
+        toolSet: TEST_AGENT_TOOL_SET,
         now: new Date('2026-09-12T14:30:00Z'),
         ...overrides,
     };
@@ -2200,7 +2203,7 @@ describe('runAgentTurn toolSet', () => {
         estimatedSeconds: args => (args.mode === 'long' ? 99 : undefined),
     };
     const customSet: AgentToolSet = {
-        ...BUILT_IN_AGENT_TOOL_SET,
+        ...TEST_AGENT_TOOL_SET,
         version: 'custom.1',
         tools: [lookup, scan, slow],
         routingRows: [
@@ -2453,11 +2456,16 @@ describe('runAgentTurn toolSet', () => {
             expect(r.results[1]).toEqual({ error: 'quota', scope: 'daily' });
         });
 
-        it('dailyQuota가 없어도 이름이 run_fresh_analysis면 예전처럼 일일 분석 쿼터를 쓴다', async () => {
+        it('dailyQuota가 없으면 이름이 run_fresh_analysis여도 일일 분석 쿼터를 쓰지 않는다', async () => {
+            // The name-keyed fallback went away with the built-in tool set:
+            // only the definition's field decides.
             const r = await runWith({ ...slow, name: 'run_fresh_analysis' });
-            expect(r.counted).toBe(1);
-            expect(r.executed).toBe(1);
-            expect(r.results[1]).toEqual({ error: 'quota', scope: 'daily' });
+            expect(r.counted).toBe(0);
+            expect(r.executed).toBe(2);
+            expect(r.results).not.toContainEqual({
+                error: 'quota',
+                scope: 'daily',
+            });
         });
 
         it('dailyQuota가 없고 다른 이름인 도구는 일일 분석 쿼터를 쓰지 않는다', async () => {
@@ -2470,7 +2478,7 @@ describe('runAgentTurn toolSet', () => {
             });
         });
 
-        it('기본 묶음의 run_fresh_analysis는 정의의 dailyQuota로 쿼터를 쓴다', async () => {
+        it('테스트 묶음의 run_fresh_analysis는 정의의 dailyQuota로 쿼터를 쓴다', async () => {
             limits.member = 1;
             const fresh = (id: string) => ({
                 id,
@@ -2489,7 +2497,7 @@ describe('runAgentTurn toolSet', () => {
     });
 });
 
-describe('runAgentTurn built-in tool caps (reference table)', () => {
+describe('runAgentTurn per-tool caps of the test tool set (reference table)', () => {
     // Expected outcomes are written out by hand from AGENT_TURN_CAPS (web 4,
     // fresh 3, filing reads 2, X 3, charts 3, tool calls 30), not read back from
     // the definitions, so a changed cap or a lost `counts` fails here.
@@ -2585,7 +2593,7 @@ describe('runAgentTurn built-in tool caps (reference table)', () => {
                 ),
             });
             await runAgentTurn(
-                params({ availableTools: new Set(AGENT_TOOL_NAMES) }),
+                params({ availableTools: new Set(TEST_AGENT_TOOL_NAMES) }),
                 d
             );
             const byId = Object.fromEntries(

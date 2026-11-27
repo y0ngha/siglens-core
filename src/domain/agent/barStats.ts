@@ -131,6 +131,9 @@ function extremeOf(
  * LATER bar, so `time` is the most recent touch. An empty window, or one with
  * no finite value for a field, gives `null` for that extreme.
  *
+ * `time` is passed through unchecked: a bar with a non-finite time can still
+ * set an extreme, so a caller that formats `time` as a date validates it first.
+ *
  * @param window - Bars oldest-first (any length).
  * @param lastClose - The close the distances are measured from; `null` or a
  *   non-finite value makes every `fromLastCloseRatio` `null`.

@@ -141,6 +141,45 @@ describe('computeBarRangeStats', () => {
         });
         expect(stats.low?.fromLastCloseRatio).toBeNull();
     });
+
+    /*
+     * Pins today's behaviour: the window's `time` is not validated. Only the
+     * VALUE decides an extreme, so a bar with a non-finite or out-of-range
+     * `time` still counts, and its `time` is reported as it came in. A caller
+     * that formats `time` as a date must check it.
+     */
+    it('counts a bar whose time is not a usable timestamp and reports that time unchanged', () => {
+        const stats = computeBarRangeStats(
+            [
+                bar(T0, 100, { high: 105, low: 95 }),
+                bar(Number.NaN, 120, { high: 130, low: 99 }),
+                bar(Number.POSITIVE_INFINITY, 90, { high: 101, low: 80 }),
+                bar(8.64e15, 100, { high: 102, low: 96 }),
+            ],
+            100
+        );
+        expect(stats.high).toEqual({
+            value: 130,
+            time: Number.NaN,
+            fromLastCloseRatio: (100 - 130) / 130,
+        });
+        expect(stats.highClose?.time).toBeNaN();
+        expect(stats.low).toEqual({
+            value: 80,
+            time: Number.POSITIVE_INFINITY,
+            fromLastCloseRatio: (100 - 80) / 80,
+        });
+        expect(stats.lowClose?.time).toBe(Number.POSITIVE_INFINITY);
+    });
+
+    it('lets a bad-time bar win a tie by position, like any other bar', () => {
+        const stats = computeBarRangeStats(
+            [bar(T0, 100), bar(Number.NEGATIVE_INFINITY, 100)],
+            100
+        );
+        expect(stats.highClose?.time).toBe(Number.NEGATIVE_INFINITY);
+        expect(stats.lowClose?.time).toBe(Number.NEGATIVE_INFINITY);
+    });
 });
 
 describe('computeCloseStreak', () => {
@@ -493,6 +532,34 @@ describe('computeEarningsReactions', () => {
         expect(
             reactions(['2026-07-31'], false, 8, [bar(Number.NaN, 1)])
         ).toEqual([]);
+    });
+
+    it('skips a bad-time bar on either side of a report date and measures across the usable neighbours', () => {
+        // The bad bars sit right before and right after the report date; the
+        // reaction still spans 07-30 → 08-03.
+        const series = [
+            bars[0]!,
+            bar(Number.NEGATIVE_INFINITY, 1),
+            bars[1]!,
+            bar(Number.NaN, 1),
+            bars[2]!,
+        ];
+        expect(reactions(['2026-07-31'], false, 8, series)).toEqual([
+            { date: '2026-07-31', moveRatio: (99 - 100) / 100 },
+        ]);
+    });
+
+    /*
+     * Pins today's behaviour: `excludeLastBar` drops the LAST INPUT bar before
+     * bad times are filtered, so when that bar is the bad-time one, the
+     * usable bar before it is kept as a completed session.
+     */
+    it('with excludeLastBar, drops the last input bar even when its time is unusable', () => {
+        const series = [...bars, bar(Number.NaN, 1)];
+        expect(reactions(['2026-08-03'], true, 8, series)).toEqual([
+            { date: '2026-08-03', moveRatio: (120 - 110) / 110 },
+        ]);
+        expect(reactions(['2026-08-03'], true)).toEqual([]);
     });
 
     it('orders newest first, drops duplicates and applies the limit', () => {

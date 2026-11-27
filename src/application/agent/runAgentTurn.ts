@@ -10,12 +10,10 @@ import {
 } from '@/domain/agent/buildAgentSystemPrompt';
 import { selectHistoryWindow } from '@/domain/agent/selectHistoryWindow';
 import { isSmallTalkMessage } from '@/domain/agent/smallTalk';
-import { BUILT_IN_AGENT_TOOL_SET } from '@/domain/agent/builtInToolSet';
 import {
     selectToolSetSpecs,
     type AgentToolDefinition,
     type AgentToolPerTurnCap,
-    type AgentToolSet,
 } from '@/domain/agent/toolSet';
 import {
     localizeTimestamps,
@@ -114,7 +112,7 @@ function withTimeout<T>(
 
 /**
  * Settles with {@link TURN_STOPPED} as soon as `signal` aborts, even when
- * `work` ignores the signal (siglens' `run_fresh_analysis` deliberately
+ * `work` ignores the signal (siglens' fresh-analysis executor deliberately
  * does, and a provider adapter might hang). The abandoned promise keeps a
  * race handler attached, so a late rejection is not unhandled.
  */
@@ -248,22 +246,6 @@ function withTurnNote(
 }
 
 /**
- * The per-user daily quota a tool's calls draw on: the definition's `dailyQuota`
- * when it sets one, else the name-keyed rule the loop used before the field
- * existed (`run_fresh_analysis` → `'freshAnalysis'`), so a consumer tool set
- * written without the field is metered exactly as before. The name fallback goes
- * away together with the built-in tool set.
- */
-function dailyQuotaOf(
-    definition: AgentToolDefinition
-): AgentToolDefinition['dailyQuota'] {
-    return (
-        definition.dailyQuota ??
-        (definition.name === 'run_fresh_analysis' ? 'freshAnalysis' : undefined)
-    );
-}
-
-/**
  * Per-turn budget, pure and local to one turn: the global caps from
  * `AGENT_TURN_CAPS` (`maxToolCalls`, `maxDistinctSymbols`) and each tool's own
  * `perTurn` cap from its definition. Counted here rather than in the consumer
@@ -379,7 +361,7 @@ export async function runAgentTurn(
         : deadline.signal;
 
     // 2–3. Prompt and window.
-    const toolSet: AgentToolSet = params.toolSet ?? BUILT_IN_AGENT_TOOL_SET;
+    const { toolSet } = params;
     const tools = selectToolSetSpecs(toolSet, params.availableTools);
     const timeZone = resolveAgentTimeZone(params.timeZone, params.locale);
     // Prefix-cache layout (DeepSeek caches the longest byte-identical request
@@ -638,8 +620,7 @@ export async function runAgentTurn(
                 return { ok: true };
             } catch (error) {
                 if (!(error instanceof CounterStoreUnavailableError)) {
-                    // The consumer's own name for its `meter: 'webSearch'` tool,
-                    // not a hard-coded 'web_search'.
+                    // The consumer's own name for its `meter: 'webSearch'` tool.
                     console.warn('[runAgentTurn] tool quota check failed', {
                         name: toolName,
                         error,
@@ -676,7 +657,7 @@ export async function runAgentTurn(
         const metered = spec.meter === 'webSearch';
         const quota = await consumeToolQuota(
             call.name,
-            dailyQuotaOf(spec),
+            spec.dailyQuota,
             metered
         );
         if ('refusal' in quota) return serialize(quota.refusal);

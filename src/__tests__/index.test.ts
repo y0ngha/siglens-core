@@ -22,15 +22,6 @@ import type {
 } from '@/index';
 import {
     AGENT_BARS_TIMEFRAMES,
-    AGENT_FILINGS_LIST_MAX,
-    AGENT_FILINGS_WINDOW_DAYS,
-    AGENT_FILING_TEXT_MAX_CHARS,
-    AGENT_MACRO_INSTRUMENTS,
-    AGENT_MACRO_QUOTES_MAX,
-    AGENT_X_POST_TEXT_MAX_CHARS,
-    AGENT_X_POSTS_MAX,
-    AGENT_X_POSTS_PAGE_SIZE,
-    AGENT_X_POSTS_WINDOW_DAYS,
     aggregateBarsToMonthly,
     aggregateBarsToWeekly,
     barPeriodStartSeconds,
@@ -316,26 +307,6 @@ describe('public API exports', () => {
         expect(validateActionPrices(undefined)).toBeUndefined();
         expect(extractReconciledActionLines(undefined)).toBeUndefined();
         expect(trend).toBe('neutral');
-    });
-
-    it('exports the get_macro_quotes instrument list and per-call cap siglens maps to provider symbols', () => {
-        expect(AGENT_MACRO_INSTRUMENTS).toContain('wti');
-        expect(AGENT_MACRO_INSTRUMENTS).toContain('usd_krw');
-        expect(AGENT_MACRO_INSTRUMENTS).toContain('jpy_krw');
-        expect(AGENT_MACRO_QUOTES_MAX).toBe(8);
-    });
-
-    it('exports the get_x_posts contract numbers the siglens executor implements', () => {
-        expect(AGENT_X_POSTS_MAX).toBe(12);
-        expect(AGENT_X_POSTS_WINDOW_DAYS).toBe(14);
-        expect(AGENT_X_POSTS_PAGE_SIZE).toBe(10);
-        expect(AGENT_X_POST_TEXT_MAX_CHARS).toBe(600);
-    });
-
-    it('exports the get_company_filings contract numbers the siglens executor implements', () => {
-        expect(AGENT_FILINGS_LIST_MAX).toBe(10);
-        expect(AGENT_FILINGS_WINDOW_DAYS).toBe(120);
-        expect(AGENT_FILING_TEXT_MAX_CHARS).toBe(12_000);
     });
 
     it('exports the weekly/monthly bar helpers siglens uses for get_bars_indicators 1Week/1Month', () => {
@@ -744,8 +715,6 @@ describe('package entrypoint export presence (API-1)', () => {
         'usMarketCloseMinute',
         'agentLimit',
         'classifyProviderError',
-        'findToolSpec',
-        'selectTools',
         'selectToolSetSpecs',
         'formatAttachedImagesMarker',
         'validateArgs',
@@ -825,6 +794,7 @@ describe('package entrypoint export presence (API-1)', () => {
         'CONFLUENCE_TREND_MA_PERIOD',
         'PULLBACK_BASE_RATES',
         'PULLBACK_EXIT_MA_PERIOD',
+        'PULLBACK_MEASURED_RATE_MEANING',
         'PULLBACK_NEAR_WILLIAMS_R',
         'PULLBACK_RSI_PERIOD',
         'PULLBACK_TREND_MA_PERIOD',
@@ -842,14 +812,7 @@ describe('package entrypoint export presence (API-1)', () => {
         'AGENT_GLOBAL_LIMITS',
         'AGENT_TURN_CAPS',
         'TOOL_TIMEOUT_MS',
-        'AGENT_TOOL_SPECS',
-        'AGENT_TOOL_NAMES',
         'FRESH_ANALYSIS_KINDS',
-        'AGENT_CHART_KINDS',
-        'AGENT_CHART_PERIODS',
-        'AGENT_COMPARE_SYMBOLS_MIN',
-        'AGENT_COMPARE_SYMBOLS_MAX',
-        'BUILT_IN_AGENT_TOOL_SET',
         'AGENT_IMAGES_PER_MESSAGE_MAX',
         'AGENT_THEMES',
         'AGENT_THEME_IDS',
@@ -863,9 +826,9 @@ describe('package entrypoint export presence (API-1)', () => {
         'AGENT_PRICE_STATS_MAX_DATES',
         'AGENT_PRICE_STATS_MAX_SUBJECTS',
         'AGENT_PRICE_STATS_PERIODS',
+        'PRICE_STATS_CAGR_ABOVE_DAYS',
         'PRICE_STATS_NOTE_TEMPLATES',
-        'BARS_RESULT_NOTES',
-        'FUNDAMENTALS_RESULT_NOTES',
+        'PRICE_STATS_YEAR',
         'AGENT_FOLLOW_UP_MARKER',
         'AGENT_PROMPT_VERSION',
         'SUGGESTIONS_PROMPT_VERSION',

@@ -203,6 +203,7 @@ export {
     evaluatePullback,
     PULLBACK_BASE_RATES,
     PULLBACK_EXIT_MA_PERIOD,
+    PULLBACK_MEASURED_RATE_MEANING,
     PULLBACK_NEAR_WILLIAMS_R,
     PULLBACK_RSI_PERIOD,
     PULLBACK_TREND_MA_PERIOD,
@@ -301,8 +302,7 @@ export {
     getSinglePatternTrend,
     type PatternTrend,
 } from './domain/analysis/candle-trend';
-// ISO-week bar aggregator — consumer (siglens `get_bars_indicators` tool)
-// uses it to build the `higherTimeframe` rollup for `1Day` bars, since the
+// ISO-week bar aggregator — the consumer's bars tool uses it to build the `higherTimeframe` rollup for `1Day` bars, since the
 // domain has no daily→weekly aggregation of its own. Pure/sync, so Tier 2.
 export { aggregateBarsToWeekly } from './domain/analysis/aggregateBarsToWeekly';
 export { aggregateBarsToMonthly } from './domain/analysis/aggregateBarsToMonthly';
@@ -317,7 +317,7 @@ export {
 } from './domain/analysis/actionRecommendation';
 // Deterministic plan-vs-price arithmetic — `runAnalysis` already attaches
 // this to every technical-axis result via `planCheck`, but the agent tool
-// layer (siglens `get_cached_analysis`) needs to run it a second time
+// layer (the consumer's cached-analysis tool) needs to run it a second time
 // against a LIVE price (not the analysis-time close) to build
 // `sinceAnalysis.planNow`. Pure/sync, so Tier 2.
 export { buildPlanCheck } from './domain/analysis/planCheck';
@@ -562,7 +562,7 @@ export type {
     PollIndicatorTranslationDone,
 } from './application/economy/types';
 
-// Agent chat — policy limits, tool catalog, prompt/window builders, provider-error classifier
+// Agent chat — policy limits, tool-set helpers, prompt/window builders, provider-error classifier
 export {
     AGENT_LIMITS,
     AGENT_GLOBAL_LIMITS,
@@ -572,27 +572,9 @@ export {
 } from './application/agent/limits';
 export { classifyProviderError } from './application/shared/providerError';
 export {
-    AGENT_TOOL_SPECS,
-    AGENT_TOOL_NAMES,
     AGENT_BARS_TIMEFRAMES,
-    AGENT_FILINGS_LIST_MAX,
-    AGENT_FILINGS_WINDOW_DAYS,
-    AGENT_FILING_TEXT_MAX_CHARS,
-    AGENT_MACRO_INSTRUMENTS,
-    AGENT_MACRO_QUOTES_MAX,
-    AGENT_X_POST_TEXT_MAX_CHARS,
-    AGENT_X_POSTS_MAX,
-    AGENT_X_POSTS_PAGE_SIZE,
-    AGENT_X_POSTS_WINDOW_DAYS,
     FRESH_ANALYSIS_KINDS,
-    AGENT_CHART_KINDS,
-    AGENT_CHART_PERIODS,
-    AGENT_COMPARE_SYMBOLS_MIN,
-    AGENT_COMPARE_SYMBOLS_MAX,
-    findToolSpec,
-    selectTools,
 } from './domain/agent/tools';
-export { BUILT_IN_AGENT_TOOL_SET } from './domain/agent/builtInToolSet';
 export { selectToolSetSpecs } from './domain/agent/toolSet';
 export {
     AGENT_IMAGES_PER_MESSAGE_MAX,
@@ -695,7 +677,9 @@ export {
     AGENT_PRICE_STATS_MAX_DATES,
     AGENT_PRICE_STATS_MAX_SUBJECTS,
     AGENT_PRICE_STATS_PERIODS,
+    PRICE_STATS_CAGR_ABOVE_DAYS,
     PRICE_STATS_NOTE_TEMPLATES,
+    PRICE_STATS_YEAR,
 } from './domain/agent/priceStats';
 export type {
     AgentPriceStatsPeriod,
@@ -712,11 +696,6 @@ export type {
     PriceStatsWindow,
     PriceStatsWindowRequest,
 } from './domain/agent/priceStats';
-// Server entry only: the executors of get_bars_indicators and get_fundamentals attach these note texts; the browser never builds a tool result.
-export {
-    BARS_RESULT_NOTES,
-    FUNDAMENTALS_RESULT_NOTES,
-} from './domain/agent/resultNotes';
 // Server entry only: the interpretive-fact helpers run in agent tool executors, never in a browser bundle.
 export { tallyEarningsReactions } from './domain/agent/earningsReactionTally';
 export type {
@@ -1485,9 +1464,6 @@ export type {
 } from './domain/agent/toolSet';
 export type {
     AgentBarsTimeframe,
-    AgentChartKind,
-    AgentChartPeriod,
-    AgentMacroInstrument,
     FreshAnalysisKind,
 } from './domain/agent/tools';
 

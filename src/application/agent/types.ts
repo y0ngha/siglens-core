@@ -50,11 +50,11 @@ export interface RunAgentTurnParams {
     availableTools: ReadonlySet<string>;
     /**
      * The consumer's tool set: the catalog the model may call, the prompt text
-     * for it and each tool's per-turn cap. Omitted: `BUILT_IN_AGENT_TOOL_SET`,
-     * which behaves exactly as the loop did before the set became injectable.
-     * `availableTools` still decides which of its tools are offered this turn.
+     * for it and each tool's per-turn cap, web-search meter and daily quota.
+     * Core ships no tools. `availableTools` still decides which of its tools
+     * are offered this turn.
      */
-    toolSet?: AgentToolSet;
+    toolSet: AgentToolSet;
     /** Symbols the user holds, for the system prompt. */
     portfolioSymbols?: readonly string[];
     /**
@@ -98,7 +98,7 @@ export interface ToolExecutionContext {
     /** Combined caller/deadline abort signal for the in-flight tool call. */
     signal: AbortSignal;
     /**
-     * Present only for `web_search` calls when
+     * Present only for calls of a `meter: 'webSearch'` tool when
      * `RunAgentTurnDependencies.webSearchMetering === 'executor'`. Claims one
      * unit of the service-wide budget: call it immediately before the billed
      * upstream request, never for a cache hit or a provider that is not
@@ -121,13 +121,13 @@ export interface AgentCounters {
     turns: CounterStore;
     /** Per-user daily premium-model turn quota. */
     premiumTurns: CounterStore;
-    /** Per-user daily `run_fresh_analysis` quota. */
+    /** Per-user daily fresh-analysis quota (tools with `dailyQuota: 'freshAnalysis'`). */
     freshAnalysis: CounterStore;
-    /** Per-user daily `web_search` quota. */
+    /** Per-user daily web-search quota (tools with `meter: 'webSearch'`). */
     webSearchUser: CounterStore;
-    /** Site-wide daily `web_search` quota, shared across all users. */
+    /** Site-wide daily web-search quota, shared across all users. */
     webSearchGlobalDay: CounterStore;
-    /** Site-wide monthly `web_search` quota, shared across all users. */
+    /** Site-wide monthly web-search quota, shared across all users. */
     webSearchGlobalMonth: CounterStore;
 }
 
@@ -147,7 +147,7 @@ export interface RunAgentTurnDependencies {
     /** Service-wide web-search caps; defaults to `AGENT_GLOBAL_LIMITS`. */
     globalLimits?: AgentGlobalLimits;
     /**
-     * Where the service-wide `web_search` budget is charged. `'gate'` (default)
+     * Where the service-wide web-search budget is charged. `'gate'` (default)
      * charges it before the executor runs, for every call. `'executor'` leaves
      * it to the executor, which claims one unit per billed request through
      * `ToolExecutionContext.claimWebSearchUnit`.
@@ -184,9 +184,9 @@ export interface AgentTurnUsage extends NormalizedUsage {
 export interface AgentRemaining {
     /** Turns left in the user's daily turn quota, or `null` when uncapped. */
     turns: number | null;
-    /** `run_fresh_analysis` calls left today, or `null` when uncapped. */
+    /** Fresh-analysis calls left today, or `null` when uncapped. */
     fresh: number | null;
-    /** `web_search` calls left today, or `null` when uncapped. */
+    /** Web-search calls left today, or `null` when uncapped. */
     search: number | null;
 }
 

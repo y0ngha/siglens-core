@@ -271,6 +271,10 @@ derivation from the unrounded inputs.
 <a id="DOM-9"></a>
 #### DOM-9 — Model-facing text is exact and internally consistent
 
+Core ships no tools: tool descriptions, routing rows and result notes live in the consumer's
+`AgentToolSet`. In core these bullets govern the agent frame and the analysis prompts; the
+tool-text bullets bind core only where the frame states the matching generic rule.
+
 - Tool descriptions and rules say exactly what the engine does ("the bullish or the bearish
   trigger conditions all held", not "every condition" when the exit side has no such gate).
 - Rules inside one prompt never contradict. Required wording (a mandated caveat) gets an
@@ -285,7 +289,7 @@ derivation from the unrounded inputs.
 - A closed-list tool's off-list branch forbids the substitute call explicitly, in both the
   tool description and its routing row ("never call it with a neighbouring entry as a
   stand-in"); "say no match" alone is read as permission to call the nearest entry.
-  ❌ robots asked, `get_themes({theme:'ev'})` called "for the overlap". ✅ No call; say the theme is not covered.
+  ❌ frame says "say no match" and stops. ✅ "say no match; never call a neighbouring entry as a stand-in".
   A second tool that reuses the same closed list (e.g. a chart tool taking the same `theme`
   argument) copies the carve-out too, in its description and its conditional row text; a row
   sentence naming another tool is emitted only when that tool is available.
@@ -358,10 +362,11 @@ derivation from the unrounded inputs.
   ❌ trigger: "what did the CEO say"          // answerable from filings/news
   ✅ trigger: "what did the CEO post on X"    // names the billed venue
   ```
-- A result note (text attached when a field is null) is conditioned on the question, and the
-  system rule says a note about a field the answer does not need is no reason to mention it,
-  search or call a tool; notes attach on null, not on relevance, so an unconditioned "follow
-  the notes" makes every note fire on every result. Notes about the window or dates behind a
+- A result note (text attached when a field is null; the notes are the consumer's, the frame
+  owns the "Result notes" rule) is conditioned on the question, and the frame rule says a note
+  about a field the answer does not need is no reason to mention it, search or call a tool;
+  notes attach on null, not on relevance, so an unconditioned "follow the notes" makes every
+  note fire on every result. Notes about the window or dates behind a
   quoted figure always apply.
 - Moving a clause from a tool description into a note is validated per clause by a live case
   that triggers it; a clause whose case regresses is restored in the description while the
@@ -455,6 +460,9 @@ without a usable key stay separate.
 
 <a id="DOM-15"></a>
 #### DOM-15 — A prompt rule's condition names a fact the tool output actually carries
+
+In core this binds the frame and analysis prompts; a tool row or description is the consumer's
+(`AgentToolSet`), and a frame rule never names a consumer tool.
 
 An instruction of the form "when X, do Y" or "use field F" is only followable if X and F
 appear in what the model sees: the tool's real return shape, not the shape you intend a

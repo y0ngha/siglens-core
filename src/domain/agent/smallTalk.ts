@@ -89,7 +89,7 @@ const SMALL_TALK_MAX_CHARS = 30;
  * that guard exists so a "tell me more" is answered from fresh tool results
  * instead of re-quoted or invented figures, but a thank-you has nothing to
  * fetch, and forcing a call there only spent a tool round-trip before a
- * one-line reply (measured 2026-11-14 replay: "고마워" → get_bars_indicators →
+ * one-line reply (measured 2026-11-14 replay: "고마워" → a bars-and-indicators call →
  * "천만에요."). Conservative by construction: every word must be an
  * acknowledgement or a filler and at least one must be an acknowledgement
  * ({@link ACKNOWLEDGEMENT_WORDS}), so a question with a thank-you in it, and a
