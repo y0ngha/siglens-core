@@ -433,7 +433,9 @@ const ENTRY_ZONE_HEADER = '### Entry Zone vs Last Close';
 
 /**
  * The close the plan state is judged against, printed with the zone's own formatter (DOM-8,
- * DOM-11) so the model can place the zone around it. It lives here and not in the Step 1
+ * DOM-11) so the model can read its zone against it. It does not ask for a zone at the close:
+ * "make the zone contain the last close" put 78% of plans at the price in the real-LLM A/B
+ * (zone top == close in 320 of 588), where the analysis named a pullback level. It lives here and not in the Step 1
  * rule because that rule sits in the cross-symbol byte-stable prefix and cannot carry a
  * per-chart number. Empty without a usable last close.
  */
@@ -447,7 +449,7 @@ function formatEntryZoneRule(
     }
     return [
         ENTRY_ZONE_HEADER,
-        `Last close ${formatQuotedPrice(close, quoting)}. Code reads entryPrices against this close with exact edges: the zone contains it when its low <= close <= its high; a zone whose high is below the close is a pullback plan; a zone above the close needs a rise into it. Step 1 of the action rules gives the entryRecommendation for each. To plan an entry at the price, make the zone contain the last close.`,
+        `Last close ${formatQuotedPrice(close, quoting)}. Code reads entryPrices against this close with exact edges: the zone contains it when its low <= close <= its high; a zone whose high is below the close is a pullback plan; a zone above the close needs a rise into it. Step 1 of the action rules gives the entryRecommendation for each. Place the zone where your analysis puts the entry; it contains this close only when the close itself sits at that level or Step 1's sell-off path applies.`,
     ];
 }
 

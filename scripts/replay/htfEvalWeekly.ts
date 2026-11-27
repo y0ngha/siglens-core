@@ -82,7 +82,7 @@ export const DAILY_ONLY_PATTERNS: readonly { name: string; pattern: RegExp }[] =
         {
             name: 'baseRateWritingRuleMeasured',
             pattern:
-                /when you mention reliability, cite the Measured label on its guide/,
+                /when you mention reliability, cite the Measured label (?:on its guide|in its guide's header)/,
         },
         {
             name: 'baseRateWritingRuleNotMeasured',

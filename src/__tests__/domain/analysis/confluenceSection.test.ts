@@ -281,8 +281,9 @@ describe('formatDeterministicMetricsSection', () => {
         const block = out.slice(out.indexOf('### Entry Zone vs Last Close'));
         expect(block).not.toMatch(/"enter"|"wait"|"avoid"/);
         expect(out).toContain(
-            'To plan an entry at the price, make the zone contain the last close.'
+            "Place the zone where your analysis puts the entry; it contains this close only when the close itself sits at that level or Step 1's sell-off path applies."
         );
+        expect(out).not.toContain('make the zone contain the last close');
     });
 
     it('prints the last close at the KRX tick for a Korean listing', () => {

@@ -2226,6 +2226,44 @@ describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () =>
             expect(result.recommendation.stopLoss).toBe(97);
         });
 
+        it('moves the stop figure in exit and riskReward prose to the floored stop, leaving the numeric field and other prose', () => {
+            const result = reconcile(
+                {
+                    ...zoneRec,
+                    positionAnalysis: '97.00 지지선 위에 있습니다.',
+                    exit: '목표 105.00. 손절 기준은 97.00달러(피봇 S1)입니다.',
+                    riskReward: '위험은 $97.00 손절이 정합니다.',
+                },
+                [94, 92]
+            );
+            const rec = result.recommendation;
+            expect(rec.exit).toBe('목표 105.00. 손절 기준은 94.00달러입니다.');
+            expect(rec.riskReward).toBe('위험은 $94.00 손절이 정합니다.');
+            expect(rec.positionAnalysis).toBe('97.00 지지선 위에 있습니다.');
+            expect(rec.stopLoss).toBe(97);
+            expect(result.changes).toContain(
+                'exit/riskReward: stop figure 97 → 94.00 in prose'
+            );
+        });
+
+        it('leaves prose and changes alone when the model stop stands or the prose does not name it', () => {
+            const standing = reconcile(
+                { ...zoneRec, stopLoss: 95, exit: '손절 95.00' },
+                [94]
+            );
+            expect(standing.recommendation.exit).toBe('손절 95.00');
+            const unnamed = reconcile(
+                { ...zoneRec, exit: '손절은 지지선 아래입니다.' },
+                [94]
+            );
+            expect(unnamed.recommendation.exit).toBe(
+                '손절은 지지선 아래입니다.'
+            );
+            expect(
+                unnamed.changes.some(line => line.startsWith('exit/riskReward'))
+            ).toBe(false);
+        });
+
         it('with no printed support in the band it falls to 1.5 ATR below the zone low: atr basis', () => {
             const result = reconcile(zoneRec, [97.5]);
             const levels = result.recommendation.reconciledLevels;

@@ -1404,6 +1404,8 @@ planState           종가가 플랜 진입 구간 어디에 있는가(`buildPla
                     (`stopLossRejected`, `no_setup/no_stop`). 하단에서 1 ATR보다 가까운 손절은 한 봉의 보통 움직임에
                     맞는다(10개 미국 대형주 2년 일봉 백테스트, 첫 청산이 손절이던 278건 중 87%가 2세션 안에
                     손절). ATR이 없으면 구간 아래 양수 손절만 유효하고, 무효면 `stopLossRejected`.
+                    손절을 옮기면 `exit`·`riskReward` 본문에서 모델 손절 숫자를 보정 손절로 바꾸고 바로 뒤
+                    괄호 라벨(옛 레벨 이름)은 지운다(`rewriteStopInProse`). 숫자 필드와 다른 본문은 그대로다.
 
 strategyResults[]   strategy skill의 분석 결과
                     strategyName으로 식별 (예: "엘리어트 파동")

@@ -2423,7 +2423,7 @@ export interface ActionRecommendation {
     stopLoss?: number;
     /** Take-profit price targets in ascending order. */
     takeProfitPrices?: number[];
-    /** Domain-derived fallback levels attached when the AI's stopLoss / takeProfitPrices are invalid or missing. The original AI fields above are never mutated — consumers can compare and decide which values to display. Only core writes it: `postProcessAnalysisWithReconcile` drops any model-supplied value, so its presence means the domain corrected the AI's levels. */
+    /** Domain-derived fallback levels attached when the AI's stopLoss / takeProfitPrices are invalid or missing. The original numeric AI fields above are never mutated — consumers can compare and decide which values to display. When the stop is moved (`stopBasis` present), the model's stop figure in `exit` and `riskReward` is replaced with the reconciled stop, so that prose names the stop the plan uses. Only core writes it: `postProcessAnalysisWithReconcile` drops any model-supplied value, so its presence means the domain corrected the AI's levels. */
     reconciledLevels?: ReconciledActionLevels;
     /** Where the last close sits against the plan's zone (and why a plan is `no_setup`). Computed by core after reconciliation; a model-supplied value is dropped. Absent on results stored before the field existed and when no close was available. */
     planState?: PlanState;

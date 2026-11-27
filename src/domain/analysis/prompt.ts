@@ -496,6 +496,12 @@ const isCandleReliabilityMeasured = (
     assetClass: AssetClass
 ): boolean => timeframe === '1Day' && assetClass === 'equity';
 
+/** `3 of 5 sessions so far`, or `3 sessions so far` when the total could not be proven. */
+const weekSessionsSoFar = (progress: PeriodProgress): string =>
+    progress.sessionsTotal === null
+        ? `${progress.sessionsSoFar} sessions so far`
+        : `${progress.sessionsSoFar} of ${progress.sessionsTotal} sessions so far`;
+
 /**
  * The tag on the last row of a weekly chart's `## Recent Bar Data` while the week is still
  * going (DOM-9: it says what code measured). "So far" is the number of daily bars observed
@@ -503,9 +509,21 @@ const isCandleReliabilityMeasured = (
  * session spec has no holiday data prints no total: it could not be proven (DOM-12).
  */
 const formatWeekProgressTag = (progress: PeriodProgress): string =>
-    progress.sessionsTotal === null
-        ? `(week in progress: ${progress.sessionsSoFar} sessions so far; its close is the latest price)`
-        : `(week in progress: ${progress.sessionsSoFar} of ${progress.sessionsTotal} sessions so far; its close is the latest price)`;
+    `(week in progress: ${weekSessionsSoFar(progress)}; its close is the latest price)`;
+
+/**
+ * @internal The Analysis Request rule printed when the last weekly bar carries the in-progress
+ * tag. The tag alone (and the `Timeframe interpretation:` line that points at it) left the
+ * unfinished week unsaid in 43 of 61 flagged weekly results of the real-LLM A/B: a fact the
+ * model reads is not an instruction to write it. The rule sits in the request block at the
+ * tail, next to the field rules it governs, and names the tag it is conditioned on (DOM-15).
+ */
+export const formatUnfinishedWeekRule = (progress: PeriodProgress): string =>
+    [
+        '',
+        '### Unfinished Week',
+        `- The last bar of ## Recent Bar Data is the current week, still in progress (${weekSessionsSoFar(progress)}): its high, low, close and candle shape can still change before the week closes. In summary, and in every field that describes the last bar, its candle or a candle pattern that includes it, say that this week is not finished yet.`,
+    ].join('\n');
 
 const formatRecentBarsSection = (
     bars: Bar[],
@@ -1801,10 +1819,54 @@ const skillHeaderLabel = (skill: Skill, timeframe: Timeframe): string => {
           : `[Measured: ${baseRateVerdictLabel(row.verdict)}, n=${row.n.toLocaleString('en-US')}]`;
 };
 
+/**
+ * @internal The marker put in front of every skill line that cites a book or website rate. The
+ * reliability rule alone left the "Measured (Bulkowski, …): … 56%" lines quoted as this chart's
+ * probability in 20 of 199 daily results of the real-LLM A/B (from 97 of 200), most of them
+ * calling it "측정상": the word "Measured" on the line read as this engine's measurement. The
+ * marker and the rule name one thing, so the rule can point at it.
+ */
+export const BOOK_FIGURE_MARKER = '[Book figure, not measured by this engine]';
+
+const CITES_BOOK = /Bulkowski|thepatternsite/i;
+
+/**
+ * A rate on the line: a percent, a rank (`rank 98/103`, `rank 24 of 36`), a source label that
+ * introduces figures (`Measured (`, `Reported (`), or the consumer's literature prefix
+ * (`Bulkowski's study (literature`). A line that only names Bulkowski for a rule or an
+ * identification cue ("Breakout: a CLOSE outside either trendline; Bulkowski: …") carries no
+ * rate the model could quote as a probability, so it is not marked.
+ */
+const CARRIES_RATE =
+    /\d+(?:\.\d+)?\s?%|\brank\s*\d+\s*(?:\/|of)\s*\d+|\b(?:Measured|Reported)\s\(|Bulkowski's study \(literature/i;
+
+const isBookRateLine = (line: string): boolean =>
+    CITES_BOOK.test(line) &&
+    CARRIES_RATE.test(line) &&
+    !line.includes(BOOK_FIGURE_MARKER);
+
+/**
+ * The skill text with each line that cites a book rate ({@link isBookRateLine}) marked with
+ * {@link BOOK_FIGURE_MARKER} (after the list dash when there is one, once: a line that already
+ * carries it is left alone) and its "Measured (" source label renamed "Reported (", so no line of
+ * the guide calls a book rate measured. Other lines are unchanged.
+ */
+const markBookFigures = (content: string): string =>
+    content
+        .split('\n')
+        .map(line =>
+            isBookRateLine(line)
+                ? line
+                      .replace(/\bMeasured(?= \()/g, 'Reported')
+                      .replace(/^(\s*(?:[-*]\s+)?)/, `$1${BOOK_FIGURE_MARKER} `)
+                : line
+        )
+        .join('\n');
+
 const buildSkillBlock = (skill: Skill, timeframe: Timeframe): string => {
     const roles =
         skill.type === 'indicator_guide' ? roleLabel(skill.usageRoles) : '';
-    return `### ${skill.name} ${skillHeaderLabel(skill, timeframe)}${roles}\n${skill.content}`;
+    return `### ${skill.name} ${skillHeaderLabel(skill, timeframe)}${roles}\n${markBookFigures(skill.content)}`;
 };
 
 /**
@@ -2048,7 +2110,7 @@ const analysisGuidelines = (locale: AnalysisLocale): string =>
         '- Framing (see CORE PRINCIPLES → Descriptive, not prescriptive): this section maps price levels into a conditional plan. Describe the plan as structure and conditions, never as an instruction to the reader. Write "이 구간을 회복하기 전까지 구조는 유효하지 않습니다" or "손절 기준으로 삼는 자리는 122,000원입니다", not "사는 편이 낫습니다"/"기다리세요"/"나눠서 매수하세요". The entryRecommendation enum carries the verdict; the prose carries the reasoning.',
         '- LONG POSITION ONLY. Never generate short (sell) strategies, entry points, stop-loss, or take-profit for short positions.',
         `- actionRecommendation must be consistent with keyLevels and priceTargets. Use those values directly, except that takeProfitPrices leaves out every level closer than ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the high of entryPrices (Step 2), even the first priceTargets.bullish target.`,
-        `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the last close is inside the zone (its low <= close <= its high, edges included), "wait" when the zone lies wholly below the close (a pullback plan) or wholly above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value. To plan an entry at the price, make the zone contain the last close (printed in ## Deterministic Metrics → Entry Zone vs Last Close); a zone whose high is below it is a pullback plan and reads "wait".`,
+        `- Step 1 — Place the entry zone. Code reads the plan state from your entry zone, stop and targets and the last close, and sets entryRecommendation from it: "enter" when the last close is inside the zone (its low <= close <= its high, edges included), "wait" when the zone lies wholly below the close (a pullback plan) or wholly above it (a plan that needs a rise into the zone), "avoid" when no target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above the zone or the close is already at or below the stop. Set entryRecommendation to that value. Put the zone at the level your analysis names for the entry (a support, a pullback level, a breakout level), not at the last close by default (printed in ## Deterministic Metrics → Entry Zone vs Last Close): let the zone contain the close only when the close itself sits at that level or the short-term sell-off path below applies, and never widen or shift a zone to reach the close. A zone whose high is below the close is a pullback plan and reads "wait".`,
         `  - Short-term sell-off path: when ## Deterministic Metrics prints "Entry verdict (computed): enter — sell-off path", put the entry zone at the snapshot close area so the close is inside it (the verdict then follows the Step 1 state: "enter" when the close is in the zone and a target lies at least ${spellSmallInteger(PLAN_MIN_ATR_SPACING)} ATR above it), and do not wait for confirmation (a reversal candle, a close back above MA5/MA20, a cross back out of the oversold zone) — the measured edge is at the sell-off close itself. A bearish tally, an unmet indicator-agreement entry condition, a met exit condition, a red Elder Impulse and a short-term downtrend are that reading's normal state: name them as risks in the prose, never as reasons to move the zone away from the close.`,
         '  - When the short-term sell-off block prints "Entry verdict (computed): none" because a company event landed in the last sessions, the drop is news-driven: place the zone yourself from the event and the chart, and do not cite the sell-off base rate as support.',
         '  - The indicator-agreement entry and exit conditions are descriptive tallies: neither is a prerequisite for, nor a veto of, any entryRecommendation value.',
@@ -2138,6 +2200,20 @@ const withoutCycleStrategies = (
 });
 
 /**
+ * A guide's body can still quote a book rate ("Measured (Bulkowski, thepatternsite.com):
+ * White Marubozu continuation 56%"), and the word "Measured" there read as this engine's
+ * measurement: the real-LLM A/B found "추세 지속 확률 56%" in 101 of 598 daily and 21 of 120
+ * weekly results, the weekly ones under a `[Not measured on weekly bars]` header. The skill
+ * text is the consumer's; core marks those lines ({@link BOOK_FIGURE_MARKER}) and this clause
+ * makes the rule name the marked rates, in every variant and every field (the leak was in
+ * summary too, not only in candlePatterns).
+ */
+const LITERATURE_RATE_CLAUSE = `including the rates on a guide line marked ${BOOK_FIGURE_MARKER}`;
+
+const literatureRateRule = (subject: 'pattern' | 'candle'): string =>
+    `The rates on a guide line marked ${BOOK_FIGURE_MARKER} come from a book or website on other data: in no field state them as a probability, success rate or reliability of this ${subject}, and never call them measured.`;
+
+/**
  * The reliability rule of the pattern and candle writing blocks (WP-18 C4, DOM-9): the guides
  * still carry textbook reliability figures, while the engine measured no edge for what it
  * detects, so a reliability claim must cite what the prompt prints, which names its own basis.
@@ -2152,11 +2228,11 @@ const baseRateWritingRule = (
 ): string => {
     const forbidden = `- Do not call a ${subject} reliable, high-confidence or likely to ${subject === 'pattern' ? 'reach its target' : 'play out'}`;
     if (timeframe !== '1Day') {
-        return `${forbidden}; reliability was not measured on ${unmeasuredBarsLabel(timeframe)} bars, so do not state any.`;
+        return `${forbidden}; reliability was not measured on ${unmeasuredBarsLabel(timeframe)} bars, so do not state any in any field, ${LITERATURE_RATE_CLAUSE}.`;
     }
     return subject === 'pattern'
-        ? `${forbidden}; when you mention reliability, cite the Measured label on its guide or the Measured line of its candidate instead.`
-        : `${forbidden}; when you mention reliability, cite the Measured label on its guide instead.`;
+        ? `${forbidden}; when you mention reliability, cite the Measured label in its guide's header or the Measured line of its candidate instead. ${literatureRateRule(subject)}`
+        : `${forbidden}; when you mention reliability, cite the Measured label in its guide's header instead. ${literatureRateRule(subject)}`;
 };
 
 /**
@@ -2195,6 +2271,7 @@ const buildAnalysisRequest = (
     regularSkills: Skill[],
     computed: ComputedCardsInPrompt,
     timeframe: Timeframe,
+    weekProgress: PeriodProgress | null,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE
 ): string => {
     const patternListInstruction =
@@ -2341,6 +2418,7 @@ const buildAnalysisRequest = (
             : []),
         FIELD_GUIDANCE_PREFACE,
         buildFieldGuidanceBody(),
+        weekProgress === null ? '' : formatUnfinishedWeekRule(weekProgress),
         indicatorGuideInstruction,
         patternListInstruction,
         strategyInstruction,
@@ -3021,6 +3099,12 @@ export function buildAnalysisPrompt({
     // comment) — this always renders the "## Analysis Request" header, so
     // unlike the pre-fix `requestDynamicPart` it is never the empty string.
     const cycleCards = buildCycleCards(injectedSkills, indicators, cardPrint);
+    // One computation for the bar-row tag and the Analysis Request rule that tells the model to
+    // say so (DOM-8): the rule prints only when the tag does.
+    const weekProgress =
+        timeframe === '1Week'
+            ? lastPeriodProgress('week', bars.at(-1), dailyBars, marketClock)
+            : null;
     const analysisRequest = buildAnalysisRequest(
         combinedGroups.pattern,
         combinedGroups.strategy,
@@ -3035,6 +3119,7 @@ export function buildAnalysisPrompt({
             ),
         },
         timeframe,
+        weekProgress,
         locale
     );
 
@@ -3114,14 +3199,7 @@ export function buildAnalysisPrompt({
             indicators.atr,
             timeframe,
             assetClass,
-            timeframe === '1Week'
-                ? lastPeriodProgress(
-                      'week',
-                      bars.at(-1),
-                      dailyBars,
-                      marketClock
-                  )
-                : null
+            weekProgress
         ),
         formatBuySellVolumeSection(indicators, config.recentBarsCount),
         formatRegimeContextSection(indicators, config),
