@@ -358,6 +358,7 @@ export {
 export type {
     ChangeReference,
     ChangeReferenceAccess,
+    PlanLevelName,
     TechnicalChange,
     TechnicalChangesOptions,
     TechnicalChangesResult,
