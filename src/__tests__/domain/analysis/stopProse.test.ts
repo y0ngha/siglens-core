@@ -344,6 +344,51 @@ describe('appendStopSentence', () => {
 });
 
 describe('rewriteStopInProse — Korean particles', () => {
+    // The new figure's last spoken syllable decides the particle: 2/4/5/9 (이·사·오·구) have no
+    // final consonant, 1/7/8 (일·칠·팔) end in ㄹ, 0/3/6 (영·삼·육) and an integer ending in zeros
+    // (십·백·천·만) end in another consonant.
+    it.each([
+        // no final consonant
+        ['손절 100.00이 무너지면', 100.02, '손절 100.02가 무너지면'],
+        ['손절 100.00은 유효', 100.04, '손절 100.04는 유효'],
+        ['손절 100.00을 지키면', 100.05, '손절 100.05를 지키면'],
+        ['손절 100.00과 목표', 100.09, '손절 100.09와 목표'],
+        ['손절 100.00으로 둔다', 100.05, '손절 100.05로 둔다'],
+        // another final consonant
+        ['손절 100.05가 무너지면', 100.1, '손절 100.10이 무너지면'],
+        ['손절 100.05는 유효', 100.03, '손절 100.03은 유효'],
+        ['손절 100.05를 지키면', 100.06, '손절 100.06을 지키면'],
+        ['손절 100.05와 목표', 100.03, '손절 100.03과 목표'],
+        ['손절 100.05로 둔다', 100.06, '손절 100.06으로 둔다'],
+        ['손절 95가 무너지면', 90, '손절 90이 무너지면'],
+        ['손절 28,050원가 무너지면', 28000, '손절 28,000원가 무너지면'],
+        ['손절 28050가 무너지면', 28000, '손절 28000이 무너지면'],
+        // ㄹ: 이/은/을/과 stay, 으로 becomes 로
+        ['손절 100.05가 무너지면', 100.01, '손절 100.01이 무너지면'],
+        ['손절 100.05는 유효', 100.07, '손절 100.07은 유효'],
+        ['손절 100.05를 지키면', 100.08, '손절 100.08을 지키면'],
+        ['손절 100.05와 목표', 100.01, '손절 100.01과 목표'],
+        ['손절 100.00으로 둔다', 100.08, '손절 100.08로 둔다'],
+        ['손절 100.05로 둔다', 100.07, '손절 100.07로 둔다'],
+        // not a particle: a word starting with the same syllable
+        ['손절 100.05이후 재진입', 100.1, '손절 100.10이후 재진입'],
+        ['손절 100.00가격대 이탈', 100.1, '손절 100.10가격대 이탈'],
+        ['손절 100.00로는 부족', 100.1, '손절 100.10로는 부족'],
+    ] as const)('%s → %s', (text, to, expected) => {
+        const from = Number(
+            /[\d,]+(?:\.\d+)?/.exec(text)?.[0].replace(/,/g, '')
+        );
+        expect(
+            rewriteStopInProse(
+                text,
+                from,
+                to,
+                text.includes('원') || !text.includes('.') ? 'KRW' : 'USD',
+                'share'
+            )
+        ).toBe(expected);
+    });
+
     it('keeps the particle after a figure with a currency symbol in front', () => {
         expect(
             rewriteStopInProse(

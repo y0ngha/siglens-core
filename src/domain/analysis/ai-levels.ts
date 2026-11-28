@@ -876,7 +876,7 @@ function stateStopInExit(
         return { recommendation: rec, change: undefined };
     }
     const price = formatProseStop(stop, currency, krxTick, locale);
-    const sentences = STOP_SENTENCE[locale] ?? STOP_SENTENCE.ko;
+    const sentences = STOP_SENTENCE[locale];
     const sentence =
         rec.reconciledLevels?.stopBasis === 'atr'
             ? sentences.atr(price)
