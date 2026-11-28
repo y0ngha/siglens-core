@@ -16,6 +16,16 @@ import {
     FIELDS_EVAL_CONSTANTS as C,
     type TrendLabel,
 } from './analysisFieldsEvalTypes';
+import { MACD_CONVERGENCE_TYPES } from '@/domain/analysis/indicatorCards';
+import { cciCrossHolds } from '@/domain/analysis/indicatorReadingsEvent';
+import { findThresholdCross } from '@/domain/signals/confirmed';
+import {
+    CCI_BEARISH_CROSS_LEVEL,
+    CCI_BULLISH_CROSS_LEVEL,
+    CCI_OVERBOUGHT_CROSS_LEVEL,
+    CCI_OVERSOLD_CROSS_LEVEL,
+    CROSS_LOOKBACK_BARS,
+} from '@/domain/signals/constants';
 import type { IndicatorGuideResult, RawStrategyResult } from '@/domain/types';
 
 export const ALWAYS_ON_KINDS = [
@@ -148,6 +158,12 @@ export interface PrintedReading {
 export interface ReadContext {
     /** An event skill's trigger ids (`gating.triggers`). */
     triggers?: readonly string[];
+    /**
+     * The CCI series of the bars the prompt saw, oldest first. With it a fired CCI cross counts
+     * toward the trend only while it still holds on the last bar (the card's rule); without it
+     * every fired cross counts.
+     */
+    cci?: readonly (number | null)[];
 }
 
 /** The close the prompt printed (`## Analysis Snapshot`), or `null`. */
@@ -292,12 +308,43 @@ function printedSignals(prompt: string): {
     };
 }
 
+/** The bar of a CCI cross the detector reports on this series (its level order, its lookback), or `null`. */
+function cciCrossIndex(
+    type: string,
+    series: readonly (number | null)[]
+): number | null {
+    const [levels, direction] =
+        type === 'cci_bullish_cross'
+            ? [
+                  [CCI_OVERSOLD_CROSS_LEVEL, CCI_BULLISH_CROSS_LEVEL],
+                  'up' as const,
+              ]
+            : type === 'cci_bearish_cross'
+              ? [
+                    [CCI_OVERBOUGHT_CROSS_LEVEL, CCI_BEARISH_CROSS_LEVEL],
+                    'down' as const,
+                ]
+              : [[], 'up' as const];
+    for (const level of levels) {
+        const at = findThresholdCross(
+            [...series],
+            level,
+            CROSS_LOOKBACK_BARS,
+            direction
+        );
+        if (at !== null) return at;
+    }
+    return null;
+}
+
 /** The numbers an event kind prints on its own value line, plus the signals it fired. */
 function eventReading(
+    kind: string,
     prompt: string,
-    triggers: readonly string[] | undefined,
+    context: ReadContext,
     values: readonly (number | null)[] | null
 ): PrintedReading | null {
+    const { triggers, cci } = context;
     const signals = printedSignals(prompt);
     const fired = (triggers ?? []).filter(
         t => signals.bullish.includes(t) || signals.bearish.includes(t)
@@ -307,8 +354,19 @@ function eventReading(
         t =>
             signals.freshBullish.includes(t) || signals.freshBearish.includes(t)
     );
-    // Side from the events that fired on this bar when there are any, else from all of them.
-    const side = fresh.length > 0 ? fresh : fired;
+    // The card's own rules, through the shipped functions: a CCI cross counts only while it
+    // holds on the last bar (listed ones lead the state), and MACD histogram convergence names
+    // no side. Side from the events that fired on this bar when there are any, else from all.
+    const holds = (t: string): boolean => {
+        if (kind !== 'cci' || cci === undefined) return true;
+        const at = cciCrossIndex(t, cci);
+        return at === null || cciCrossHolds(t, cci, at);
+    };
+    const counted = fired.filter(holds);
+    const freshCounted = counted.filter(t => fresh.includes(t));
+    const side = (freshCounted.length > 0 ? freshCounted : counted).filter(
+        t => kind !== 'macd' || !MACD_CONVERGENCE_TYPES.has(t)
+    );
     const bullish = side.some(t => signals.bullish.includes(t));
     const bearish = side.some(t => signals.bearish.includes(t));
     return {
@@ -486,8 +544,9 @@ export function printedKind(
     }
     if (isEventKind(kind)) {
         return eventReading(
+            kind,
             prompt,
-            context.triggers,
+            context,
             captures(prompt, new RegExp(EVENT_LINES[kind], 'm'))
         );
     }

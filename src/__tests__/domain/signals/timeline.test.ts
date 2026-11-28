@@ -55,6 +55,9 @@ const STOCK: SectorStock = {
 
 const BARS = wavyBars(560);
 
+// The two heavy timeline tests take ~2-3s alone (hundreds of detector passes); the default 5s trips when the full suite runs in parallel.
+const HEAVY_TIMELINE_TIMEOUT_MS = 30_000;
+
 describe('confirmedSignalTimeline', () => {
     describe('입력이 비어 있거나 days가 1 미만이면', () => {
         it('빈 배열을 반환한다', () => {
@@ -293,45 +296,53 @@ describe('confirmedSignalTimeline', () => {
     });
 
     describe('detectNewConfirmedSignals와', () => {
-        it('전날 없던 타입은 정확히 그 접두 구간의 새 신호와 같다', () => {
-            const lookbackDays = 100_000; // window always covers the whole prefix
-            const days = 80;
-            const timeline = confirmedSignalTimeline(BARS, {
-                days: days + 1,
-                lookbackDays,
-            });
-            const base = BARS.length - days - 1;
-            const newCounts = Array.from({ length: days }, (_, offset) => {
-                const k = offset + 1;
-                const previous = new Set(
-                    typesOf(timeline[k - 1].signals ?? [])
-                );
-                const derived = (timeline[k].signals ?? []).filter(
-                    s => !previous.has(s.type)
-                );
-                const direct = detectNewConfirmedSignals(
-                    BARS.slice(0, base + k + 1)
-                );
-                expect(typesOf(derived)).toEqual(typesOf(direct));
-                return direct.length;
-            });
-            expect(newCounts.some(n => n > 0)).toBe(true);
-        });
+        it(
+            '전날 없던 타입은 정확히 그 접두 구간의 새 신호와 같다',
+            { timeout: HEAVY_TIMELINE_TIMEOUT_MS },
+            () => {
+                const lookbackDays = 100_000; // window always covers the whole prefix
+                const days = 80;
+                const timeline = confirmedSignalTimeline(BARS, {
+                    days: days + 1,
+                    lookbackDays,
+                });
+                const base = BARS.length - days - 1;
+                const newCounts = Array.from({ length: days }, (_, offset) => {
+                    const k = offset + 1;
+                    const previous = new Set(
+                        typesOf(timeline[k - 1].signals ?? [])
+                    );
+                    const derived = (timeline[k].signals ?? []).filter(
+                        s => !previous.has(s.type)
+                    );
+                    const direct = detectNewConfirmedSignals(
+                        BARS.slice(0, base + k + 1)
+                    );
+                    expect(typesOf(derived)).toEqual(typesOf(direct));
+                    return direct.length;
+                });
+                expect(newCounts.some(n => n > 0)).toBe(true);
+            }
+        );
     });
 
     describe('감지기 목록을 따로 갖지 않으므로', () => {
-        it('detectSignals가 내놓는 모든 확정 타입이 나타날 수 있다', () => {
-            const timeline = confirmedSignalTimeline(BARS, { days: 300 });
-            const seen = new Set(
-                timeline.flatMap(d => typesOf(d.signals ?? []))
-            );
-            expect(seen.size).toBeGreaterThan(5);
-            expect(
-                timeline
-                    .flatMap(d => d.signals ?? [])
-                    .every(s => s.phase === 'confirmed')
-            ).toBe(true);
-        });
+        it(
+            'detectSignals가 내놓는 모든 확정 타입이 나타날 수 있다',
+            { timeout: HEAVY_TIMELINE_TIMEOUT_MS },
+            () => {
+                const timeline = confirmedSignalTimeline(BARS, { days: 300 });
+                const seen = new Set(
+                    timeline.flatMap(d => typesOf(d.signals ?? []))
+                );
+                expect(seen.size).toBeGreaterThan(5);
+                expect(
+                    timeline
+                        .flatMap(d => d.signals ?? [])
+                        .every(s => s.phase === 'confirmed')
+                ).toBe(true);
+            }
+        );
     });
 });
 

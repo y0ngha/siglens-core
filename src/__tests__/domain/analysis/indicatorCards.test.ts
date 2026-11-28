@@ -413,6 +413,208 @@ describe('event cards', () => {
         });
     });
 
+    describe('MACD histogram convergence names no side', () => {
+        const macd = skill(
+            'MACD Signal Guide',
+            'macd',
+            eventGate(
+                'macd_bullish_cross',
+                'macd_bearish_cross',
+                'macd_histogram_bullish_convergence',
+                'macd_histogram_bearish_convergence'
+            )
+        );
+        // MACD still above its signal line and zero while the histogram shrinks (AMAT 2019-02-07).
+        const indicators = ind({
+            macd: [{ macd: 1.62, signal: 1.36, histogram: 0.26 }],
+        });
+        const read = (signals: Signal[], newSignalTypes: SignalType[] = []) =>
+            cardOf(macd, indicators, { signals, newSignalTypes }).signal;
+
+        it('is neutral when the only signal is bearish convergence, still listed in the reading', () => {
+            const out = read(
+                [
+                    signal(
+                        'macd_histogram_bearish_convergence',
+                        'bearish',
+                        BAR_COUNT - 1,
+                        'expected'
+                    ),
+                ],
+                ['macd_histogram_bearish_convergence']
+            );
+            expect(out?.trend).toBe('neutral');
+            expect(out?.reading).toMatchObject({
+                state: 'macd_histogram_bearish_convergence',
+            });
+        });
+
+        it('is neutral for bullish convergence alone', () => {
+            expect(
+                read([
+                    signal(
+                        'macd_histogram_bullish_convergence',
+                        'bullish',
+                        BAR_COUNT - 1,
+                        'expected'
+                    ),
+                ])?.trend
+            ).toBe('neutral');
+        });
+
+        it('is neutral when the only newly lit signal is convergence, even with an older cross listed', () => {
+            expect(
+                read(
+                    [
+                        signal('macd_bullish_cross', 'bullish', BAR_COUNT - 3),
+                        signal(
+                            'macd_histogram_bearish_convergence',
+                            'bearish',
+                            BAR_COUNT - 1,
+                            'expected'
+                        ),
+                    ],
+                    ['macd_histogram_bearish_convergence']
+                )?.trend
+            ).toBe('neutral');
+        });
+
+        it('keeps a fresh cross: the side of the cross, with convergence beside it', () => {
+            expect(
+                read(
+                    [
+                        signal('macd_bearish_cross', 'bearish'),
+                        signal(
+                            'macd_histogram_bullish_convergence',
+                            'bullish',
+                            BAR_COUNT - 1,
+                            'expected'
+                        ),
+                    ],
+                    ['macd_bearish_cross']
+                )?.trend
+            ).toBe('bearish');
+        });
+
+        it('keeps an older cross that nothing newer replaces', () => {
+            expect(
+                read([signal('macd_bullish_cross', 'bullish', BAR_COUNT - 3)])
+                    ?.trend
+            ).toBe('bullish');
+        });
+    });
+
+    describe('a CCI cross counts only while it holds on the last bar', () => {
+        const cci = skill(
+            'CCI Signal Guide',
+            'cci',
+            eventGate('cci_bullish_cross', 'cci_bearish_cross')
+        );
+        /** A series of `BAR_COUNT` values whose last values are `tail`. */
+        const series = (tail: number[]): number[] => [
+            ...Array<number>(BAR_COUNT - tail.length).fill(0),
+            ...tail,
+        ];
+        const read = (
+            tail: number[],
+            signals: Signal[],
+            newSignalTypes: SignalType[] = []
+        ) =>
+            cardOf(cci, ind({ cci: series(tail) }), {
+                signals,
+                newSignalTypes,
+            }).signal;
+
+        it('AAPL 2020-03-12: a bullish cross through -100 undone inside the lookback is neutral', () => {
+            // -136 -> -83 (cross up through -100 two bars ago) -> -92 -> -164.
+            const out = read(
+                [-136, -83, -92, -164],
+                [signal('cci_bullish_cross', 'bullish', BAR_COUNT - 3)]
+            );
+            expect(out?.trend).toBe('neutral');
+            expect(out?.reading).toMatchObject({ state: 'cci_bullish_cross' });
+        });
+
+        it('a bullish cross through -100 that still holds stays bullish (MRVL 2018-08-03)', () => {
+            expect(
+                read(
+                    [-101, -88, -78],
+                    [signal('cci_bullish_cross', 'bullish', BAR_COUNT - 2)]
+                )?.trend
+            ).toBe('bullish');
+        });
+
+        it('a fresh bullish cross through -100 on the last bar stays bullish', () => {
+            expect(
+                read(
+                    [-126, -94],
+                    [signal('cci_bullish_cross', 'bullish')],
+                    ['cci_bullish_cross']
+                )?.trend
+            ).toBe('bullish');
+        });
+
+        it('a bullish cross through +100 that fell back below it is neutral', () => {
+            expect(
+                read(
+                    [90, 113, 95],
+                    [signal('cci_bullish_cross', 'bullish', BAR_COUNT - 2)]
+                )?.trend
+            ).toBe('neutral');
+        });
+
+        it('a bearish cross through 0 that went back above it is neutral (000660.KS 2022-05-16)', () => {
+            expect(
+                read(
+                    [20, -10, 72],
+                    [signal('cci_bearish_cross', 'bearish', BAR_COUNT - 2)]
+                )?.trend
+            ).toBe('neutral');
+        });
+
+        it('a bearish cross through +100 that still holds stays bearish', () => {
+            expect(
+                read(
+                    [145, 82],
+                    [signal('cci_bearish_cross', 'bearish')],
+                    ['cci_bearish_cross']
+                )?.trend
+            ).toBe('bearish');
+        });
+
+        it('a reversed cross does not cancel a held one the other way', () => {
+            // Bearish through 0 three bars ago still holds; the bullish cross through -100 two
+            // bars ago is undone by the last bar. Neither is newly lit.
+            expect(
+                read(
+                    [20, -120, -90, -130],
+                    [
+                        signal('cci_bullish_cross', 'bullish', BAR_COUNT - 2),
+                        signal('cci_bearish_cross', 'bearish', BAR_COUNT - 3),
+                    ]
+                )?.trend
+            ).toBe('bearish');
+        });
+
+        it('the reading leads with the held cross, the undone one trails it', () => {
+            const out = read(
+                [20, -120, -90, -130],
+                [
+                    signal('cci_bullish_cross', 'bullish', BAR_COUNT - 2),
+                    signal('cci_bearish_cross', 'bearish', BAR_COUNT - 3),
+                ]
+            );
+            expect(out?.trend).toBe('bearish');
+            expect(out?.reading).toMatchObject({
+                state: 'cci_bearish_cross',
+                signals: [
+                    { type: 'cci_bearish_cross', barsAgo: 2 },
+                    { type: 'cci_bullish_cross', barsAgo: 1 },
+                ],
+            });
+        });
+    });
+
     it('has no card when none of its signals fired', () => {
         expect(
             cardOf(rsi, ind({ rsi: flat(50) }), {
