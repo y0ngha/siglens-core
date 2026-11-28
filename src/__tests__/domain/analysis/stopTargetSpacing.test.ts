@@ -159,7 +159,11 @@ describe('formatStopTargetSpacing', () => {
         );
         expect(atPrice).toContain('stop candidates none — no support level');
         expect(atPrice).toContain(
-            `Do not compute a stop price yourself: set stopLoss to the lowest support printed below the zone and name it in exit; code replaces it with a stop ${SL_FALLBACK_ATR_MULTIPLIER}×ATR below the zone low (no lower than ${SL_MAX_ATR_MULTIPLIER}×ATR below the zone middle, and no stop at all when the zone is too wide for any stop to fit), so say in exit that the final stop is ATR-based and set by code`
+            `Do not compute a stop price yourself: set stopLoss to the lowest support printed below the zone, name it in exit as the stop and say there that no support lies one ATR below the zone; code replaces it with a stop ${SL_FALLBACK_ATR_MULTIPLIER}×ATR below the zone low (no lower than ${SL_MAX_ATR_MULTIPLIER}×ATR below the zone middle, and no stop at all when the zone is too wide for any stop to fit)`
+        );
+        // The model copied the old "say the final stop is set by code" into the answer.
+        expect(atPrice).not.toMatch(
+            /set by code|say in exit that the final stop/
         );
         expect(atPrice).toContain(
             'first target from none — no resistance level'

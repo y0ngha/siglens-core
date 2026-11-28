@@ -90,7 +90,7 @@ function formatList(
     return levels.map(l => formatLevel(l, quoting)).join(', ');
 }
 
-const NO_STOP_LEVEL = `none — no support level in the data lies that far below. Do not compute a stop price yourself: set stopLoss to the lowest support printed below the zone and name it in exit; code replaces it with a stop ${SL_FALLBACK_ATR_MULTIPLIER}×ATR below the zone low (no lower than ${SL_MAX_ATR_MULTIPLIER}×ATR below the zone middle, and no stop at all when the zone is too wide for any stop to fit), so say in exit that the final stop is ATR-based and set by code`;
+const NO_STOP_LEVEL = `none — no support level in the data lies that far below. Do not compute a stop price yourself: set stopLoss to the lowest support printed below the zone, name it in exit as the stop and say there that no support lies one ATR below the zone; code replaces it with a stop ${SL_FALLBACK_ATR_MULTIPLIER}×ATR below the zone low (no lower than ${SL_MAX_ATR_MULTIPLIER}×ATR below the zone middle, and no stop at all when the zone is too wide for any stop to fit)`;
 const NO_TARGET_LEVEL =
     'none — no resistance level in the data lies that far above; a plan with no target that far above its zone is read as no setup, so say in exit that the first target has no level beyond one ATR instead of using a closer one';
 

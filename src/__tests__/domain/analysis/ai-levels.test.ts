@@ -2246,7 +2246,7 @@ describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () =>
             );
         });
 
-        it('leaves prose and changes alone when the model stop stands or the prose does not name it', () => {
+        it('leaves the prose as written when the model stop stands or the prose does not name it', () => {
             const standing = reconcile(
                 { ...zoneRec, stopLoss: 95, exit: '손절 95.00' },
                 [94]
@@ -2256,12 +2256,16 @@ describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () =>
                 { ...zoneRec, exit: '손절은 지지선 아래입니다.' },
                 [94]
             );
+            // The prose is not edited; the stop it does not name is stated after it.
             expect(unnamed.recommendation.exit).toBe(
-                '손절은 지지선 아래입니다.'
+                '손절은 지지선 아래입니다.\n\n이 계획의 손절가는 $94.00입니다.'
             );
             expect(
                 unnamed.changes.some(line => line.startsWith('exit/riskReward'))
             ).toBe(false);
+            expect(unnamed.changes).toContain(
+                'exit: stated effective stop 94.00'
+            );
         });
 
         it('with no printed support in the band it falls to 1.5 ATR below the zone low: atr basis', () => {
@@ -2488,5 +2492,210 @@ describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () =>
                 reason: 'stopped',
             });
         });
+    });
+});
+
+describe('the exit states the effective stop (QA AN-01)', () => {
+    const response = (rec: ActionRecommendation): AnalysisResponse => ({
+        summary: '',
+        trend: 'bearish',
+        indicatorResults: [],
+        riskLevel: 'high',
+        keyLevels: { support: [], resistance: [] },
+        priceTargets: {
+            bullish: { targets: [], condition: '' },
+            bearish: { targets: [], condition: '' },
+        },
+        patternSummaries: [],
+        strategyResults: [],
+        candlePatterns: [],
+        trendlines: [],
+        actionRecommendation: rec,
+    });
+    const nvda: ActionRecommendation = {
+        ...baseRec,
+        entryRecommendation: 'wait',
+        entryPrices: [145, 146.59],
+        stopLoss: 126.98,
+        takeProfitPrices: [159.23, 164.27, 167.82],
+        exit: '상방 시나리오의 목표는 159.23(단기 POC), 164.27(장기 스윙 저점), 167.82(EMA20) 순이며, 손절 기준은 진입 구간 아래 145.00입니다.',
+        riskReward: '위험은 145.00 지지 이탈로 제한됩니다.',
+    };
+    const nvdaAtr = 12.897818204908166;
+
+    it('appends the standing model stop after the prose, edits nothing, and records it (NVDA)', () => {
+        const result = reconcileBullishActionRecommendation(
+            nvda,
+            145.795,
+            nvdaAtr,
+            [],
+            'USD'
+        );
+        expect(result.wasReconciled).toBe(false);
+        expect(result.recommendation.reconciledLevels).toBeUndefined();
+        expect(result.recommendation.exit).toBe(
+            `${nvda.exit}\n\n이 계획의 손절가는 $126.98입니다.`
+        );
+        expect(result.recommendation.riskReward).toBe(nvda.riskReward);
+        expect(result.changes).toEqual(['exit: stated effective stop 126.98']);
+
+        const out = postProcessAnalysisWithReconcile(
+            response(nvda),
+            150.49,
+            nvdaAtr,
+            []
+        ).actionRecommendation;
+        expect(out?.planState?.stopBasis).toBe('model');
+        expect(out?.exit).toBe(
+            `${nvda.exit}\n\n이 계획의 손절가는 $126.98입니다.`
+        );
+        // riskReward is never edited (only the deterministic line is prepended).
+        expect(out?.riskReward?.endsWith(nvda.riskReward)).toBe(true);
+    });
+
+    it('is idempotent: a second pass appends nothing', () => {
+        const once = reconcileBullishActionRecommendation(
+            nvda,
+            145.795,
+            nvdaAtr,
+            [],
+            'USD'
+        );
+        const twice = reconcileBullishActionRecommendation(
+            once.recommendation,
+            145.795,
+            nvdaAtr,
+            [],
+            'USD'
+        );
+        expect(twice.recommendation).toBe(once.recommendation);
+        expect(twice.changes).toEqual([]);
+    });
+
+    it('leaves an exit that already names the effective stop unchanged', () => {
+        const rec: ActionRecommendation = {
+            ...nvda,
+            exit: '목표 159.23, 손절 126.98입니다.',
+        };
+        const result = reconcileBullishActionRecommendation(
+            rec,
+            145.795,
+            nvdaAtr,
+            [],
+            'USD'
+        );
+        expect(result.recommendation).toBe(rec);
+        expect(result.changes).toEqual([]);
+    });
+
+    it('states an ATR-basis stop and keeps the model text as written (MSFT)', () => {
+        const exit =
+            '**손절 기준**\n\n- 진입 구간 아래 475.99가 손절 기준입니다.\n\n그 아래로 1 ATR 이상 떨어진 지지가 데이터에 뚜렷하지 않습니다.';
+        const out = postProcessAnalysisWithReconcile(
+            response({
+                ...baseRec,
+                entryRecommendation: 'wait',
+                entryPrices: [482.41, 484.79],
+                stopLoss: 475.99,
+                takeProfitPrices: [504.96, 509.53, 515.27],
+                exit,
+                riskReward: '',
+            }),
+            492.85,
+            16.505968998261924,
+            []
+        ).actionRecommendation;
+        expect(out?.reconciledLevels?.stopBasis).toBe('atr');
+        // #426's floor-move rewrite already names 457.65, so nothing is appended.
+        expect(out?.exit).toBe(exit.replace('475.99', '457.65'));
+    });
+
+    it.each([
+        [
+            'ko',
+            '손절 기준은 진입 구간 아래입니다.',
+            '이 계획의 손절가는 변동성(ATR)을 기준으로 정한 $457.65입니다.',
+        ],
+        [
+            'en',
+            'No support lies one ATR below the zone.',
+            "The plan's stop is $457.65, set from the ATR (volatility).",
+        ],
+        [
+            'ja',
+            '損切りはゾーンの下です。',
+            'このプランの損切りはATR（値動きの幅）を基準にした$457.65です。',
+        ],
+        [
+            'zh',
+            '止损位于区间下方。',
+            '本计划的止损价为$457.65，按ATR（波动幅度）设定。',
+        ],
+    ] as const)(
+        'writes the ATR stop sentence in %s',
+        (locale, exit, sentence) => {
+            const out = postProcessAnalysisWithReconcile(
+                response({
+                    ...baseRec,
+                    entryRecommendation: 'wait',
+                    entryPrices: [482.41, 484.79],
+                    stopLoss: 475.99,
+                    takeProfitPrices: [504.96],
+                    exit,
+                    riskReward: '',
+                }),
+                492.85,
+                16.505968998261924,
+                [],
+                'USD',
+                locale
+            ).actionRecommendation;
+            expect(out?.exit).toBe(`${exit}\n\n${sentence}`);
+        }
+    );
+
+    it('writes a KRW stop at the tick with the locale unit', () => {
+        const krw: ActionRecommendation = {
+            ...baseRec,
+            entryRecommendation: 'wait',
+            entryPrices: [30000, 31000],
+            stopLoss: 29500,
+            takeProfitPrices: [36000],
+            exit: '損切りはゾーンの下です。',
+            riskReward: '',
+        };
+        const ja = postProcessAnalysisWithReconcile(
+            response(krw),
+            32000,
+            1000,
+            [],
+            'KRW',
+            'ja'
+        ).actionRecommendation;
+        expect(ja?.reconciledLevels?.stopLoss).toBe(28500);
+        expect(ja?.exit).toBe(
+            '損切りはゾーンの下です。\n\nこのプランの損切りはATR（値動きの幅）を基準にした28,500ウォンです。'
+        );
+        const ko = postProcessAnalysisWithReconcile(
+            response({ ...krw, exit: '손절은 구간 아래입니다.' }),
+            32000,
+            1000,
+            [],
+            'KRW',
+            'ko'
+        ).actionRecommendation;
+        expect(ko?.exit).toBe(
+            '손절은 구간 아래입니다.\n\n이 계획의 손절가는 변동성(ATR)을 기준으로 정한 28,500원입니다.'
+        );
+        // A figure written at the tick counts as naming the stop.
+        const named = postProcessAnalysisWithReconcile(
+            response({ ...krw, exit: '손절 28,500원 이탈 시 무효.' }),
+            32000,
+            1000,
+            [],
+            'KRW',
+            'ko'
+        ).actionRecommendation;
+        expect(named?.exit).toBe('손절 28,500원 이탈 시 무효.');
     });
 });

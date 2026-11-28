@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { rewriteStopInProse } from '@/domain/analysis/stopProse';
+import {
+    appendStopSentence,
+    namesStop,
+    rewriteStopInProse,
+} from '@/domain/analysis/stopProse';
 
 describe('rewriteStopInProse', () => {
     const usd = (text: string, from = 14.5, to = 14.23) =>
@@ -259,5 +263,162 @@ describe('rewriteStopInProse', () => {
         expect(krw('손절 28,030원 이탈 시', 28030)).toBe(
             '손절 27,400원 이탈 시'
         );
+    });
+});
+
+describe('appendStopSentence', () => {
+    const sentence = '손절가는 $126.98입니다.';
+    const usd = (text: string, stop = 126.98, line = sentence) =>
+        appendStopSentence(text, stop, line, 'USD', 'share');
+
+    it('appends the stop sentence and leaves the prose as written (QA AN-01 NVDA)', () => {
+        const nvda =
+            '상방 시나리오의 목표는 159.23(단기 POC), 164.27(장기 스윙 저점), 167.82(EMA20) 순이며, 손절 기준은 진입 구간 아래 145.00입니다.';
+        expect(usd(nvda)).toBe(`${nvda}\n\n${sentence}`);
+    });
+
+    it('leaves an exit that already names the stop unchanged', () => {
+        const text = '목표 159.23, 손절 126.98입니다.';
+        expect(usd(text)).toBe(text);
+    });
+
+    it('matches the stop at its quoted precision and with commas', () => {
+        expect(usd('손절 457.65', 457.65104650260713)).toBe('손절 457.65');
+        expect(usd('Stop at $1,234.50.', 1234.5)).toBe('Stop at $1,234.50.');
+    });
+
+    it('matches a KRW figure at the KRX tick', () => {
+        const text = '손절 27,400원 이탈 시 무효입니다.';
+        expect(
+            appendStopSentence(
+                text,
+                27412,
+                '손절가는 27,400원입니다.',
+                'KRW',
+                'share'
+            )
+        ).toBe(text);
+        expect(namesStop('손절 27400원', 27412, 'KRW', 'share')).toBe(true);
+        expect(namesStop('손절 28,000원', 27412, 'KRW', 'share')).toBe(false);
+    });
+
+    it.each([
+        ['127', 126.98, true],
+        ['127.0', 126.98, true],
+        ['0.0825', 0.08253, true],
+        ['0.083', 0.08253, true],
+        ['126.98', 126.975, true],
+        ['130', 126.98, false],
+        ['126.9', 126.98, false],
+        ['0.08', 0.08253, false],
+        ['5', 5.44, false],
+        ['5.4', 5.44, true],
+    ] as const)('reads %s as the stop %s: %s', (figure, stop, named) => {
+        expect(namesStop(`손절 ${figure}`, stop, 'USD', 'share')).toBe(named);
+    });
+
+    it('does not read an ATR multiple or a percent as the stop', () => {
+        expect(namesStop('1.5 ATR 아래, 1.5% 손실', 1.5, 'USD', 'share')).toBe(
+            false
+        );
+    });
+
+    it.each([
+        ['en', 'The stop is set below 145.00.', 'The stop is $126.98.'],
+        ['ja', '損切りは145.00の下です。', '損切りは$126.98です。'],
+        ['zh', '止损位于145.00下方。', '止损价为$126.98。'],
+    ])('appends in %s', (_locale, text, line) => {
+        expect(usd(text, 126.98, line)).toBe(`${text}\n\n${line}`);
+    });
+
+    it('trims trailing whitespace before the new paragraph and is idempotent', () => {
+        const once = usd('손절 145.00\n\n');
+        expect(once).toBe(`손절 145.00\n\n${sentence}`);
+        expect(usd(once)).toBe(once);
+    });
+
+    it('leaves an empty exit empty and ignores an unusable stop', () => {
+        expect(usd('')).toBe('');
+        expect(usd('손절 145.00', Number.NaN)).toBe('손절 145.00');
+    });
+});
+
+describe('rewriteStopInProse — Korean particles', () => {
+    // The new figure's last spoken syllable decides the particle: 2/4/5/9 (이·사·오·구) have no
+    // final consonant, 1/7/8 (일·칠·팔) end in ㄹ, 0/3/6 (영·삼·육) and an integer ending in zeros
+    // (십·백·천·만) end in another consonant.
+    it.each([
+        // no final consonant
+        ['손절 100.00이 무너지면', 100.02, '손절 100.02가 무너지면'],
+        ['손절 100.00은 유효', 100.04, '손절 100.04는 유효'],
+        ['손절 100.00을 지키면', 100.05, '손절 100.05를 지키면'],
+        ['손절 100.00과 목표', 100.09, '손절 100.09와 목표'],
+        ['손절 100.00으로 둔다', 100.05, '손절 100.05로 둔다'],
+        // another final consonant
+        ['손절 100.05가 무너지면', 100.1, '손절 100.10이 무너지면'],
+        ['손절 100.05는 유효', 100.03, '손절 100.03은 유효'],
+        ['손절 100.05를 지키면', 100.06, '손절 100.06을 지키면'],
+        ['손절 100.05와 목표', 100.03, '손절 100.03과 목표'],
+        ['손절 100.05로 둔다', 100.06, '손절 100.06으로 둔다'],
+        ['손절 95가 무너지면', 90, '손절 90이 무너지면'],
+        ['손절 28,050원가 무너지면', 28000, '손절 28,000원가 무너지면'],
+        ['손절 28050가 무너지면', 28000, '손절 28000이 무너지면'],
+        // ㄹ: 이/은/을/과 stay, 으로 becomes 로
+        ['손절 100.05가 무너지면', 100.01, '손절 100.01이 무너지면'],
+        ['손절 100.05는 유효', 100.07, '손절 100.07은 유효'],
+        ['손절 100.05를 지키면', 100.08, '손절 100.08을 지키면'],
+        ['손절 100.05와 목표', 100.01, '손절 100.01과 목표'],
+        ['손절 100.00으로 둔다', 100.08, '손절 100.08로 둔다'],
+        ['손절 100.05로 둔다', 100.07, '손절 100.07로 둔다'],
+        // not a particle: a word starting with the same syllable
+        ['손절 100.05이후 재진입', 100.1, '손절 100.10이후 재진입'],
+        ['손절 100.00가격대 이탈', 100.1, '손절 100.10가격대 이탈'],
+        ['손절 100.00로는 부족', 100.1, '손절 100.10로는 부족'],
+    ] as const)('%s → %s', (text, to, expected) => {
+        const from = Number(
+            /[\d,]+(?:\.\d+)?/.exec(text)?.[0].replace(/,/g, '')
+        );
+        expect(
+            rewriteStopInProse(
+                text,
+                from,
+                to,
+                text.includes('원') || !text.includes('.') ? 'KRW' : 'USD',
+                'share'
+            )
+        ).toBe(expected);
+    });
+
+    it('keeps the particle after a figure with a currency symbol in front', () => {
+        expect(
+            rewriteStopInProse(
+                '손절 $84.04가 무너지면',
+                84.04,
+                82.71,
+                'USD',
+                'share'
+            )
+        ).toBe('손절 $82.71가 무너지면');
+    });
+
+    it('fits the particle after a unitless figure to the new figure', () => {
+        expect(
+            rewriteStopInProse(
+                '손절 84.04가 무너지면',
+                84.04,
+                82.71,
+                'USD',
+                'share'
+            )
+        ).toBe('손절 82.71이 무너지면');
+        expect(
+            rewriteStopInProse(
+                '손절 28,000원이 무너지면',
+                28000,
+                27400,
+                'KRW',
+                'share'
+            )
+        ).toBe('손절 27,400원이 무너지면');
     });
 });
