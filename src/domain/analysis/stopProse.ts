@@ -198,6 +198,9 @@ const escapeRegExp = (text: string): string =>
  * - Two alternatives or a band that the rewrite made equal (`27,400원 또는 27,400원(피봇 S3)`,
  *   `27,400~27,400원`) collapse to one, keeping a member's label; a pair the rewrite did not
  *   produce is never touched.
+ * - A Korean particle right after a rewritten figure with no unit word and no currency symbol
+ *   in front (이/가, 은/는, 을/를, 과/와, 으로/로) is matched to the new figure's final sound
+ *   (`84.04가` → `82.71이`; `$84.04가` stays, it reads "달러가").
  * - Korean numeral forms (`8만3천1백원`) are not matched. Running it again with the same `from`
  *   and `to` changes nothing.
  *
@@ -333,7 +336,7 @@ function planStopEdits(
         if (isEntryZoneEdge(text.slice(0, start), after)) continue;
         const unit = match[3] ?? '';
         const figure = int.includes(',') ? groupThousands(plain) : plain;
-        const edit =
+        const base =
             levelTokenEdit(
                 text.slice(cursor, start),
                 cursor,
@@ -341,6 +344,24 @@ function planStopEdits(
                 end,
                 `${figure}${unit}`
             ) ?? trailingLabelEdit(start, end, after, figure, unit);
+        // A Korean particle after a unitless figure follows the new figure (`84.04가` →
+        // `82.71이`).
+        // A currency symbol in front (`$84.04가`) is read as "달러", so the particle stays.
+        const symbolBefore =
+            CURRENCY_SYMBOL.test(text.charAt(start - 1)) ||
+            CURRENCY_SYMBOL.test(base.lead);
+        const particle =
+            unit === '' && !symbolBefore
+                ? PARTICLE_AFTER.exec(text.slice(base.end))?.[1]
+                : undefined;
+        const edit =
+            particle === undefined
+                ? base
+                : {
+                      ...base,
+                      end: base.end + particle.length,
+                      tail: `${base.tail}${withKoreanParticle(particle, figure)}`,
+                  };
         edits.push(edit);
         cursor = edit.end;
     }
@@ -415,4 +436,125 @@ function collapseRepeatedStop(
                 : second;
         }
     );
+}
+
+/** The value of a figure's integer and decimal parts. */
+const figureNumber = (int: string, frac: string | undefined): number =>
+    Number(`${int.replace(/,/g, '')}${frac ?? ''}`);
+
+/**
+ * @internal
+ * Whether a text names a stop price: some figure equals the stop, or the stop as the listing
+ * quotes it (a reconciled stop is unrounded, `457.65104…`, and prose writes `457.65`), with or
+ * without thousands commas, and for KRW at the KRX tick. A figure also names the stop when it
+ * is the stop rounded to the figure's own decimal places (`127` or `127.0` for 126.98,
+ * `0.0825` for 0.08253), as long as that precision keeps at least two significant digits of
+ * the stop: whole numbers from 10 up, one decimal from 1 to 10, and below 1 the decimals down
+ * to the second significant digit (`0.083` names 0.08253, `0.08` does not). `130` does not
+ * name 126.98.
+ */
+export function namesStop(
+    text: string,
+    stop: number,
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
+): boolean {
+    const quoted = Number(
+        formatPrice(stop, currency, krxTick).replace(/,/g, '')
+    );
+    const exact = stopFigureMatcher(stop, currency, krxTick);
+    const printed = Number.isFinite(quoted)
+        ? stopFigureMatcher(quoted, currency, krxTick)
+        : exact;
+    const minDecimals = Math.max(0, 1 - Math.floor(Math.log10(stop)));
+    return [...text.matchAll(PRICE_FIGURE)].some(m => {
+        const value = figureNumber(m[1], m[2]);
+        const decimals = m[2] === undefined ? 0 : m[2].length - 1;
+        const rounded =
+            decimals >= minDecimals &&
+            Math.abs(value - stop) <=
+                0.5 * 10 ** -decimals + 1e-9 * Math.max(1, Math.abs(stop));
+        return exact(value) || printed(value) || rounded;
+    });
+}
+
+/**
+ * @internal
+ * An `exit` that states the stop the plan is read with, by adding and never editing.
+ *
+ * The model can write a stop figure in `exit` that is not the plan's stop (QA of `p35`: the
+ * entry-zone low 145.00 named as the stop while `stopLoss` was 126.98), and
+ * {@link rewriteStopInProse} sees only a stop core moved. Editing prose to fix that produced new
+ * contradictions (another scenario's stop rewritten, a target deleted with a sentence), so
+ * the prose is left as written: when no figure in `text` is the stop ({@link namesStop}),
+ * `sentence`, which states it, is appended as its own paragraph. An empty `text` stays empty
+ * (the model wrote no exit). Running it again appends nothing.
+ */
+export function appendStopSentence(
+    text: string,
+    stop: number,
+    sentence: string,
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
+): string {
+    if (!Number.isFinite(stop) || stop <= 0 || text.trim() === '') return text;
+    if (namesStop(text, stop, currency, krxTick)) return text;
+    return `${text.trimEnd()}\n\n${sentence}`;
+}
+
+/**
+ * Whether the Korean reading of a figure ends in a consonant, and whether that consonant is
+ * ㄹ: `145` (…오) has none, `126.98` (…팔) ends in ㄹ, `300` (…백) and `145.00` (…영) in another.
+ * A figure ending in zeros with no decimal part ends in 십·백·천·만·억, all with a consonant.
+ */
+function koreanFinal(figure: string): 'none' | 'rieul' | 'other' {
+    const digits = figure.replace(/,/g, '');
+    const last = digits.at(-1);
+    if (!digits.includes('.') && last === '0') return 'other';
+    switch (last) {
+        case '1':
+        case '7':
+        case '8':
+            return 'rieul';
+        case '2':
+        case '4':
+        case '5':
+        case '9':
+            return 'none';
+        default:
+            return 'other';
+    }
+}
+
+/** A currency symbol written before a figure. */
+const CURRENCY_SYMBOL = /[$₩¥€£]/u;
+
+const PARTICLE_AFTER = /^(으로|로|이|가|은|는|을|를|과|와)(?![가-힣])/u;
+
+const PARTICLE_PAIRS: Record<string, readonly [string, string]> = {
+    이: ['이', '가'],
+    가: ['이', '가'],
+    은: ['은', '는'],
+    는: ['은', '는'],
+    을: ['을', '를'],
+    를: ['을', '를'],
+    과: ['과', '와'],
+    와: ['과', '와'],
+};
+
+/**
+ * `rest` with a Korean particle right after a unitless figure matched to that figure: the
+ * model's `84.04가` becomes `82.71이` when the figure changes.
+ */
+function withKoreanParticle(rest: string, figure: string): string {
+    const particle = PARTICLE_AFTER.exec(rest)?.[1];
+    if (particle === undefined) return rest;
+    const final = koreanFinal(figure);
+    const fitted =
+        particle === '으로' || particle === '로'
+            ? final === 'other'
+                ? '으로'
+                : '로'
+            : PARTICLE_PAIRS[particle][final === 'none' ? 1 : 0];
+    return `${fitted}${rest.slice(particle.length)}`;
 }

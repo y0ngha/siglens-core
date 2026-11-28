@@ -1339,9 +1339,24 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * entry carries the old card trends. Without that deploy, `p35` entries written by the
  * previous core keep the old MACD and CCI trends until their TTL and the version must bump.
  *
+ * `p36` (QA of `p35`): with no support one ATR below the zone, `### Stop & Target Spacing` no
+ * longer tells the model to "say in exit that the final stop is ATR-based and set by code"
+ * (the model copied it into the answer as "최종 손절은 ATR 기준으로 코드가 설정합니다", with no
+ * price); it now says to name the lowest support as the stop and say no support lies one ATR
+ * below. The Step 3 exit rule gains a sentence forbidding any field from saying that code,
+ * the system or the app sets, computes or replaces a value (stable bytes of every technical
+ * prompt, dynamic bytes of every prompt whose spacing block has no stop candidate). Post-
+ * processing now appends a localized sentence stating the effective stop to an `exit` that
+ * names no figure equal to it (`appendStopSentence`, every plan with a stop below its zone;
+ * the prose itself is not edited), and a Korean particle after a figure the floor-move
+ * rewrite changed follows the new figure. Cached `p35` entries carry the old prose, so
+ * the bump moves every technical key. Deploy impact as for `p35`: every technical-analysis
+ * entry (and its peek and overall keys) goes cold at once; deploy outside U.S. and Korean
+ * market hours with the prewarm's model capacity in mind.
+ *
  * @internal
  */
-export const PROMPT_TEMPLATE_VERSION = 'p35' as const;
+export const PROMPT_TEMPLATE_VERSION = 'p36' as const;
 
 /**
  * @internal Redis key for the technical-analysis **peek pointer** — the latest

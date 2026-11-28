@@ -11,7 +11,10 @@ import {
     ENTRY_RECOMMENDATION_BY_POSITION,
 } from '@/domain/analysis/planState';
 import { computePatternTargets } from '@/domain/analysis/patternTargets';
-import { rewriteStopInProse } from '@/domain/analysis/stopProse';
+import {
+    appendStopSentence,
+    rewriteStopInProse,
+} from '@/domain/analysis/stopProse';
 import {
     ceilToKrxTick,
     roundToKrxTick,
@@ -557,7 +560,8 @@ function stopMoveWhy(
  * bullish 추천에 SL/TP 보정을 적용한다. AI 원본 숫자 필드(stopLoss, takeProfitPrices, entryPrices)는
  * 수정하지 않고 reconciledLevels에만 보정값을 병기한다. 손절이 옮겨지면 exit·riskReward 본문에서
  * 모델 손절 숫자만 보정된 손절로 바꾼다({@link rewriteStopInProse}): 본문이 카드가 쓰지 않는 손절을
- * 말하지 않게 하기 위해서다.
+ * 말하지 않게 하기 위해서다. 그 뒤 보정 여부와 관계없이, `exit`에 실효 손절 숫자가 없으면 손절가
+ * 문장을 새 문단으로 덧붙이고(`changes`에 `exit: stated effective stop …`) 본문은 고치지 않는다.
  */
 export function reconcileBullishActionRecommendation(
     rec: ActionRecommendation,
@@ -567,6 +571,42 @@ export function reconcileBullishActionRecommendation(
     currency: CurrencyCode,
     locale: AnalysisLocale = DEFAULT_ANALYSIS_LOCALE,
     krxTick: KrxTickTable = 'share'
+): ReconcileResult {
+    const result = reconcileBullishLevels(
+        rec,
+        entryPrice,
+        atr,
+        stopCandidates,
+        currency,
+        locale,
+        krxTick
+    );
+    // After the levels, on either path: `wasReconciled` keeps meaning "core changed a level".
+    const stated = stateStopInExit(
+        result.recommendation,
+        entryPrice,
+        currency,
+        krxTick,
+        locale
+    );
+    return stated.change === undefined
+        ? result
+        : {
+              ...result,
+              recommendation: stated.recommendation,
+              changes: [...result.changes, stated.change],
+          };
+}
+
+/** The level reconciliation of {@link reconcileBullishActionRecommendation}, before `exit` states the stop. */
+function reconcileBullishLevels(
+    rec: ActionRecommendation,
+    entryPrice: number,
+    atr: number | undefined,
+    stopCandidates: readonly number[],
+    currency: CurrencyCode,
+    locale: AnalysisLocale,
+    krxTick: KrxTickTable
 ): ReconcileResult {
     // A fallback is a computed price, so a KRX listing gets it at its tick —
     // here, not after post-processing, so the plan check and the risk:reward
@@ -758,6 +798,102 @@ export function reconcileBullishActionRecommendation(
               ]
             : changes,
     };
+}
+
+/** The KRW unit word after a price in each output locale (all four are units `stopProse` reads). */
+const KRW_UNIT: Record<AnalysisLocale, string> = {
+    ko: '원',
+    en: ' won',
+    ja: 'ウォン',
+    zh: '韩元',
+};
+
+/**
+ * The stop sentence {@link appendStopSentence} adds to `exit`, per locale. An `atr` stop says it was
+ * set from the ATR, which holds for every ATR-basis stop (1.5 ATR below the zone low, or the
+ * five-ATR cap from the zone's middle); it never says what "code" did (DOM-9).
+ */
+const STOP_SENTENCE: Record<
+    AnalysisLocale,
+    {
+        readonly atr: (price: string) => string;
+        readonly plain: (price: string) => string;
+    }
+> = {
+    ko: {
+        atr: price =>
+            `이 계획의 손절가는 변동성(ATR)을 기준으로 정한 ${price}입니다.`,
+        plain: price => `이 계획의 손절가는 ${price}입니다.`,
+    },
+    en: {
+        atr: price =>
+            `The plan's stop is ${price}, set from the ATR (volatility).`,
+        plain: price => `The plan's stop is ${price}.`,
+    },
+    ja: {
+        atr: price =>
+            `このプランの損切りはATR（値動きの幅）を基準にした${price}です。`,
+        plain: price => `このプランの損切りは${price}です。`,
+    },
+    zh: {
+        atr: price => `本计划的止损价为${price}，按ATR（波动幅度）设定。`,
+        plain: price => `本计划的止损价为${price}。`,
+    },
+};
+
+/** The stop as {@link STOP_SENTENCE} prints it: `$457.65`, `27,400원`, `27,400 won`. */
+function formatProseStop(
+    price: number,
+    currency: CurrencyCode,
+    krxTick: KrxTickTable,
+    locale: AnalysisLocale
+): string {
+    return currency === 'KRW'
+        ? `${roundToKrxTick(price, krxTick).toLocaleString('en-US')}${KRW_UNIT[locale]}`
+        : formatLevelPrice(price, currency, krxTick);
+}
+
+/**
+ * The plan's `exit` made to state the stop the plan is read with: when no figure in it is the
+ * effective stop, the localized stop sentence is appended ({@link appendStopSentence}). The
+ * prose is never edited. Runs on every plan with a stop below its zone, reconciled or not,
+ * because the model can name a figure in `exit` that differs from its own `stopLoss`.
+ */
+function stateStopInExit(
+    rec: ActionRecommendation,
+    entryPrice: number,
+    currency: CurrencyCode,
+    krxTick: KrxTickTable,
+    locale: AnalysisLocale
+): { recommendation: ActionRecommendation; change: string | undefined } {
+    const stop = effectiveStopLoss(rec);
+    const zoneLow = entryZoneBottom(rec.entryPrices) ?? entryPrice;
+    if (
+        !isFinitePositive(stop) ||
+        stop >= zoneLow ||
+        typeof rec.exit !== 'string'
+    ) {
+        return { recommendation: rec, change: undefined };
+    }
+    const price = formatProseStop(stop, currency, krxTick, locale);
+    const sentences = STOP_SENTENCE[locale] ?? STOP_SENTENCE.ko;
+    const sentence =
+        rec.reconciledLevels?.stopBasis === 'atr'
+            ? sentences.atr(price)
+            : sentences.plain(price);
+    const exit = appendStopSentence(
+        rec.exit,
+        stop,
+        sentence,
+        currency,
+        krxTick
+    );
+    return exit === rec.exit
+        ? { recommendation: rec, change: undefined }
+        : {
+              recommendation: { ...rec, exit },
+              change: `exit: stated effective stop ${formatPrice(stop, currency, krxTick)}`,
+          };
 }
 
 /**
