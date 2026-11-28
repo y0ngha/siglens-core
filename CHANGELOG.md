@@ -1,5 +1,11 @@
 # Changelog
 
+# [3.2.0](https://github.com/y0ngha/siglens-core/compare/v3.1.3...v3.2.0) (2026-11-28)
+
+### Features
+
+* 변화 비교에 기준선 현재 위치와 예전 플랜 기준선 교차를 더한다 ([#430](https://github.com/y0ngha/siglens-core/issues/430)) ([ffdbb83](https://github.com/y0ngha/siglens-core/commit/ffdbb83522ef92e111acace05651652ce224f687))
+
 ## [3.1.3](https://github.com/y0ngha/siglens-core/compare/v3.1.2...v3.1.3) (2026-11-28)
 
 ### Bug Fixes
