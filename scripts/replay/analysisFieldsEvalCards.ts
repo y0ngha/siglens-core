@@ -18,14 +18,7 @@ import {
 } from './analysisFieldsEvalTypes';
 import { MACD_CONVERGENCE_TYPES } from '@/domain/analysis/indicatorCards';
 import { cciCrossHolds } from '@/domain/analysis/indicatorReadingsEvent';
-import { findThresholdCross } from '@/domain/signals/confirmed';
-import {
-    CCI_BEARISH_CROSS_LEVEL,
-    CCI_BULLISH_CROSS_LEVEL,
-    CCI_OVERBOUGHT_CROSS_LEVEL,
-    CCI_OVERSOLD_CROSS_LEVEL,
-    CROSS_LOOKBACK_BARS,
-} from '@/domain/signals/constants';
+import { findCciCross } from '@/domain/signals/confirmed';
 import type { IndicatorGuideResult, RawStrategyResult } from '@/domain/types';
 
 export const ALWAYS_ON_KINDS = [
@@ -308,35 +301,6 @@ function printedSignals(prompt: string): {
     };
 }
 
-/** The bar of a CCI cross the detector reports on this series (its level order, its lookback), or `null`. */
-function cciCrossIndex(
-    type: string,
-    series: readonly (number | null)[]
-): number | null {
-    const [levels, direction] =
-        type === 'cci_bullish_cross'
-            ? [
-                  [CCI_OVERSOLD_CROSS_LEVEL, CCI_BULLISH_CROSS_LEVEL],
-                  'up' as const,
-              ]
-            : type === 'cci_bearish_cross'
-              ? [
-                    [CCI_OVERBOUGHT_CROSS_LEVEL, CCI_BEARISH_CROSS_LEVEL],
-                    'down' as const,
-                ]
-              : [[], 'up' as const];
-    for (const level of levels) {
-        const at = findThresholdCross(
-            [...series],
-            level,
-            CROSS_LOOKBACK_BARS,
-            direction
-        );
-        if (at !== null) return at;
-    }
-    return null;
-}
-
 /** The numbers an event kind prints on its own value line, plus the signals it fired. */
 function eventReading(
     kind: string,
@@ -359,8 +323,9 @@ function eventReading(
     // no side. Side from the events that fired on this bar when there are any, else from all.
     const holds = (t: string): boolean => {
         if (kind !== 'cci' || cci === undefined) return true;
-        const at = cciCrossIndex(t, cci);
-        return at === null || cciCrossHolds(t, cci, at);
+        // The detector's own search (level order, lookback), shared with the card.
+        const at = findCciCross(t, cci)?.index;
+        return at === undefined || cciCrossHolds(t, cci, at);
     };
     const counted = fired.filter(holds);
     const freshCounted = counted.filter(t => fresh.includes(t));

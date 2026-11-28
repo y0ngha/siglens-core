@@ -694,7 +694,7 @@ export function reconcileBullishActionRecommendation(
     const changes: readonly string[] = [
         ...(slWasReconciled
             ? [
-                  `stopLoss: ${rec.stopLoss ?? 'null'} → ${formatPrice(reconciled.stopLoss, currency, krxTick)} (floor, ${stopBasis})`,
+                  `stopLoss: ${rec.stopLoss == null ? 'null' : formatPrice(rec.stopLoss, currency, krxTick)} → ${formatPrice(reconciled.stopLoss, currency, krxTick)} (floor, ${stopBasis})`,
               ]
             : []),
         ...(slRejected
@@ -754,7 +754,7 @@ export function reconcileBullishActionRecommendation(
         changes: proseRewritten
             ? [
                   ...changes,
-                  `exit/riskReward: stop figure ${movedFrom} → ${formatPrice(reconciledSl, currency, krxTick)} in prose`,
+                  `exit/riskReward: stop figure ${formatPrice(movedFrom, currency, krxTick)} → ${formatPrice(reconciledSl, currency, krxTick)} in prose`,
               ]
             : changes,
     };

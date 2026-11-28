@@ -404,6 +404,59 @@ export function detectIchimokuCloudBreakout(
     };
 }
 
+/**
+ * The levels each CCI cross type is detected at, in the order the detector searches them, and
+ * the cross direction. The first level with a cross inside the lookback wins, even when a later
+ * level has an earlier cross.
+ */
+const CCI_CROSS_SPECS: Readonly<
+    Record<
+        'cci_bullish_cross' | 'cci_bearish_cross',
+        {
+            readonly levels: readonly number[];
+            readonly direction: CrossDirection;
+        }
+    >
+> = {
+    cci_bullish_cross: {
+        levels: [CCI_OVERSOLD_CROSS_LEVEL, CCI_BULLISH_CROSS_LEVEL],
+        direction: 'up',
+    },
+    cci_bearish_cross: {
+        levels: [CCI_OVERBOUGHT_CROSS_LEVEL, CCI_BEARISH_CROSS_LEVEL],
+        direction: 'down',
+    },
+};
+
+/**
+ * @internal The bar and level of the CCI cross of `type` that the detector reports on `series`
+ * within the last `lookback` bars, or `null` (also for a type that is not a CCI cross). The CCI
+ * detectors, the card's hold check and the replay scripts all read the cross through this one
+ * function, so they cannot pick different levels: a bar that crosses two levels at once (-150 →
+ * 150 crosses -100 and +100) reports the level searched first.
+ */
+export function findCciCross(
+    type: string,
+    series: readonly (number | null)[],
+    lookback: number = CROSS_LOOKBACK_BARS
+): { readonly index: number; readonly level: number } | null {
+    const spec =
+        type === 'cci_bullish_cross' || type === 'cci_bearish_cross'
+            ? CCI_CROSS_SPECS[type]
+            : undefined;
+    if (spec === undefined) return null;
+    for (const level of spec.levels) {
+        const index = findThresholdCross(
+            [...series],
+            level,
+            lookback,
+            spec.direction
+        );
+        if (index !== null) return { index, level };
+    }
+    return null;
+}
+
 /** @internal Detects CCI crossing up through an oversold/momentum level (bullish confirmed signal). */
 export function detectCciBullishCross(
     _bars: Bar[],
@@ -411,24 +464,14 @@ export function detectCciBullishCross(
 ): Signal | null {
     const cci = indicators.cci;
     if (cci.length < 2) return null;
-    const thresholds = [CCI_OVERSOLD_CROSS_LEVEL, CCI_BULLISH_CROSS_LEVEL];
-    for (const threshold of thresholds) {
-        const idx = findThresholdCross(
-            cci,
-            threshold,
-            CROSS_LOOKBACK_BARS,
-            'up'
-        );
-        if (idx !== null) {
-            return {
-                type: 'cci_bullish_cross',
-                direction: 'bullish',
-                phase: 'confirmed',
-                detectedAt: idx,
-            };
-        }
-    }
-    return null;
+    const cross = findCciCross('cci_bullish_cross', cci);
+    if (cross === null) return null;
+    return {
+        type: 'cci_bullish_cross',
+        direction: 'bullish',
+        phase: 'confirmed',
+        detectedAt: cross.index,
+    };
 }
 
 /** @internal Detects +DI crossing above -DI with strong ADX (bullish confirmed signal). */
@@ -731,24 +774,14 @@ export function detectCciBearishCross(
 ): Signal | null {
     const cci = indicators.cci;
     if (cci.length < 2) return null;
-    const thresholds = [CCI_OVERBOUGHT_CROSS_LEVEL, CCI_BEARISH_CROSS_LEVEL];
-    for (const threshold of thresholds) {
-        const idx = findThresholdCross(
-            cci,
-            threshold,
-            CROSS_LOOKBACK_BARS,
-            'down'
-        );
-        if (idx !== null) {
-            return {
-                type: 'cci_bearish_cross',
-                direction: 'bearish',
-                phase: 'confirmed',
-                detectedAt: idx,
-            };
-        }
-    }
-    return null;
+    const cross = findCciCross('cci_bearish_cross', cci);
+    if (cross === null) return null;
+    return {
+        type: 'cci_bearish_cross',
+        direction: 'bearish',
+        phase: 'confirmed',
+        detectedAt: cross.index,
+    };
 }
 
 /**
