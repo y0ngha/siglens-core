@@ -435,6 +435,7 @@ describe('technicalChangesBetween: levels', () => {
                 direction: 'up',
                 time: bars[66].time,
                 close: 121,
+                pastNow: true,
             },
             {
                 kind: 'level_crossed',
@@ -443,6 +444,7 @@ describe('technicalChangesBetween: levels', () => {
                 direction: 'up',
                 time: bars[76].time,
                 close: 151,
+                pastNow: true,
             },
         ]);
     });
@@ -526,8 +528,35 @@ describe('technicalChangesBetween: levels', () => {
                 direction: 'down',
                 time: bars[1].time,
                 close: 95,
+                pastNow: false,
             },
         ]);
+    });
+
+    it('sets pastNow by whether the last close is still past the level', () => {
+        const run = (
+            closes: number[],
+            side: 'supports' | 'resistances',
+            p: number
+        ) =>
+            ofKind(
+                technicalChangesBetween(mkBars(closes), {
+                    fromIndex: 0,
+                    reference: ref({ [side]: [p] }),
+                }),
+                'level_crossed'
+            );
+        // Crossed down and still below.
+        expect(run([100, 94, 93], 'supports', 96)[0].pastNow).toBe(true);
+        // Crossed down, then back above.
+        expect(run([100, 94, 99], 'supports', 96)[0].pastNow).toBe(false);
+        // Crossed up a resistance and ends exactly on it: at or above is above, still past.
+        expect(run([100, 104, 102], 'resistances', 102)[0].pastNow).toBe(true);
+        expect(run([90, 104, 102], 'resistances', 102)[0].pastNow).toBe(true);
+        // Crossed down a support and ends exactly on it: at or below is below, still past.
+        expect(run([100, 94, 96], 'supports', 96)[0].pastNow).toBe(true);
+        // Crossed up a support, ends exactly on it: back below by the tie rule.
+        expect(run([95, 99, 96], 'supports', 96)[0].pastNow).toBe(false);
     });
 
     it('reports nothing for a level never crossed or without a reference', () => {
@@ -560,6 +589,164 @@ describe('technicalChangesBetween: levels', () => {
         );
         expect(crossed).toHaveLength(1);
         expect(crossed[0]).toMatchObject({ time: bars[3].time, close: 98 });
+    });
+});
+
+describe('technicalChangesBetween: plan levels', () => {
+    const run = (closes: number[], p: ActionRecommendation | null) =>
+        ofKind(
+            technicalChangesBetween(mkBars(closes), {
+                fromIndex: 0,
+                reference: ref({ plan: p }),
+            }),
+            'plan_level_crossed'
+        );
+
+    it('reports a stop closed below and recovered with pastNow false', () => {
+        const bars = mkBars([105, 95, 89, 96, 105]);
+        const changes = run([105, 95, 89, 96, 105], plan());
+        expect(changes).toEqual(
+            [
+                {
+                    kind: 'plan_level_crossed',
+                    level: 'stop',
+                    price: 90,
+                    direction: 'down',
+                    time: bars[2].time,
+                    close: 89,
+                    pastNow: false,
+                },
+                {
+                    kind: 'plan_level_crossed',
+                    level: 'entry_low',
+                    price: 100,
+                    direction: 'down',
+                    time: bars[1].time,
+                    close: 95,
+                    pastNow: false,
+                },
+            ].sort((a, b) => a.time - b.time)
+        );
+    });
+
+    it('reports an entry high crossed and still past', () => {
+        const changes = run([105, 112, 115], plan());
+        expect(changes).toHaveLength(1);
+        expect(changes[0]).toMatchObject({
+            level: 'entry_high',
+            price: 110,
+            direction: 'up',
+            close: 112,
+            pastNow: true,
+        });
+    });
+
+    it('orders items by time, then price', () => {
+        const changes = run([105, 80, 120], plan());
+        expect(changes.map(c => c.level)).toEqual([
+            'stop',
+            'entry_low',
+            'entry_high',
+        ]);
+        const jump = run([95, 120], plan({ stopLoss: 90 }));
+        expect(jump.map(c => c.level)).toEqual(['entry_low', 'entry_high']);
+    });
+
+    it('lists level_crossed, then plan_level_crossed, then trend_changed', () => {
+        const bars = mkBars(FLAT_THEN_UP.slice(0, 66));
+        const { changes } = okResult(
+            technicalChangesBetween(bars, {
+                fromIndex: 62,
+                reference: ref({ resistances: [112], plan: plan() }),
+            })
+        );
+        const firstOf = (kind: TechnicalChange['kind']): number =>
+            changes.findIndex(c => c.kind === kind);
+        expect(firstOf('level_crossed')).toBeGreaterThanOrEqual(0);
+        expect(firstOf('level_crossed')).toBeLessThan(
+            firstOf('plan_level_crossed')
+        );
+        expect(firstOf('plan_level_crossed')).toBeLessThan(
+            firstOf('trend_changed')
+        );
+    });
+
+    it('splits a one-price zone: the level-order tiebreak and the tie at the shared price', () => {
+        const single = plan({ entryPrices: [100] });
+        // Same time and price: entry_low comes before entry_high.
+        expect(run([105, 99], single).map(c => c.level)).toEqual([
+            'entry_low',
+            'entry_high',
+        ]);
+        // A close exactly on 100 is inside the zone: it leaves the upper side of entry_high
+        // but is not below entry_low.
+        const tie = run([105, 100], single);
+        expect(tie.map(c => c.level)).toEqual(['entry_high']);
+        expect(tie[0]).toMatchObject({ direction: 'down', pastNow: true });
+    });
+
+    it('reports no stop for a stop not below the zone low, even when crossed', () => {
+        const levels = (stopLoss: number) =>
+            run([105, 80], plan({ stopLoss })).map(c => c.level);
+        expect(levels(100)).toEqual(['entry_low']);
+        expect(levels(95)).toEqual(['stop', 'entry_low']);
+    });
+
+    it('reads the effective stop: the reconciled one, and none when it was rejected', () => {
+        const reconciled = plan({
+            stopLoss: 90,
+            reconciledLevels: {
+                exit: '',
+                riskReward: '',
+                reason: '',
+                stopLoss: 95,
+            },
+        });
+        const stop = run([105, 94], reconciled).find(c => c.level === 'stop');
+        expect(stop).toMatchObject({ price: 95, close: 94 });
+        const rejected = plan({
+            stopLoss: 90,
+            reconciledLevels: {
+                exit: '',
+                riskReward: '',
+                reason: '',
+                stopLossRejected: true,
+            },
+        });
+        expect(run([105, 80], rejected).map(c => c.level)).toEqual([
+            'entry_low',
+        ]);
+    });
+
+    it('reports nothing without a plan or when no plan level is crossed', () => {
+        expect(run([105, 80, 120], null)).toEqual([]);
+        expect(run([105, 106, 104], plan())).toEqual([]);
+        expect(
+            technicalChangesBetween(mkBars([105, 80]), { fromIndex: 0 })
+        ).toMatchObject({ ok: true, changes: [] });
+    });
+
+    it('uses the plan-check tie rules at each level', () => {
+        // A close exactly on the stop is a broken stop; exactly on the zone high is not above it.
+        expect(run([105, 90], plan())[0]).toMatchObject({
+            level: 'stop',
+            direction: 'down',
+            pastNow: true,
+        });
+        expect(run([105, 110], plan())).toEqual([]);
+        // A close exactly on the zone low is not below the zone.
+        expect(run([105, 100], plan())).toEqual([]);
+        // Baseline on the stop is already below it; a close above is a move up.
+        const regained = run([90, 91], plan());
+        expect(regained.find(c => c.level === 'stop')).toMatchObject({
+            direction: 'up',
+            pastNow: true,
+        });
+    });
+
+    it('skips a stop that is not below the entry zone', () => {
+        const changes = run([105, 80], plan({ stopLoss: 105 }));
+        expect(changes.map(c => c.level)).toEqual(['entry_low']);
     });
 });
 
@@ -1006,6 +1193,12 @@ describe('types', () => {
         expectTypeOf<
             Extract<TechnicalChange, { kind: 'level_crossed' }>['direction']
         >().toEqualTypeOf<'down' | 'up'>();
+        expectTypeOf<
+            Extract<TechnicalChange, { kind: 'level_crossed' }>['pastNow']
+        >().toEqualTypeOf<boolean>();
+        expectTypeOf<
+            Extract<TechnicalChange, { kind: 'plan_level_crossed' }>['level']
+        >().toEqualTypeOf<'stop' | 'entry_low' | 'entry_high'>();
         expectTypeOf<
             Extract<TechnicalChange, { kind: 'trend_changed' }>
         >().toHaveProperty('slopeAtr');

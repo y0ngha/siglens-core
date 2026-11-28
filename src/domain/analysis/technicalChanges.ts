@@ -10,6 +10,7 @@ import {
     asObject,
     asOptionalEnum,
 } from '@/domain/analysis/normalizePrimitives';
+import { alertablePlanLevels } from '@/domain/analysis/priceLevelAlert';
 import { calculateIndicators } from '@/domain/indicators';
 import { confirmedSignalTimeline } from '@/domain/signals/timeline';
 import { isInfoDepthAllowed } from '@/domain/tier';
@@ -63,6 +64,9 @@ export interface ChangeReference {
 export type ChangeReferenceAccess =
     { readonly tier: Tier; readonly config?: TierConfig } | 'as_shown';
 
+/** A level of the reference plan: the invalidation (stop) or an entry zone edge. */
+export type PlanLevelName = 'stop' | 'entry_low' | 'entry_high';
+
 export type TechnicalChange =
     | {
           readonly kind: 'trend_changed';
@@ -87,6 +91,24 @@ export type TechnicalChange =
           /** `Bar.time` of the first close on the other side. */
           readonly time: number;
           readonly close: number;
+          /**
+           * Whether the close at the last bar is still on the crossed side, by the same tie
+           * rule as the crossing. `false`: the level was crossed and the price came back.
+           */
+          readonly pastNow: boolean;
+      }
+    | {
+          readonly kind: 'plan_level_crossed';
+          /** `stop`: the invalidation level; `entry_low` / `entry_high`: the entry zone edges. */
+          readonly level: PlanLevelName;
+          readonly price: number;
+          /** `down`: the close moved to the lower side of the level; `up`: to the upper side. */
+          readonly direction: 'down' | 'up';
+          /** `Bar.time` of the first close on the other side. */
+          readonly time: number;
+          readonly close: number;
+          /** Whether the close at the last bar is still on the crossed side (same tie rule). */
+          readonly pastNow: boolean;
       }
     | {
           readonly kind: 'plan_position_changed';
@@ -394,17 +416,49 @@ function sideOfLevel(
 }
 
 type LevelCrossing = Extract<TechnicalChange, { kind: 'level_crossed' }>;
+type PlanLevelCrossing = Extract<
+    TechnicalChange,
+    { kind: 'plan_level_crossed' }
+>;
+
+interface Crossing {
+    readonly direction: 'down' | 'up';
+    readonly time: number;
+    readonly close: number;
+    readonly pastNow: boolean;
+}
+
+/**
+ * The first close after the baseline on the other side of a level than the baseline close,
+ * and whether the last close is still on that side. `null` when no close crossed. Corrupt
+ * closes are skipped (DOM-1): they neither cross a level nor hide a later crossing.
+ */
+function firstCrossing(
+    bars: readonly Bar[],
+    fromIndex: number,
+    side: 'support' | 'resistance',
+    price: number
+): Crossing | null {
+    const start = sideOfLevel(bars[fromIndex].close, side, price);
+    const crossing = bars
+        .slice(fromIndex + 1)
+        .filter(bar => isFinitePositive(bar.close))
+        .find(bar => sideOfLevel(bar.close, side, price) !== start);
+    if (crossing === undefined) return null;
+    const last = bars[bars.length - 1];
+    return {
+        direction: start === 'upper' ? 'down' : 'up',
+        time: crossing.time,
+        close: crossing.close,
+        pastNow: sideOfLevel(last.close, side, price) !== start,
+    };
+}
 
 function levelChanges(
     bars: readonly Bar[],
     fromIndex: number,
     reference: ChangeReference
 ): LevelCrossing[] {
-    const startClose = bars[fromIndex].close;
-    // Corrupt closes are skipped (DOM-1): they neither cross a level nor hide a later crossing.
-    const later = bars
-        .slice(fromIndex + 1)
-        .filter(bar => isFinitePositive(bar.close));
     const levels = [
         ...reference.supports.map(price => ({
             side: 'support' as const,
@@ -417,23 +471,60 @@ function levelChanges(
     ];
     return levels
         .flatMap(({ side, price }): LevelCrossing[] => {
-            const start = sideOfLevel(startClose, side, price);
-            const crossing = later.find(
-                bar => sideOfLevel(bar.close, side, price) !== start
-            );
-            if (crossing === undefined) return [];
-            return [
-                {
-                    kind: 'level_crossed',
-                    side,
-                    price,
-                    direction: start === 'upper' ? 'down' : 'up',
-                    time: crossing.time,
-                    close: crossing.close,
-                },
-            ];
+            const crossing = firstCrossing(bars, fromIndex, side, price);
+            if (crossing === null) return [];
+            return [{ kind: 'level_crossed', side, price, ...crossing }];
         })
         .sort((a, b) => a.time - b.time || a.price - b.price);
+}
+
+/**
+ * The tie rule of each plan level, as the plan check reads it: a close at or below the stop is
+ * a broken stop and a close at or below the zone's high edge is not above the zone (both read
+ * like a support); a close at or above the zone's low edge is not below the zone (like a
+ * resistance).
+ */
+const PLAN_LEVEL_SIDE = {
+    stop: 'support',
+    entry_low: 'resistance',
+    entry_high: 'support',
+} as const satisfies Record<PlanLevelName, 'support' | 'resistance'>;
+
+const PLAN_LEVEL_ORDER: readonly PlanLevelName[] = [
+    'stop',
+    'entry_low',
+    'entry_high',
+];
+
+function planLevelChanges(
+    bars: readonly Bar[],
+    fromIndex: number,
+    plan: ActionRecommendation
+): PlanLevelCrossing[] {
+    const { entryZone, invalidation } = alertablePlanLevels(plan);
+    const prices: Record<PlanLevelName, number | null> = {
+        stop: invalidation,
+        entry_low: entryZone?.low ?? null,
+        entry_high: entryZone?.high ?? null,
+    };
+    return PLAN_LEVEL_ORDER.flatMap((level): PlanLevelCrossing[] => {
+        const price = prices[level];
+        if (price === null) return [];
+        const crossing = firstCrossing(
+            bars,
+            fromIndex,
+            PLAN_LEVEL_SIDE[level],
+            price
+        );
+        if (crossing === null) return [];
+        return [{ kind: 'plan_level_crossed', level, price, ...crossing }];
+    }).sort(
+        (a, b) =>
+            a.time - b.time ||
+            a.price - b.price ||
+            PLAN_LEVEL_ORDER.indexOf(a.level) -
+                PLAN_LEVEL_ORDER.indexOf(b.level)
+    );
 }
 
 function signalChanges(
@@ -481,8 +572,8 @@ function signalChanges(
  * What changed in the technical reading between the close of `bars[fromIndex]` and the close
  * of the last bar. Descriptive only.
  *
- * Order: `plan_position_changed`, `level_crossed` (by time), `trend_changed`,
- * `signal_started` (by time).
+ * Order: `plan_position_changed`, `level_crossed` (by time), `plan_level_crossed` (by time,
+ * then price), `trend_changed`, `signal_started` (by time).
  * - trend: the computed trend (`computeAnalysisTrend`) on `bars[0..fromIndex]` and on all
  *   bars; an item only when both ends are measurable and the label differs.
  * - signals: confirmed signals that start on a bar after `fromIndex` (episode-start rule of
@@ -492,7 +583,14 @@ function signalChanges(
  * - levels: per reference level, the first close after the baseline on the other side of it
  *   than the baseline close (the tie rules of the plan check: a close at or below a support is
  *   below it, at or above a resistance is above it). A level crossed and crossed back is
- *   reported once, with its first crossing.
+ *   reported once, with its first crossing; `pastNow` says whether the last close is still on
+ *   the crossed side (same tie rule), so "crossed down on 11-18" is never read as "below now".
+ * - plan levels: with a reference plan, the stop (`alertablePlanLevels().invalidation`) and the
+ *   entry zone's low and high edges get the same first-crossing rule as `level_crossed`
+ *   (stop and zone high: a close at or below is on the lower side; zone low: a close at or
+ *   above is on the upper side), each with `pastNow`. A plan level never crossed gives no item.
+ *   A stop that is not below the zone's low, or a rejected or absent one, is not a plan level, so
+ *   it gives no `stop` item: the absence of a `stop` item never means the stop held.
  * - plan: `buildPlanState` at both ends against the same plan; an item only when the position
  *   (or the `no_setup` reason) differs.
  *
@@ -546,6 +644,9 @@ export function technicalChangesBetween(
     const changes: TechnicalChange[] = [
         ...(plan === null ? [] : [plan]),
         ...(reference ? levelChanges(bars, fromIndex, reference) : []),
+        ...(reference?.plan
+            ? planLevelChanges(bars, fromIndex, reference.plan)
+            : []),
         ...(trend.change === null ? [] : [trend.change]),
         ...signals.changes,
     ];
