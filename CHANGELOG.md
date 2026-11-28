@@ -1,5 +1,15 @@
 # Changelog
 
+## [3.1.2](https://github.com/y0ngha/siglens-core/compare/v3.1.1...v3.1.2) (2026-11-28)
+
+### Bug Fixes
+
+* MACD 수렴만으로는 카드 방향을 정하지 않고 CCI는 유지되는 교차만 센다 ([#427](https://github.com/y0ngha/siglens-core/issues/427)) ([64d6bba](https://github.com/y0ngha/siglens-core/commit/64d6bbac5c7354cb00354e2209af3ae26e75f05a))
+
+### Features
+
+* 에이전트 시계에 미국 야간 세션과 일일 휴지 상태를 넣는다 ([#428](https://github.com/y0ngha/siglens-core/issues/428)) ([944f7b0](https://github.com/y0ngha/siglens-core/commit/944f7b0692241a1450661bb510af396b779387f2))
+
 ## [3.1.1](https://github.com/y0ngha/siglens-core/compare/v3.1.0...v3.1.1) (2026-11-27)
 
 ### Bug Fixes
