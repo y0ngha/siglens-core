@@ -2221,7 +2221,7 @@ describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () =>
                 'AI가 제시한 손절가가 진입 구간 하단에서 1 ATR보다 가까워 그 아래 기준 가격대로 옮겼습니다.'
             );
             expect(result.changes).toContain(
-                'stopLoss: 97 → 94.00 (floor, level)'
+                'stopLoss: 97.00 → 94.00 (floor, level)'
             );
             expect(result.recommendation.stopLoss).toBe(97);
         });
@@ -2242,7 +2242,7 @@ describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () =>
             expect(rec.positionAnalysis).toBe('97.00 지지선 위에 있습니다.');
             expect(rec.stopLoss).toBe(97);
             expect(result.changes).toContain(
-                'exit/riskReward: stop figure 97 → 94.00 in prose'
+                'exit/riskReward: stop figure 97.00 → 94.00 in prose'
             );
         });
 
@@ -2273,7 +2273,7 @@ describe('stop floor, plan state and the computed verdict (WP-15 core-2)', () =>
                 'AI가 제시한 손절가가 진입 구간 하단에서 1 ATR보다 가까워 ATR 기준값으로 계산했습니다.'
             );
             expect(result.changes).toContain(
-                'stopLoss: 97 → 95.00 (floor, atr)'
+                'stopLoss: 97.00 → 95.00 (floor, atr)'
             );
         });
 

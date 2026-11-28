@@ -30,6 +30,10 @@ import {
  * which rewrites the fixture from the CURRENT builder (review the diff: it is
  * exactly the prompt change). With the variable unset the test never writes.
  *
+ * The overnight-session instants were added with the overnight states, so
+ * their hashes are renders of the builder that introduced them; the three
+ * older instants kept their hashes through that change.
+ *
  * The prompt hashes were generated with this test tool set by the builder as it
  * was before the built-in tool set was deleted, so the deletion is shown not to
  * have moved a byte of the frame. The turn-context hashes are carried over
@@ -50,6 +54,16 @@ const TURN_CONTEXT_INSTANTS = [
     '2026-09-12T14:30:00Z',
     '2026-11-20T23:59:59.999Z',
     '2026-01-01T00:00:00Z',
+    // Around the overnight-session launch (Sun 2026-12-06 21:00 ET): one minute
+    // before it, Sunday night, a weekday overnight, the weekday 20:00–21:00
+    // pause, Sunday 20:30 ET (closed, overnight from 21:00; not a pause) and a
+    // holiday eve (Thu 2026-12-24 21:30 ET, no session before Christmas).
+    '2026-12-07T01:59:00Z',
+    '2026-12-07T02:30:00Z',
+    '2026-12-08T03:00:00Z',
+    '2026-12-08T01:30:00Z',
+    '2026-12-14T01:30:00Z',
+    '2026-12-25T02:30:00Z',
 ];
 
 const AVAILABILITY_SETS: ReadonlyArray<readonly [string, readonly string[]]> = [

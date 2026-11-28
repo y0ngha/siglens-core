@@ -596,6 +596,26 @@ describe('event cards', () => {
             ).toBe('bearish');
         });
 
+        it('a bar crossing -100 and +100 at once is read against -100, the level the detector reports', () => {
+            // -150 -> 150 crosses both levels on one bar; 50 is below +100 but above -100.
+            expect(
+                read(
+                    [-150, 150, 50],
+                    [signal('cci_bullish_cross', 'bullish', BAR_COUNT - 2)]
+                )?.trend
+            ).toBe('bullish');
+        });
+
+        it('a bar crossing +100 and 0 downward at once is read against +100', () => {
+            // 150 -> -50 crosses both levels on one bar; 50 is above 0 but below +100.
+            expect(
+                read(
+                    [150, -50, 50],
+                    [signal('cci_bearish_cross', 'bearish', BAR_COUNT - 2)]
+                )?.trend
+            ).toBe('bearish');
+        });
+
         it('the reading leads with the held cross, the undone one trails it', () => {
             const out = read(
                 [20, -120, -90, -130],

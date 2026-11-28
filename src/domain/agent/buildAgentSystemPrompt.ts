@@ -21,7 +21,7 @@ export type { AgentLocale };
  * Bump whenever the frame text changes (the consumer versions its own tool
  * text, `AgentToolSet.version`); logged per turn.
  */
-export const AGENT_PROMPT_VERSION = '2026-11-27.1';
+export const AGENT_PROMPT_VERSION = '2026-11-28.1';
 
 export interface BuildAgentSystemPromptInput {
     locale: AgentLocale;
@@ -66,8 +66,8 @@ export interface AgentTurnContextInput {
     now: Date;
     /**
      * @deprecated Ignored. The US line is computed from `now` (pre-market,
-     * regular, after-hours and the next boundary, holidays and half days
-     * included), so a caller-supplied status could only disagree with it.
+     * regular, after-hours, overnight and the next boundary, holidays and half
+     * days included), so a caller-supplied status could only disagree with it.
      * Remove once the consumer stops passing it (siglens still does, in its
      * agent turn stream and a fake-provider test); removal is tracked with the
      * consumer's core bump.

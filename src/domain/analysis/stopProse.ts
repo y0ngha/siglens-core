@@ -107,20 +107,34 @@ const ROLE_WORD = new RegExp(
 const CLAUSE_START = /[\s\S]*[.!?。;；\n]/u;
 const CLAUSE_END = /[.!?。;；\n]/u;
 
-const isEntryZoneEdge = (textBefore: string, after: string): boolean => {
+/**
+ * The clause text around a range that a figure belongs to: `lead` runs from the clause start to
+ * the range's first figure, `trail` from the range's end to the clause end. `null` when the
+ * figure is not part of a range.
+ */
+function rangeClause(
+    textBefore: string,
+    after: string
+): { lead: string; trail: string } | null {
     const rest = RANGE_REST.exec(after);
     const before = RANGE_BEFORE.exec(textBefore);
-    if (rest === null && before === null) return false;
-    // The text before the range's first figure, from the start of its clause.
+    if (rest === null && before === null) return null;
     const rangeStart =
         before === null ? textBefore : textBefore.slice(0, before.index);
     const lead = rangeStart.slice(
         CLAUSE_START.exec(rangeStart)?.[0].length ?? 0
     );
-    // The rest of the clause after the range.
     const tail = rest === null ? after : after.slice(rest[0].length);
     const trail = tail.slice(0, CLAUSE_END.exec(tail)?.index ?? tail.length);
-    // The role keyword nearest to the range on either side decides (before wins a tie).
+    return { lead, trail };
+}
+
+/**
+ * Whether the role keyword nearest to the range is an entry word: the last one in `lead`
+ * against the first one in `trail`, by distance from the range, the one before winning a tie.
+ * No keyword on either side is not an entry.
+ */
+function nearestRoleIsEntry(lead: string, trail: string): boolean {
     const lastBefore = [...lead.matchAll(ROLE_WORD)].at(-1);
     const firstAfter = [...trail.matchAll(ROLE_WORD)].at(0);
     const beforeDistance =
@@ -130,7 +144,14 @@ const isEntryZoneEdge = (textBefore: string, after: string): boolean => {
     const afterDistance =
         firstAfter === undefined ? Infinity : firstAfter.index;
     const nearest = beforeDistance <= afterDistance ? lastBefore : firstAfter;
+    // Group 1 is the stop words; an entry word matches with it unset.
     return nearest !== undefined && nearest[1] === undefined;
+}
+
+/** Whether the figure ending `textBefore` and followed by `after` is an edge of an entry zone. */
+const isEntryZoneEdge = (textBefore: string, after: string): boolean => {
+    const clause = rangeClause(textBefore, after);
+    return clause !== null && nearestRoleIsEntry(clause.lead, clause.trail);
 };
 
 const groupThousands = (digits: string): string => {
@@ -198,67 +219,152 @@ export function rewriteStopInProse(
     if (from === to || !Number.isFinite(from) || !Number.isFinite(to)) {
         return text;
     }
+    const plain = formatPrice(to, currency, krxTick);
+    const edits = planStopEdits(
+        text,
+        stopFigureMatcher(from, currency, krxTick),
+        plain
+    );
+    if (edits.length === 0) return text;
+    const rewritten = applyStopEdits(text, edits);
+    return collapseRepeatedStop(rewritten.text, plain, rewritten.produced);
+}
+
+/**
+ * One replacement in the prose: `text[start, end)` becomes `lead + figure + tail`, and
+ * `figure` is the rewritten stop (its output offset is what {@link collapseRepeatedStop} reads).
+ */
+interface StopEdit {
+    readonly start: number;
+    readonly end: number;
+    readonly lead: string;
+    readonly figure: string;
+    readonly tail: string;
+}
+
+/**
+ * Whether a prose figure is the model's stop: equal to `from` within a relative 1e-9, or for
+ * KRW the same price once both are rounded to the KRX tick.
+ */
+function stopFigureMatcher(
+    from: number,
+    currency: CurrencyCode,
+    krxTick: KrxTickTable
+): (value: number) => boolean {
     const tolerance = 1e-9 * Math.max(1, Math.abs(from));
-    const isStop = (value: number): boolean =>
+    return value =>
         Math.abs(value - from) <= tolerance ||
         (currency === 'KRW' &&
             Math.abs(
                 roundToKrxTick(value, krxTick) - roundToKrxTick(from, krxTick)
             ) <= tolerance);
-    const plain = formatPrice(to, currency, krxTick);
+}
 
-    const parts: string[] = [];
-    // Output offsets where a rewritten figure starts (after any `$`).
-    const produced = new Set<number>();
-    let length = 0;
-    let cursor = 0;
-    const emit = (piece: string): void => {
-        parts.push(piece);
-        length += piece.length;
+/**
+ * Label drop for a level name around the figure: `MA20(28,000원)` → `27,400원`. `before` is the
+ * text between the previous edit and the figure (offset `beforeStart` in `text`); the edit
+ * applies only when a {@link LEVEL_TOKEN} name and its parenthesis hold the figure alone.
+ */
+function levelTokenEdit(
+    before: string,
+    beforeStart: number,
+    after: string,
+    end: number,
+    figure: string
+): StopEdit | null {
+    const prefix = PREFIX_TOKEN.exec(before);
+    const closing = CLOSING_PAREN.exec(after);
+    if (prefix === null || closing === null || !isLevelToken(prefix[2])) {
+        return null;
+    }
+    return {
+        start: beforeStart + prefix.index + prefix[1].length,
+        end: end + closing[0].length,
+        lead: prefix[4],
+        figure,
+        tail: '',
     };
+}
 
+/**
+ * Label drop after the figure: `28,000원(라운드)` → `27,400원`. A parenthesised label that names a
+ * level or is a signed distance goes, with the space the match took only to reach it; any other
+ * label stays and only the figure changes.
+ */
+function trailingLabelEdit(
+    start: number,
+    end: number,
+    after: string,
+    figure: string,
+    unit: string
+): StopEdit {
+    const label = TRAILING_LABEL.exec(after);
+    return label !== null && isDroppableLabel(label[2])
+        ? {
+              start,
+              end: end + label[0].length,
+              lead: '',
+              figure,
+              tail: unit.trimEnd(),
+          }
+        : { start, end, lead: '', figure, tail: unit };
+}
+
+/**
+ * Every stop figure in `text` and its replacement, in text order. One pass: an edit that also
+ * consumed a label or a closing parenthesis moves the cursor past it, so a figure inside the
+ * consumed text is not edited again, and the level-name search reads only the text after the
+ * previous edit.
+ */
+function planStopEdits(
+    text: string,
+    isStop: (value: number) => boolean,
+    plain: string
+): StopEdit[] {
+    const edits: StopEdit[] = [];
+    let cursor = 0;
     for (const match of text.matchAll(PRICE_FIGURE)) {
         const [whole, int, frac] = match;
         const start = match.index;
         if (start < cursor) continue;
-        const value = Number(`${int.replace(/,/g, '')}${frac ?? ''}`);
-        if (!isStop(value)) continue;
-        const unit = match[3] ?? '';
-        const figure = int.includes(',') ? groupThousands(plain) : plain;
+        if (!isStop(Number(`${int.replace(/,/g, '')}${frac ?? ''}`))) continue;
         const end = start + whole.length;
-        const before = text.slice(cursor, start);
         const after = text.slice(end);
         if (isEntryZoneEdge(text.slice(0, start), after)) continue;
-
-        const prefix = PREFIX_TOKEN.exec(before);
-        const closing = CLOSING_PAREN.exec(after);
-        if (prefix !== null && closing !== null && isLevelToken(prefix[2])) {
-            // `MA20(28,000원)` → `27,400원`: the level name and its parentheses go.
-            const tokenStart = prefix.index + prefix[1].length;
-            emit(before.slice(0, tokenStart));
-            emit(prefix[4]);
-            produced.add(length);
-            emit(`${figure}${unit}`);
-            cursor = end + closing[0].length;
-            continue;
-        }
-
-        emit(before);
-        produced.add(length);
-        emit(figure);
-        const label = TRAILING_LABEL.exec(after);
-        if (label !== null && isDroppableLabel(label[2])) {
-            // A space the match took only to reach the dropped label is not kept either.
-            emit(unit.trimEnd());
-            cursor = end + label[0].length;
-        } else {
-            emit(unit);
-            cursor = end;
-        }
+        const unit = match[3] ?? '';
+        const figure = int.includes(',') ? groupThousands(plain) : plain;
+        const edit =
+            levelTokenEdit(
+                text.slice(cursor, start),
+                cursor,
+                after,
+                end,
+                `${figure}${unit}`
+            ) ?? trailingLabelEdit(start, end, after, figure, unit);
+        edits.push(edit);
+        cursor = edit.end;
     }
-    if (produced.size === 0) return text;
-    emit(text.slice(cursor));
-    return collapseRepeatedStop(parts.join(''), plain, produced);
+    return edits;
+}
+
+/** The text with every edit applied, and the output offsets where a rewritten figure starts. */
+function applyStopEdits(
+    text: string,
+    edits: readonly StopEdit[]
+): { text: string; produced: ReadonlySet<number> } {
+    const parts: string[] = [];
+    const produced = new Set<number>();
+    let length = 0;
+    let cursor = 0;
+    for (const edit of edits) {
+        const lead = `${text.slice(cursor, edit.start)}${edit.lead}`;
+        parts.push(lead, edit.figure, edit.tail);
+        produced.add(length + lead.length);
+        length += lead.length + edit.figure.length + edit.tail.length;
+        cursor = edit.end;
+    }
+    parts.push(text.slice(cursor));
+    return { text: parts.join(''), produced };
 }
 
 /**

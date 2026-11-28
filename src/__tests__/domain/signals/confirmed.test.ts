@@ -21,9 +21,12 @@ import {
     detectShortMaBullishCross,
     detectSqueezeMomentumBullish,
     detectSupertrendBullishFlip,
+    detectCciBearishCross,
+    findCciCross,
     findCross,
     findThresholdCross,
 } from '@/domain/signals/confirmed';
+import { cciCrossHolds } from '@/domain/analysis/indicatorReadingsEvent';
 import {
     EMPTY_INDICATOR_RESULT,
     PCTB_OVERBOUGHT,
@@ -1006,6 +1009,53 @@ describe('detectIchimokuCloudBreakout', () => {
 });
 
 // ─── detectCciBullishCross ────────────────────────────────────────────────────
+
+describe('findCciCross', () => {
+    it('a bar crossing -100 and +100 at once reports -100, the level the detector searches first', () => {
+        const cci = [...Array<number>(8).fill(-150), 150, 50];
+        expect(findCciCross('cci_bullish_cross', cci)).toEqual({
+            index: 8,
+            level: -100,
+        });
+        expect(
+            detectCciBullishCross(buildBars(10), withCci(cci))?.detectedAt
+        ).toBe(8);
+        // Read against -100 the cross holds at 50; against +100 it would be undone.
+        expect(cciCrossHolds('cci_bullish_cross', cci, 8)).toBe(true);
+    });
+
+    it('a bar crossing +100 and 0 downward at once reports +100, the level the detector searches first', () => {
+        const cci = [...Array<number>(8).fill(150), -50, 50];
+        expect(findCciCross('cci_bearish_cross', cci)).toEqual({
+            index: 8,
+            level: 100,
+        });
+        expect(
+            detectCciBearishCross(buildBars(10), withCci(cci))?.detectedAt
+        ).toBe(8);
+        // Read against +100 the cross holds at 50; against 0 it would be undone.
+        expect(cciCrossHolds('cci_bearish_cross', cci, 8)).toBe(true);
+    });
+
+    it('the level searched first wins even when the other level crossed earlier', () => {
+        // +100 up at index 7, -100 up at index 9 (after a drop): the -100 cross is reported.
+        const cci = [...Array<number>(7).fill(90), 120, -120, -80];
+        expect(findCciCross('cci_bullish_cross', cci)).toEqual({
+            index: 9,
+            level: -100,
+        });
+    });
+
+    it('honours the lookback and ignores a type that is not a CCI cross', () => {
+        const cci = [-120, -80, ...Array<number>(8).fill(-70)];
+        expect(findCciCross('cci_bullish_cross', cci)).toBeNull();
+        expect(findCciCross('cci_bullish_cross', cci, 10)).toEqual({
+            index: 1,
+            level: -100,
+        });
+        expect(findCciCross('rsi_oversold', [-120, -80])).toBeNull();
+    });
+});
 
 describe('detectCciBullishCross', () => {
     describe('최근 3 bar 내 -100 상향 돌파가 있을 때', () => {
