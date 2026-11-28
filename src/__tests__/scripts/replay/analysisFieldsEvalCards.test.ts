@@ -1296,3 +1296,88 @@ describe('checkCycleCards', () => {
         ).toBe(0);
     });
 });
+
+describe('event card trend rule (the shipped card rules, D7)', () => {
+    const prompt = (lines: string[]) =>
+        [
+            '- MACD: 1.62 / Signal 1.36 / Histogram 0.26',
+            '- CCI(20): -164.0',
+            ...lines,
+        ].join('\n');
+    const macd = (lines: string[]) =>
+        ruleTrendOfKind('macd', prompt(lines), {
+            triggers: [
+                'macd_bullish_cross',
+                'macd_bearish_cross',
+                'macd_histogram_bullish_convergence',
+                'macd_histogram_bearish_convergence',
+            ],
+        });
+
+    it('MACD: histogram convergence alone names no side', () => {
+        expect(
+            macd([
+                'Bullish signals: none',
+                'Bearish signals: macd_histogram_bearish_convergence(macd)',
+                'Newly lit on this bar (bearish): macd_histogram_bearish_convergence(macd)',
+            ])
+        ).toBe('neutral');
+    });
+
+    it('MACD: a newly lit convergence beside an older cross stays neutral, a fresh cross keeps its side', () => {
+        expect(
+            macd([
+                'Bullish signals: macd_bullish_cross(macd)',
+                'Bearish signals: macd_histogram_bearish_convergence(macd)',
+                'Newly lit on this bar (bearish): macd_histogram_bearish_convergence(macd)',
+            ])
+        ).toBe('neutral');
+        expect(
+            macd([
+                'Bullish signals: macd_histogram_bullish_convergence(macd)',
+                'Bearish signals: macd_bearish_cross(macd)',
+                'Newly lit on this bar (bearish): macd_bearish_cross(macd)',
+            ])
+        ).toBe('bearish');
+    });
+
+    describe('CCI: a cross counts only while it holds on the last bar', () => {
+        const series = (tail: number[]) => [
+            ...Array<number>(30).fill(0),
+            ...tail,
+        ];
+        const cci = (tail: number[]) =>
+            ruleTrendOfKind(
+                'cci',
+                prompt([
+                    'Bullish signals: cci_bullish_cross(cci)',
+                    'Bearish signals: none',
+                ]),
+                {
+                    triggers: ['cci_bullish_cross', 'cci_bearish_cross'],
+                    cci: series(tail),
+                }
+            );
+
+        it('AAPL 2020-03-12: -136, -83, -92, -164 is neutral', () => {
+            expect(cci([-136, -83, -92, -164])).toBe('neutral');
+        });
+
+        it('a cross that still holds keeps its side', () => {
+            expect(cci([-101, -88, -78])).toBe('bullish');
+        });
+
+        it('without the series every cross counts', () => {
+            expect(
+                ruleTrendOfKind(
+                    'cci',
+                    prompt([
+                        'Bullish signals: cci_bullish_cross(cci)',
+                        'Bearish signals: none',
+                    ]),
+                    { triggers: ['cci_bullish_cross', 'cci_bearish_cross'] }
+                )
+            ).toBe('bullish');
+        });
+    });
+});

@@ -1332,6 +1332,13 @@ export const BRIEFING_MODEL_ID = 'deepseek-v4.1-flash' as const;
  * outside U.S. and Korean market hours and with the prewarm's model capacity in mind, as for any
  * technical bump.
  *
+ * Card trends after `p35` (MACD histogram convergence names no side; a CCI cross counts only
+ * while it holds on the last bar): no prompt byte changes, but the cache holds the
+ * post-processed result, whose cards carry the trend. No bump is needed only because siglens
+ * ships this core version in the same deploy that first serves `p35`, so no stored `p35`
+ * entry carries the old card trends. Without that deploy, `p35` entries written by the
+ * previous core keep the old MACD and CCI trends until their TTL and the version must bump.
+ *
  * @internal
  */
 export const PROMPT_TEMPLATE_VERSION = 'p35' as const;

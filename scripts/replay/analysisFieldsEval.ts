@@ -226,6 +226,7 @@ import type {
     StoredBars,
     Verdict,
 } from './types';
+import { calculateCCI } from '@/domain/indicators/cci';
 import { buildOutcomeWindow } from '@/domain/outcomes/buildOutcomeWindow';
 import { labelAnalysisOutcome } from '@/domain/outcomes/labelAnalysisOutcome';
 import { TIMEFRAMES } from '@/domain/constants/market';
@@ -1484,8 +1485,17 @@ async function gatingMode(
  * before run's may only be paired when every prompt is the same (the tags change nothing the
  * model is sent).
  */
-function armCasesOf(run: RunData): readonly ArmCase[] {
-    return run.results.filter(r => r.repeat === 1).map(readArmCase);
+function armCasesOf(run: RunData, set: SetData): readonly ArmCase[] {
+    return run.results
+        .filter(r => r.repeat === 1)
+        .map(result => {
+            const arm = readArmCase(result);
+            const bars = set.storedOf.get(result.symbol)?.bars;
+            if (bars === undefined) return arm;
+            // The CCI of the bars up to the analysed one: the card's hold check needs the series.
+            const seen = bars.slice(0, barIndexOf(result, bars) + 1);
+            return { ...arm, cci: calculateCCI(seen) };
+        });
 }
 
 function assertSamePrompts(before: RunData, repeat: RunData): void {
@@ -1552,8 +1562,11 @@ function compareRuns(args: FieldsEvalArgs, set: SetData): RunComparisonData {
         ...CYCLE_STRATEGY_SKILLS,
         ...Object.fromEntries(tagged.map(t => [t.name, t.kind])),
     };
-    const [after, before] = [armCasesOf(afterRun), armCasesOf(beforeRun)];
-    const repeat = repeatRun === null ? null : armCasesOf(repeatRun);
+    const [after, before] = [
+        armCasesOf(afterRun, set),
+        armCasesOf(beforeRun, set),
+    ];
+    const repeat = repeatRun === null ? null : armCasesOf(repeatRun, set);
     const comparison = compareArms({
         kindOfSkill,
         triggersOfSkill: Object.fromEntries(

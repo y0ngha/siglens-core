@@ -115,6 +115,11 @@ export interface ArmCase {
     prompt: string;
     /** The result's own analysed-bar close (`dataAsOf.close`). */
     close: number | null;
+    /**
+     * The CCI series of the stored bars up to the analysed bar (the CCI card's hold check reads
+     * it); absent when the arm was read without the set's bars.
+     */
+    cci?: readonly (number | null)[];
 }
 
 const EMPTY_SUMMARY = '__none__';
@@ -509,6 +514,7 @@ export function cardTrendAgreement(
                               model: row.model,
                               rule: ruleTrendOfKind(kind, c.prompt, {
                                   triggers: triggersOfSkill[row.skill],
+                                  cci: c.cci,
                               }),
                           },
                       ];

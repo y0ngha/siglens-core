@@ -8,6 +8,7 @@ import {
     STOCHASTIC_OVERBOUGHT_LEVEL,
     STOCHASTIC_OVERSOLD_LEVEL,
 } from '@/domain/indicators/constants';
+import { cciSignalHolds } from '@/domain/analysis/indicatorReadingsEvent';
 import type {
     AnalysisSignal,
     IndicatorCardKind,
@@ -62,6 +63,30 @@ const NEUTRAL = (): Trend => 'neutral';
  * (stochastic, stoch_rsi, williams_r, bollinger, macd_v, elder_ray, chandelier) are neutral
  * below; the oscillator rule (overbought bearish, oversold bullish) stays for `connors_rsi`.
  * Kinds with n < 30 keep the rule of the design.
+ *
+ * Re-measured for the shipped MACD and CCI rules (a newly lit event leads; CCI crosses count
+ * only while they hold on the last bar; MACD histogram convergence names no side). The figures
+ * above for macd (4.1%) and cci (3.8%) predate "newly lit first" and no longer describe the
+ * rule. Opposite share against the old model's own per-card trend, and the share of cards that
+ * are neutral, on the OLD-prompt runs `old-m` (206 MACD / 289 CCI cards) and `old-m-rep` (204 /
+ * 295), `2026-11-22-wp15-c2-after2` (292 / 396) and `2026-11-22-wp16-before-m` (292 / 396):
+ * MACD with convergence taking a side 6.3% / 4.4% / 4.5% / 4.8%, now 1.0% / 0.0% / 0.3% / 0.3%
+ * with 43% of MACD cards neutral (2-3% before). CCI with every cross counting 6.9% / 4.7% / 6.1% /
+ * 4.8%, now 7.3% / 4.7% / 5.6% / 5.6% with 7-8% neutral (6-7% before). RSI is unchanged
+ * (5.4% / 3.5% / 1.0% / 2.0%, within resampling noise).
+ *
+ * DELIBERATE DEPARTURE from the D7 fallback above: CCI stays above 5% on three of the four runs
+ * (old-m, c2-after2, wp16-before-m) and keeps its trend instead of mapping to `neutral`. The
+ * hold check fixes the cards whose cross was undone inside the lookback (AAPL 2020-03-12), but
+ * the remaining opposites are cases where the card is right and the old model is wrong: on
+ * the cases read by hand, a cross that is fresh on the last bar or still holds is the correct
+ * side per the skill, and the model followed the lagging 7-bar `[rising]/[falling]` slope tag.
+ * Mapping CCI to neutral would throw those correct cards away.
+ *
+ * To re-measure, run `analysisFieldsEval --mode output --set <set> --skills <skills> --run
+ * <after run> --before <old run> [--repeat <old run repeat>]`; `summary.output.cardTrend` holds
+ * the per-skill `n` and `opposite` the figures above come from (the same rule as the card, on
+ * the printed signal lists and the CCI series of the set's stored bars).
  */
 export const INDICATOR_CARD_TREND_RULE: {
     readonly [K in IndicatorCardKind]: (
@@ -264,22 +289,43 @@ const isIndicatorKind = (
     kind: Skill['computedCard']
 ): kind is IndicatorCardKind => INDICATOR_CARD_KINDS.some(k => k === kind);
 
+/** @internal The MACD signals that anticipate (histogram shrinking) rather than report a cross. */
+export const MACD_CONVERGENCE_TYPES: ReadonlySet<string> = new Set([
+    'macd_histogram_bullish_convergence',
+    'macd_histogram_bearish_convergence',
+]);
+
 /**
  * The directions a card's trend is read from: the signals newly lit on this bar when there are
  * any (an older cross never outweighs the one the prompt lists as newly lit; both directions
- * newly lit read as no side), else every signal the reading lists.
+ * newly lit read as no side), else every signal the reading lists. Two kinds narrow that:
+ * a CCI cross counts only while it still holds on the last bar (a cross the series has since
+ * undone names no side), and a MACD card takes no side from histogram convergence, which is
+ * momentum fading with no line or signal cross and so no reversal yet. The newly lit set is
+ * chosen first and convergence dropped after, so a MACD card whose only newly lit signal is
+ * convergence is neutral even when an older cross is listed (the older cross does not
+ * outweigh the signal the prompt lists as newly lit, and that one names no side).
  */
 const directionsOf = (
     reading: IndicatorReading,
     selection: SkillSelectionContext
 ): SignalDirection[] => {
     const fresh = new Set<string>(selection.newSignalTypes ?? []);
-    const newly = reading.signals.filter(s => fresh.has(s.type));
-    return (newly.length > 0 ? newly : reading.signals).flatMap(s => {
-        const hit = selection.signals.find(d => d.type === s.type);
-        return hit === undefined ? [] : [hit.direction];
-    });
+    const listed =
+        reading.kind === 'cci'
+            ? reading.signals.filter(s => cciSignalHolds(s.type, selection))
+            : reading.signals;
+    const newly = listed.filter(s => fresh.has(s.type));
+    return (newly.length > 0 ? newly : listed)
+        .filter(
+            s => reading.kind !== 'macd' || !MACD_CONVERGENCE_TYPES.has(s.type)
+        )
+        .flatMap(s => {
+            const hit = selection.signals.find(d => d.type === s.type);
+            return hit === undefined ? [] : [hit.direction];
+        });
 };
+
 /**
  * @internal One card per injected `indicator_guide` skill that carries a `computed_card` tag
  * of an indicator kind and whose reading exists (an always-on line printed as `N/A`, an event

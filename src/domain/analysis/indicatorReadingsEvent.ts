@@ -5,12 +5,19 @@ import {
     lastNonNull,
     price,
 } from '@/domain/analysis/indicatorReadingFigures';
+import {
+    CCI_BEARISH_CROSS_LEVEL,
+    CCI_BULLISH_CROSS_LEVEL,
+    CCI_OVERBOUGHT_CROSS_LEVEL,
+    CCI_OVERSOLD_CROSS_LEVEL,
+} from '@/domain/signals/constants';
 import type {
     FiredSignals,
     IndicatorCardSignal,
     IndicatorReadInput,
     ReadingOf,
     Skill,
+    SkillSelectionContext,
 } from '@/domain/types';
 
 // ─── Fired signals ────────────────────────────────────────────────────────────
@@ -86,12 +93,63 @@ export function readMacd(
     };
 }
 
+/**
+ * @internal Whether a CCI cross detected on bar `detectedAt` still holds on the last bar. The
+ * detector reports the first cross inside its lookback, so a cross can still be listed after
+ * the series went back through the level (a bullish cross through -100 two bars ago, CCI below
+ * -100 again now). The level it crossed is the one whose cross sits on `detectedAt`; a signal
+ * whose level cannot be found, or a series with no last value, is kept.
+ */
+export function cciCrossHolds(
+    type: string,
+    series: readonly (number | null)[],
+    detectedAt: number
+): boolean {
+    const last = series.findLast((v): v is number => v !== null);
+    const prev = series[detectedAt - 1];
+    const at = series[detectedAt];
+    if (last === undefined || prev == null || at == null) return true;
+    if (type === 'cci_bullish_cross') {
+        const level = [CCI_OVERSOLD_CROSS_LEVEL, CCI_BULLISH_CROSS_LEVEL].find(
+            l => prev <= l && at > l
+        );
+        return level === undefined || last > level;
+    }
+    if (type === 'cci_bearish_cross') {
+        const level = [
+            CCI_OVERBOUGHT_CROSS_LEVEL,
+            CCI_BEARISH_CROSS_LEVEL,
+        ].find(l => prev >= l && at < l);
+        return level === undefined || last < level;
+    }
+    return true;
+}
+
+/** Whether the selection's CCI cross of this type still holds; a type it does not list is kept. */
+export function cciSignalHolds(
+    type: string,
+    selection: SkillSelectionContext
+): boolean {
+    const detectedAt = selection.signals.find(d => d.type === type)?.detectedAt;
+    return (
+        detectedAt === undefined ||
+        cciCrossHolds(type, selection.indicators.cci, detectedAt)
+    );
+}
+
 export function readCci(
     input: IndicatorReadInput,
     skill: Skill
 ): ReadingOf<'cci'> | null {
-    const hit = fired(skill, input);
-    if (hit === null) return null;
+    const listed = fired(skill, input);
+    if (listed === null) return null;
+    // A cross the series has undone since trails the ones that hold, so the state and the
+    // description lead with a signal that can decide the card's trend (order kept within each group).
+    const signals = [
+        ...listed.signals.filter(s => cciSignalHolds(s.type, input.selection)),
+        ...listed.signals.filter(s => !cciSignalHolds(s.type, input.selection)),
+    ];
+    const hit = { state: signals[0].type, signals };
     return {
         kind: 'cci',
         basis: 'event',
