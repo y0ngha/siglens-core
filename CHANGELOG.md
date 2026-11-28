@@ -1,5 +1,11 @@
 # Changelog
 
+## [3.1.3](https://github.com/y0ngha/siglens-core/compare/v3.1.2...v3.1.3) (2026-11-28)
+
+### Bug Fixes
+
+* 분석 본문이 코드 동작을 말하지 않게 하고 실제 손절가를 밝힌다 ([#429](https://github.com/y0ngha/siglens-core/issues/429)) ([b317ff8](https://github.com/y0ngha/siglens-core/commit/b317ff82a5cfefa98aaa269606f357f63cdaf0a4))
+
 ## [3.1.2](https://github.com/y0ngha/siglens-core/compare/v3.1.1...v3.1.2) (2026-11-28)
 
 ### Bug Fixes
